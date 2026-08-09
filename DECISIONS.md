@@ -4,7 +4,7 @@ Every call made while building this system, and the reasoning behind it.
 
 This file answers **"what did we choose, and why?"** The task brief itself —
 what the founder actually asked for — is interpreted separately in
-`documentation/task2-engineering/superdocs-round2-working-notes.md`. Keep the
+`documentation/brief/superdocs-round2-working-notes.md`. Keep the
 two apart: their requirements there, our choices here.
 
 Every entry records the same eight things:
@@ -38,6 +38,7 @@ write-up repeats them.
 | 2026-08-09 | Request identity = **model matches candidate against the whole register; no embedding layer**. Uncertain → flag, never merge | Register is ~250 tokens, so nothing needs narrowing; an embedding shortlist would add a silent-miss failure mode for no gain | Cost grows with register size — fine at this scale, revisit if a pile ever produces hundreds of rows | v1 starting point, no build evidence yet | Re-examine after the first real run; if vector retrieval ends up unused anywhere, defend that in the write-up |
 | 2026-08-09 | Request granularity = **the source document's own cut**; one written item = one row | Re-cutting the customer's list would be our judgement, not a fact in any document — violates the locked facts-not-judgements rule | A bundled bullet becomes one broad row | v1 starting point | Bundle-detection flag is parked, not built; revisit after the first real pile |
 | 2026-08-09 | **One run = one project**; run starts with a project identifier + folder; out-of-project docs → bucket 3 | Task PDF page 2 assumes *related* documents; mixing projects would corrupt matching and the register; gives bucket-3 decisions a concrete yardstick | Cannot analyse two projects in a single run | — | Idempotency now keys on the project identifier — design and test it |
+| 2026-08-09 | **Repository layout** — runnable things at the root, background under `documentation/`; three folders renamed | A stranger must understand the tree from the root listing alone (behaviour #6); the old names would have misled readers | Empty `app/`/`ui/`/`tests/` exist before any code | — | Fill them as code arrives |
 | 2026-08-09 | Rules live in a user-supplied **`rules.yaml`**, with a filled-in default shipped in the repo; **4 rules locked** (R1–R4) | Task PDF page 2 says the user hands over the rules; page 12 requires a new rule to be a data change; a default file is needed for behaviour #6 (fresh clone runs) | Four rules cover less ground than a long list, but each can actually be demonstrated | — | Prove rule-file swapping in the demo |
 | 2026-08-09 | Finding = **5 required fields** (rule, found, evidence, row, decision) + review state | Evidence field satisfies the exact-source requirement; decision field keeps the human gate real; review state enables mixed approve/reject in one session | Rigid shape; a finding that fits none of the fields has nowhere to go | — | Watch for findings that resist the shape during build |
 | 2026-08-09 | **D1/D2 deliverable-side rules** — every row cites a source; no `Delivered` without a testing outcome | Task PDF page 2 requires checking the deliverable too; these catch the system's own bad output, not just bad documents | Two extra checks per run | — | Must be covered by tests |
@@ -432,3 +433,56 @@ When nothing is broken, the system reports exactly that. Two rules:
 
 - **Never manufacture a finding.** A weak or invented finding to look thorough is a failure, not a save. Task PDF page 2 calls an honest report of no findings *"the rarest output in this industry"* — the empty result is itself the signal of quality.
 - **An empty result must not look like a crash.** Output states what actually ran: *"4 rules evaluated across 9 documents — no findings."* A blank screen reads as a failed run and breaks behaviour #5's requirement that a success message only ever means the output is genuinely in the state it claims.
+
+---
+
+## Repository layout (LOCKED 2026-08-09)
+
+**Decision.** One line governs the whole tree: **what is needed to run the
+system lives at the root; what is background reading lives under
+`documentation/`.** A stranger should understand the repo from the root listing
+alone — that is behaviour #6 turned into a folder structure.
+
+```
+/
+├── README.md · TASK.md · DECISIONS.md · PROGRESS.md
+├── pyproject.toml · docker-compose.yml · .env.example
+│
+├── app/              the system — ingest/ register/ rules/ api/ mcp/
+├── ui/               the React review screen
+├── tests/
+├── migrations/       Alembic
+├── config/           rules.yaml — everything changeable without touching code
+├── sample-piles/     synthetic corpora: the demo pile and the second-run pile
+│
+└── documentation/    background; not needed to run anything
+    ├── brief/            the task PDF, the working notes, the review protocol
+    ├── product-research/
+    ├── testing-intel/
+    ├── reference/
+    └── artifacts/        docx/pdf files produced while testing SuperDocs
+```
+
+**Three renames made on the way here, each fixing a name that would have misled
+someone later:**
+
+- `documentation/task2-engineering/` → `documentation/brief/`. The folder holds
+  the brief for Tasks 1 through 4; the "2" meant Round 2, not Task 2, and every
+  reader would have got that wrong.
+- `documentation/test-docs/` → `documentation/artifacts/`. Once `tests/` exists,
+  two unrelated things would have been called "test" — one holds Word and PDF
+  files from probing SuperDocs, the other holds our test suite.
+- `sample-piles/` promoted to the root. It is not documentation; it is the data
+  the run command points at, so a stranger has to find it immediately.
+
+**Folders inside `app/` are named after the work, not the file type** —
+`ingest/`, `register/`, `rules/`. No `helpers/`, no `utils.py`; those always
+become the drawer everything gets thrown into.
+
+**Trade-off.** `app/` and `ui/` and `tests/` are created empty (with
+`.gitkeep`) before any code exists. Slightly premature, accepted deliberately:
+settling the shape while the repo holds four files is far cheaper than moving
+forty later.
+
+**Note.** Task 2's build does not live here — it goes as a pull request to the
+public `superdocsapp/superdocs-builds` repository. This repository is Task 1.

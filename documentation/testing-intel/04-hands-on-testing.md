@@ -68,8 +68,8 @@ Observed reality:
 
 ### Export round-trip — ✅
 - `POST /v1/documents/export` (html or session_id), formats docx/pdf/html/md/txt.
-- HTML→DOCX: HTTP 200, valid OOXML (36KB, real `word/document.xml`). Files at `test-docs/export-test.docx`.
-- HTML→PDF: valid PDF 1.4, 1 page (23KB). `test-docs/export-test.pdf`.
+- HTML→DOCX: HTTP 200, valid OOXML (36KB, real `word/document.xml`). Files at `documentation/artifacts/export-test.docx`.
+- HTML→PDF: valid PDF 1.4, 1 page (23KB). `documentation/artifacts/export-test.pdf`.
 - Fidelity claim holds at basic level; deeper test pending on the big doc.
 
 ### ⭐ Agent self-signup — ✅ (the headline agent-native test)
@@ -87,7 +87,7 @@ Observed reality:
 - Minor oddity: sending the message "start" on a simple `<h1>Doc A</h1>` doc caused the AI to expand it into a full 19-chunk "Business Services Proposal" — an ambiguous one-word message triggered generation. (Edge behavior worth noting.)
 
 ## Test 5 — Big-document fidelity round-trip (⭐ the headline test)
-Source: `test-docs/fidelity-test-master.docx` — a 22-page fictional Master Services Agreement built (by a background agent) with footnotes, endnotes, comments, tracked changes, 5 tables, image, headers/footers, equation, hyperlinks, landscape + 2-column sections.
+Source: `documentation/artifacts/fidelity-test-master.docx` — a 22-page fictional Master Services Agreement built (by a background agent) with footnotes, endnotes, comments, tracked changes, 5 tables, image, headers/footers, equation, hyperlinks, landscape + 2-column sections.
 
 ### Import (upload → parse) — ✅ excellent
 - `POST /v1/documents/upload` (57.7KB docx) → HTTP 200, parsed into **313 chunks**.
@@ -199,7 +199,7 @@ Visual editor typing + toolbar, drawing canvas, format painter, click-to-edit-im
 1. **Create-from-scratch** (`chat`, natural language, no HTML drafted in my context) → full styled Statement of Work generated. Got `session_id` + per-element `data-chunk-id`s back. 1 op. ✅
    - Note: asked for 3 sections, got extras (Project Overview + signature block + footer w/ `<mark>Please fill:</mark>` placeholders) — same "edits slightly broader than the literal ask" pattern seen in REST tests. Reasonable for a create.
 2. **Chunk-precise targeted edit** (`chat`, `response_mode='compact'`) → "change Fees to 40/60, update all $ amounts, touch nothing else." Landed exactly: Upfront 40% → $2,400, Final 60% → $3,600, Total $6,000. Only the one content chunk edited; header/signature/footer untouched. 1 op. ✅
-3. **Export** (`export_document`, docx, session-based) → returned an **MCP-specific signed `download_url` envelope** (binary not inlined; ~168h expiry). Downloaded 38.6KB file → real OOXML: `$2,400.00`/`$3,600.00`/`$6,000.00` present, **no stale 50%** (edit fully propagated), **5 `<w:tbl>` tables** + real `styles.xml`/`numbering.xml` preserved. File: `test-docs/mcp-sow-export.docx`. ✅
+3. **Export** (`export_document`, docx, session-based) → returned an **MCP-specific signed `download_url` envelope** (binary not inlined; ~168h expiry). Downloaded 38.6KB file → real OOXML: `$2,400.00`/`$3,600.00`/`$6,000.00` present, **no stale 50%** (edit fully propagated), **5 `<w:tbl>` tables** + real `styles.xml`/`numbering.xml` preserved. File: `documentation/artifacts/mcp-sow-export.docx`. ✅
 
 **Session stickiness confirmed:** one `session_id` across create → edit → export; chunk IDs received in one call and honored across turns (didn't invent any). Matches the MCP server's own guidance.
 
@@ -286,5 +286,5 @@ Two prompts (`convert_format.target_format`, `review_contract_for_redflags.viewp
 ## Throwaway test artifacts created on the account (safe to delete)
 - Sessions: `adi-mcp-a2a-1`, `adi-mcp-roster-1`, `adi-mcp-upload-1`, `adi-mcp-presigned-1`, `adi-mcp-cancel-1` (+ earlier REST-test sessions).
 - Durable docs: `MCP Test SOW — Acme Redesign` (f64a936b) and others under list_documents — all `ai_created` test docs.
-- Local files: `test-docs/mcp-sow-export.docx`, `mcp-upload-src.html/.b64`.
+- Local files: `documentation/artifacts/mcp-sow-export.docx`, `mcp-upload-src.html/.b64`.
 - Key `sk_48ca20b506ec2c25991d897c505b44dd` is STILL VALID (not revoked) — revoke after all testing.
