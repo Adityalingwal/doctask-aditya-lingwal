@@ -14,7 +14,8 @@ Built for the SuperDocs Round 2 engineering task, Task 1.
 
 | File | What it holds |
 |---|---|
-| `documentation/task2-engineering/superdocs-round2-working-notes.md` | Every locked decision, with reasoning, rejected alternatives, and the Decision Log. **Source of truth.** |
+| `DECISIONS.md` | Every call we made and why, the alternatives rejected, and the resulting spec. **Read this before writing code.** |
+| `documentation/task2-engineering/superdocs-round2-working-notes.md` | What the brief requires, interpreted. Their asks, not our choices. |
 | `documentation/task2-engineering/SuperDocs-Task-Engineer.pdf` | The original brief. Wins over any interpretation. |
 | `PROGRESS.md` | What is built, what is assumed, what is blocked. |
 
@@ -35,10 +36,9 @@ silently choose differently.
 ### MUST — the three that matter most here
 
 - **Use the locked vocabulary, everywhere.** This project's words are fixed in
-  the working notes: *register, row, request, finding, rule, run, pile,
-  blocker*. Use exactly those in code, tests, and log messages. Never write
+  `DECISIONS.md`: *register, row, request, finding, rule, run, pile, blocker*. Use exactly those in code, tests, and log messages. Never write
   `item`, `entry`, or `record` where the thing is a row. The founder reads the
-  notes and then the code; both must speak one language.
+  decisions and then the code; both must speak one language.
 - **No hidden state.** A function's result comes from its arguments, not from a
   module-level variable. Two runs execute at the same time — one shared global
   is all it takes to leak one run's data into another.
@@ -131,7 +131,8 @@ silently choose differently.
 ## Never do
 
 One line each, on purpose — this list is meant to be remembered, not read. The
-full reasoning behind every item lives in the working notes.
+reasoning behind each item lives in `DECISIONS.md` (our choices) or the
+working notes (the brief's requirements).
 
 ### The system must never
 
@@ -170,8 +171,8 @@ A change is done only when all of these are true:
       practical fix.
 - [ ] Any assumption you made is written into `PROGRESS.md` by you — not merely
       mentioned in a summary message, which nobody will find later.
-- [ ] Any decision you made is written into the working notes' Decision Log —
-      one canonical home, never a second log.
+- [ ] Any decision you made is written into `DECISIONS.md` — one canonical
+      home, never a second log.
 - [ ] No secrets, no dead code, no orphaned imports.
 - [ ] Self-checked against the four failure modes that most often catch AI
       fixes:
