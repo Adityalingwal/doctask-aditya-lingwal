@@ -83,7 +83,7 @@
 - Multi-document AI analyst system banana hai: documents ingest kare, type/context identify kare, facts extract kare, contradictions aur material gaps/rule violations identify kare, aur source-backed final report/brief/register banaye.
 - Har material claim/finding ke saath exact evidence location deni hai: filename + page/section/paragraph/text span as applicable.
 - System conflict ko silently resolve ya overwrite nahi karega; competing claims aur evidence human ke saamne surface karega.
-- Human har finding ko approve, reject, modify, ya resolve kar sake; same review session mein mixed decisions support hone chahiye, aur rejected item ko change karne par unrelated approved findings preserve rehne chahiye.
+- Human har finding ko **approve ya reject** kar sake (page 2 — bas yahi do); same review session mein mixed decisions support hone chahiye, aur rejected item ko change karne par unrelated approved findings preserve rehne chahiye.
 
 ### Agentic behaviour and observable steps
 - Demo-specific hardcoded pipeline nahi banana; real input variability ke against system robust hona chahiye.

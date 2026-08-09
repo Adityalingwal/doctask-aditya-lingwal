@@ -38,6 +38,8 @@ write-up repeats them.
 | 2026-08-09 | Request identity = **model matches candidate against the whole register; no embedding layer**. Uncertain → flag, never merge | Register is ~250 tokens, so nothing needs narrowing; an embedding shortlist would add a silent-miss failure mode for no gain | Cost grows with register size — fine at this scale, revisit if a pile ever produces hundreds of rows | v1 starting point, no build evidence yet | Re-examine after the first real run; if vector retrieval ends up unused anywhere, defend that in the write-up |
 | 2026-08-09 | Request granularity = **the source document's own cut**; one written item = one row | Re-cutting the customer's list would be our judgement, not a fact in any document — violates the locked facts-not-judgements rule | A bundled bullet becomes one broad row | v1 starting point | Bundle-detection flag is parked, not built; revisit after the first real pile |
 | 2026-08-09 | **One run = one project**; run starts with a project identifier + folder; out-of-project docs → bucket 3 | Task PDF page 2 assumes *related* documents; mixing projects would corrupt matching and the register; gives bucket-3 decisions a concrete yardstick | Cannot analyse two projects in a single run | — | Idempotency now keys on the project identifier — design and test it |
+| 2026-08-09 | **Review interface scope** — one page, four sections (stages · skipped · register · cost) | Behaviours #1 and #10 land on this screen too, not just #3; an earlier "list and two buttons" sketch was too small | More UI than planned, though still one screen | — | `modify`/`resolve` are beyond the brief — optional only |
+| 2026-08-09 | **Build order = vertical slices**, riskiest property first, interface last | Every graded behaviour is a runtime property and cannot be exercised on a dummy-data scaffold | Interface risks being rushed at the end | — | Slice 1 must prove kill-and-resume before anything widens |
 | 2026-08-09 | **Repository layout** — runnable things at the root, background under `documentation/`; three folders renamed | A stranger must understand the tree from the root listing alone (behaviour #6); the old names would have misled readers | Empty `app/`/`ui/`/`tests/` exist before any code | — | Fill them as code arrives |
 | 2026-08-09 | Rules live in a user-supplied **`rules.yaml`**, with a filled-in default shipped in the repo; **4 rules locked** (R1–R4) | Task PDF page 2 says the user hands over the rules; page 12 requires a new rule to be a data change; a default file is needed for behaviour #6 (fresh clone runs) | Four rules cover less ground than a long list, but each can actually be demonstrated | — | Prove rule-file swapping in the demo |
 | 2026-08-09 | Finding = **5 required fields** (rule, found, evidence, row, decision) + review state | Evidence field satisfies the exact-source requirement; decision field keeps the human gate real; review state enables mixed approve/reject in one session | Rigid shape; a finding that fits none of the fields has nowhere to go | — | Watch for findings that resist the shape during build |
@@ -491,3 +493,107 @@ forty later.
 
 **Note.** Task 2's build does not live here — it goes as a pull request to the
 public `superdocsapp/superdocs-builds` repository. This repository is Task 1.
+
+---
+
+## Review interface — scope (LOCKED 2026-08-09)
+
+**Decision.** One page, four sections. Not a dashboard product, and not a
+two-button list either — an earlier sketch of "a list and two buttons" was too
+small, because two graded behaviours land on this screen and not only the
+approval one.
+
+```
+┌─────────────────────────────────────────┐
+│  Run: Acme intake portal                │
+│                                         │
+│  STAGES        ← behaviour #1           │
+│  ✓ ingest      9 files, 1 skipped  1.2s │
+│  ✓ classify    3 types found       4.1s │
+│  ✓ extract     12 requests         8.7s │
+│  ⏸ review      waiting for you          │
+│                                         │
+│  SKIPPED       ← bucket 2 / bucket 3    │
+│  beta-crm-notes.md — not this project   │
+│                                         │
+│  REGISTER      ← behaviour #3   [✓] [✗] │
+│  Intake form      Delivered             │
+│  Email notif      Disputed  ▸           │
+│    ├ meeting-mar12: asked verbally      │
+│    └ request-v2:    absent              │
+│                                         │
+│  Run cost: ₹4.20 · 21.3s  ← behaviour #10│
+└─────────────────────────────────────────┘
+```
+
+**Why each section is there, in the brief's words:**
+
+- **Stages** — behaviour #1: *"the system moves through visible stages and shows
+  what it decided at each one."* Watchability is graded; it has to be visible
+  somewhere, and this is the somewhere.
+- **Skipped** — the three-bucket handling only counts if the reason is
+  surfaced. "Skipped" alone is not honest; "skipped, and here is why" is.
+- **Register** — behaviour #3: item-by-item approve and reject, and rejecting
+  one item must not disturb the others.
+- **Cost and timing** — behaviour #10: *"what it spent and where the time went,
+  stage by stage."*
+
+**Deliberately out of scope:** no sidebar, no settings page, no charts, no
+design system, no state library. `useState` and `fetch` for one screen.
+
+**Where creativity belongs here.** Not in decoration — the brief never asks for
+a good-looking interface, and page 3 prefers *"fewer stages that genuinely
+hold"* over theater. The creative decisions are about **what gets shown**: both
+sides of a conflict next to each other so a human can decide without opening a
+file; the *reason* a file was skipped rather than the fact of it; how long a
+blocked request has been stuck. That is judgement, not styling.
+
+**Beyond the brief, marked optional.** The working notes say a human can
+"approve, reject, modify, or resolve" a finding. The brief itself (page 2) only
+requires **approve and reject**. Modify and resolve are our own addition — build
+them only if the required behaviours are all finished and time remains.
+
+---
+
+## Build order — vertical slices (LOCKED 2026-08-09)
+
+**Decision.** Build in thin end-to-end slices, riskiest property first, user
+interface last. Each slice closes one graded behaviour and leaves something that
+actually runs.
+
+**Alternatives rejected:**
+
+- **Boilerplate first** — scaffold FastAPI, React, the database and the graph
+  with dummy data, then fill in logic. Rejected because every graded behaviour
+  here is a *runtime* property — resume, concurrency, the gate, machine-drive —
+  and none of them can be exercised on a scaffold holding fake data. The
+  approach reliably discovers the hardest problems last, when the least time is
+  left.
+- **Full paper design first** — rejected because checkpoint granularity cannot
+  honestly be designed without watching a real checkpointer behave. The design
+  would be wrong in exactly the details that matter.
+
+**Slice 1 — the narrowest thing that proves the riskiest property:**
+
+one `.md` file in → the graph runs → two rows in the register → `interrupt()`
+→ approve over the API → export. Then kill the process mid-run and start it
+again: it must continue without redoing finished work or duplicating a row.
+
+No interface, no rules engine, no MCP, no PDF or DOCX — only `.md`, and approval
+over `curl`. If this survives a kill, the most dangerous part of the build is
+already proven.
+
+**Then widen, one behaviour per slice:** remaining formats and bucket handling →
+rules engine and findings → MCP wrappers over the same API → incremental update
+with its invariance proof → concurrency and idempotency → the review interface →
+cost and timing.
+
+**Why the interface is last.** Behaviour #4 requires approval to be an API
+operation, so the API *is* the real interface and the screen is a thin client
+over it. Building the screen first would mean rebuilding it once the register's
+real shape is known.
+
+**Trade-off, stated honestly:** leaving the interface until late risks it being
+rushed. Accepted because it is genuinely one screen and the API behind it will
+already be proven by then — but if the schedule slips, this is the first place
+the damage will show.
