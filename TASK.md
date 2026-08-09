@@ -15,8 +15,8 @@ Built for the SuperDocs Round 2 engineering task, Task 1.
 | File | What it holds |
 |---|---|
 | `DECISIONS.md` | Every call we made and why, the alternatives rejected, and the resulting spec. **Read this before writing code.** |
-| `documentation/brief/superdocs-round2-working-notes.md` | What the brief requires, interpreted. Their asks, not our choices. |
-| `documentation/brief/SuperDocs-Task-Engineer.pdf` | The original brief. Wins over any interpretation. |
+| `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md` | What the brief requires, interpreted. Their asks, not our choices. |
+| `documentation/superdocs-engineering-task/SuperDocs-Task-Engineer.pdf` | The original brief. Wins over any interpretation. |
 | `PROGRESS.md` | What is built, what is assumed, what is blocked. |
 
 **Do not re-derive locked decisions.** If one looks wrong, say so — never

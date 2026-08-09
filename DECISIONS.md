@@ -4,7 +4,7 @@ Every call made while building this system, and the reasoning behind it.
 
 This file answers **"what did we choose, and why?"** The task brief itself —
 what the founder actually asked for — is interpreted separately in
-`documentation/brief/superdocs-round2-working-notes.md`. Keep the
+`documentation/superdocs-engineering-task/superdocs-round2-working-notes.md`. Keep the
 two apart: their requirements there, our choices here.
 
 Every entry records the same eight things:
@@ -456,22 +456,27 @@ alone — that is behaviour #6 turned into a folder structure.
 ├── sample-piles/     synthetic corpora: the demo pile and the second-run pile
 │
 └── documentation/    background; not needed to run anything
-    ├── brief/            the task PDF, the working notes, the review protocol
+    ├── superdocs-engineering-task/   the task PDF, the working notes,
+    │                                 the review protocol
     ├── product-research/
     ├── testing-intel/
     ├── reference/
-    └── artifacts/        docx/pdf files produced while testing SuperDocs
+    └── product-test-files/           docx/pdf files produced while
+                                      probing SuperDocs
 ```
 
 **Three renames made on the way here, each fixing a name that would have misled
 someone later:**
 
-- `documentation/task2-engineering/` → `documentation/brief/`. The folder holds
-  the brief for Tasks 1 through 4; the "2" meant Round 2, not Task 2, and every
-  reader would have got that wrong.
-- `documentation/test-docs/` → `documentation/artifacts/`. Once `tests/` exists,
-  two unrelated things would have been called "test" — one holds Word and PDF
-  files from probing SuperDocs, the other holds our test suite.
+- `documentation/task2-engineering/` → `documentation/superdocs-engineering-task/`.
+  The folder holds the brief for Tasks 1 through 4; the "2" meant Round 2, not
+  Task 2, and every reader would have got that wrong. The task PDF only bars
+  "SuperDocs" from the *repository* name, so a folder may carry it.
+- `documentation/test-docs/` → `documentation/product-test-files/`. Once
+  `tests/` exists, two unrelated things would have been called "test" — one
+  holds Word and PDF files from probing SuperDocs, the other holds our test
+  suite. "artifacts" was considered and rejected: in software that word means
+  build output, which is not what these are.
 - `sample-piles/` promoted to the root. It is not documentation; it is the data
   the run command points at, so a stranger has to find it immediately.
 
