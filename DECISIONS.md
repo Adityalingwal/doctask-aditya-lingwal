@@ -45,8 +45,21 @@ write-up repeats them.
 | 2026-08-09 | Finding = **5 required fields** (rule, found, evidence, row, decision) + review state | Evidence field satisfies the exact-source requirement; decision field keeps the human gate real; review state enables mixed approve/reject in one session | Rigid shape; a finding that fits none of the fields has nowhere to go | — | Watch for findings that resist the shape during build |
 | 2026-08-09 | **D1/D2 deliverable-side rules** — every row cites a source; no `Delivered` without a testing outcome | Task PDF page 2 requires checking the deliverable too; these catch the system's own bad output, not just bad documents | Two extra checks per run | — | Must be covered by tests |
 | 2026-08-09 | `No findings` is a **first-class output** — never manufacture, never render as a blank/crash | Task PDF page 2 calls an honest no-findings report the rarest output; behaviour #5 requires success messages to be true | — | — | Needs a test asserting a clean corpus yields zero findings and a non-empty message |
+| 2026-08-09 | PDF extraction = **pdfplumber** (primary) + **pypdf** (encryption check only); scanned and encrypted PDFs skipped with reason | pdfplumber preserves table structure; pypdf adds one-line `.is_encrypted`; two libraries, two jobs, zero overlap | 300 KB extra dependency (pypdf); no scanned PDF support | Tested on 7 PDFs including 59-page IRS doc (14 tables, 315K chars) and 22-page MSA — zero data loss across all pages | Add OCR only if domain expands to scanned documents |
 
 ---
+
+## PDF library choice — pdfplumber + pypdf (LOCKED 2026-08-09)
+
+- **Decision:** `pdfplumber` for extraction, `pypdf` for encryption detection only. Scanned/encrypted PDFs skipped with reason.
+- **Date locked:** 2026-08-09.
+- **Problem:** PDF hardest of four formats — tables, encryption, scanned pages need deliberate choices.
+- **Alternatives:** pdfplumber alone (crashes on encryption, empty error message), pypdf alone (garbles tables), pdfminer directly (lower-level internal API, 6 lines instead of 1).
+- **Reason:** pdfplumber preserves table structure (rows × cols). pypdf's `.is_encrypted` is a one-line, well-tested public API. Two libraries, non-overlapping jobs.
+- **Trade-off:** 300 KB extra dependency (pypdf). No scanned PDF support — OCR (`pytesseract`) rejected: adds system-level Tesseract dependency, slows processing, unnecessary in this domain.
+- **Evidence:** Tested 7 PDFs on 2026-08-09: 59-page IRS doc (14 tables, 315K chars), 22-page MSA (5 tables), 21-page MSA, 14-page task PDF, IRS W-9 form, encrypted synthetic (detected), scanned synthetic (0 chars, flagged). Zero pages empty. All tables structured.
+- **Limitation:** Scanned PDFs → 0 chars → skipped. Multi-column layouts → best-effort, may garble ordering in edge cases.
+- **Next improvement:** OCR if domain expands to scanned docs. Column-ordering heuristics if real piles surface garbling.
 
 ## Orchestration framework decision — LangGraph (LOCKED)
 
@@ -181,6 +194,7 @@ Every incoming file passes two checks, in order: **format first, then type.** A 
 - **Trade-off:** images/screenshots and spreadsheets are out. Acceptable — task PDF page 8 rails spreadsheet-output products out anyway, and screenshots carry no extractable claim text.
 - **This list is deliberately hardcoded.** Task PDF page 12 permits this: intentional hard-coded defences alongside intelligent logic are a legitimate fix, not a patch. Intelligence belongs in the type decision, not the format gate.
 - **README must declare this list** — task PDF page 4 requires the accepted formats and domains to be stated, because a second run means different documents inside the declared set.
+- **PDF extraction:** `pdfplumber` (text + table extraction) with `pypdf` for encryption detection only. Scanned PDFs and encrypted PDFs are skipped with a message naming the reason and the fix. Full decision and evidence in the PDF library choice section below.
 
 ### Lock 2b — unrecognised document types (three-bucket handling)
 When a file opens successfully, the system decides — it is not matched against a hardcoded filename list:

@@ -13,9 +13,16 @@ is in `DECISIONS.md`. Nothing about the system's design is restated here.
 `TASK.md` is written apart from its Commands section, which stays empty until
 the project structure exists.
 
-No code yet. Next: a throwaway LangGraph exercise — five nodes, a checkpointer,
-an `interrupt()`, then kill the process and resume it — to get the runtime's
-concepts in hand before designing the real graph.
+**LangGraph learning exercise complete.** A throwaway five-node graph with
+SQLite checkpointer, interrupt/Command, and kill-and-resume was built and tested
+externally. The six core concepts (State, Node, Edge, Conditional Edge,
+Checkpointer, interrupt/Command) are in hand.
+
+**Ingest pipeline scoping started.** PDF library choice locked: `pdfplumber` for
+extraction, `pypdf` for encryption detection. Decision and evidence in
+`DECISIONS.md`. Accepted formats declared in `README.md`.
+
+No code yet in this repository.
 
 ## Assumptions
 
@@ -42,3 +49,17 @@ resurface. Wrote `TASK.md`: what this is, where the truth lives, code
 conventions, a never-do list split into "the system must never" and "you must
 never", a definition of done, and the git rule (branch commits and pull requests
 allowed, merging is not).
+
+**2026-08-09 — LangGraph learning exercise completed**
+Built a throwaway five-node graph with SQLite checkpointer, interrupt/Command,
+and kill-and-resume outside this repository. Verified all three scenarios:
+(a) interrupt → approve/reject with conditional routing, (b) kill during
+interrupt → resume with same thread_id skips already-completed nodes, (c) two
+thread_ids keep state separate. The six concepts are in hand for graph design.
+
+**2026-08-09 — PDF library choice locked, README updated**
+Tested pdfplumber, pypdf, and pdfminer.six across 7 PDFs (59-page IRS doc with
+14 tables, 22-page MSA, encrypted/scanned synthetic). Chose `pdfplumber` for
+extraction + `pypdf` for encryption detection. Updated `DECISIONS.md`
+(table entry + detailed section), `README.md` (formats table + limitations), and
+`PROGRESS.md` (this entry).
