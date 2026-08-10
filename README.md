@@ -3,8 +3,9 @@
 ## What this system does
 
 An agentic system that reads documents from a software requirements-to-delivery
-workflow, traces what a client requested and what happened during delivery and
-testing, and surfaces gaps, blockers, and conflicting evidence for human review
+workflow and produces a grounded **Requirements-to-Delivery Register**. Each
+row traces one client requirement through delivery and testing, with gaps,
+blockers, conflicting evidence, and rule findings surfaced for human review
 before anything commits.
 
 ## Document formats accepted

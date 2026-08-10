@@ -12,9 +12,8 @@ _Rewritten in place — this section always describes the present, not the past.
 actors; the workflow boundary, primary document types, and core domain cases are
 locked in `DECISIONS.md`.
 
-The previous register choice is reopened. Next decision: register vs brief vs
-report. Architecture work starts only after the remaining product decisions are
-closed.
+The final deliverable is now locked as a **Requirements-to-Delivery Register**.
+Next: define what the register must contain before architecture work begins.
 
 The pending consistency audit covers the review-screen scope, configurable vs
 hardcoded formats, the separate classify stage, citation-preserving extraction,
@@ -52,11 +51,12 @@ _None open._
 
 Newest first.
 
-**2026-08-11 — Domain corrected; deliverable reopened**
+**2026-08-11 — Domain corrected; register selected**
 Replaced the previous software-feature-delivery framing with the agreed
 Software Requirements-to-Delivery contract across `README.md`, `TASK.md`, and
-`DECISIONS.md`. Reopened register vs brief vs report; queued six consistency
-issues for their relevant decision blocks before architecture begins.
+`DECISIONS.md`. Selected the Requirements-to-Delivery Register after comparing
+it with a brief and report; queued six consistency issues for their relevant
+decision blocks before architecture begins.
 
 **2026-08-09 — Task 1 scoping complete, `TASK.md` written**
 Worked through the orchestration choice and the full domain scoping in one

@@ -29,7 +29,7 @@ write-up repeats them.
 |---|---|---|---|---|---|
 | 2026-08-09 | Agent orchestration = **LangGraph** (raw `StateGraph` for Task 1); LangChain only as thin `langchain-core` layer; no legacy chains/`AgentExecutor` | Brief behaviours #1, #2, #3, #9 are LangGraph built-ins; it is the founder's own named stack, so zero deviation cost; checkpointer shares our existing PostgreSQL | More boilerplate than a hand-rolled loop; real learning curve; still leaves ~5.5 of 10 behaviours for us to build | Research-stage only — see "Orchestration framework decision" section | Convert to real evidence via resume test, same-pile concurrency test, and stage-timing numbers before write-up |
 | 2026-08-09 | Task 2 orchestration shape (`create_agent` vs `StateGraph`) **deferred** | `create_agent` runs on the LangGraph runtime, so deciding later is not a rewrite; Task 1 is the current focus | Task 2 stack stays formally open a while longer | — | Decide when Task 2 starts, against the SuperDocs four-call contract |
-| 2026-08-09 | Task 1 deliverable: **register was the previous proposal; choice reopened** | Register has a strong incremental-update argument, but register vs brief vs report must be reviewed against the corrected domain before row design starts | Output schema and row-level decisions remain open | Reasoning-stage only | Decide the deliverable shape next |
+| 2026-08-11 | Task 1 deliverable = **Requirements-to-Delivery Register**; one row traces one client requirement | Stable row units make focused updates, exact unchanged proof, item-level review, citations, and machine use simpler than narrative prose | Rows can compress nuance; detailed evidence/history must remain available outside the summary cells | Reasoning-stage; risks reviewed against a worked example | Design columns and prove row-level invariance on sample piles |
 | 2026-08-09 | Accepted formats = **`.pdf`, `.docx`, `.md`, `.txt`** (hardcoded gate) | These are the shapes real project documents arrive in; `.eml` parsing adds cost with no evaluation gain | Images and spreadsheets excluded | — | Declare the list in README (task PDF page 4) |
 | 2026-08-11 | Document-type handling = **primary / related additional / unrelated**, decided from content at runtime | A strict type list would discard useful delivery evidence, while processing unrelated files would contaminate the analysis | Related additional types receive best-effort handling rather than a type-specific guarantee | Reasoning-stage | Second-run test must include one related additional and one unrelated file |
 | 2026-08-11 | Domain = **Software Requirements-to-Delivery**; actors = **Client** and **Software Provider** | Generalises the requirements → clarification → build/configure → client testing → feedback loop Aditya lived without narrowing the system to one company, product, or feature type | Deliberately excludes pre-sales and full project/commercial management | Current domain contract below; build evidence still needed | Validate with two different synthetic client engagements |
@@ -150,25 +150,22 @@ This second case must be explicitly tested and documented in the README. Surfaci
 
 ---
 
-## Deliverable shape — register/table (PREVIOUS PROPOSAL, REOPENED 2026-08-11)
+## Deliverable shape — Requirements-to-Delivery Register (LOCKED 2026-08-11)
 
-> The reasoning below is retained because it may still win, but register vs
-> brief vs report is not currently locked. Do not design rows or columns until
-> the deliverable discussion is complete.
-
-- **Decision:** Task 1's grounded deliverable is a **register** — a table where one row tracks one item — not a narrative brief or report.
+- **Decision:** Task 1's grounded deliverable is a **Requirements-to-Delivery Register** — one row traces one client requirement — not a narrative brief or report.
 - **Problem:** The brief offers three shapes ("a register, a brief, or a report", Task PDF page 2) and we must pick one before designing state, extraction, or the review UI.
 - **Alternatives:** narrative brief, narrative report. Both explicitly permitted by the brief.
 - **Reason:** Driven by the brief's *incremental update* requirement (page 2) — when a new document arrives, unaffected output must stay **exactly** as it was and the system must be able to **prove** it. A row is a natural unit of change: new document → 2 rows change, the rest stay byte-identical, provable by row-level hash comparison. Narrative prose has no such unit — an LLM rewrite perturbs wording in untouched paragraphs, making invariance almost impossible to prove.
-- **Trade-off:** A table carries less nuance than prose. Mitigated by wrapping the table in a thin document: short header (project, documents read, run metadata) → the register table → a conflicts section. The table remains the core.
+- **Trade-off:** Summary cells carry less nuance than prose. Each row therefore keeps expandable evidence, history, testing details, and attached findings; the register remains the core deliverable.
 - **Evidence:** Reasoning-stage. Must be proven by an actual incremental-update test showing unaffected rows unchanged.
 - **Limitation:** If a finding genuinely does not fit a row shape, it will be forced into the conflicts section rather than the table. Watch for this during build.
 - **Next improvement:** Revisit only if the row model actually breaks in practice; do not pre-optimise.
 
-**Output flow:** documents → system builds register → human reviews row by row (approve / reject) → approved register exported.
+**Output flow:** documents → system builds register → human review → approved register exported.
 
-If the register proposal is selected again, its final column set must be
-re-designed against the current domain rather than copied from the old example.
+The deliverable type and one-requirement-per-row mental model are locked. Exact
+columns, statuses, row-matching behaviour, review actions, UI presentation,
+storage, and export format remain open for their own decision blocks.
 
 ## Domain — Software Requirements-to-Delivery (LOCKED 2026-08-11)
 

@@ -4,9 +4,10 @@
 
 An agentic system that reads documents from a software requirements-to-delivery
 workflow (meeting notes, client requirements documents, and testing feedback),
-traces what a client requested and what happened during delivery and testing,
-and surfaces gaps, blockers, and conflicting evidence for human review before
-anything commits. The final deliverable shape is still being reviewed.
+and produces a grounded **Requirements-to-Delivery Register**. Each row traces
+one client requirement through delivery and testing; gaps, blockers,
+conflicting evidence, and rule findings are surfaced for human review before
+anything commits.
 
 Built for the SuperDocs Round 2 engineering task, Task 1.
 
