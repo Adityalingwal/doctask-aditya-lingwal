@@ -195,6 +195,12 @@ Every incoming file passes two checks, in order: **format first, then type.** A 
 - **This list is deliberately hardcoded.** Task PDF page 12 permits this: intentional hard-coded defences alongside intelligent logic are a legitimate fix, not a patch. Intelligence belongs in the type decision, not the format gate.
 - **README must declare this list** — task PDF page 4 requires the accepted formats and domains to be stated, because a second run means different documents inside the declared set.
 - **PDF extraction:** `pdfplumber` (text + table extraction) with `pypdf` for encryption detection only. Scanned PDFs and encrypted PDFs are skipped with a message naming the reason and the fix. Full decision and evidence in the PDF library choice section below.
+- **DOCX extraction:** `python-docx` — standard library, extracts paragraphs and table cells. No alternatives needed.
+- **MD and TXT:** No library required — Python's built-in `open().read()`. Plain text, no extraction complexity.
+- **Encoding:** UTF-8 assumed with Latin-1 fallback. If both fail, file skipped with reason `unreadable encoding`.
+- **Folder scan:** Top-level files only. Subfolders ignored. Documents read in-place — no copy, no upload.
+- **Pre-processing:** None. pdfplumber and python-docx produce clean output. Text passed raw to next node.
+- **Processing order:** Sequential, one document per node pass. Extraction is fast (~1s for 9 documents); parallelism adds complexity with no meaningful speed gain. Kill-resume covers every document boundary via the checkpointer.
 
 ### Lock 2b — unrecognised document types (three-bucket handling)
 When a file opens successfully, the system decides — it is not matched against a hardcoded filename list:
