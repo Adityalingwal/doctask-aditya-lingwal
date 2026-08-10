@@ -29,12 +29,12 @@ write-up repeats them.
 |---|---|---|---|---|---|
 | 2026-08-09 | Agent orchestration = **LangGraph** (raw `StateGraph` for Task 1); LangChain only as thin `langchain-core` layer; no legacy chains/`AgentExecutor` | Brief behaviours #1, #2, #3, #9 are LangGraph built-ins; it is the founder's own named stack, so zero deviation cost; checkpointer shares our existing PostgreSQL | More boilerplate than a hand-rolled loop; real learning curve; still leaves ~5.5 of 10 behaviours for us to build | Research-stage only — see "Orchestration framework decision" section | Convert to real evidence via resume test, same-pile concurrency test, and stage-timing numbers before write-up |
 | 2026-08-09 | Task 2 orchestration shape (`create_agent` vs `StateGraph`) **deferred** | `create_agent` runs on the LangGraph runtime, so deciding later is not a rewrite; Task 1 is the current focus | Task 2 stack stays formally open a while longer | — | Decide when Task 2 starts, against the SuperDocs four-call contract |
-| 2026-08-09 | Task 1 deliverable = **register (table)**, not a narrative brief/report | A row is a natural unit of change, so incremental-update invariance is provable; prose is not | Less nuance than prose; mitigated by a thin header + conflicts section around the table | Reasoning-stage — needs an incremental-update test | Prove unaffected rows stay byte-identical |
+| 2026-08-09 | Task 1 deliverable: **register was the previous proposal; choice reopened** | Register has a strong incremental-update argument, but register vs brief vs report must be reviewed against the corrected domain before row design starts | Output schema and row-level decisions remain open | Reasoning-stage only | Decide the deliverable shape next |
 | 2026-08-09 | Accepted formats = **`.pdf`, `.docx`, `.md`, `.txt`** (hardcoded gate) | These are the shapes real project documents arrive in; `.eml` parsing adds cost with no evaluation gain | Images and spreadsheets excluded | — | Declare the list in README (task PDF page 4) |
-| 2026-08-09 | Unrecognised document types → **three-bucket handling** (known / related-unknown / unrelated), decided at runtime | A hardcoded type list would be the "fixed script with labels" the task PDF warns against | Bucket-2 docs yield lower-confidence facts | — | Second-run test must include one bucket-2 and one bucket-3 file |
-| 2026-08-09 | Domain = **Software feature delivery**; no industry named; contracts/SOW/invoices excluded | Aditya's lived Arka experience; sits inside the task PDF's own example list; industry-free so the evaluator's second-run pile still fits | Loses the immigration-vertical tie-in that would have echoed Task 2 | — | Lock the document-type list next |
-| 2026-08-09 | Document types = **3** (meeting notes, feature request list, testing feedback). Email thread, internal spec, and delivery note all **cut** | Each surviving type feeds a distinct register column; the cut three were either redundant or never existed at Arka | Fewer types to demo; relies on bucket-2 handling if an evaluator's pile has an extra type | — | Build synthetic pile with ~9 files across the 3 types |
-| 2026-08-09 | Blockers = a **status + column**, not a document type | A blocker is a state a request sits in; its record already lives in meeting notes | One extra column to populate | — | Blocked rows must produce a "stalled, never followed up" finding |
+| 2026-08-11 | Document-type handling = **primary / related additional / unrelated**, decided from content at runtime | A strict type list would discard useful delivery evidence, while processing unrelated files would contaminate the analysis | Related additional types receive best-effort handling rather than a type-specific guarantee | Reasoning-stage | Second-run test must include one related additional and one unrelated file |
+| 2026-08-11 | Domain = **Software Requirements-to-Delivery**; actors = **Client** and **Software Provider** | Generalises the requirements → clarification → build/configure → client testing → feedback loop Aditya lived without narrowing the system to one company, product, or feature type | Deliberately excludes pre-sales and full project/commercial management | Current domain contract below; build evidence still needed | Validate with two different synthetic client engagements |
+| 2026-08-11 | Primary document types = **3** (meeting notes, client requirements document, testing feedback); related additional documents are also processed | These are the minimum sources needed for discussion, written scope, and client validation; a delivery summary may add evidence but is not required | Extra related types get best-effort handling rather than a type-specific guarantee | Reasoning-stage | Prove with one related additional document and one unrelated document |
+| 2026-08-11 | Blocker = a **domain condition**, not a document type; final output representation deferred | A blocker exists when work is explicitly stopped by a missing answer or dependency, regardless of which related document reports it | Column/status design remains open until the deliverable is chosen | Reasoning-stage | Revisit during deliverable design |
 | 2026-08-09 | Request identity = **model matches candidate against the whole register; no embedding layer**. Uncertain → flag, never merge | Register is ~250 tokens, so nothing needs narrowing; an embedding shortlist would add a silent-miss failure mode for no gain | Cost grows with register size — fine at this scale, revisit if a pile ever produces hundreds of rows | v1 starting point, no build evidence yet | Re-examine after the first real run; if vector retrieval ends up unused anywhere, defend that in the write-up |
 | 2026-08-09 | Request granularity = **the source document's own cut**; one written item = one row | Re-cutting the customer's list would be our judgement, not a fact in any document — violates the locked facts-not-judgements rule | A bundled bullet becomes one broad row | v1 starting point | Bundle-detection flag is parked, not built; revisit after the first real pile |
 | 2026-08-09 | **One run = one project**; run starts with a project identifier + folder; out-of-project docs → bucket 3 | Task PDF page 2 assumes *related* documents; mixing projects would corrupt matching and the register; gives bucket-3 decisions a concrete yardstick | Cannot analyse two projects in a single run | — | Idempotency now keys on the project identifier — design and test it |
@@ -150,7 +150,11 @@ This second case must be explicitly tested and documented in the README. Surfaci
 
 ---
 
-## Deliverable shape — register/table (LOCKED 2026-08-09)
+## Deliverable shape — register/table (PREVIOUS PROPOSAL, REOPENED 2026-08-11)
+
+> The reasoning below is retained because it may still win, but register vs
+> brief vs report is not currently locked. Do not design rows or columns until
+> the deliverable discussion is complete.
 
 - **Decision:** Task 1's grounded deliverable is a **register** — a table where one row tracks one item — not a narrative brief or report.
 - **Problem:** The brief offers three shapes ("a register, a brief, or a report", Task PDF page 2) and we must pick one before designing state, extraction, or the review UI.
@@ -163,29 +167,74 @@ This second case must be explicitly tested and documented in the README. Surfaci
 
 **Output flow:** documents → system builds register → human reviews row by row (approve / reject) → approved register exported.
 
-The register's final column set is defined once, under "Register — final shape" below. Do not restate it here.
+If the register proposal is selected again, its final column set must be
+re-designed against the current domain rather than copied from the old example.
 
-## Domain — Software feature delivery (LOCKED 2026-08-09)
+## Domain — Software Requirements-to-Delivery (LOCKED 2026-08-11)
 
 **Declared domain (this exact line goes in the README):**
 
-> **Software feature delivery** — the documents a development team and its customer produce while a feature is requested, built, tested, and changed.
+> **Software Requirements-to-Delivery** — the documents created after a client
+> starts sharing software requirements, while a software provider clarifies,
+> builds or configures and delivers the work, and while the client tests it and
+> returns feedback or changes.
 
-- **Why this domain:** it is Aditya's lived experience as founding engineer at Arka (3-person team building software for immigration legal firms: feature request → build → client testing → change loop). Task PDF page 2 requires a domain the candidate "actually knows and can stand behind," and lists *"a project's plans with its status reports and meeting notes"* among its own examples — this pile is exactly that. The domain is not invented; it sits inside the task PDF's own example set.
-- **Naming choices, deliberate:**
-  - "feature delivery" not "project delivery" — *project* reads as one-off gig work; *feature* reads as ongoing product work.
-  - "customer" not "client" — *client* carries an agency flavour; *customer* is product-neutral.
-  - No "small team" qualifier — it diminishes the work for no accuracy gain.
-  - **No industry named.** Not "immigration" or "legal". If the domain were bound to an industry, the evaluator's second-run pile (likely some other industry) would fall outside the declared set. The domain is defined by the *work*, not the vertical, so it covers both agency and in-house product teams.
-- **Defence line if asked why this domain:** "I was founding engineer at Arka. We built software for immigration legal firms — their feature requests came in, I built them, they tested, then the change loop ran. I saw this pile every day, and the problem was that nothing tracked what was asked for versus what got built."
-- **Framing rule:** company-level = "we built software for legal firms"; personal level = "I built their feature requests." Never describe it as client projects or freelancing — it was a company with founders, ongoing customers, and a full build-test-deploy cycle.
-- **Out of scope on purpose:** contracts, SOWs, invoices, and pricing documents. Aditya did not own these at Arka and could not defend them under questioning. Anything not lived is not in the pile.
+### Actors
+
+- **Client:** the person or organisation that provides the software
+  requirements and validates the delivered result.
+- **Software Provider:** the freelancer, team, agency, or software company that
+  clarifies the requirements and builds, configures, or fixes the software.
+
+### Workflow boundary
+
+The domain starts when actual client requirements begin to be discussed or
+collected. A call containing only a product introduction, demo, pricing, or deal
+discussion is pre-sales and outside the domain. If that same call records an
+actual software requirement, that requirement is inside the domain.
+
+The tracked workflow is:
+
+`requirement discussion → written requirements → clarification/blockers → build
+or configuration → client testing → feedback/change/fix loop`
+
+The Task 1 system observes this workflow through documents. It does not build,
+configure, deploy, or fix the software itself, and it never assumes delivery or
+success without source evidence.
+
+### Domain conditions already agreed
+
+- **Documentation gap:** a requirement appears in meeting notes but not in the
+  client requirements document. Surface the gap for a human decision; absence
+  alone is not a conflict.
+- **Conflict:** two sources make incompatible claims about the same
+  requirement. Surface both; never choose one silently.
+- **Blocker:** work is explicitly stopped by a missing answer or dependency.
+  A missing detail alone is not a blocker unless a source says work is stopped.
+- **New or updated information:** no existing semantic match means a new
+  requirement; compatible detail enriches the existing requirement;
+  incompatible meaning uses the conflict path.
+- **Testing feedback:** classify each feedback item as `Passed`, `Defect`,
+  `Change request`, or `Unclear`. Testing information may appear in meeting
+  notes or another related document, not only in a file labelled testing
+  feedback.
+- **Baseline correctness:** crashes, silent data loss, failed core actions, and
+  false-success behaviour are defects even when a client did not spell out
+  basic failure handling. A request for additional behaviour beyond the agreed
+  requirement is a change request. If evidence cannot distinguish the two,
+  report `Unclear` for human review.
+
+### Out of scope
+
+Pre-sales material, product demos, pricing, contracts, SOWs, invoices, payments,
+source-code execution, deployment work, sprint/resource management, and CRM
+integration are not part of this document-analysis domain.
 
 ## Declared set — file formats and document types (LOCKED 2026-08-09)
 
 Terminology, kept separate on purpose (conflating these caused real confusion once):
 - **File format** = can the file be opened? (`.pdf`, `.docx`, `.md`, `.txt`) — a parsing question.
-- **Document type** = what is inside it? (meeting notes, feature request, testing feedback) — a meaning question.
+- **Document type** = what is inside it? (meeting notes, client requirements document, testing feedback) — a meaning question.
 
 Every incoming file passes two checks, in order: **format first, then type.** A format failure stops before the type check ever runs.
 
@@ -203,61 +252,69 @@ Every incoming file passes two checks, in order: **format first, then type.** A 
 - **Pre-processing:** None. pdfplumber and python-docx produce clean output. Text passed raw to next node.
 - **Processing order:** Sequential, one document per node pass. Extraction is fast (~1s for 9 documents); parallelism adds complexity with no meaningful speed gain. Kill-resume covers every document boundary via the checkpointer.
 
-### Lock 2b — unrecognised document types (three-bucket handling)
+### Lock 2b — primary, related additional, and unrelated documents
 When a file opens successfully, the system decides — it is not matched against a hardcoded filename list:
 
 | Bucket | Condition | Action |
 |---|---|---|
 | 1. Known type | Matches one of the declared document types | Process fully |
-| 2. Related, unknown type | Belongs to this project, but is a type we did not declare | Extract facts, flag as `unrecognised document type` |
-| 3. Unrelated | Not about this project at all (e.g. a resume) | Skip, with the reason recorded |
+| 2. Related additional type | Belongs to this client software engagement, but is not one of the three primary types | Extract relevant facts and identify it as a `related additional document` |
+| 3. Unrelated | Not about this client software engagement at all (e.g. a resume) | Skip, with the reason recorded |
 
-- **Alternatives rejected:** (A) strict — process only the declared types, skip everything else. Rejected: a hardcoded type list is exactly the "fixed script with labels" the task PDF warns against on page 2. (B) open — attempt to process anything. Rejected: irrelevant files would pollute the register.
+- **Alternatives rejected:** (A) strict — process only the declared types, skip everything else. Rejected: a hardcoded type list is exactly the "fixed script with labels" the task PDF warns against on page 2. (B) open — attempt to process anything. Rejected: irrelevant files would contaminate the analysis.
 - **Reason for the middle path:** the classification decision is made by the system at runtime, satisfying task PDF page 12 ("intelligence in the system deciding, code executing"), while the format gate stays deterministic.
 - **Evidence:** must be proven by a second-run test using a different pile that deliberately contains one bucket-2 and one bucket-3 file.
 
 ---
 
-## Document types — the declared list (LOCKED 2026-08-09)
+## Document types — the declared list (LOCKED 2026-08-11)
 
-Three types. Each one feeds a **different** register column — that is the test a type must pass to earn its place. Two types filling the same column would mean one is redundant.
+Three primary document types receive the declared behaviour guarantee:
 
-| # | Document type | What is inside | Register column it feeds |
-|---|---|---|---|
-| 1 | **Meeting notes** | What was discussed with the customer; what they said verbally | *First appeared* — and specifically the case where a request exists **only** verbally |
-| 2 | **Feature request list** | The customer's written list of what to build | *Request* itself + *In writing? ✅* |
-| 3 | **Testing feedback** | What the customer reported after testing | *What testing found* |
+| # | Document type | What it may contain |
+|---|---|---|
+| 1 | **Meeting Notes** | Requirement discussions, clarifications, blockers, delivery statements, or testing comments |
+| 2 | **Client Requirements Document** | The client's written software requirements and later compatible additions |
+| 3 | **Testing Feedback** | Passed checks, defects, change requests, and unclear testing observations |
 
-**Three types is not thin.** A pile is made of files, not types: 3 meetings + 2 list versions + 4 testing rounds = 9 files. Task PDF page 3 explicitly prefers fewer stages that genuinely hold over stages done as theater, and a defended cut over a hollow one.
+Facts are classified from content, not from filenames alone. Testing evidence,
+for example, may appear in meeting notes. A related delivery summary, email
+export, or other supported-format document is processed as a related additional
+document; the system does not require or depend on a formal delivery summary.
 
-### Types considered and cut, with reasons
-- **Email thread — CUT.** What it contributed ("a request that arrived outside the written list") is already contributed by meeting notes; two types filling one column means one is redundant. Also removes any suggestion of email-system integration, which was never intended — an email thread would only ever be a `.txt` file someone saved into the watched folder. If a real email file does appear in an evaluator's pile, the three-bucket handling catches it as bucket 2 (`related, unrecognised type`), so nothing breaks.
-- **Internal feature spec — CUT.** Originally framed as a document that *decides* what to build. No such document existed at Arka — the written list arrived and the whole list got built. Inventing it would have been the exact thing that collapses under questioning.
-- **Status update / delivery note — CUT.** Considered as the source for a *Built?* column, but delivery happened once as a whole handover, not as per-feature progress updates. Testing feedback already proves existence: a customer can only test what exists. The *Built?* column was therefore removed rather than backed by an invented document.
+The three primary types keep the guaranteed path small and testable. A second
+run must also prove one related additional document is used and one unrelated
+document is skipped with a reason.
 
-### The rule that resolves what belongs in the register
-**The register records FACTS, not JUDGEMENTS.**
+### Output principle — facts, not judgements
+**The grounded deliverable records facts, not judgements.**
 
-| Column asks | Column never asks |
+| Output may report | Output must not decide |
 |---|---|
 | What was requested? | Should it have been requested? |
 | Is it in writing? | Should it have been? |
 | What did testing find? | Was the customer right? |
 
-Every column is "what happened," never "what should have happened." Judgements belong to the human at review time — which is exactly what task PDF page 2 requires: the system surfaces the conflict, it does not resolve it.
+Every output field asks "what happened," never "what should have happened."
+Judgements belong to the human at review time — the system surfaces a conflict
+but does not resolve it.
 
-### Blockers — a status, not a document type
-At Arka, an incoming request was checked for blockers; if one existed, the team went back to the customer (usually via a fresh meeting) and the feature waited until it cleared, then shipped end to end.
+### Blockers — a domain condition, not a document type
+When a requirement cannot proceed because the Software Provider needs an answer
+or dependency, the blocker may be reported in meeting notes or any other
+related document.
 
-A blocker is a **state a request sits in**, not a document. Its record lives in meeting notes, which is already a declared type. So it adds no new type — it adds one register column and one status value.
+A blocker is a **condition a requirement sits in**, not a document type. Its
+final representation stays open until the deliverable shape is chosen.
 
-`Blocked` is a distinct problem from `Disputed`:
-- **Disputed** = two documents say different things.
-- **Blocked** = work is stopped, waiting on someone's answer.
+A blocker is distinct from a conflict:
+- **Conflict** = two documents make incompatible claims.
+- **Blocker** = work is explicitly stopped, waiting on an answer or dependency.
 
-Blockers earn their column because they surface a finding nothing else can: *a request blocked weeks ago, the answer never came, and nobody followed up.*
+## Register — previous shape proposal (NOT LOCKED)
 
-## Register — final shape (LOCKED 2026-08-09)
+> Retained only as input to the next deliverable discussion. The columns,
+> statuses, and worked example below are not the current implementation spec.
 
 **Columns:** Request · First appeared · In writing? · Blocker · What testing found · Status
 **Status values:** Delivered · Disputed · Blocked · Not built

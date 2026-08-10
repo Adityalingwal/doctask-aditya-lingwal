@@ -2,10 +2,10 @@
 
 ## What this system does
 
-An agentic system that reads a pile of software-feature-delivery documents
-and produces a register — one row for each customer request, tracing what
-was asked, what happened to it, and where the documents disagree. A human
-approves every row before anything commits.
+An agentic system that reads documents from a software requirements-to-delivery
+workflow, traces what a client requested and what happened during delivery and
+testing, and surfaces gaps, blockers, and conflicting evidence for human review
+before anything commits.
 
 ## Document formats accepted
 
@@ -22,5 +22,10 @@ layouts are best-effort — some column ordering may be garbled.
 
 ## Domain
 
-**Software feature delivery** — the documents a development team and its
-customer produce while a feature is requested, built, tested, and changed.
+**Software Requirements-to-Delivery** — the documents created after a client
+starts sharing software requirements, while a software provider clarifies,
+builds or configures and delivers the work, and while the client tests it and
+returns feedback or changes.
+
+Pre-sales demos, pricing, contracts, invoices, and payment records are outside
+this domain.

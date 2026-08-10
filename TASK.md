@@ -2,11 +2,11 @@
 
 ## What this is
 
-An agentic system that reads a pile of software-feature-delivery documents
-(meeting notes, feature request lists, testing feedback) and produces a
-**register**: one row for each thing the customer asked to be built, tracing
-what was asked, what happened to it, and where the documents disagree. A human
-approves every row and every finding before anything commits.
+An agentic system that reads documents from a software requirements-to-delivery
+workflow (meeting notes, client requirements documents, and testing feedback),
+traces what a client requested and what happened during delivery and testing,
+and surfaces gaps, blockers, and conflicting evidence for human review before
+anything commits. The final deliverable shape is still being reviewed.
 
 Built for the SuperDocs Round 2 engineering task, Task 1.
 
@@ -19,8 +19,9 @@ Built for the SuperDocs Round 2 engineering task, Task 1.
 | `documentation/superdocs-engineering-task/SuperDocs-Task-Engineer.pdf` | The original brief. Wins over any interpretation. |
 | `PROGRESS.md` | What is built, what is assumed, what is blocked. |
 
-**Do not re-derive locked decisions.** If one looks wrong, say so — never
-silently choose differently.
+Treat `DECISIONS.md` as the current record, not as immutable history. If a
+decision looks wrong, stop and discuss it; update its existing canonical entry
+rather than silently choosing differently or adding a duplicate decision.
 
 ## Commands
 

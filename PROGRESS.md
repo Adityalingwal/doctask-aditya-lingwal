@@ -7,8 +7,18 @@ Locked decisions and their reasoning live in `DECISIONS.md`, not here.
 
 _Rewritten in place — this section always describes the present, not the past._
 
-**2026-08-09.** Task 1 scoping is complete — every decision and its reasoning
-is in `DECISIONS.md`. Nothing about the system's design is restated here.
+**2026-08-11.** Task 1 scoping is active again. The domain contract is now
+**Software Requirements-to-Delivery**, with Client and Software Provider as the
+actors; the workflow boundary, primary document types, and core domain cases are
+locked in `DECISIONS.md`.
+
+The previous register choice is reopened. Next decision: register vs brief vs
+report. Architecture work starts only after the remaining product decisions are
+closed.
+
+The pending consistency audit covers the review-screen scope, configurable vs
+hardcoded formats, the separate classify stage, citation-preserving extraction,
+run idempotency, and the unverified small-register/short-document assumptions.
 
 `TASK.md` is written apart from its Commands section, which stays empty until
 the project structure exists.
@@ -31,8 +41,8 @@ marked — the correction is more useful than a clean page.
 
 | Date | Assumption | Why we assumed it | Status |
 |---|---|---|---|
-| 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in request matching; the whole register fits in one model call, so nothing needs narrowing | Open — breaks if a real pile produces hundreds of rows |
-| 2026-08-09 | Source documents are short enough to read whole | Meeting notes, request lists and testing feedback are short by nature, so vector retrieval may not be needed at all | Open — if real documents turn out large, pgvector retrieval comes back in |
+| 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in request matching; the whole register fits in one model call, so nothing needs narrowing | Reopened 2026-08-11 — depends on choosing a register and measuring real sample piles |
+| 2026-08-09 | Source documents are short enough to read whole | Meeting notes, client requirements documents, and testing feedback are expected to be short, so vector retrieval may not be needed | Open — if real documents turn out large, pgvector retrieval comes back in |
 
 ## Blockers
 
@@ -41,6 +51,12 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-11 — Domain corrected; deliverable reopened**
+Replaced the previous software-feature-delivery framing with the agreed
+Software Requirements-to-Delivery contract across `README.md`, `TASK.md`, and
+`DECISIONS.md`. Reopened register vs brief vs report; queued six consistency
+issues for their relevant decision blocks before architecture begins.
 
 **2026-08-09 — Task 1 scoping complete, `TASK.md` written**
 Worked through the orchestration choice and the full domain scoping in one
