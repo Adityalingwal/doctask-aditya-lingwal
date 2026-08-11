@@ -16,11 +16,40 @@ The final deliverable is now locked as a **Requirements-to-Delivery Register**.
 The provider-side Delivery Owner is both the system user and human reviewer.
 One run is one complete processing cycle for one submitted document batch;
 multiple initial and update runs may operate on the same project register.
-Next: define the human-gate scope.
+The human-gate scope is now locked in `DECISIONS.md` — a judgement or a change
+to an existing row is gated, a copied fact is not. Next: define the reject
+action, what happens once a finding or proposal is rejected.
 
 The pending consistency audit covers the review-screen scope, configurable vs
 hardcoded formats, the separate classify stage, citation-preserving extraction,
 run idempotency, and the unverified small-register/short-document assumptions.
+
+Added to that audit on 2026-08-11, recorded only — none of these are resolved,
+and no product decision changed when they were written down:
+
+- **`request` vs `requirement` drift.** `TASK.md` locks the word `request`, while
+  its own opening description, the register lock in `DECISIONS.md`, and the
+  information-design checklist below all say `requirement`. Nothing records
+  whether this is an intended rename or a slip.
+- **The locked vocabulary has no canonical home.** `TASK.md` states the project's
+  words are fixed in `DECISIONS.md`, but `DECISIONS.md` has no vocabulary section.
+- **`pile` vs `batch` drift.** `pile` sits in the locked vocabulary, the run lock
+  says a run consumes one submitted document batch, and `sample-piles/README.md`
+  still says a pile is what a single run consumes.
+- **Deliverable-side rule D2 depends on an unlocked status.** D2 forbids a
+  `Delivered` row without a testing outcome, but the status values it names live
+  in the register section marked NOT LOCKED.
+- **Stale coverage index in the working notes.** It still states Task 1 scoping is
+  complete as of 2026-08-09 and that the next phase is architecture.
+- **Status mismatch across the two files.** Request identity, request granularity,
+  the rules playbook with its finding shape, and the review-screen scope are
+  labelled LOCKED or `v1 starting point` in `DECISIONS.md`, while the matching
+  items in the roadmap below are still open. Which label is authoritative is
+  undecided.
+- **Review-screen mockup implies per-row approval.** The review-screen scope
+  section in `DECISIONS.md` shows `[✓] [✗]` against the register in its
+  mockup, implying per-row approval, which the human-gate scope locked on
+  2026-08-11 does not require for plain rows.
 
 `TASK.md` is written apart from its Commands section, which stays empty until
 the project structure exists.
@@ -54,7 +83,7 @@ in `DECISIONS.md`; implementation detail belongs in code and tests.
 - [x] Select the Requirements-to-Delivery Register.
 - [x] Choose the actual system user and human reviewer.
 - [x] Define one-run scope.
-- [ ] Define the human-gate scope.
+- [x] Define the human-gate scope.
 - [ ] Define the incremental input contract.
 - [ ] Decide coverage or defended cuts for behaviours 6–10.
 - [ ] Lock the React, FastAPI, and MCP boundary.
@@ -106,6 +135,21 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-11 — Human-gate scope locked**
+Locked the 13-scenario human-gate checklist in `DECISIONS.md`: gated wherever
+the system judges or changes an existing row, not where it only copies a fact.
+Ticked the product-contract checklist item and queued one more
+consistency-audit entry — the review-screen mockup's per-row `[✓] [✗]`.
+
+**2026-08-11 — Consistency audit widened (housekeeping only)**
+Recorded six further unresolved issues found during a read-only context audit:
+four terminology or dependency drifts, one stale coverage index, and the mismatch
+where several 2026-08-09 decisions read as locked in `DECISIONS.md` while their
+information-design counterparts here are still open. Nothing was resolved and no
+product decision changed. Also corrected the project auto-memory, which still
+claimed scoping was complete and carried the superseded domain and run-scope
+wording.
 
 **2026-08-11 — Documentation handoff hardened**
 Added an append-only decision-history policy, restored superseded decisions,

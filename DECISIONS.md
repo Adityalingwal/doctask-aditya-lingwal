@@ -59,6 +59,7 @@ write-up repeats them.
 | 2026-08-09 | `No findings` is a **first-class output** — never manufacture, never render as a blank/crash | Task PDF page 2 calls an honest no-findings report the rarest output; behaviour #5 requires success messages to be true | — | — | Needs a test asserting a clean corpus yields zero findings and a non-empty message |
 | 2026-08-09 | PDF extraction = **pdfplumber** (primary) + **pypdf** (encryption check only); scanned and encrypted PDFs skipped with reason | pdfplumber preserves table structure; pypdf adds one-line `.is_encrypted`; two libraries, two jobs, zero overlap | 300 KB extra dependency (pypdf); no scanned PDF support | Tested on 7 PDFs including 59-page IRS doc (14 tables, 315K chars) and 22-page MSA — zero data loss across all pages | Add OCR only if domain expands to scanned documents |
 | 2026-08-10 | **Classify step dropped** — LLM infers document type during extraction; no separate classification node | Heuristics fragile on real documents; LLM context window naturally discerns meeting notes vs feature lists vs testing feedback; extra node adds complexity with no value | Six nodes instead of seven; simpler graph | — | — |
+| 2026-08-11 | Human-gate scope = **13 scenarios**, gated wherever the system judges or changes an existing row | Keeps the gate scarce so the two genuinely dangerous items are not lost among mechanical ticks on plain facts | On a first run most rows are plain, so the gate is thin — mostly findings plus the final export | Reasoning-stage only — see "Human-gate scope" section | Define the reject action — what happens once something is rejected |
 
 ---
 
@@ -249,8 +250,53 @@ integration are not part of this document-analysis domain.
 - The client supplies requirements, testing feedback, and clarifications but
   does not log in to or approve inside the V1 system. Client decisions enter as
   new source evidence.
-- The exact objects and actions inside approve/reject remain open for the
-  human-gate-scope decision.
+- Which objects are gated for approve/reject is now decided — see "Human-gate
+  scope" below. The reject action — what happens once something is rejected —
+  remains open for the next decision.
+
+## Human-gate scope (LOCKED 2026-08-11)
+
+**The rule that generates the table:** the gate applies where the system is
+making a **judgement** or **changing something that already exists**. Where it
+is only copying a fact, it does not.
+
+| # | Scenario | Gate? | Reason |
+|---|---|---|---|
+| 1 | A new row, entirely fresh — no conflict, no uncertainty | No | The system copied a fact with its citation; no judgement was applied |
+| 2 | New evidence added to an existing row, same meaning | No | Same fact, more proof; nothing changed |
+| 3 | A new document changes the meaning of an existing row | Yes | This is a conflict; the system may not decide it |
+| 4 | Possible match to an existing row — the system is unsure | Yes | A wrong merge corrupts the register silently and is hard to catch later |
+| 5 | Conflict — two sources make incompatible claims | Yes | The brief's own rule: surface both sides, the human chooses |
+| 6 | Rule finding (R1–R4) | Yes | A judgement, drawn from the user's own supplied rules |
+| 7 | Deliverable-side finding (D1/D2) | Yes | The system doubting its own output; it must not clear itself |
+| 8 | Blocker — work is explicitly stopped | No | A fact written in a source document, not an opinion |
+| 9 | Suspicious instruction found inside a source document | No | Reported only; the system already refused to follow it, so approve/reject has no meaning |
+| 10 | A file was skipped, with its reason | No | Information, not a proposed action; a wrong skip is re-run, not rejected |
+| 11 | An update run's focused change proposal | Yes | The brief requires it explicitly; existing output is being changed |
+| 12 | Final export / commit | Yes | The hard floor — nothing leaves the system without it |
+| 13 | A `No findings` report | No | No action was proposed |
+
+**Why the gate stays scarce.** Scenario 12 (final export) already gates the
+whole register, so plain rows are never released without approval —
+item-by-item ticking is not required for facts. A 12-row first run needing 12
+ticks would bury the two genuinely dangerous items in mechanical noise.
+
+**The feared case is already covered.** "Requested verbally in a meeting,
+absent from the written requirements document" is not a plain row — it
+produces a row *and* an R1 finding, and the finding is gated (scenario 6). No
+separate rule is needed.
+
+**Alternatives rejected:** (a) gate on every register row — rejected for the
+attention-dilution reason above; (b) gate only on the final export — rejected
+because conflicts, findings, and updates are named individually in the brief
+(task PDF page 2) and must be decidable item by item.
+
+**Status.** Reasoning-stage; no build evidence yet. On a first run most rows
+are plain, so the gate is thin — mostly findings plus the final export. That is
+correct behaviour, not a weakness — do not write this up as proven.
+
+The reject action — what happens once a finding or proposal is rejected —
+remains open for the next decision.
 
 ## One-run scope (LOCKED 2026-08-11)
 
