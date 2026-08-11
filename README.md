@@ -41,6 +41,19 @@ this domain.
   case — new evidence that makes an already-rejected finding truer — stays
   silently suppressed in V1.
 
+- **R3 cannot fire on time.** The rule "no requirement stays blocked beyond
+  `max_days`" turns on elapsed time, but a run only starts when a document
+  arrives. A blocker passing its threshold during a quiet spell raises
+  nothing until the next document lands — late, not lost.
+
+- **One run at a time per project.** A second run queues rather than
+  failing. A run parked at human review holds that place for as long as the
+  reviewer takes, so a queued run may wait a long time — it is waiting, not
+  stuck.
+
+- **Documents beyond the configured page limit are skipped**, with the
+  reason given, rather than being split up.
+
 ## Assumptions
 
 - **Who starts a run.** The brief does not say. Our call: the system watches

@@ -72,6 +72,20 @@ write-up repeats them.
 | 2026-08-11 | D2 amended: no row marked **`Done`** (not `Delivered`) without a testing outcome | `Delivered` no longer exists once the five-value status set locked; D2 must track the current status set | — | Reasoning-stage — see "Deliverable-side rules" section | Closes the "D2 depends on an unlocked status" audit item |
 | 2026-08-11 | Phase 1's three open items — brief acceptance contract, behaviours 6–10 coverage, React/FastAPI/MCP boundary — **deferred to build time**, not cut | Writing pass/fail checks or a component boundary before the relevant design exists would be guesswork; task PDF page 8's order (never-do → test → code) still holds | Phase 1 counted complete with these three items open | Reasoning-stage | Each item resolved just before its own build slice; a later cut must carry its reason into the Task 4 write-up |
 | 2026-08-11 | Accepted-format list moves to **`config/formats.yaml`**; the reader behind each format stays in code (`app/ingest/`); a startup check reconciles the two | `TASK.md`'s configuration-over-code rule and Lock 2a's "deliberately hardcoded" claim could not both be true; the list and its readers are different things and can each follow the rule that actually fits them | One more startup check to write and keep passing; a reader can still only be added in code | Reasoning-stage — see "Config/code split" section | Write the startup-check test; its error message must name both the missing reader and the fix |
+| 2026-08-11 | **Six pipeline stages locked** — Ingest → Extract → Match → Examine → Review → Commit; the model is called only in Extract, Match, and Examine | Each stage does one job; Review and Commit need no model call, and classify was already folded into Extract on 2026-08-10 | A first run over nine documents costs eleven model calls, not one per document | Reasoning-stage — see "Pipeline stages" section | Confirm the eleven-call arithmetic against a real run |
+| 2026-08-11 | Ingest stops the run early when nothing is new or changed, or when every file was skipped | Running later stages on an empty batch spends time and money to report nothing | A run can end at Ingest having done real work while showing no register change | Reasoning-stage — see "Pipeline stages" section | — |
+| 2026-08-11 | **Extract calls the model once per document, sequentially** — not batched, not parallel | Keeps citation attribution certain (the filename is never asked of the model), gives a clean per-document checkpoint, and isolates one document's failure from the rest | ~50–150s sequential vs ~15s parallel for ten documents; accepted so slice 1's kill-and-resume proof stays clean — parallelism deferred, not rejected | Reasoning-stage — see "Extract — how documents are read" section | Revisit fan-out once resume is proven |
+| 2026-08-11 | **Citation location is derived, never modelled** — the model returns only the source's exact words; code searches the document text and finds the page/heading/line itself | A wrong location becomes structurally impossible, and the same search doubles as a fabrication detector | Plain substring match after whitespace normalisation, no fuzzy matching; the two error directions are not symmetric — a fabricated quote cannot slip through, a genuine one differing by a space can raise a dismissible false alarm | Reasoning-stage — see "Extract — how documents are read" section | — |
+| 2026-08-11 | Document size limit lives in config; no chunking built | Domain documents run 5–10 pages; the measured context ceiling (~150 pages) is far beyond that | A genuinely long document is skipped with reason rather than processed in parts | Reasoning-stage — see "Extract — how documents are read" section | Declare the configured limit in README |
+| 2026-08-11 | Match and Examine stay two stages, not merged | Examine reads rows Match has just written, so it cannot run first; merging would hide Match's decisions from behaviour #1 and cost a checkpoint | One extra model call per run, on a ~250-token register — not worth saving | Reasoning-stage — see "Match and Examine" section | — |
+| 2026-08-11 | All documents in a batch move through each stage together — no document completes the whole pipeline alone | Match needs every new requirement at once or the same requirement becomes two rows; Examine needs the whole register; Review must happen once, not once per document | — | Reasoning-stage — see "Pipeline stages" section | — |
+| 2026-08-11 | Four conditional early exits locked — nothing new/changed at Ingest, every file skipped at Ingest, nothing found at Extract, register unchanged at Match; Review is never skipped | Each spends no time or money producing an empty result rather than running stages to say nothing | — | Reasoning-stage — see "Pipeline stages" section | — |
+| 2026-08-11 | State carries progress and pointers only; the database holds the material | LangGraph rewrites the whole state at every checkpoint — nine documents' extracted text held in state would be rewritten nine times over (~2.7M characters) to say the same thing once | Nothing is stored in both places — one source of truth, never two | Reasoning-stage — see "Run state and checkpoints" section | — |
+| 2026-08-11 | Checkpoints placed where redoing work is expensive; every stage writes on unit completion; Commit is atomic | A unit costs real time and money only at Extract (5–15s, a paid call); Ingest is cheap enough to simply rerun; a half-written Commit would leave the register lying about itself | — | Reasoning-stage — see "Run state and checkpoints" section | — |
+| 2026-08-11 | Review decisions write straight to the database, one at a time — never through state | A rejected finding must be remembered permanently across runs; state belongs to one run's thread and does not survive into the next | Whether decisions are written one at a time or batched stays deliberately open | Reasoning-stage — see "Run state and checkpoints" section | Revisit batched-vs-individual review writes |
+| 2026-08-11 | Run id = random UUID (also the LangGraph `thread_id`); one run per project via a database lock; a second run queues; only one `waiting` run allowed per project | A waiting run holds no batch — the batch forms only when a run starts — so a second waiting run would repeat identical, empty work; content-derived ids and row-level/optimistic locking were both considered and dropped | A run parked at Review holds the project's lock for as long as the reviewer takes | Reasoning-stage — see "Run identity and concurrency" section | Honest README limitation on the wait |
+| 2026-08-11 | **Seven database tables locked for slice 1** — `projects`, `runs`, `documents`, `register_rows`, `citations`, `decisions`, `audit` | Covers one `.md` file in, two rows out, approval over the API, export, and kill-and-resume; extracted text lives in `documents` rather than in graph state, matching the state-vs-database lock | Rules and findings have no table yet — they arrive with the rules-engine slice; LangGraph's own checkpoint table lives in the same Postgres and is not one of the seven | Reasoning-stage — see "Database tables — slice 1" section | Add rules/findings tables when that slice arrives |
+| 2026-08-11 | **Five API endpoints locked for slice 1** — start a run, poll status, submit one decision, finish review, fetch the export; React and MCP arrive in later slices | `POST /runs` returns the id immediately, matching `TASK.md`'s "a run is not an HTTP request" rule; finishing review is its own endpoint so the Delivery Owner can stop halfway without the system committing behind them | — | Reasoning-stage — see "API — slice 1" section | — |
 
 ---
 
@@ -388,8 +402,8 @@ it.
   against the same project register.
 - One run cannot mix documents from unrelated project contexts.
 - Each run will have its own identity, status, timing, cost, and recoverable
-  execution state. Exact identity and duplicate-run behaviour remain open for
-  the architecture decision.
+  execution state. Exact identity and duplicate-run behaviour are locked in
+  "Run identity and concurrency" below.
 
 ## Incremental input contract (LOCKED 2026-08-11)
 
@@ -693,6 +707,297 @@ merged:**
 - "Did this requirement change at all?" → the fingerprint
 - "What else happened on this row?" → audit history
 
+## Pipeline stages (LOCKED 2026-08-11)
+
+Six stages, in order: **Ingest → Extract → Match → Examine → Review →
+Commit.**
+
+| Stage | What it does | What it does not do | Model call |
+|---|---|---|---|
+| **Ingest** | Reads the watched folder, takes every new or changed file as the batch, gates format against `config/formats.yaml`, extracts clean text plus its location data (page/heading/line) | Decide document type, understand content | No |
+| **Extract** | Given one document's text, reports what it says — type, date, requirements, testing observations, blockers, embedded instructions | See the register | **Yes** — once per document |
+| **Match** | Given the batch's requirements and the current register, decides new row vs. existing row vs. possible-match flag | Run rules, raise findings | **Yes** — once per batch |
+| **Examine** | Given the register Match produced and `config/rules.yaml`, runs each rule and raises findings | Change the register | **Yes** — once per register |
+| **Review** | Presents everything gated (see "Human-gate scope") and waits for the Delivery Owner's decisions | Call a model, match anything | No |
+| **Commit** | Makes approved decisions permanent, writes audit history, produces exports | Run if nothing was approved | No |
+
+**A first run over nine documents costs eleven model calls, not
+twenty-seven** — nine for Extract (one per document), one for Match, one for
+Examine. Review and Commit call no model at all. Worth stating plainly,
+because "three model calls per document" was the worry that prompted
+checking.
+
+**All documents in a batch move through each stage together** — no document
+completes the whole pipeline alone before the next begins. Match needs every
+new requirement at once, or the same requirement appearing in two documents
+becomes two rows; Examine needs the whole register, since a rule like R4
+cannot be answered from one row; and Review must happen once, not once per
+document.
+
+**Extract is a loop, with its checkpoint inside it.** One document per pass;
+state carries "5 of 9 done, next is #6". Killed on the sixth, a restart
+resumes at the sixth — the five completed model calls are not repeated.
+
+### Conditional routes
+
+Behaviour #1 requires decisions that can change the path:
+
+| Where | Condition | What happens |
+|---|---|---|
+| Ingest | Nothing new or changed | Run ends here |
+| Ingest | One file's format is unsupported, or it will not open | Skip that file with its reason; the rest continue |
+| Ingest | Every file was skipped | Run ends here, reasons shown |
+| Extract | The document is unrelated to this engagement | Skip it; the rest continue |
+| Extract | Nothing at all was found in any document | Run ends here |
+| Extract | More documents remain | Loop back to Extract, else go to Match |
+| Match | The register did not change by a single cell | Run ends here |
+| Review | — | Never skipped — reaching Review means something changed and the export needs approval |
+
+Four of these end the run early (the "Run ends here" rows); each exists for
+the same reason — running the remaining stages to produce an empty result
+spends time and money to say nothing. The "register did not change" exit
+also handles a duplicate or renamed document: its requirements match
+existing rows with citations already present, so nothing new is proposed.
+
+## Extract — how documents are read (LOCKED 2026-08-11)
+
+**One document, one model call, sequentially** — not all documents in one
+prompt, and not in parallel. Three reasons, the first decisive:
+
+1. **Citation integrity.** With several documents in one prompt the model
+   can attribute a quote to the wrong file — a fabricated citation, the
+   worst failure this system has. One document per call means the filename
+   is something the code already knows and never asks the model for.
+2. **Resume.** A checkpoint after each document — killed on the sixth of
+   nine, a restart resumes at the sixth.
+3. **Isolation.** One document failing leaves the others unaffected.
+
+**Parallelism deferred, not rejected.** The gain is real — roughly 50–150s
+sequential versus ~15s parallel for ten documents, since one call runs
+5–15s. Declined for slice 1 because kill-and-resume is the property it
+exists to prove, and that proof is far cleaner sequentially; parallelism is
+easy to add later as a fan-out, wrong resume behaviour is not easy to fix
+later.
+
+**Six things come out of one document**, each with its location and the
+source's own words: document type, document date, requirements, testing
+observations (labelled `Passed`/`Defect`/`Change request`/`Unclear`),
+blockers, and any instruction embedded in the document aimed at the system
+(reported, never followed). A starting list — more will likely be needed
+once the build is real.
+
+**Citations: the model supplies the words, the code finds the place.** The
+model returns the source's exact words and nothing about location; the code
+searches the document text for those words and derives the page, heading,
+or line itself. Location comes from code, never from the model, so a wrong
+one is not possible.
+
+This doubles as a fabrication detector: words the model invented will not
+be found in the text, and the extraction is flagged. The two error
+directions are not symmetric — an invented quote cannot slip through, while
+a genuine quote differing by a space can raise a false alarm a human then
+dismisses. The failure always lands on the safe side.
+
+Matching is a plain substring search after normalising whitespace and
+newlines — **no fuzzy matching**, which could match the wrong passage and
+reintroduce the risk this avoids. The prompt tells the model to copy
+wording verbatim, keeping false alarms rare.
+
+**Document size limit lives in config; no chunking built.** The domain is
+small teams and freelancers, where documents run 5–10 pages; 40–50 would
+already be unusual. Measured against real data (the 59-page,
+315k-character PDF from the library test, ≈80k tokens) the context ceiling
+only bites past roughly 150 pages — far beyond anything expected. A page
+limit therefore lives in config, documents beyond it are skipped with the
+reason stated, and the limit is declared in the README.
+
+## Match and Examine (LOCKED 2026-08-11)
+
+**Match** is given the requirements Extract found and the register as it
+stands, and answers one question per requirement: existing row, or new one?
+Nothing else — no rules, no findings. Three outcomes: a new row; a citation
+added to an existing row; or, where the model is unsure, the possible-match
+flag the human resolves at Review. One call for the whole batch, not one
+per requirement — two documents in the same batch can describe the same
+requirement, and only a model seeing them together notices. **Match writes.
+It is the only stage that changes the register** — and even what it writes
+stays a proposal until Commit; nothing is settled before the human approves
+it at Review.
+
+**Examine** is given the register Match produced and `config/rules.yaml`,
+and runs each rule to produce findings. One call for the whole register,
+not one per row — R4 ("every written requirement has a testing outcome")
+cannot be answered from a single row. **Examine reads. It changes
+nothing.**
+
+**Why they stay separate**, having considered merging them:
+- Examine cannot run before Match finishes — a rule asking about row #3
+  needs Match to have created it first.
+- Merging would cost a graded behaviour: behaviour #1 requires visible
+  stages that show what was decided at each, and Match's own decision (for
+  example, that WhatsApp was not the same requirement as Email) would
+  disappear inside a combined call.
+- A checkpoint would be lost — Match succeeding and Examine failing would
+  redo both instead of only the failed half.
+- One prompt would carry two jobs, and the rules come from user config —
+  ten rules would swamp the matching work.
+- The saving is one call out of eleven, on a ~250-token register — not
+  worth it.
+
+## Run state and checkpoints (LOCKED 2026-08-11)
+
+**State carries only how far the run has got, plus pointers. The real
+material lives in the database.** LangGraph writes the whole state at every
+checkpoint — nine documents of extracted text is roughly 300k characters;
+held in state it would be rewritten on each of the nine Extract passes,
+about 2.7M characters written to say the same thing nine times. Held in the
+database it is written once and read when needed, and the state carries
+little more than "5 of 9 done". Nothing is stored in both places — two
+copies means two versions of the truth and no way to tell which is current.
+
+**Checkpoints go where redoing the work is expensive:**
+
+| Where | Cost of one unit | Checkpoint |
+|---|---|---|
+| Ingest, per file | ~0.1s, no money | No — rerun the whole stage |
+| Extract, per document | 5–15s and money | Yes — five documents redone means five model calls paid for twice |
+
+Ingest is therefore a single node with no internal checkpoint; Extract is a
+loop that checkpoints after every document. Killed on the sixth of nine, a
+restart reads "5 of 9 done" and resumes at the sixth — the five completed
+calls are not repeated.
+
+**Everything is written as soon as its unit completes** — "unit" means
+something different at each stage:
+
+| Stage | A unit is | Written |
+|---|---|---|
+| Ingest | one file's text | after each file |
+| Extract | one document's extraction | after each document |
+| Match | the batch's result | once |
+| Examine | the findings | once |
+| Review | one decision | after each decision |
+| Commit | the whole commit | once, atomically |
+
+**Commit must be all-or-nothing.** It makes rows permanent, writes audit
+history, and produces exports; half of that — rows committed, audit
+missing — would leave the register lying about itself.
+
+**Review decisions go straight to the database, not through state.** At
+Review the graph is stopped, so nothing new is written to state; decisions
+arrive through the API one at a time and are written to the database
+immediately, and the graph resumes only once the Delivery Owner is done.
+The deciding reason is the earlier reject-permanence lock: a rejected
+finding must not resurface on a later run, but state belongs to one run and
+run 2 cannot see run 1's state — a rejection held only in state would
+resurface next run, exactly what that lock exists to prevent. The audit
+trail must also be readable months later, and a machine asking "which
+findings were approved?" needs a database query, not a state blob to
+interrogate. So: **state answers "where has the graph got to"; the database
+answers "what was decided."** On resume, the graph picks up at Review and
+reads from the database how many decisions are in and how many remain.
+
+> **Revisitable.** Whether Review decisions are written one at a time or
+> batched is deliberately left open. Locked as one-at-a-time only so the
+> build has a defined starting point — Aditya wants to reopen it later and
+> compare.
+
+## Run identity and concurrency (LOCKED 2026-08-11)
+
+**Run id is a random UUID**, doubling as the LangGraph `thread_id`. Its only
+job is identification.
+
+**One run at a time per project, enforced by a database lock.** Two
+different projects run side by side untouched; a second run on the same
+project does not start while the first holds the lock.
+
+**A second run is queued, not refused.** It is created immediately and
+returns its id with status `waiting`; when the first run commits, it starts
+on its own. A run's status moves `waiting` → `running` → `waiting for
+review` → `done`, and is polled — matching `TASK.md`'s "a run is not an HTTP
+request" rule.
+
+**Only one `waiting` run per project.** Pressing again returns the same
+waiting run's id rather than creating another, because **a waiting run
+holds no batch** — the batch is formed only when the run starts, from
+whatever Ingest finds then. Two waiting runs would do identical work, and
+the second would find nothing new. Files arriving during the wait all land
+in that one batch.
+
+**Two approaches considered and dropped:**
+- **Content-derived ids** (hash the batch, same files → same id). Both
+  problems it would solve are already solved elsewhere — duplicate starts
+  by the lock and queue, a repeated batch by Ingest's own "nothing new or
+  changed" exit. It also breaks on a real case: change `rules.yaml` and
+  deliberately re-run — content is identical, so the run would be refused
+  for no good reason.
+- **Row-level locking, and optimistic versioning.** Row-level cannot work —
+  Match and Examine each need the whole register. Optimistic versioning
+  breaks against the human gate: a run can sit at Review for hours, by
+  which time its version is stale.
+
+**Checked against behaviour #9:** two different projects at once use
+separate locks and separate registers with no contact; the same project hit
+twice queues the second run, which then runs and exits cleanly with a
+stated reason if nothing changed; state corruption is impossible because
+two runs never write one register concurrently.
+
+**Honest limitation for the README.** One run at a time per project, and a
+run parked at Review holds the lock for as long as the human takes.
+Acceptable here — the domain is one Delivery Owner per project — but it must
+be stated, or a queued run looks like a hang.
+
+## Database tables — slice 1 (LOCKED 2026-08-11)
+
+Seven tables are enough for slice 1 — one `.md` file in, two rows out,
+approval over the API, export, and a kill-and-resume that holds:
+
+| Table | Holds |
+|---|---|
+| `projects` | One client engagement, owning one continuing register |
+| `runs` | The run id, its status (`waiting` / `running` / `waiting for review` / `done`), which project it belongs to, timing, cost |
+| `documents` | The text Ingest extracted — deliberately here rather than in the graph state |
+| `register_rows` | The requirements: seven cells per row, plus that row's fingerprint |
+| `citations` | Per cell: which cell, which file, which place, and the source's own words |
+| `decisions` | What the human approved or rejected, and when |
+| `audit` | Which cell changed, from what to what, in which run, because of which document |
+
+**LangGraph creates its own checkpoint table**, in the same Postgres — one
+database, as already locked. It is not one of the seven above, and we do
+not write it.
+
+**Rules and findings have no table yet.** Slice 1 has no rules engine; those
+tables arrive with the slice that needs them.
+
+**Migrations from the first table** — already locked in `TASK.md`'s code
+conventions, because without them a fresh clone cannot build its schema and
+"a stranger can run it" fails at step one.
+
+Deliberately a starting point: the shape may move once the code is real.
+
+## API — slice 1 (LOCKED 2026-08-11)
+
+Slice 1 exposes the API only. React and the MCP server come in later
+slices, per the build order's "interface last".
+
+| Endpoint | Does |
+|---|---|
+| `POST /runs` | Start a run. Returns the id immediately; the work continues in the background |
+| `GET /runs/{id}` | Status — which stage, what it cost, what was skipped and why |
+| `POST /runs/{id}/decisions` | One decision: "F-01 approved" |
+| `POST /runs/{id}/finish-review` | The reviewer is done; the graph may continue |
+| `GET /runs/{id}/export` | The approved register, JSON or Markdown |
+
+`POST /runs` never blocks while a run executes — `TASK.md`'s existing rule,
+*"a run is not an HTTP request; starting a run returns an id immediately,
+progress is polled."*
+
+**Why finishing the review is its own endpoint**, rather than the graph
+resuming by itself once every pending item has a decision: the Delivery
+Owner must be able to stop halfway, think, or go and ask someone, without
+the system committing behind them. That final press is itself a gated
+action — export approval, scenario #12 of the human-gate scope.
+
 ## Requirement identity — how one row is formed (LOCKED 2026-08-09, v1 starting point)
 
 > **Status: v1 starting point, deliberately revisitable.** Locked so the build has a defined place to start. Expect real findings once we run this on an actual project — revise here, and record what changed and why.
@@ -981,6 +1286,16 @@ again: it must continue without redoing finished work or duplicating a row.
 No interface, no rules engine, no MCP, no PDF or DOCX — only `.md`, and approval
 over `curl`. If this survives a kill, the most dangerous part of the build is
 already proven.
+
+**Slice 1, made concrete now the architecture is settled:**
+
+- **In:** Ingest (`.md` only) · Extract · Match · Review · Commit; Postgres
+  with migrations and the seven tables; the five endpoints; the
+  kill-and-resume test.
+- **Out:** Examine and the rules engine · `.pdf`/`.docx`/`.txt` · the watched
+  folder · MCP · React · cost and timing · the prompt-injection detector.
+- Extract calls a model, but tests run without a key — `GenericFakeChatModel`,
+  already noted above under "Orchestration framework decision".
 
 **Then widen, one behaviour per slice:** remaining formats and bucket handling →
 rules engine and findings → MCP wrappers over the same API → incremental update

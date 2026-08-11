@@ -19,7 +19,14 @@ Owner is both the system user and human reviewer. One run is one complete
 processing cycle for one submitted document batch; the incremental input
 contract now defines what a batch is and who starts a run. The human-gate
 scope and its two actions, Approve/Reject, are locked in `DECISIONS.md`.
-Next: Phase 3, system architecture.
+
+Phase 3 (system architecture) is under way and deliberately partial: the
+architecture slice 1 needs is now settled — pipeline stages and LangGraph
+state/checkpoints in full, plus the slice-1 share of run identity (a
+random-UUID run id, one run per project by database lock, a queued second
+run), database tables (seven), and the API (five endpoints) — so
+implementation can begin. The rest of Phase 3 is decided alongside the
+slice that needs it.
 
 The pending consistency audit covers the review-screen redesign, run
 idempotency, and the still-open short-document/pgvector assumption. The
@@ -92,15 +99,20 @@ exercise.
 
 ### 3. System architecture
 
-- [ ] Map components and end-to-end data flow.
+- [x] Map components and end-to-end data flow.
 - [ ] Define document parsing and model/provider boundaries.
-- [ ] Define run identity, idempotency, and concurrency behaviour.
-- [ ] Define LangGraph state, nodes, edges, and checkpoints.
-- [ ] Define database tables, migrations, versions, and audit trail.
+- [ ] Define run identity, idempotency, and concurrency behaviour. Slice 1's
+      share is settled (UUID run id, per-project lock, queued second run);
+      the rest arrives with the slice that needs it.
+- [x] Define LangGraph state, nodes, edges, and checkpoints.
+- [ ] Define database tables, migrations, versions, and audit trail. Slice
+      1's share is settled (seven tables, migrations from the first table);
+      the rest arrives with the slice that needs it.
 - [ ] Define the human-review state machine.
 - [ ] Define watched-folder and focused-update architecture.
 - [ ] Define prompt-injection, no-bluff, and security controls.
-- [ ] Define FastAPI, MCP, and React contracts.
+- [ ] Define FastAPI, MCP, and React contracts. Slice 1's share is settled
+      (five endpoints); the rest arrives with the slice that needs it.
 - [ ] Define failure, retry, logging, timing, and cost behaviour.
 
 ### 4. Proof and implementation plan
@@ -120,6 +132,7 @@ marked — the correction is more useful than a clean page.
 |---|---|---|---|
 | 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in requirement matching; the whole register fits in one model call, so nothing needs narrowing | Register now chosen — seven columns, `DECISIONS.md` "Register shape", 2026-08-11 — still open until measured against real sample projects |
 | 2026-08-09 | Source documents are short enough to read whole | Meeting notes, client requirements documents, and testing feedback are expected to be short, so vector retrieval may not be needed | Open — if real documents turn out large, pgvector retrieval comes back in |
+| 2026-08-11 | Source documents run 5–10 pages (40–50 would already be unusual) | The domain is small teams and freelancers | A config page-limit plus a stated README limitation cover documents beyond it — chunking was therefore not built |
 
 ## Blockers
 
@@ -128,6 +141,18 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-11 — Phase 3 architecture: pipeline, state, run identity, database tables, and API locked**
+Locked in `DECISIONS.md`: the six pipeline stages (Ingest through Commit)
+with where the model is called, Extract's one-document-per-call shape with
+its citation/fabrication-detector mechanism, Match and Examine kept
+separate, LangGraph state-vs-database and checkpoint placement, run
+identity's slice-1 share (UUID, per-project lock, one queued waiting run),
+the seven slice-1 database tables, and the five slice-1 API endpoints.
+Deliberately partial — five Phase 3 points remain untouched. Rewrote the
+stale closing line in "One-run scope" to point at the new run-identity
+section. Added three README limitations (R3 timing, one-run-per-project
+queueing, the document size limit).
 
 **2026-08-11 — Vocabulary locked; consistency-audit backlog cleared**
 Renamed `request` → `requirement` and `pile` → `project` throughout
