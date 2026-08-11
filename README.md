@@ -10,16 +10,30 @@ before anything commits.
 
 ## Document formats accepted
 
-| Format | Supported? | Notes |
+The system is not yet implemented; this table declares the intended set rather
+than reporting working behaviour.
+
+| Format | Declared set? | Notes |
 |---|---|---|
-| `.pdf` | ✅ | Text-based PDFs only. Scanned, encrypted, and image-based PDFs are skipped with reason. |
-| `.docx` | ✅ | Standard Word documents. |
-| `.md` | ✅ | Markdown files. |
-| `.txt` | ✅ | Plain text files. |
-| `.xlsx`, `.pptx`, `.eml`, images | ❌ | Skipped — `unsupported format`. |
+| `.pdf` | Included | Text-based PDFs only. Scanned, encrypted, and image-based PDFs are skipped with reason. |
+| `.docx` | Included | Standard Word documents. |
+| `.md` | Included | Markdown files. |
+| `.txt` | Included | Plain text files. |
+| `.xlsx`, `.pptx`, `.eml`, images | Excluded | Skipped — `unsupported format`. |
 
 **PDF limitations:** Tables are extracted with structure preserved. Multi-column
 layouts are best-effort — some column ordering may be garbled.
+
+## Rules
+
+A filled-in `rules.yaml` ships with the repository so a fresh clone runs
+without supplying one. The evaluator can edit it or point the system at their
+own file. Adding or changing a rule is a config edit, not a code change.
+
+## Model access
+
+Runs require an OpenRouter API key in `.env`. No model or offline model runtime
+is bundled. Automated tests use a fake model and require no API key.
 
 ## Domain
 
@@ -53,6 +67,9 @@ this domain.
 
 - **Documents beyond the configured page limit are skipped**, with the
   reason given, rather than being split up.
+
+- **A changed document is re-read in full**, rather than only its edited
+  part. Documents that have not changed are never re-read.
 
 ## Assumptions
 

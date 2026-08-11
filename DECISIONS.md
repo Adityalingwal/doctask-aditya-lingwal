@@ -62,30 +62,41 @@ write-up repeats them.
 | 2026-08-11 | Human-gate scope = **13 scenarios**, gated wherever the system judges or changes an existing row | Keeps the gate scarce so the two genuinely dangerous items are not lost among mechanical ticks on plain facts | On a first run most rows are plain, so the gate is thin — mostly findings plus the final export | Reasoning-stage only — see "Human-gate scope" section | Define the reject action — what happens once something is rejected |
 | 2026-08-11 | Human-gate actions = **Approve / Reject only**, identical at all seven gated points; buttons act on a stated proposal, not an object | Task PDF page 2: human "approves what is right and rejects what is wrong ... item by item"; per-object verbs (solve/park/merge) would be seven separate failure modes | No custom per-scenario actions; on a conflict the buttons decide only whether it is shown, never which side is right | Reasoning-stage — see "Human-gate actions" section | README owes the reject-limitation note (see next row) |
 | 2026-08-11 | Reject = **excluded from the register, kept permanently in the run record**; final, not conditional | Makes "do not ask again" possible — without a permanent record the same finding returns on every later run | A rejected finding that later becomes *stronger* through new evidence stays suppressed in V1 | Reasoning-stage — see "Human-gate actions" section | Document as an honest README limitation |
-| 2026-08-11 | Incremental input contract — **a batch is every new and changed file waiting when a run starts**; a later file is its own run; the Delivery Owner or a machine starts the run | Conflicts live between files, not inside one; task PDF's own "an update should cost like an update"; one review sitting instead of three | Trigger is a v1 starting point, not the PDF's own rule — auto-start risks the same-pile-twice problem behaviour #9 grades | Reasoning-stage — see "Incremental input contract" section | README owes the run-trigger assumption note; revisit trigger at architecture phase |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the intra-file delta decision:** Incremental input contract — **a batch is every new and changed file waiting when a run starts**; a later file is its own run; the Delivery Owner or a machine starts the run | Conflicts live between files, not inside one; task PDF's own "an update should cost like an update"; one review sitting instead of three | Trigger is a v1 starting point, not the PDF's own rule — auto-start risks the same-pile-twice problem behaviour #9 grades | Reasoning-stage — see "Incremental input contract" section | README owes the run-trigger assumption note; revisit trigger at architecture phase |
 | 2026-08-11 | Register shape = **seven columns**, per-cell citations, three kinds of attachment (conflicts, findings, possible-match flag) | Per-cell citation follows the brief directly; attachments stay off the row to preserve the human-gate lock and the unchanged-rows proof | Supersedes the six-column NOT LOCKED proposal and its worked example, which used the old status set | Reasoning-stage — see "Register shape" section | — |
-| 2026-08-11 | Status values = **five** (`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed`), provisional, config-changeable | `Blocked` and `Never happened` are different problems to the Delivery Owner; a status column earns its place once a register is too long to scan as plain text | Deliberately provisional — more values may be added later; adding one must be a config edit, never code | Reasoning-stage — see "Register shape" section | — |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the six-value status set defined in code:** Status values = **five** (`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed`), provisional, config-changeable | `Blocked` and `Never happened` are different problems to the Delivery Owner; a status column earns its place once a register is too long to scan as plain text | Deliberately provisional — more values may be added later; adding one must be a config edit, never code | Reasoning-stage — see "Register shape" section | — |
 | 2026-08-11 | Citations = **file + place + quoted words**; each format supplies the locator it can actually produce | A filename alone is not "the exact place" the brief asks for; quoted words mean the Delivery Owner usually never opens the source file | Rejected one uniform locator across formats — a line number is a poor locator inside a PDF | Reasoning-stage — see "Citations" section | Quote-length maximum lives in config |
 | 2026-08-11 | Export = **JSON as the record, Markdown generated from it** | JSON is what machines read (behaviour #4) and what the unchanged-proof compares; Markdown is for the Delivery Owner to read and send on | One source of truth only — Markdown is never edited directly | Reasoning-stage — see "Export, audit history, and unchanged proof" section | — |
 | 2026-08-11 | Audit history at **cell level**; unchanged proof by a **per-row fingerprint over cells only**, attachments excluded | Cell-level audit answers all three of the brief's questions (what/when/which source); excluding attachments stops one new finding marking an unmoved requirement "changed" | Two instruments kept deliberately separate rather than merged into one | Reasoning-stage — see "Export, audit history, and unchanged proof" section | — |
 | 2026-08-11 | Everything the system produces is in **English** — register, statuses, findings, logs, exports, and repository documentation | Keeps the deliverable and codebase in one language regardless of what language design conversations happen in | — | Reasoning-stage — see "Register shape" section | — |
 | 2026-08-11 | D2 amended: no row marked **`Done`** (not `Delivered`) without a testing outcome | `Delivered` no longer exists once the five-value status set locked; D2 must track the current status set | — | Reasoning-stage — see "Deliverable-side rules" section | Closes the "D2 depends on an unlocked status" audit item |
-| 2026-08-11 | Phase 1's three open items — brief acceptance contract, behaviours 6–10 coverage, React/FastAPI/MCP boundary — **deferred to build time**, not cut | Writing pass/fail checks or a component boundary before the relevant design exists would be guesswork; task PDF page 8's order (never-do → test → code) still holds | Phase 1 counted complete with these three items open | Reasoning-stage | Each item resolved just before its own build slice; a later cut must carry its reason into the Task 4 write-up |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the behaviour-coverage decision:** Phase 1's three open items — brief acceptance contract, behaviours 6–10 coverage, React/FastAPI/MCP boundary — **deferred to build time**, not cut | Writing pass/fail checks or a component boundary before the relevant design exists would be guesswork; task PDF page 8's order (never-do → test → code) still holds | Phase 1 counted complete with these three items open | Reasoning-stage | Each item resolved just before its own build slice; a later cut must carry its reason into the Task 4 write-up |
 | 2026-08-11 | Accepted-format list moves to **`config/formats.yaml`**; the reader behind each format stays in code (`app/ingest/`); a startup check reconciles the two | `TASK.md`'s configuration-over-code rule and Lock 2a's "deliberately hardcoded" claim could not both be true; the list and its readers are different things and can each follow the rule that actually fits them | One more startup check to write and keep passing; a reader can still only be added in code | Reasoning-stage — see "Config/code split" section | Write the startup-check test; its error message must name both the missing reader and the fix |
 | 2026-08-11 | **Six pipeline stages locked** — Ingest → Extract → Match → Examine → Review → Commit; the model is called only in Extract, Match, and Examine | Each stage does one job; Review and Commit need no model call, and classify was already folded into Extract on 2026-08-10 | A first run over nine documents costs eleven model calls, not one per document | Reasoning-stage — see "Pipeline stages" section | Confirm the eleven-call arithmetic against a real run |
-| 2026-08-11 | Ingest stops the run early when nothing is new or changed, or when every file was skipped | Running later stages on an empty batch spends time and money to report nothing | A run can end at Ingest having done real work while showing no register change | Reasoning-stage — see "Pipeline stages" section | — |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the rules-change re-run decision:** Ingest stops the run early when nothing is new or changed, or when every file was skipped | Running later stages on an empty batch spends time and money to report nothing | A run can end at Ingest having done real work while showing no register change | Reasoning-stage — see "Pipeline stages" section | — |
 | 2026-08-11 | **Extract calls the model once per document, sequentially** — not batched, not parallel | Keeps citation attribution certain (the filename is never asked of the model), gives a clean per-document checkpoint, and isolates one document's failure from the rest | ~50–150s sequential vs ~15s parallel for ten documents; accepted so slice 1's kill-and-resume proof stays clean — parallelism deferred, not rejected | Reasoning-stage — see "Extract — how documents are read" section | Revisit fan-out once resume is proven |
-| 2026-08-11 | **Citation location is derived, never modelled** — the model returns only the source's exact words; code searches the document text and finds the page/heading/line itself | A wrong location becomes structurally impossible, and the same search doubles as a fabrication detector | Plain substring match after whitespace normalisation, no fuzzy matching; the two error directions are not symmetric — a fabricated quote cannot slip through, a genuine one differing by a space can raise a dismissible false alarm | Reasoning-stage — see "Extract — how documents are read" section | — |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the narrowed citation-location claim:** **Citation location is derived, never modelled** — the model returns only the source's exact words; code searches the document text and finds the page/heading/line itself | A wrong location becomes structurally impossible, and the same search doubles as a fabrication detector | Plain substring match after whitespace normalisation, no fuzzy matching; the two error directions are not symmetric — a fabricated quote cannot slip through, a genuine one differing by a space can raise a dismissible false alarm | Reasoning-stage — see "Extract — how documents are read" section | — |
 | 2026-08-11 | Document size limit lives in config; no chunking built | Domain documents run 5–10 pages; the measured context ceiling (~150 pages) is far beyond that | A genuinely long document is skipped with reason rather than processed in parts | Reasoning-stage — see "Extract — how documents are read" section | Declare the configured limit in README |
 | 2026-08-11 | Match and Examine stay two stages, not merged | Examine reads rows Match has just written, so it cannot run first; merging would hide Match's decisions from behaviour #1 and cost a checkpoint | One extra model call per run, on a ~250-token register — not worth saving | Reasoning-stage — see "Match and Examine" section | — |
 | 2026-08-11 | All documents in a batch move through each stage together — no document completes the whole pipeline alone | Match needs every new requirement at once or the same requirement becomes two rows; Examine needs the whole register; Review must happen once, not once per document | — | Reasoning-stage — see "Pipeline stages" section | — |
-| 2026-08-11 | Four conditional early exits locked — nothing new/changed at Ingest, every file skipped at Ingest, nothing found at Extract, register unchanged at Match; Review is never skipped | Each spends no time or money producing an empty result rather than running stages to say nothing | — | Reasoning-stage — see "Pipeline stages" section | — |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the rules-change re-run decision:** Four conditional early exits locked — nothing new/changed at Ingest, every file skipped at Ingest, nothing found at Extract, register unchanged at Match; Review is never skipped | Each spends no time or money producing an empty result rather than running stages to say nothing | — | Reasoning-stage — see "Pipeline stages" section | — |
 | 2026-08-11 | State carries progress and pointers only; the database holds the material | LangGraph rewrites the whole state at every checkpoint — nine documents' extracted text held in state would be rewritten nine times over (~2.7M characters) to say the same thing once | Nothing is stored in both places — one source of truth, never two | Reasoning-stage — see "Run state and checkpoints" section | — |
 | 2026-08-11 | Checkpoints placed where redoing work is expensive; every stage writes on unit completion; Commit is atomic | A unit costs real time and money only at Extract (5–15s, a paid call); Ingest is cheap enough to simply rerun; a half-written Commit would leave the register lying about itself | — | Reasoning-stage — see "Run state and checkpoints" section | — |
 | 2026-08-11 | Review decisions write straight to the database, one at a time — never through state | A rejected finding must be remembered permanently across runs; state belongs to one run's thread and does not survive into the next | Whether decisions are written one at a time or batched stays deliberately open | Reasoning-stage — see "Run state and checkpoints" section | Revisit batched-vs-individual review writes |
-| 2026-08-11 | Run id = random UUID (also the LangGraph `thread_id`); one run per project via a database lock; a second run queues; only one `waiting` run allowed per project | A waiting run holds no batch — the batch forms only when a run starts — so a second waiting run would repeat identical, empty work; content-derived ids and row-level/optimistic locking were both considered and dropped | A run parked at Review holds the project's lock for as long as the reviewer takes | Reasoning-stage — see "Run identity and concurrency" section | Honest README limitation on the wait |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the rejected-export terminal status:** Run id = random UUID (also the LangGraph `thread_id`); one run per project via a database lock; a second run queues; only one `waiting` run allowed per project | A waiting run holds no batch — the batch forms only when a run starts — so a second waiting run would repeat identical, empty work; content-derived ids and row-level/optimistic locking were both considered and dropped | A run parked at Review holds the project's lock for as long as the reviewer takes | Reasoning-stage — see "Run identity and concurrency" section | Honest README limitation on the wait |
 | 2026-08-11 | **Seven database tables locked for slice 1** — `projects`, `runs`, `documents`, `register_rows`, `citations`, `decisions`, `audit` | Covers one `.md` file in, two rows out, approval over the API, export, and kill-and-resume; extracted text lives in `documents` rather than in graph state, matching the state-vs-database lock | Rules and findings have no table yet — they arrive with the rules-engine slice; LangGraph's own checkpoint table lives in the same Postgres and is not one of the seven | Reasoning-stage — see "Database tables — slice 1" section | Add rules/findings tables when that slice arrives |
 | 2026-08-11 | **Five API endpoints locked for slice 1** — start a run, poll status, submit one decision, finish review, fetch the export; React and MCP arrive in later slices | `POST /runs` returns the id immediately, matching `TASK.md`'s "a run is not an HTTP request" rule; finishing review is its own endpoint so the Delivery Owner can stop halfway without the system committing behind them | — | Reasoning-stage — see "API — slice 1" section | — |
+| 2026-08-12 | Status values = **six** (`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed` · `No evidence yet`), provisional and defined as a named set in code; the document page limit lives in `config/formats.yaml`; the citation quote-length maximum is a named constant in code | A row created before any delivery or testing evidence exists cannot be described truthfully by any of the original five values; `No evidence yet` reports on the register rather than on the work. The configuration-over-code rule names rules, formats, and thresholds; a status vocabulary is none of those, and treating every constant as configuration turns the config directory into a dumping ground | Adding a seventh status is a code change | Reasoning-stage — see "Register shape", "Citations", and "Extract — how documents are read" sections | — |
+| 2026-08-12 | **Citation location is derived, never modelled, with a duplicate-text limitation** — the mechanism is unchanged: the model returns only the source's exact words and code derives the location; a fabricated quote cannot pass, but where the same words appear more than once in one document, the first match is used and a wrong location is possible | The search proves that the quote exists in the document, not that a repeated occurrence is the passage the model read | The cited place may not be the passage the model read; nothing is built to disambiguate it | Reasoning-stage — see "Extract — how documents are read" section | — |
+| 2026-08-12 | Incremental input contract — **a batch is every new and changed file waiting when a run starts**; a later file is its own run; the Delivery Owner or a machine starts the run; a changed file is re-read in full; intra-file delta processing was considered and rejected | Diffs are unreliable on re-exported files; a changed region loses its surrounding context; deletions have no decided meaning; the saving is only one model call per edited file | A one-line edit to a 10-page document costs a full re-read of that document | Reasoning-stage — see "Incremental input contract" section | — |
+| 2026-08-12 | A run proceeds when a file is new or changed or when the rules have changed; a rules-only run skips Extract and Match and goes to Examine, which can only produce findings and cannot change a register cell; the other three early exits are unchanged | Tuning a rule threshold and re-running is a real use of this system, and the old exit made it silently do nothing | — | Reasoning-stage — see "Pipeline stages" section | Decide at build time how to detect that the rules have changed |
+| 2026-08-12 | A run is started against a `project_id`; the source folder is recorded on the project, not passed per run | Two runs on one project must not read different folders into one continuing register | The project must exist before slice 1 can start a run | Reasoning-stage — see "Database tables — slice 1" and "API — slice 1" sections | Decide at build time how a project is created in slice 1 |
+| 2026-08-12 | In slice 1, the run executes inside the FastAPI process; the per-project lock is a durable database row, not a session-level advisory lock; interrupted runs resume from their checkpoints on startup | Behaviour #6 penalises a second process to start, and a connection-scoped lock would free a project at the exact moment its run died half-finished | An in-flight run stops until the API process is restarted | Reasoning-stage — see "Run state and checkpoints", "Run identity and concurrency", and "API — slice 1" sections | Surface a lock row whose run cannot be resumed rather than clearing it silently |
+| 2026-08-12 | Run id = random UUID (also the LangGraph `thread_id`); one run per project via a database lock; a second run queues; only one `waiting` run allowed per project; the run status set gains terminal `closed without export` when the Delivery Owner rejects the export, so `done` and `closed without export` are the two ways a run can end; proposed rows live in `register_rows`, marked with the run that proposed them and settled at Commit; a review decision can change until `finish-review`, with the later answer overwriting the earlier answer, which is not kept | Marking a run `done` when nothing was exported would be a false success claim; one register with a proposed marker keeps Commit a state flip rather than a copy between tables; the `decisions` table already holds each answer before anything commits | The proposed-row representation and changeable-review-decision rule are v1 starting points, deliberately revisitable | Reasoning-stage — see "Human-gate actions", "Match and Examine", "Run state and checkpoints", "Run identity and concurrency", and "Database tables — slice 1" sections | Decide the exact proposed-state columns and rejected-proposal storage at build time |
+| 2026-08-12 | No behaviour is cut; each of the ten is assigned to a slice in the locked build order, with behaviour #10 (cost and timing) the first candidate if time forces a cut; the brief acceptance contract and the React/FastAPI/MCP boundary remain deferred to build time, not cut | The brief permits cutting behaviours #6–#10 with a stated reason, and the absence of a stated position made scheduled work look like dropped work | All ten behaviours remain in scope unless a later cut is made; behaviour #10 is only a candidate, not a decided cut | Reasoning-stage — see "Build order — vertical slices" section | Resolve the other two deferred items before their build slices; if a cut is made, record its reason in the Task 4 write-up |
+| 2026-08-12 | Model calls go through **OpenRouter**; the model name and base URL live in `config/model.yaml`, which ships with a working default chosen at build time; the API key comes only from the environment, with `.env.example` committed | One key can reach many models, and swapping the model remains a config change rather than a code change | One extra network hop and another service that can fail; no bundled or offline model; the working default is not pinned to a `:free` variant | Reasoning-stage — see "Model provider and client" section | Add `config/model.yaml` and `.env.example` at build time; verify the default model and its context window against the live OpenRouter catalogue; decide failure handling in Phase 3 #10 |
+| 2026-08-12 | One model client is constructed in one place and passed as an argument to Extract, Match, and Examine; stages never construct a client or read `config/model.yaml` themselves | Argument passing obeys the no-hidden-state rule, while one construction path prevents three copies of the same configuration logic from drifting | The client must be passed explicitly through the composition path | Reasoning-stage — see "Model provider and client" section | Prove at build time that all three stages use the injected client |
+| 2026-08-12 | `POST /runs/{id}/finish-review` is refused while any gated review decision is missing; the run stays at Review and the error names every outstanding decision | Finishing with an unanswered gate would claim completion while an approved output may not exist | The Delivery Owner must answer every gated review decision before the run can leave Review | Reasoning-stage — see "API — slice 1" section | Test refusal, the unchanged Review state, and the named outstanding decisions |
 
 ---
 
@@ -158,16 +169,16 @@ These four brief behaviours map directly onto LangGraph built-ins:
 | #9 "two runs at the same time stay two runs" | `thread_id` isolation + Postgres checkpointer (multi-worker safe) |
 
 Supporting reasons:
-- **Zero deviation cost.** The brief names LangGraph as the founder's own working stack. Building in it means our work is directly comparable to the job, and the write-up spends no words defending a deviation.
+- **Working-stack comparability.** The brief names LangGraph as the founder's own working stack. Building in it means our work is directly comparable to the job.
 - **One database.** `langgraph.checkpoint.postgres` puts checkpoints in the PostgreSQL instance we already need for pgvector retrieval. No second datastore, no second failure mode.
 - **Small explainable concept surface.** Six concepts total: State, Node, Edge, conditional edge, Checkpointer, interrupt. This matters because the founder may modify the build live — every concept must be defensible out loud without notes.
-- **Testable without a live key.** `GenericFakeChatModel` (scripted responses, including tool calls and errors) plus `InMemorySaver` satisfy the brief's behaviour #7 requirement that tests run without spending money.
+- **Testable without a live key.** No test needs a live key because the model is always `GenericFakeChatModel` (scripted responses, including tool calls and errors). The process-kill test additionally needs the Postgres checkpointer, because an in-memory checkpointer dies with the process it is meant to outlive. Whether `InMemorySaver` is used for tests that never kill a process remains part of the Phase 4 test strategy.
 - **Stage boundaries come free.** Because work is already partitioned into nodes, per-stage timing for behaviour #10 is a start/end stamp per node. In a monolithic loop the concept of a "stage" does not naturally exist, so the required breakdown would be artificial.
 
 ### Why the alternatives were rejected
 - **Hand-rolled agent loop:** would mean re-implementing checkpointing, resume semantics, and run isolation ourselves — i.e. writing a worse LangGraph with far less testing behind it. Time spent there buys no evaluation credit; the brief grades the four behaviours, not their implementation origin.
 - **LangChain-only (no LangGraph):** LangChain's single-pass chain model has no durable state or resume story. Behaviour #2 alone rules it out.
-- **AutoGen / CrewAI:** both are permitted, but neither is the founder's stack, and both would need a deviation justification in the write-up for no functional gain on the four behaviours above.
+- **AutoGen / CrewAI:** both are permitted, but offer no functional gain on the four behaviours above.
 
 ### LangChain usage boundary — what we deliberately do NOT use
 This is an explicit guardrail, not a preference. LangChain's older surface area is large and much of it is legacy.
@@ -225,9 +236,10 @@ This second case must be explicitly tested and documented in the README. Surfaci
 
 **Output flow:** documents → system builds register → human review → approved register exported.
 
-The deliverable type and one-requirement-per-row mental model are locked. Exact
-columns, statuses, row-matching behaviour, review actions, UI presentation,
-storage, and export format remain open for their own decision blocks.
+The deliverable type and one-requirement-per-row mental model are locked.
+Columns, statuses, row matching, review actions, storage, and export are locked
+in their own sections, several as v1 starting points marked there. UI
+presentation remains open.
 
 ## Domain — Software Requirements-to-Delivery (LOCKED 2026-08-11)
 
@@ -306,8 +318,9 @@ integration are not part of this document-analysis domain.
 ## Human-gate scope (LOCKED 2026-08-11)
 
 **The rule that generates the table:** the gate applies where the system is
-making a **judgement** or **changing something that already exists**. Where it
-is only copying a fact, it does not.
+making a **judgement** or **changing what an existing row means**. Adding
+further evidence for the same meaning is not a change of meaning. Where the
+system is only copying a fact, the gate does not apply.
 
 | # | Scenario | Gate? | Reason |
 |---|---|---|---|
@@ -315,7 +328,7 @@ is only copying a fact, it does not.
 | 2 | New evidence added to an existing row, same meaning | No | Same fact, more proof; nothing changed |
 | 3 | A new document changes the meaning of an existing row | Yes | This is a conflict; the system may not decide it |
 | 4 | Possible match to an existing row — the system is unsure | Yes | A wrong merge corrupts the register silently and is hard to catch later |
-| 5 | Conflict — two sources make incompatible claims | Yes | The brief's own rule: surface both sides, the human chooses |
+| 5 | Conflict — two sources make incompatible claims | Yes | The system may not resolve the conflict silently; it must surface it for a person |
 | 6 | Rule finding (R1–R4) | Yes | A judgement, drawn from the user's own supplied rules |
 | 7 | Deliverable-side finding (D1/D2) | Yes | The system doubting its own output; it must not clear itself |
 | 8 | Blocker — work is explicitly stopped | No | A fact written in a source document, not an opinion |
@@ -363,16 +376,25 @@ the system respects every decision."*
 | # | Scenario | System proposes | Approve | Reject |
 |---|---|---|---|---|
 | 3 | New document changes an existing row's meaning | "Attach this opposing claim to row #4, both sides" | Both claims show on the row | Row stays as it was |
-| 4 | Uncertain match | "Merge this new requirement into row #7?" | One row | Two separate rows |
+| 4 | Uncertain match | "Merge this new requirement into row #7?" | One row | Merge does not happen; the two rows stay separate |
 | 5 | Conflict | "Show this conflict on row #3, both sides" | Conflict shows in the register | It does not |
 | 6 | Rule finding | "R1 broken — attach this finding to row #3" | Finding travels with the row | It does not |
 | 7 | Deliverable finding | "D1 broken — this row carries no source citation" | Finding shows | It does not |
 | 11 | Update proposal | "Change these 2 rows, leave the other 6 untouched" | Change applies | Register unchanged |
-| 12 | Final export | "Export this register" | Export happens | It does not |
+| 12 | Final export | "Export this register" | Export happens | It does not; the run ends as `closed without export` |
+
+Only rejection at the final export gate ends the run. Rejecting an uncertain
+match, finding, conflict, or update proposal stops that proposal and the run
+continues to the next proposal. `done` and `closed without export` are the two
+terminal statuses; reaching either releases the project lock. The run history
+therefore distinguishes an exported register from one the Delivery Owner saw
+and deliberately chose not to export.
 
 **On a conflict, the buttons only decide whether the conflict is shown** —
-never which side is right. Choosing a side would be resolving it, which the
-brief forbids.
+never which side is right. The register records facts, not judgements. Which
+claim is correct is not a fact present in any document, so the system has no
+basis to record it; a button that recorded it would put a judgement into a
+facts-only register.
 
 **Reject = excluded from the register, kept in the run record, permanently.**
 The record is what makes "do not ask again" possible; without it the same
@@ -436,12 +458,27 @@ The task PDF does not say who starts a run. This is a logged assumption under
 the PDF's own page-4 rule — make a reasonable call, write it and the reasoning
 down. It belongs in the README, not only here.
 
-**A batch holds both new and changed files; only the changed part of an
-edited file is processed, never the whole document again.** This half is the
-brief's own requirement — task PDF page 2: "not a rewrite and not a full
-re-run ... an update should cost like an update." Working out what changed
-inside an edited file means the system must retain the earlier version —
-architecture-phase work, same Phase 3 box.
+**A batch holds both new and changed files, and a changed file is read again
+in full.** Documents that have not changed are never read or sent to a model
+again; their previously extracted text remains in the `documents` table. Not
+re-reading untouched documents is the brief's requirement, and it is met.
+
+Processing only the edited portion of a changed file was considered and
+deliberately not built:
+
+1. **Diffs are unreliable on real files.** Re-exporting a `.docx` can change
+   whitespace and paragraph flow throughout its extracted text after a
+   one-line edit, so most of the document appears changed. A re-exported PDF
+   has the same problem.
+2. **A changed region loses its surrounding context.** A line such as "Also
+   add search" has no reliable meaning without the section heading and nearby
+   requirements.
+3. **Deletion has no decided meaning.** A removed bullet might withdraw a
+   requirement, remove its row, or conflict with testing feedback that already
+   refers to it. That behaviour is not decided.
+4. **The saving is only one model call per edited file.** A run normally holds
+   one to three files, and edited files are a minority. The larger saving is
+   already in place because untouched documents are never re-read.
 
 **A file removed from the watched location changes nothing.** Its rows stay
 in the register. The document did arrive once; deleting the file does not
@@ -458,7 +495,7 @@ Every incoming file passes two checks, in order: **format first, then type.** A 
 ### Lock 2a — accepted file formats
 - **Accepted:** `.pdf`, `.docx`, `.md`, `.txt`. Anything else is skipped with reason `unsupported format`.
 - **Reason:** these are the shapes real project documents actually arrive in. Email threads are represented as `.txt`/`.md` files rather than `.eml`, avoiding mail-parsing complexity for no evaluation gain.
-- **Trade-off:** images/screenshots and spreadsheets are out. Acceptable — task PDF page 8 rails spreadsheet-output products out anyway, and screenshots carry no extractable claim text.
+- **Trade-off:** images/screenshots and spreadsheets are out. Acceptable in this domain: requirements arrive as meeting notes, client requirements documents, and testing feedback, not spreadsheets, so no spreadsheet reader is written; images/screenshots carry no extractable claim text.
 - **This list lives in config, not code.** See "Config/code split" immediately
   below — the list itself is a data change, while the reader behind each
   format is a deliberate hard-coded defence. Updated 2026-08-11; see the
@@ -470,7 +507,7 @@ Every incoming file passes two checks, in order: **format first, then type.** A 
 - **Encoding:** UTF-8 assumed with Latin-1 fallback. If both fail, file skipped with reason `unreadable encoding`.
 - **Folder scan:** Top-level files only. Subfolders ignored. Documents read in-place — no copy, no upload.
 - **Pre-processing:** None. pdfplumber and python-docx produce clean output. Text passed raw to next node.
-- **Processing order:** Sequential, one document per node pass. Extraction is fast (~1s for 9 documents); parallelism adds complexity with no meaningful speed gain. Kill-resume covers every document boundary via the checkpointer.
+- **Processing order:** Sequential, one document per node pass. Extraction is fast (~1s for 9 documents); parallelism adds complexity with no meaningful speed gain. Ingest carries no internal checkpoint because rereading a file is cheap (~0.1s, no model call); the per-document checkpoint lives in Extract, where one unit costs 5–15s and a paid model call.
 
 ### Config/code split — where the format list lives (LOCKED 2026-08-11)
 
@@ -503,7 +540,7 @@ When a file opens successfully, the system decides — it is not matched against
 | 2. Related additional type | Belongs to this client software engagement, but is not one of the three primary types | Extract relevant facts and identify it as a `related additional document` |
 | 3. Unrelated | Not about this client software engagement at all (e.g. a resume) | Skip, with the reason recorded |
 
-- **Alternatives rejected:** (A) strict — process only the declared types, skip everything else. Rejected: a hardcoded type list is exactly the "fixed script with labels" the task PDF warns against on page 2. (B) open — attempt to process anything. Rejected: irrelevant files would contaminate the analysis.
+- **Alternatives rejected:** (A) strict — process only the declared types, skip everything else. Rejected: a strict list would discard useful delivery evidence. (B) open — attempt to process anything. Rejected: irrelevant files would contaminate the analysis.
 - **Reason for the middle path:** the classification decision is made by the system at runtime, satisfying task PDF page 12 ("intelligence in the system deciding, code executing"), while the format gate stays deterministic.
 - **Evidence:** must be proven by a second-run test using a different project that deliberately contains one bucket-2 and one bucket-3 file.
 
@@ -604,17 +641,19 @@ was never in writing, so asking for it is a change request — the client calls
 both a bug. Where the evidence cannot separate the two, the label is
 `Unclear` and the system does not decide.
 
-### Status — five values, provisional
+### Status — six values, provisional
 
-`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed`
+`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed` · `No evidence yet`
 
 Deliberately provisional: more may be added once the product is being built.
-Adding one is a config edit, never a code change (task PDF page 12, "a data
-change, not a rewrite"). `Blocked` and `Never happened` are kept deliberately
-separate: one is a wait with a known cause, the other is something that fell
-through silently — entirely different problems to the Delivery Owner. A
-status column earns its place once a register is too long to scan as plain
-text.
+The values are a fixed set defined in code; adding one is a code change, made
+deliberately. `No evidence yet` means no source has yet reported delivery or
+testing for this requirement. `Blocked` and `Never happened` are kept
+deliberately separate: one is a wait with a known cause, the other is something
+that fell through silently — entirely different problems to the Delivery
+Owner. `Never happened` is a positive claim that something fell through and
+requires evidence, whereas `No evidence yet` claims nothing. A status column
+earns its place once a register is too long to scan as plain text.
 
 ### Conflicts, findings, and the possible-match flag attach to a row — they are not columns
 
@@ -640,11 +679,16 @@ never reaches a file, a cell, or a screen.
 
 ## Citations (LOCKED 2026-08-11)
 
-**Three parts: file · place · the words themselves.** For example:
-`meeting-notes-10-mar.md` · page 2, "Discussion" · *"they also want search
-over old records."* A filename alone is not "the exact place" the brief asks
-for — on a 20-page PDF it sends the reader off to hunt. Carrying the quoted
-words means the Delivery Owner usually never has to open the file at all.
+**For something present, three parts: file · place · the words themselves.**
+For example: `meeting-notes-10-mar.md` · page 2, "Discussion" · *"they also
+want search over old records."* A filename alone is not "the exact place" the
+brief asks for — on a 20-page PDF it sends the reader off to hunt. Carrying the
+quoted words means the Delivery Owner usually never has to open the file at
+all.
+
+**For something absent:** the citation names the exact file read and states
+that the requirement is not in it. A place and quoted words do not apply to an
+absence.
 
 **Each format supplies the location it can actually produce:**
 
@@ -660,9 +704,8 @@ number is a poor locator inside a PDF, where the page is what a reader can
 actually use.
 
 **Quote length:** roughly one sentence — enough for the claim to stand on its
-own. A maximum length lives in config (a client who writes paragraph-long
-bullets should not inflate the register), changed by editing config, never
-code.
+own. A maximum length is a named constant in code (a client who writes
+paragraph-long bullets should not inflate the register).
 
 ## Export, audit history, and unchanged proof (LOCKED 2026-08-11)
 
@@ -744,7 +787,8 @@ Behaviour #1 requires decisions that can change the path:
 
 | Where | Condition | What happens |
 |---|---|---|
-| Ingest | Nothing new or changed | Run ends here |
+| Ingest | No new or changed file and the rules are unchanged since the last run | Run ends here |
+| Ingest | No new or changed file but the rules changed | Skip Extract and Match; go to Examine |
 | Ingest | One file's format is unsupported, or it will not open | Skip that file with its reason; the rest continue |
 | Ingest | Every file was skipped | Run ends here, reasons shown |
 | Extract | The document is unrelated to this engagement | Skip it; the rest continue |
@@ -755,9 +799,14 @@ Behaviour #1 requires decisions that can change the path:
 
 Four of these end the run early (the "Run ends here" rows); each exists for
 the same reason — running the remaining stages to produce an empty result
-spends time and money to say nothing. The "register did not change" exit
-also handles a duplicate or renamed document: its requirements match
-existing rows with citations already present, so nothing new is proposed.
+spends time and money to say nothing. The Ingest exit applies only when there
+is no new or changed file and the rules are unchanged since the last run. The
+"register did not change" exit also handles a duplicate or renamed document:
+its requirements match existing rows with citations already present, so
+nothing new is proposed.
+
+How the system detects that the rules have changed since the last run is
+build-time work.
 
 ## Extract — how documents are read (LOCKED 2026-08-11)
 
@@ -789,8 +838,11 @@ once the build is real.
 **Citations: the model supplies the words, the code finds the place.** The
 model returns the source's exact words and nothing about location; the code
 searches the document text for those words and derives the page, heading,
-or line itself. Location comes from code, never from the model, so a wrong
-one is not possible.
+or line itself. Location comes from code, never from the model. A fabricated
+quote cannot pass.
+
+Where the same words appear more than once in one document, the first match
+is used, so the cited place may not be the one the model read.
 
 This doubles as a fabrication detector: words the model invented will not
 be found in the text, and the extraction is flagged. The two error
@@ -803,13 +855,13 @@ newlines — **no fuzzy matching**, which could match the wrong passage and
 reintroduce the risk this avoids. The prompt tells the model to copy
 wording verbatim, keeping false alarms rare.
 
-**Document size limit lives in config; no chunking built.** The domain is
-small teams and freelancers, where documents run 5–10 pages; 40–50 would
-already be unusual. Measured against real data (the 59-page,
+**Document size limit lives in `config/formats.yaml`; no chunking built.** The
+domain is small teams and freelancers, where documents run 5–10 pages; 40–50
+would already be unusual. Measured against real data (the 59-page,
 315k-character PDF from the library test, ≈80k tokens) the context ceiling
-only bites past roughly 150 pages — far beyond anything expected. A page
-limit therefore lives in config, documents beyond it are skipped with the
-reason stated, and the limit is declared in the README.
+only bites past roughly 150 pages — far beyond anything expected. A page limit
+therefore lives in `config/formats.yaml`, documents beyond it are skipped with
+the reason stated, and the limit is declared in the README.
 
 ## Match and Examine (LOCKED 2026-08-11)
 
@@ -823,6 +875,21 @@ requirement, and only a model seeing them together notices. **Match writes.
 It is the only stage that changes the register** — and even what it writes
 stays a proposal until Commit; nothing is settled before the human approves
 it at Review.
+
+Proposed rows are written into `register_rows` itself. Each carries the id of
+the run that proposed it and a marker that it is not committed. Commit settles
+the row; rejection removes it from the proposed register. A proposal is not
+part of the register available for export, and fingerprints cover committed
+rows only.
+
+A separate `proposals` table was rejected. It would create two structures for
+one row and make Commit copy data between them, increasing the risk of a
+partly copied register. Keeping the proposal in `register_rows` makes Commit a
+state change. The exact column or state name, and whether a rejected proposal
+is deleted or retained with a rejected marker, remain build-time details.
+
+> **V1 starting point, deliberately revisitable.** Proposed rows living in
+> `register_rows` is the defined starting shape, not a permanent constraint.
 
 **Examine** is given the register Match produced and `config/rules.yaml`,
 and runs each rule to produce findings. One call for the whole register,
@@ -843,6 +910,55 @@ nothing.**
   ten rules would swamp the matching work.
 - The saving is one call out of eleven, on a ~250-token register — not
   worth it.
+
+## Model provider and client (LOCKED 2026-08-12)
+
+Development and demo runs call models through **OpenRouter**, using its
+OpenAI-compatible interface. The model name and base URL live in
+`config/model.yaml`, which ships with a working default already filled in.
+The exact default model id is deliberately fixed at build time, when it can be
+checked against the live OpenRouter catalogue rather than guessed here. The
+API key comes only from the environment: a stranger copies `.env.example` to
+`.env` and supplies an OpenRouter key there. The key never appears in committed
+config. Tests remain separate from this setup and use
+`GenericFakeChatModel`, with no provider or key.
+
+This closes the provider, credentials, and model-swapping gap shared by
+Extract, Match, and Examine. The brief names no model provider, and its
+no-real-money guidance constrains development and demo cost rather than
+requiring every run to use a free tier. One OpenRouter key can reach many
+models, while naming the model in config makes a swap a data change instead of
+a code change. The OpenAI-compatible boundary also keeps the dependency
+surface to one client instead of a provider-specific package.
+
+The model client is constructed in exactly one place, then passed as an
+argument to Extract, Match, and Examine. None of those stages constructs its
+own client or reads `config/model.yaml` directly. Passing the client obeys the
+no-hidden-state rule; one construction path also prevents three copies of the
+same configuration logic from drifting. `model.yaml`, `rules.yaml`, and
+`formats.yaml` remain separate because they configure different concerns.
+
+A single named hosted provider was rejected because changing vendor would
+require a code and dependency change. Ollama was rejected because local calls
+would make the demo much slower and small local models tend to paraphrase when
+Extract needs exact words. Groq's free tier was rejected because its open
+models are less reliable at structured output and verbatim copying. A client
+built independently inside each stage was rejected because it duplicates
+configuration logic; a module-level global client was rejected because it is
+hidden state.
+
+The accepted trade-off is an extra network hop and another service that can be
+slow or unavailable. OpenRouter's `:free` variants can also be rate-limited or
+flaky, so the working default is not pinned to one. There is no
+bundled or offline model. A weak hosted model does not make citation failures
+silent: the exact-word check in "Extract — how documents are read" flags an
+invented or paraphrased quote that cannot be found in the source.
+
+This is reasoning-stage only; no model has been called from this repository.
+At build time, `config/model.yaml` and `.env.example` must be added, the default
+model must be verified against the live OpenRouter catalogue, and its context
+window must be checked against the existing measured document ceiling. Model
+failure, retry, logging, timing, and cost behaviour remains Phase 3 #10 work.
 
 ## Run state and checkpoints (LOCKED 2026-08-11)
 
@@ -897,6 +1013,33 @@ interrogate. So: **state answers "where has the graph got to"; the database
 answers "what was decided."** On resume, the graph picks up at Review and
 reads from the database how many decisions are in and how many remain.
 
+Until `finish-review` is pressed, the Delivery Owner can change a decision.
+The later answer updates the existing `decisions` row and the earlier answer
+is not kept. Nothing has committed at that point, so the earlier answer is not
+a register change. After `finish-review`, no decision can change: that press
+validates that every gated review decision has an answer and advances according
+to those answers. An approved export proceeds to Commit; a rejected export
+closes the run without one. This does not alter the permanent suppression of a
+rejected finding after Commit. Refusing changes before that point was rejected
+because one misclick would lock in a wrong answer without protecting any
+committed state.
+
+> **V1 starting point, deliberately revisitable.** Overwriting a review
+> decision before `finish-review` is the defined starting behaviour.
+
+On application startup, runs left in `running` continue from their LangGraph
+checkpoints without a separate resume call. The startup sweep takes ownership
+of each run's durable project lock, and the lock is released when the run
+finishes. If a run cannot be resumed, the application surfaces the problem
+instead of silently clearing the lock. An explicit resume API was rejected
+because the graded restart behaviour promises that restarting the process is
+enough to continue the run.
+
+The review screen reads the same durable progress. `GET /runs/{id}` returns
+the recorded stage, status, and skipped work, and the screen polls it. Because
+progress lives in Postgres rather than only in the process, the screen cannot
+show a state the server has not recorded.
+
 > **Revisitable.** Whether Review decisions are written one at a time or
 > batched is deliberately left open. Locked as one-at-a-time only so the
 > build has a defined starting point — Aditya wants to reopen it later and
@@ -907,15 +1050,28 @@ reads from the database how many decisions are in and how many remain.
 **Run id is a random UUID**, doubling as the LangGraph `thread_id`. Its only
 job is identification.
 
-**One run at a time per project, enforced by a database lock.** Two
-different projects run side by side untouched; a second run on the same
-project does not start while the first holds the lock.
+**In slice 1, a run executes as a background task inside the FastAPI process
+that accepted `POST /runs`.** There is no separate worker process or task
+queue. Slice 1 runs one API process; a separate worker remains a legitimate
+later change if higher concurrency requires it.
+
+**One run at a time per project, enforced by a durable database row.** This is
+not a session-level advisory lock: a connection-scoped lock would disappear
+when a killed process closed its connection, making a half-finished project
+look free. The row survives process death and is released only when the run
+reaches a terminal status or is deliberately reconciled. Whether it is a
+column on `projects` or a claim associated with `runs` is a build-time detail.
+Two different projects run side by side untouched; a second run on the same
+project does not start while the first holds the lock. The database row keeps
+that guarantee correct even if the API later runs multiple processes.
 
 **A second run is queued, not refused.** It is created immediately and
-returns its id with status `waiting`; when the first run commits, it starts
-on its own. A run's status moves `waiting` → `running` → `waiting for
-review` → `done`, and is polled — matching `TASK.md`'s "a run is not an HTTP
-request" rule.
+returns its id with status `waiting`; when the first run reaches a terminal
+status, it starts on its own. A run's status moves `waiting` → `running` →
+`waiting for review`, then ends as either `done` after export or `closed
+without export` after the Delivery Owner rejects export. The status is polled,
+matching `TASK.md`'s "a run is not an HTTP request" rule. Either terminal
+status releases the lock and allows the queued run to start.
 
 **Only one `waiting` run per project.** Pressing again returns the same
 waiting run's id rather than creating another, because **a waiting run
@@ -942,6 +1098,23 @@ twice queues the second run, which then runs and exits cleanly with a
 stated reason if nothing changed; state corruption is impossible because
 two runs never write one register concurrently.
 
+**Execution trade-offs accepted:**
+
+1. If the API process dies, its in-flight run stops. Completed work remains in
+   the Postgres checkpoint, but execution waits for the process to restart.
+2. The lock cannot be tied to the process. A durable database row can remain
+   truthful after the process and its connections have gone away.
+3. Blocking work cannot sit on the event loop. File reads and model calls run
+   off the loop, following `TASK.md`'s existing thread rule.
+4. Multiple API workers would break the slice 1 assumption that one process
+   holds one run. The database lock, rather than that assumption, preserves
+   correctness if the process model changes.
+
+The durable lock and startup resume are permanent design choices. Executing
+the work inside the API process is slice 1 only. A killed process can leave a
+project safely occupied until startup resumes its run; the system fails closed
+instead of allowing another run to write the same register.
+
 **Honest limitation for the README.** One run at a time per project, and a
 run parked at Review holds the lock for as long as the human takes.
 Acceptable here — the domain is one Delivery Owner per project — but it must
@@ -954,10 +1127,10 @@ approval over the API, export, and a kill-and-resume that holds:
 
 | Table | Holds |
 |---|---|
-| `projects` | One client engagement, owning one continuing register |
-| `runs` | The run id, its status (`waiting` / `running` / `waiting for review` / `done`), which project it belongs to, timing, cost |
+| `projects` | One client engagement, owning one continuing register and the path to its folder of source documents |
+| `runs` | The run id, its status (`waiting` / `running` / `waiting for review` / `done` / `closed without export`), which project it belongs to, timing, cost |
 | `documents` | The text Ingest extracted — deliberately here rather than in the graph state |
-| `register_rows` | The requirements: seven cells per row, plus that row's fingerprint |
+| `register_rows` | The requirements: seven cells per row, that row's fingerprint, the proposing run id, and whether the row is committed |
 | `citations` | Per cell: which cell, which file, which place, and the source's own words |
 | `decisions` | What the human approved or rejected, and when |
 | `audit` | Which cell changed, from what to what, in which run, because of which document |
@@ -982,7 +1155,7 @@ slices, per the build order's "interface last".
 
 | Endpoint | Does |
 |---|---|
-| `POST /runs` | Start a run. Returns the id immediately; the work continues in the background |
+| `POST /runs` | Start a run against a `project_id`. Reads the source folder recorded on that project and returns the id immediately; the work continues in the accepting FastAPI process |
 | `GET /runs/{id}` | Status — which stage, what it cost, what was skipped and why |
 | `POST /runs/{id}/decisions` | One decision: "F-01 approved" |
 | `POST /runs/{id}/finish-review` | The reviewer is done; the graph may continue |
@@ -992,11 +1165,44 @@ slices, per the build order's "interface last".
 *"a run is not an HTTP request; starting a run returns an id immediately,
 progress is polled."*
 
+`POST /runs` takes only the `project_id`; the source-folder path is not a
+per-run input. A project owns one continuing register, so keeping its folder
+on the `projects` row prevents two runs from reading different folders into
+that register. In slice 1, Ingest reads the folder directly; a later watcher
+uses the same project property. Passing a folder path in each run request was
+rejected because it would allow one register to describe unrelated source
+folders. Slice 1 needs one project to exist, but whether it is created by a
+seed fixture, migration, or another build-time mechanism is left to
+implementation. No project-creation endpoint is decided.
+
+`GET /runs/{id}` reports `closed without export` like any other status; the
+endpoint set does not change.
+
+The in-process background task adds no second service or command to the slice
+1 setup. A separate worker was rejected for this slice because it would add a
+second process to start without providing checkpoint durability, which
+LangGraph's Postgres checkpointer already provides.
+
 **Why finishing the review is its own endpoint**, rather than the graph
 resuming by itself once every pending item has a decision: the Delivery
 Owner must be able to stop halfway, think, or go and ask someone, without
-the system committing behind them. That final press is itself a gated
-action — export approval, scenario #12 of the human-gate scope.
+the system committing behind them. That final press declares that the Delivery
+Owner is done; it does not answer any gate, including export approval,
+scenario #12 of the human-gate scope.
+
+`POST /runs/{id}/finish-review` is refused while any gated review decision is
+missing. The run stays at Review, and the error names every outstanding
+decision and tells the Delivery Owner to answer it before trying again. For
+example, if an uncertain match was rejected but export approval was never
+answered, the endpoint reports that export approval is still outstanding and
+does not advance the run.
+
+Accepting an incomplete review was rejected because the run could move on
+without producing an export, leaving the Delivery Owner with a false impression
+that review had finished successfully. That is the false completion forbidden
+by `TASK.md`. The refusal also preserves the reason this endpoint exists: the
+Delivery Owner can stop halfway and return later without the system committing
+behind them.
 
 ## Requirement identity — how one row is formed (LOCKED 2026-08-09, v1 starting point)
 
@@ -1016,7 +1222,7 @@ The mirror danger matters just as much: *"email notification"* and *"SMS notific
 
 **Locked method:** when a new candidate requirement is extracted, the current register is passed to the model, which decides: match an existing row, or create a new one. **No embedding/vector layer in this path.**
 
-- **Match** → no new row; the source citation is *added* to the existing row. One row accumulates several citations, which is how *First appeared* and *What testing found* both get filled on a single row.
+- **Match** → no new row; the source citation is *added* to the existing row. One row accumulates several citations, which is how *First seen* and *What testing found* both get filled on a single row.
 - **Uncertain** → do not merge and do not guess. Flag the row (`possibly the same as row N`) and let the human decide at review. This is behaviour #5 (never bluff) applied to row identity.
 - **Wrong merges are recoverable** — the human gate sits in front of the register, so a bad merge cannot pass silently.
 
@@ -1194,7 +1400,7 @@ public `superdocsapp/superdocs-builds` repository. This repository is Task 1.
 > **Mockup superseded (2026-08-11).** The screen below is a record of the
 > original thinking, not the current design. Three things in it are now
 > wrong: the `classify` stage (dropped 2026-08-10), the status `Delivered`
-> (not one of the five current status values), and `[✓] [✗]` against the
+> (not one of the six current status values), and `[✓] [✗]` against the
 > register implying per-row approval (the human-gate scope locked 2026-08-11
 > does not gate plain rows). The redesign is deferred to the architecture
 > phase — the screen's shape depends on the API and register, neither of
@@ -1252,11 +1458,6 @@ sides of a conflict next to each other so a human can decide without opening a
 file; the *reason* a file was skipped rather than the fact of it; how long a
 blocked requirement has been stuck. That is judgement, not styling.
 
-**Beyond the brief, marked optional.** The working notes say a human can
-"approve, reject, modify, or resolve" a finding. The brief itself (page 2) only
-requires **approve and reject**. Modify and resolve are our own addition — build
-them only if the required behaviours are all finished and time remains.
-
 ---
 
 ## Build order — vertical slices (LOCKED 2026-08-09)
@@ -1301,6 +1502,24 @@ already proven.
 rules engine and findings → MCP wrappers over the same API → incremental update
 with its invariance proof → concurrency and idempotency → the review interface →
 cost and timing.
+
+| # | Behaviour | Where it lands |
+|---|---|---|
+| 1 | Visible stages whose decisions change the path | Slice 1 — the six stages and the conditional routes |
+| 2 | Survives being stopped | Slice 1 — Postgres checkpointer and the kill-and-resume test |
+| 3 | Human holds the gate, item by item | Slice 1 — Review and `POST /runs/{id}/decisions` |
+| 4 | A machine can drive it | Half in slice 1 — approval is already an API operation, which is what the PDF requires; the MCP server is the strongest form and arrives in the MCP slice |
+| 5 | Never bluffs | Slice 1 — the citation locator's fabrication check, and `No evidence yet` rather than an invented status |
+| 6 | A stranger can run it | Slice 1 — docker-compose, README, and `TASK.md`'s Commands section |
+| 7 | It proves itself | Slice 1 onwards — tests from the first slice, none needing a live key |
+| 8 | Takes no orders from its documents | Its own slice — Extract already reports embedded instructions rather than following them; the detector comes with that slice |
+| 9 | Concurrent runs stay separate | The concurrency slice |
+| 10 | It knows what it cost | The cost-and-timing slice |
+
+If time runs short, behaviour #10 is the first candidate to cut because its
+absence does not weaken a claim the system makes about its own output. This is
+a candidate, not a decision. A cut is decided only when made, and its reason
+then goes in the Task 4 write-up.
 
 **Why the interface is last.** Behaviour #4 requires approval to be an API
 operation, so the API *is* the real interface and the screen is a thin client

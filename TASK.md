@@ -146,8 +146,9 @@ differently.
   progress is polled. Long work must survive the client hanging up.
 - **Pydantic at the boundary, plain data inside.** Validate once at the edge,
   then trust it.
-- **The review UI stays small.** One list, two buttons. No state library, no
-  design system — `useState` and `fetch` are enough for one screen.
+- **The review UI stays small.** Follow `DECISIONS.md`'s locked "Review
+  interface — scope"; no state library, no design system — `useState` and
+  `fetch` are enough for one screen.
 - **Migrations from the first table** (Alembic). Without them a fresh clone
   cannot build its schema, and "a stranger can run it" fails on step one.
 - **One Postgres.** LangGraph's checkpoints and our own tables live together.
