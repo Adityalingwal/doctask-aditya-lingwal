@@ -65,16 +65,27 @@ this domain.
   reviewer takes, so a queued run may wait a long time — it is waiting, not
   stuck.
 
+- **A process kill can repeat one model call.** If the process is killed
+  between a model call returning and its checkpoint being written, that one
+  document is read again on resume. No work is lost and nothing is duplicated
+  in the register — only that single call is repeated.
+
+- **Files arriving during human review wait for the next run.** They wait for
+  that review to finish and are then collected into the next batch; they are
+  not lost.
+
 - **Documents beyond the configured page limit are skipped**, with the
   reason given, rather than being split up.
 
 - **A changed document is re-read in full**, rather than only its edited
   part. Documents that have not changed are never re-read.
 
-## Assumptions
+- **Reported run cost is an estimate.** It is the token count from the model's
+  response multiplied by a configured rate, not a bill.
 
-- **Who starts a run.** The brief does not say. Our call: the system watches
-  the location and reports what has arrived, but a run itself is
-  started by the Delivery Owner, or by a machine calling the same operation.
-  Reason: auto-starting would break the one-run-one-batch rule and is the
-  easiest route into the duplicate-run problem the brief grades.
+## Run start
+
+The system polls each project's folder every 10 seconds. When at least one file
+is new or changed, no run is active on that project, and the folder has been
+quiet for 30 seconds, a run starts by itself. Manual start through `POST /runs`
+remains available.

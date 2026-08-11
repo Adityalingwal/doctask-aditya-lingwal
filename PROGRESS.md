@@ -8,74 +8,42 @@ Locked decisions and their reasoning live in `DECISIONS.md`, not here.
 _Rewritten in place — this section always describes the present, not the past._
 
 **2026-08-12.** Phase 1 (product contract) and Phase 2 (information design)
-are both complete — see the Planning roadmap below. The domain contract is
-**Software Requirements-to-Delivery**, with Client and Software Provider as
-the actors; the workflow boundary, primary document types, and core domain
-cases are locked in `DECISIONS.md`.
+are complete. The final deliverable remains the seven-column
+**Requirements-to-Delivery Register**, with per-cell citations, six status
+values, and the provider-side Delivery Owner as both system user and human
+reviewer.
 
-The final deliverable is the **Requirements-to-Delivery Register** — seven
-columns, per-cell citations, six status values. The provider-side Delivery
-Owner is both the system user and human reviewer. One run is one complete
-processing cycle for one submitted document batch; the incremental input
-contract now defines what a batch is and who starts a run. The human-gate
-scope and its two actions, Approve/Reject, are locked in `DECISIONS.md`.
+Phase 3 (system architecture) is closed apart from two remainders that belong
+to later build slices: the rules and findings tables, and the MCP tool surface
+plus React screen shape. The seven slice-1 database tables, migrations from the
+first table, five slice-1 API endpoints, pipeline, LangGraph state and
+checkpoints, review state machine, watched-folder trigger, focused-update
+contract, prompt-injection boundary, failure handling, retry, logging, timing,
+and estimated cost behaviour are locked in `DECISIONS.md`.
 
-Phase 3 (system architecture) is under way and deliberately partial: the
-architecture slice 1 needs is now settled — pipeline stages and LangGraph
-state/checkpoints in full, plus the slice-1 share of run identity (a
-random-UUID run id, one run per project by database lock, a queued second
-run), database tables (seven), the API (five endpoints), and the document
-parsing and model/provider boundary (OpenRouter through one injected client) —
-so implementation can begin. The rest of Phase 3 is decided alongside the
-slice that needs it.
+Runs use random UUIDs, a durable per-project database lock, and one waiting
+run. The project folder is polled every 10 seconds and starts a run after 30
+seconds of quiet when new or changed files are waiting and no run is active.
+Extract has one retry and a 120-second per-call timeout; the narrow
+answer-to-checkpoint kill window is documented as a one-call repeat
+limitation. Logs are JSON lines on stdout, stage timing is measured, and run
+cost is reported as an estimate from token counts in model response metadata
+and a configured rate.
 
-The pending consistency audit covers the review-screen redesign, run
-idempotency, and the still-open short-document/pgvector assumption. The
-review screen's `DECISIONS.md` mockup is no longer a silent contradiction —
-it now carries a banner naming the three things about it that are outdated;
-the redesign itself stays deferred to the architecture phase (see "Review
-interface — scope" in `DECISIONS.md`).
-
-`TASK.md` is written apart from its Commands section, which stays empty until
-the project structure exists.
-
-All 27 findings from the two independent documentation reviews are resolved
-and their list has been removed. Nothing from those reviews is outstanding.
-
-**LangGraph learning exercise complete.** A throwaway five-node graph with
-SQLite checkpointer, interrupt/Command, and kill-and-resume was built and tested
-externally. The six core concepts (State, Node, Edge, Conditional Edge,
-Checkpointer, interrupt/Command) are in hand.
-
-**Ingest pipeline scoping started.** PDF library choice locked: `pdfplumber` for
-extraction, `pypdf` for encryption detection. Decision and evidence in
-`DECISIONS.md`. Accepted formats declared in `README.md`.
-
-No code yet in this repository.
-
-Documentation history now follows an explicit policy: the Decision Log is
-append-only, canonical sections contain only current truth, and current-facing
-files do not carry stale alternatives. Root `CLAUDE.md` imports the repository
-working contract and defines source priority and continuation rules for future
-Claude Code sessions.
+Phase 4 proof and implementation planning is next. The short-document/pgvector
+assumption remains open until real sample projects are measured. `TASK.md` is
+written apart from its Commands section, which stays empty until the project
+structure exists. No code exists in this repository yet.
 
 ## Planning roadmap
 
 This section tracks only status and continuation order. Decision reasoning stays
 in `DECISIONS.md`; implementation detail belongs in code and tests.
 
-**These four are not four gates in a row.** Phases 1 and 2 are closed, but
-phase 3 is not finished before code starts. Only what the first slice needs is
-settled first — components and data flow, and LangGraph state and checkpoints,
-in full; plus the slice's share of run identity, database tables and
-migrations, and the API. The rest — parsing and model boundary, the
-human-review state machine, watched folder and focused update, prompt-injection
-and no-bluff controls, failure and cost behaviour — is decided alongside the
-slice that needs it. Phase 4's items are per-slice too, not a gate before
-implementation. This follows the locked build order: checkpoint granularity
-cannot be designed honestly without watching a real checkpointer behave, and
-every graded behaviour is a runtime property no dummy-data scaffold can
-exercise.
+**These four are not four gates in a row.** Phases 1 and 2 are closed. Phase 3
+is closed except for the database and interface remainders explicitly kept
+with their later slices below. Phase 4's items are per-slice, not a gate before
+implementation.
 
 ### 1. Product contract
 
@@ -105,19 +73,18 @@ exercise.
 
 - [x] Map components and end-to-end data flow.
 - [x] Define document parsing and model/provider boundaries.
-- [ ] Define run identity, idempotency, and concurrency behaviour. Slice 1's
-      share is settled (UUID run id, per-project lock, queued second run);
-      the rest arrives with the slice that needs it.
+- [x] Define run identity, idempotency, and concurrency behaviour.
 - [x] Define LangGraph state, nodes, edges, and checkpoints.
-- [ ] Define database tables, migrations, versions, and audit trail. Slice
-      1's share is settled (seven tables, migrations from the first table);
-      the rest arrives with the slice that needs it.
-- [ ] Define the human-review state machine.
-- [ ] Define watched-folder and focused-update architecture.
-- [ ] Define prompt-injection, no-bluff, and security controls.
-- [ ] Define FastAPI, MCP, and React contracts. Slice 1's share is settled
-      (five endpoints); the rest arrives with the slice that needs it.
-- [ ] Define failure, retry, logging, timing, and cost behaviour.
+- [ ] Define database tables, migrations, versions, and audit trail. The
+      slice-1 tables are settled; the rules and findings tables arrive with
+      the rules-engine slice.
+- [x] Define the human-review state machine.
+- [x] Define watched-folder and focused-update architecture.
+- [x] Define prompt-injection, no-bluff, and security controls.
+- [ ] Define FastAPI, MCP, and React contracts. The five slice-1 endpoints are
+      settled; the MCP tool surface and React screen shape arrive with their
+      slices.
+- [x] Define failure, retry, logging, timing, and cost behaviour.
 
 ### 4. Proof and implementation plan
 
@@ -145,6 +112,17 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-12 — Remaining Phase 3 architecture locked**
+Closed the idempotency decision with its one-call repeat limitation, plus
+watched-folder triggering, prompt-injection controls, failure and retry
+behaviour, and logging, timing, and estimated cost reporting.
+Runs now auto-start after a 10-second poll and 30-second quiet period; model
+calls use two attempts and a 120-second per-call timeout. Phase 3 now retains
+only the stated later-slice remainders for rules/findings tables and the
+MCP/React contracts. Added the three current README limitations for a repeated
+Extract call, files waiting during Review, and estimated rather than billed
+cost.
 
 **2026-08-12 — All 27 review findings resolved; three Phase 3 locks recorded**
 Applied the agreed fix for every finding from the two documentation reviews
