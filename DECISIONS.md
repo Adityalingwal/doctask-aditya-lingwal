@@ -60,6 +60,17 @@ write-up repeats them.
 | 2026-08-09 | PDF extraction = **pdfplumber** (primary) + **pypdf** (encryption check only); scanned and encrypted PDFs skipped with reason | pdfplumber preserves table structure; pypdf adds one-line `.is_encrypted`; two libraries, two jobs, zero overlap | 300 KB extra dependency (pypdf); no scanned PDF support | Tested on 7 PDFs including 59-page IRS doc (14 tables, 315K chars) and 22-page MSA — zero data loss across all pages | Add OCR only if domain expands to scanned documents |
 | 2026-08-10 | **Classify step dropped** — LLM infers document type during extraction; no separate classification node | Heuristics fragile on real documents; LLM context window naturally discerns meeting notes vs feature lists vs testing feedback; extra node adds complexity with no value | Six nodes instead of seven; simpler graph | — | — |
 | 2026-08-11 | Human-gate scope = **13 scenarios**, gated wherever the system judges or changes an existing row | Keeps the gate scarce so the two genuinely dangerous items are not lost among mechanical ticks on plain facts | On a first run most rows are plain, so the gate is thin — mostly findings plus the final export | Reasoning-stage only — see "Human-gate scope" section | Define the reject action — what happens once something is rejected |
+| 2026-08-11 | Human-gate actions = **Approve / Reject only**, identical at all seven gated points; buttons act on a stated proposal, not an object | Task PDF page 2: human "approves what is right and rejects what is wrong ... item by item"; per-object verbs (solve/park/merge) would be seven separate failure modes | No custom per-scenario actions; on a conflict the buttons decide only whether it is shown, never which side is right | Reasoning-stage — see "Human-gate actions" section | README owes the reject-limitation note (see next row) |
+| 2026-08-11 | Reject = **excluded from the register, kept permanently in the run record**; final, not conditional | Makes "do not ask again" possible — without a permanent record the same finding returns on every later run | A rejected finding that later becomes *stronger* through new evidence stays suppressed in V1 | Reasoning-stage — see "Human-gate actions" section | Document as an honest README limitation |
+| 2026-08-11 | Incremental input contract — **a batch is every new and changed file waiting when a run starts**; a later file is its own run; the Delivery Owner or a machine starts the run | Conflicts live between files, not inside one; task PDF's own "an update should cost like an update"; one review sitting instead of three | Trigger is a v1 starting point, not the PDF's own rule — auto-start risks the same-pile-twice problem behaviour #9 grades | Reasoning-stage — see "Incremental input contract" section | README owes the run-trigger assumption note; revisit trigger at architecture phase |
+| 2026-08-11 | Register shape = **seven columns**, per-cell citations, three kinds of attachment (conflicts, findings, possible-match flag) | Per-cell citation follows the brief directly; attachments stay off the row to preserve the human-gate lock and the unchanged-rows proof | Supersedes the six-column NOT LOCKED proposal and its worked example, which used the old status set | Reasoning-stage — see "Register shape" section | — |
+| 2026-08-11 | Status values = **five** (`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed`), provisional, config-changeable | `Blocked` and `Never happened` are different problems to the Delivery Owner; a status column earns its place once a register is too long to scan as plain text | Deliberately provisional — more values may be added later; adding one must be a config edit, never code | Reasoning-stage — see "Register shape" section | — |
+| 2026-08-11 | Citations = **file + place + quoted words**; each format supplies the locator it can actually produce | A filename alone is not "the exact place" the brief asks for; quoted words mean the Delivery Owner usually never opens the source file | Rejected one uniform locator across formats — a line number is a poor locator inside a PDF | Reasoning-stage — see "Citations" section | Quote-length maximum lives in config |
+| 2026-08-11 | Export = **JSON as the record, Markdown generated from it** | JSON is what machines read (behaviour #4) and what the unchanged-proof compares; Markdown is for the Delivery Owner to read and send on | One source of truth only — Markdown is never edited directly | Reasoning-stage — see "Export, audit history, and unchanged proof" section | — |
+| 2026-08-11 | Audit history at **cell level**; unchanged proof by a **per-row fingerprint over cells only**, attachments excluded | Cell-level audit answers all three of the brief's questions (what/when/which source); excluding attachments stops one new finding marking an unmoved requirement "changed" | Two instruments kept deliberately separate rather than merged into one | Reasoning-stage — see "Export, audit history, and unchanged proof" section | — |
+| 2026-08-11 | Everything the system produces is in **English** — register, statuses, findings, logs, exports, and repository documentation | Keeps the deliverable and codebase in one language regardless of what language design conversations happen in | — | Reasoning-stage — see "Register shape" section | — |
+| 2026-08-11 | D2 amended: no row marked **`Done`** (not `Delivered`) without a testing outcome | `Delivered` no longer exists once the five-value status set locked; D2 must track the current status set | — | Reasoning-stage — see "Deliverable-side rules" section | Closes the "D2 depends on an unlocked status" audit item |
+| 2026-08-11 | Phase 1's three open items — brief acceptance contract, behaviours 6–10 coverage, React/FastAPI/MCP boundary — **deferred to build time**, not cut | Writing pass/fail checks or a component boundary before the relevant design exists would be guesswork; task PDF page 8's order (never-do → test → code) still holds | Phase 1 counted complete with these three items open | Reasoning-stage | Each item resolved just before its own build slice; a later cut must carry its reason into the Task 4 write-up |
 
 ---
 
@@ -250,9 +261,9 @@ integration are not part of this document-analysis domain.
 - The client supplies requirements, testing feedback, and clarifications but
   does not log in to or approve inside the V1 system. Client decisions enter as
   new source evidence.
-- Which objects are gated for approve/reject is now decided — see "Human-gate
-  scope" below. The reject action — what happens once something is rejected —
-  remains open for the next decision.
+- Which objects are gated for approve/reject is decided — see "Human-gate
+  scope" below. The gate's two actions, and what reject means, are decided too
+  — see "Human-gate actions" below.
 
 ## Human-gate scope (LOCKED 2026-08-11)
 
@@ -295,8 +306,54 @@ because conflicts, findings, and updates are named individually in the brief
 are plain, so the gate is thin — mostly findings plus the final export. That is
 correct behaviour, not a weakness — do not write this up as proven.
 
-The reject action — what happens once a finding or proposal is rejected —
-remains open for the next decision.
+The reject action — what happens once a finding or proposal is rejected — is
+decided next, in "Human-gate actions" immediately below.
+
+## Human-gate actions (LOCKED 2026-08-11)
+
+**Two buttons only: Approve / Reject.** Identical at all seven gated points —
+no per-object verbs (no solve, park, merge).
+
+**The buttons act on a stated proposal, not on an object.** At every gated
+point the system states what it intends to do; Approve makes it happen,
+Reject stops it. Task PDF page 2: *"a person reviews what the system intends
+to do, approves what is right and rejects what is wrong ... item by item, and
+the system respects every decision."*
+
+**What each button means, scenario by scenario:**
+
+| # | Scenario | System proposes | Approve | Reject |
+|---|---|---|---|---|
+| 3 | New document changes an existing row's meaning | "Attach this opposing claim to row #4, both sides" | Both claims show on the row | Row stays as it was |
+| 4 | Uncertain match | "Merge this new request into row #7?" | One row | Two separate rows |
+| 5 | Conflict | "Show this conflict on row #3, both sides" | Conflict shows in the register | It does not |
+| 6 | Rule finding | "R1 broken — attach this finding to row #3" | Finding travels with the row | It does not |
+| 7 | Deliverable finding | "D1 broken — this row carries no source citation" | Finding shows | It does not |
+| 11 | Update proposal | "Change these 2 rows, leave the other 6 untouched" | Change applies | Register unchanged |
+| 12 | Final export | "Export this register" | Export happens | It does not |
+
+**On a conflict, the buttons only decide whether the conflict is shown** —
+never which side is right. Choosing a side would be resolving it, which the
+brief forbids.
+
+**Reject = excluded from the register, kept in the run record, permanently.**
+The record is what makes "do not ask again" possible; without it the same
+finding returns on every later run. Reject is final, not conditional.
+
+**Alternatives rejected:** per-object custom actions (solve/park/merge) —
+theatre, and seven separate failure modes instead of one; conditional reject
+(reopens when new evidence arrives) — over-engineering.
+
+**Honest limitation for the README.** A rejected finding that later becomes
+*stronger* through new evidence stays suppressed in V1. The common case — new
+evidence that *resolves* the problem — is safe, because the rule simply stops
+breaking and no finding is produced at all.
+
+**Not the audit-trail requirement.** The task PDF's audit-trail line ("what
+changed, when, and because of which source") is about the register's own
+changes, not about keeping rejected findings. Keeping them is our own choice,
+made for the repeat-suppression reason above — the PDF is not the source for
+it.
 
 ## One-run scope (LOCKED 2026-08-11)
 
@@ -309,6 +366,48 @@ remains open for the next decision.
 - Each run will have its own identity, status, timing, cost, and recoverable
   execution state. Exact identity and duplicate-run behaviour remain open for
   the architecture decision.
+
+## Incremental input contract (LOCKED 2026-08-11)
+
+**One run consumes every new file waiting at the time it starts** — not one
+run per file. A later file, or a new version of an existing document, becomes
+its own run against the same project register.
+
+**Reason for batching rather than one-run-per-file:** conflicts live *between*
+files, not inside one; the task PDF's own standard is that "an update should
+cost like an update"; and it gives the Delivery Owner one review to sit
+through instead of three.
+
+> **Trigger — v1 starting point, deliberately revisitable.** Locked so the
+> build has a defined place to start. May be reopened during the architecture
+> phase, exactly like request identity.
+
+The system watches the location and reports what has arrived; the run itself
+is started by the Delivery Owner, or by a machine through the same operation.
+Auto-start was rejected: it would break the one-run-one-batch lock, and is the
+easiest route into the "same pile hit twice" duplicate-run problem behaviour
+#9 grades. Behaviour #4 is unaffected either way — the trigger is an
+operation a machine can call.
+
+**Product-level promise:** the system detects arrivals itself; the Delivery
+Owner never has to announce a new file. *How* it detects, and where the
+watched location is configured, is architecture-phase work (`PROGRESS.md`,
+"Define watched-folder and focused-update architecture").
+
+The task PDF does not say who starts a run. This is a logged assumption under
+the PDF's own page-4 rule — make a reasonable call, write it and the reasoning
+down. It belongs in the README, not only here.
+
+**A batch holds both new and changed files; only the changed part of an
+edited file is processed, never the whole document again.** This half is the
+brief's own requirement — task PDF page 2: "not a rewrite and not a full
+re-run ... an update should cost like an update." Working out what changed
+inside an edited file means the system must retain the earlier version —
+architecture-phase work, same Phase 3 box.
+
+**A file removed from the watched location changes nothing.** Its rows stay
+in the register. The document did arrive once; deleting the file does not
+make that untrue.
 
 ## Declared set — file formats and document types (LOCKED 2026-08-09)
 
@@ -391,51 +490,158 @@ A blocker is distinct from a conflict:
 - **Conflict** = two documents make incompatible claims.
 - **Blocker** = work is explicitly stopped, waiting on an answer or dependency.
 
-## Register fields and statuses — previous proposal (NOT LOCKED)
+## Register shape (LOCKED 2026-08-11)
 
-> The register itself is locked. The columns, statuses, and worked example
-> below are retained only as input to the upcoming register-design discussion;
-> they are not the current implementation spec.
+This replaces the earlier not-locked column/status proposal below it in
+history. Worked example carried through this section and the two that follow:
 
-**Columns:** Request · First appeared · In writing? · Blocker · What testing found · Status
-**Status values:** Delivered · Disputed · Blocked · Not built
+`meeting-notes-10-mar.md` records a call asking for a notification on form
+submit, **WhatsApp** as well, and **search over old records**.
+`client-requirements-v1.md` writes down only the form with validation, an
+**email** notification, and a records list page — no WhatsApp, no search.
+`testing-feedback-25-mar.md` reports the form and email working, and the list
+page opening but **missing search — "this is essential"**. A later
+`meeting-notes-20-mar.md` records that WhatsApp is waiting on API credentials
+the client has not sent.
 
-Every cell carries a source citation (`filename, section`). Conflicts attach to their row.
+### Columns — seven
 
-### Worked example — the declared domain end to end
+`What was asked` · `In writing?` · `What testing found` · `Status` ·
+`Blocked on` · `First seen` · `Last moved`
 
-Source pile:
+**Every cell carries its own citation, not one per row.** Two cells on one row
+routinely come from two different documents. Task PDF page 2: "every claim in
+the deliverable traces to the exact place in the sources it came from."
 
-**`meeting-notes-mar12.md`**
-> Client discussed the intake form. They want an email to go out to the applicant after submission.
+**`Blocked on` is its own column** — `Status` holds one word; the reason plus
+its citation will not fit inside it.
 
-**`client-requirements-v2.md`**
-> 1. Intake form with validation
-> 2. Save submissions to database
-> 3. SMS alerts on status change
+**Two dates, and why both are needed.** Without them rule R3 cannot run at
+all — "blocked longer than `max_days`" is unanswerable if nothing records when
+the block started, and three days stuck looks identical to three months
+stuck. Dates come from the document, not from the run: a 20 March meeting
+note delivered on 10 April describes 20 March, and the run date only records
+when the system happened to look — the two give opposite R3 answers on the
+same row. When no date can be found, the cell says "date unknown" and R3
+simply does not run on that row (behaviour #5: say what is not supported
+rather than invent it).
 
-*(no mention of email — that stayed verbal)*
+**"In writing? = No" carries its own evidence**, not the bare word "No" — for
+example "`client-requirements-v1.md` read in full, no mention of search."
+This is where R1 fires and where the client argument actually happens, so an
+unsupported "No" is the most expensive wrong cell in the register. An absence
+is a claim too, and the per-claim citation rule covers it.
 
-**`meeting-notes-mar20.md`**
-> Asked client for SMS gateway credentials before we can build SMS alerts. Awaiting response.
+**Testing observations carry a label:** `Passed` · `Defect` · `Change
+request` · `Unclear`. Rule R2 ("testing feedback asking for new behaviour is
+a change request, not a bug") cannot run without it. In the worked example
+above, the list page opening without search is a real defect; search itself
+was never in writing, so asking for it is a change request — the client calls
+both a bug. Where the evidence cannot separate the two, the label is
+`Unclear` and the system does not decide.
 
-**`testing-feedback-mar28.md`**
-> Form works. But no email is being received by applicants. This is a bug.
+### Status — five values, provisional
 
-Resulting register:
+`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed`
 
-| Request | First appeared | In writing? | Blocker | What testing found | Status |
-|---|---|---|---|---|---|
-| Intake form | `client-requirements-v2.md` | ✅ | — | Works | Delivered |
-| DB save | `client-requirements-v2.md` | ✅ | — | No issues | Delivered |
-| Email notification | `meeting-notes-mar12.md` | ❌ | — | "not being received" | **Disputed** |
-| SMS alerts | `client-requirements-v2.md` | ✅ | Gateway credentials requested from client (`meeting-notes-mar20.md`), no response | — | **Blocked** |
+Deliberately provisional: more may be added once the product is being built.
+Adding one is a config edit, never a code change (task PDF page 12, "a data
+change, not a rewrite"). `Blocked` and `Never happened` are kept deliberately
+separate: one is a wait with a known cause, the other is something that fell
+through silently — entirely different problems to the Delivery Owner. A
+status column earns its place once a register is too long to scan as plain
+text.
 
-**Row 3 is the point of the whole system.** The client calls it a bug; the written record says it was never requested. The system states both and resolves neither — the human decides.
+### Conflicts, findings, and the possible-match flag attach to a row — they are not columns
 
-**Row 4 shows a blocker, not a conflict or automatically a finding.** A configured rule may later raise a finding if, for example, blocked work was never followed up.
+Four reasons, the last two load-bearing:
 
-**Worked example — an incremental update on the register above:** later, `meeting-notes-apr15.md` arrives — the client supplied the SMS gateway credentials, and separately confirmed the email notification was in fact agreed verbally and should be treated as in-scope. The system must touch only two rows: the SMS alerts row (`Blocked` → unblocked) and the email notification row (its conflict now has new evidence). The intake-form and DB-save rows must remain byte-identical, and the system must be able to prove that. Neither change commits without human approval.
+1. One row can carry several; a column holds one.
+2. A finding has its own internal shape (rule, what was found, evidence, the
+   question for the human) that will not fit in a cell.
+3. **It would break the human-gate lock.** Plain rows are not gated but
+   findings are; a finding living inside the row would let approving the row
+   silently approve the finding too.
+4. **It would break the unchanged-rows proof.** A finding stored inside the
+   row changes the row's content the moment a new finding lands — marking it
+   changed when the client's requirement never moved.
+
+The "possibly the same as row N" flag attaches the same way, for the same
+reasons — it is a question for the human, not a property of the requirement.
+
+**Everything the system produces is in English.** The register, its status
+values, findings, logs, exports, and all repository documentation are
+English. Hinglish is only how Aditya and Claude talk while deciding — it
+never reaches a file, a cell, or a screen.
+
+## Citations (LOCKED 2026-08-11)
+
+**Three parts: file · place · the words themselves.** For example:
+`meeting-notes-10-mar.md` · page 2, "Discussion" · *"they also want search
+over old records."* A filename alone is not "the exact place" the brief asks
+for — on a 20-page PDF it sends the reader off to hunt. Carrying the quoted
+words means the Delivery Owner usually never has to open the file at all.
+
+**Each format supplies the location it can actually produce:**
+
+| Format | Location |
+|---|---|
+| `.pdf` | page number (pdfplumber reads page by page) |
+| `.md` | nearest heading |
+| `.docx` | nearest heading — Word stores no page numbers; where a page breaks is decided at render time, and `python-docx` returns paragraphs. Claiming "page 4" from a `.docx` would be inventing it. |
+| `.txt` | line number |
+
+**Rejected: forcing one uniform locator across all four formats.** A line
+number is a poor locator inside a PDF, where the page is what a reader can
+actually use.
+
+**Quote length:** roughly one sentence — enough for the claim to stand on its
+own. A maximum length lives in config (a client who writes paragraph-long
+bullets should not inflate the register), changed by editing config, never
+code.
+
+## Export, audit history, and unchanged proof (LOCKED 2026-08-11)
+
+### Export — JSON and Markdown
+
+JSON is the real record: machines read it directly (behaviour #4), and it is
+what the unchanged-proof compares. Markdown is generated from it for the
+Delivery Owner to read and send on. One register, two surfaces — no second
+source of truth.
+
+### Audit history — cell level
+
+Each entry: **which cell · what it was · what it is now · which run · which
+source document.** Tested against the brief's own three questions ("what
+changed, when, and because of which source"), row-level history answers only
+two — "row 4 changed" points at a row without saying what moved, leaving the
+Delivery Owner to hunt for it. Cell-level history answers all three, at no
+extra cost — it is the same data.
+
+Attachments arriving or leaving are recorded here too: "finding F-02 attached
+to row 5, run 2, `meeting-notes-20-mar.md`."
+
+### Unchanged proof — one fingerprint per row, over the cells only
+
+Not per column, not per cell, and **attachments are excluded**.
+
+- Fingerprint unchanged → that row's requirement did not move by a single
+  byte. This is the brief's proof ("byte-identical where you promise
+  untouched").
+- Fingerprint changed → audit history says exactly which cell moved.
+
+**Why attachments are excluded:** run 2 attaching a new finding to row 5
+without touching any of its cells must leave row 5 counted as **unchanged**,
+because the brief's claim is about the client's requirement, and that
+requirement did not move. The finding is not lost — audit history records
+it. Including attachments in the fingerprint would mark every affected row
+"changed" while no requirement had moved, making the unchanged-rows claim
+look false when it is not.
+
+**Two separate questions, two separate instruments, deliberately not
+merged:**
+- "Did this requirement change at all?" → the fingerprint
+- "What else happened on this row?" → audit history
 
 ## Request identity — how one row is formed (LOCKED 2026-08-09, v1 starting point)
 
@@ -557,7 +763,7 @@ Decision:  Treat as a change request, or accept as agreed scope?
 Task PDF page 2 requires checking the sources **and the deliverable**. Two rules run against the register itself:
 
 - **D1** — every row carries at least one source citation
-- **D2** — no row is marked `Delivered` without a testing outcome
+- **D2** — no row is marked `Done` without a testing outcome
 
 **Why these exist:** R1–R4 catch problems in the *documents*. D1–D2 catch problems in the *system's own output* — a row built without evidence, or a status asserted without backing. This is behaviour #5 (never bluff) turned inward on ourselves.
 

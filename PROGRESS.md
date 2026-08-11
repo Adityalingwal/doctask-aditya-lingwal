@@ -7,18 +7,19 @@ Locked decisions and their reasoning live in `DECISIONS.md`, not here.
 
 _Rewritten in place — this section always describes the present, not the past._
 
-**2026-08-11.** Task 1 scoping is active again. The domain contract is now
-**Software Requirements-to-Delivery**, with Client and Software Provider as the
-actors; the workflow boundary, primary document types, and core domain cases are
-locked in `DECISIONS.md`.
+**2026-08-11.** Phase 1 (product contract) and Phase 2 (information design)
+are both complete — see the Planning roadmap below. The domain contract is
+**Software Requirements-to-Delivery**, with Client and Software Provider as
+the actors; the workflow boundary, primary document types, and core domain
+cases are locked in `DECISIONS.md`.
 
-The final deliverable is now locked as a **Requirements-to-Delivery Register**.
-The provider-side Delivery Owner is both the system user and human reviewer.
-One run is one complete processing cycle for one submitted document batch;
-multiple initial and update runs may operate on the same project register.
-The human-gate scope is now locked in `DECISIONS.md` — a judgement or a change
-to an existing row is gated, a copied fact is not. Next: define the reject
-action, what happens once a finding or proposal is rejected.
+The final deliverable is the **Requirements-to-Delivery Register** — seven
+columns, per-cell citations, five status values. The provider-side Delivery
+Owner is both the system user and human reviewer. One run is one complete
+processing cycle for one submitted document batch; the incremental input
+contract now defines what a batch is and who starts a run. The human-gate
+scope and its two actions, Approve/Reject, are locked in `DECISIONS.md`.
+Next: Phase 3, system architecture.
 
 The pending consistency audit covers the review-screen scope, configurable vs
 hardcoded formats, the separate classify stage, citation-preserving extraction,
@@ -36,9 +37,6 @@ and no product decision changed when they were written down:
 - **`pile` vs `batch` drift.** `pile` sits in the locked vocabulary, the run lock
   says a run consumes one submitted document batch, and `sample-piles/README.md`
   still says a pile is what a single run consumes.
-- **Deliverable-side rule D2 depends on an unlocked status.** D2 forbids a
-  `Delivered` row without a testing outcome, but the status values it names live
-  in the register section marked NOT LOCKED.
 - **Stale coverage index in the working notes.** It still states Task 1 scoping is
   complete as of 2026-08-09 and that the next phase is architecture.
 - **Status mismatch across the two files.** Request identity, request granularity,
@@ -79,23 +77,26 @@ in `DECISIONS.md`; implementation detail belongs in code and tests.
 ### 1. Product contract
 
 - [ ] Define the brief acceptance contract with exact pass/fail checks.
+      Deferred to build time — decision recorded in `DECISIONS.md`.
 - [x] Lock domain, actors, workflow boundary, and document types.
 - [x] Select the Requirements-to-Delivery Register.
 - [x] Choose the actual system user and human reviewer.
 - [x] Define one-run scope.
 - [x] Define the human-gate scope.
-- [ ] Define the incremental input contract.
-- [ ] Decide coverage or defended cuts for behaviours 6–10.
-- [ ] Lock the React, FastAPI, and MCP boundary.
+- [x] Define the incremental input contract.
+- [ ] Decide coverage or defended cuts for behaviours 6–10. Deferred to build
+      time — decision recorded in `DECISIONS.md`.
+- [ ] Lock the React, FastAPI, and MCP boundary. Deferred to build time —
+      decision recorded in `DECISIONS.md`.
 
 ### 2. Information design
 
-- [ ] Define the core domain terms and relationships.
-- [ ] Define requirement identity and granularity.
-- [ ] Define register fields and statuses.
-- [ ] Define evidence and citation requirements by file format.
-- [ ] Define rules, findings, and no-findings behaviour.
-- [ ] Define export, audit-history, and unchanged-proof contracts.
+- [x] Define the core domain terms and relationships.
+- [x] Define requirement identity and granularity.
+- [x] Define register fields and statuses.
+- [x] Define evidence and citation requirements by file format.
+- [x] Define rules, findings, and no-findings behaviour.
+- [x] Define export, audit-history, and unchanged-proof contracts.
 
 ### 3. System architecture
 
@@ -125,7 +126,7 @@ marked — the correction is more useful than a clean page.
 
 | Date | Assumption | Why we assumed it | Status |
 |---|---|---|---|
-| 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in request matching; the whole register fits in one model call, so nothing needs narrowing | Reopened 2026-08-11 — depends on choosing a register and measuring real sample piles |
+| 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in request matching; the whole register fits in one model call, so nothing needs narrowing | Register now chosen — seven columns, `DECISIONS.md` "Register shape", 2026-08-11 — still open until measured against real sample piles |
 | 2026-08-09 | Source documents are short enough to read whole | Meeting notes, client requirements documents, and testing feedback are expected to be short, so vector retrieval may not be needed | Open — if real documents turn out large, pgvector retrieval comes back in |
 
 ## Blockers
@@ -135,6 +136,18 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-11 — Phase 1 and Phase 2 closed**
+Locked the remaining decisions in `DECISIONS.md`: human-gate actions
+(Approve/Reject, reject kept permanently in the run record), the incremental
+input contract (batch = every new and changed file waiting when a run
+starts), the seven-column register shape with per-cell citations and five
+status values, citation format per file type, and export/audit-history/
+unchanged-proof. Ticked the incremental-input-contract item and all six
+Phase 2 items; the three remaining Phase 1 items are logged as deferred to
+build time, not cut. D2 now reads `Done`, which resolves and removes the
+"D2 depends on an unlocked status" audit bullet above. Added three working
+rules to `TASK.md`.
 
 **2026-08-11 — Human-gate scope locked**
 Locked the 13-scenario human-gate checklist in `DECISIONS.md`: gated wherever

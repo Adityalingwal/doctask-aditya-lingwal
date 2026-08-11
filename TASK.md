@@ -32,6 +32,10 @@ differently.
 - If the answer is discoverable in the repository, inspect it before asking or
   assuming. If evidence is missing or multiple readings would materially change
   behaviour or architecture, stop and ask Aditya.
+- Say whether a claim is the brief's or ours. State plainly whether an answer
+  comes from the task PDF or is our own choice; write "the brief says" only
+  where the PDF actually says it. Never put our own decision behind the
+  founder's authority.
 
 ## Documentation maintenance
 
@@ -106,6 +110,11 @@ differently.
 
 ### Abstraction
 
+- **No speculative edge cases.** Raise an edge case only when it can genuinely
+  happen in this domain — "it could happen" is not enough; name a real
+  scenario in which it does. A case reached only by reasoning outward is
+  written down as a limitation, not built around. A small system that fully
+  works beats a large one half-built.
 - **Two occurrences are fine; extract on the third.** A wrong abstraction costs
   more than the duplication it removed, and it is much harder to undo. Resist
   making something generic before you have seen it used three ways.
@@ -136,6 +145,10 @@ differently.
 - **Migrations from the first table** (Alembic). Without them a fresh clone
   cannot build its schema, and "a stranger can run it" fails on step one.
 - **One Postgres.** LangGraph's checkpoints and our own tables live together.
+- **Everything the system produces is in English.** The register, its status
+  values, findings, logs, exports, and all repository documentation are
+  English. Hinglish is only how Aditya and Claude talk while deciding — it
+  never reaches a file, a cell, or a screen.
 
 ### Logging and tests
 
