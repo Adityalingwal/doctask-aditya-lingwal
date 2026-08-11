@@ -23,6 +23,16 @@ Built for the SuperDocs Round 2 engineering task, Task 1.
 If a decision looks wrong, stop and discuss it rather than silently choosing
 differently.
 
+## Evidence and uncertainty
+
+- Treat recalled or memory-derived project context as unverified until the
+  relevant live repository source confirms it.
+- Keep **verified facts**, **inferences**, and **open questions** distinct; never
+  present an inference or guess as a confirmed fact.
+- If the answer is discoverable in the repository, inspect it before asking or
+  assuming. If evidence is missing or multiple readings would materially change
+  behaviour or architecture, stop and ask Aditya.
+
 ## Documentation maintenance
 
 - The `DECISIONS.md` **Decision Log is append-only**. Never delete or replace an

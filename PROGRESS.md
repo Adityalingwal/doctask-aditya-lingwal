@@ -110,7 +110,9 @@ Newest first.
 **2026-08-11 — Documentation handoff hardened**
 Added an append-only decision-history policy, restored superseded decisions,
 removed the conflicting old run-scope section, and added root Claude Code
-continuation instructions. No product behaviour changed in this cleanup.
+continuation instructions. Added permanent cross-agent rules for verifying
+memory, separating fact from inference, and asking when material evidence is
+missing. No product behaviour changed in this cleanup.
 
 **2026-08-11 — Domain corrected; register selected**
 Replaced the previous software-feature-delivery framing with the agreed
