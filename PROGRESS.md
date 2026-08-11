@@ -123,6 +123,307 @@ exercise.
 - [ ] Plan implementation slices and repository boilerplate.
 - [ ] Plan fresh-clone verification and demo evidence capture.
 
+## Review findings — open
+
+Two independent documentation reviews were run on 2026-08-11 against the same
+brief, each reading the task PDF, the working notes, `TASK.md`,
+`DECISIONS.md`, `PROGRESS.md`, `README.md`, and the two folder READMEs. The
+reviewers were two different models, run separately with no sight of each
+other's work:
+
+- **Fable** — background agent inside this repository.
+- **Codex** — `codex exec`, run non-interactively.
+
+`[both]` = raised independently by both reviewers · `[F]` = Fable only ·
+`[C]` = Codex only.
+
+**Nothing here has been judged yet.** This list records what the reviewers
+said and where a fix would land. Real-or-not is decided one at a time before
+anything is written. As each finding is resolved, its fix goes to
+`DECISIONS.md`, `README.md`, `TASK.md`, or `config/README.md`, and its entry
+is removed from here — this section is meant to shrink to nothing.
+
+### How placement was decided
+
+| Destination | What goes there |
+|---|---|
+| `DECISIONS.md` — text fix | The finding is stale, contradictory, or misattributed text *inside* a canonical section. No new decision needed; the section is corrected in place. If a Decision Log row changes meaning, the old row is marked `SUPERSEDED` and a new dated row is added (append-only rule). |
+| `DECISIONS.md` — new decision | Something genuinely undecided. It must be decided first, then written as its own canonical section plus a Decision Log row. |
+| `PROGRESS.md` | Tracking only — roadmap ticks, the dated log entry for this review, and any assumption. Never a second decision log. |
+| `README.md` | User-facing claims and limitations. |
+| `TASK.md` | Standing working rules only. |
+
+Most items land in two places: the fix itself in `DECISIONS.md`, and a
+roadmap tick or log line here. Only the non-obvious second destination is
+named below.
+
+### Blocking slice 1
+
+#### 1. Model provider and model never decided — `[both]`
+Fable S1 · Codex 5.4. Extract is in slice 1 and calls a model; no provider,
+no model, no env-var contract anywhere. Codex 3.4 is the same gap seen from
+the other end: the "no chunking, ~150-page ceiling" decision rests on a
+context window belonging to a model that was never chosen.
+
+**Already decided in conversation on 2026-08-11** — OpenRouter, model name in
+`config/model.yaml`, key in `.env`; one client passed to the three stages.
+Not yet written into `DECISIONS.md`.
+
+- Lands in: `DECISIONS.md` new section + Decision Log row · `config/README.md`
+  gains a `model.yaml` row · this file ticks Phase 3 #2 · `README.md`
+  states the key requirement.
+- Also settles Codex 3.4 once the chosen model's context window is stated.
+
+#### 2. `POST /runs` has no project or input contract — `[both]`
+Fable S3 · Codex 5.1. Slice 1 is "one `.md` file in" with the watched folder
+explicitly out of scope, but nothing says how a run learns which project it
+belongs to or which folder Ingest reads. Every table is per-project.
+
+- Lands in: `DECISIONS.md` — "API — slice 1" and "Database tables — slice 1"
+  extended; needs a decision first.
+
+#### 3. No status value for a first-run row — `[F]`
+Fable S2. The five values are `Done` · `Partial` · `Never happened` ·
+`Blocked` · `Disputed`. Slice 1's own scenario is one `.md` producing two
+fresh rows with no delivery and no testing evidence yet; none of the five is
+true of that row, and `Never happened` asserts something the sources do not
+say. D2 ("no row marked `Done` without a testing outcome") already assumes
+rows exist under some other status before testing.
+
+- Lands in: `DECISIONS.md` — "Register shape" status set; needs a decision.
+- Note: statuses are locked as config-changeable, so this connects to item 10.
+
+#### 4. `InMemorySaver` cannot prove kill-and-resume — `[C]`
+Codex 2.3. "Orchestration framework decision" says `GenericFakeChatModel`
+plus `InMemorySaver` satisfy behaviour #7, while slice 1 lists Postgres and
+the kill-and-resume test. An in-memory checkpointer dies with the process, so
+it cannot demonstrate behaviour #2.
+
+- Lands in: `DECISIONS.md` — text fix in "Orchestration framework decision";
+  possibly a decision about which checkpointer each test class uses.
+
+#### 5. Nothing owns background execution, restart, or the lock lifecycle — `[C]`
+Codex 5.2. Three locked statements depend on a mechanism that was never
+chosen: `POST /runs` returns immediately and "the work continues in the
+background"; one run per project "enforced by a database lock"; a queued run
+"starts on its own" when the first commits. After a process kill the
+LangGraph checkpoint survives, but nothing says what restarts the run or what
+happens to the lock.
+
+- Lands in: `DECISIONS.md` — extends "Run identity and concurrency" and
+  "Run state and checkpoints"; needs a decision.
+
+#### 6. Pending proposals and the rejected-export ending have no home — `[C]`
+Codex 5.3. Match writes rows that "stay a proposal until Commit", but the
+seven tables describe `register_rows` as holding requirements, with no
+pending state. Run status runs `waiting → running → waiting for review →
+done`, so a rejected export has no terminal transition and no defined moment
+where the project lock is released.
+
+- Lands in: `DECISIONS.md` — "Database tables — slice 1" and a new
+  human-review state machine section; this file ticks Phase 3 #6.
+- This is the point currently under discussion (Phase 3 #6).
+
+### Should fix before submission
+
+#### 7. `TASK.md` mandates the UI shape `DECISIONS.md` rejected — `[both]`
+Fable C1 · Codex 3.2. `TASK.md`: *"The review UI stays small. One list, two
+buttons."* `DECISIONS.md` "Review interface — scope": *"not a two-button list
+either — an earlier sketch of 'a list and two buttons' was too small"*, and
+locks one page with four sections. An agent following `TASK.md` would build
+the rejected design and drop behaviours #1 and #10 from the screen.
+
+- Lands in: `TASK.md` — "Shape of the system" line corrected to point at the
+  locked decision.
+
+#### 8. Intra-file delta processing rests on undecided version retention — `[both]`
+Fable B3 · Codex 3.3. "Incremental input contract" locks that *"only the
+changed part of an edited file is processed"*, then says retaining the earlier
+version is architecture-phase work. Lock 2a meanwhile says *"Documents read
+in-place — no copy, no upload."* Fable notes the retained extracted text in
+the `documents` table may already satisfy this without copying files, but
+nothing says so.
+
+- Lands in: `DECISIONS.md` — "Incremental input contract" and Lock 2a
+  reconciled; this file's Phase 3 #7 (watched folder / focused update).
+- Related to item 11, which is the same sentence seen as a misattribution.
+
+#### 9. Re-running after a `rules.yaml` edit dies at Ingest — `[F]`
+Fable C2. "Run identity and concurrency" rejects content-derived run ids
+partly on this case: *"change `rules.yaml` and deliberately re-run — content
+is identical, so the run would be refused for no good reason."* But "Pipeline
+stages" locks the exit *"Ingest | Nothing new or changed | Run ends here"* —
+so that same re-run ends before Examine ever runs. Tuning R3's `max_days` is
+the most likely real instance.
+
+- Lands in: `DECISIONS.md` — the two sections reconciled; may need a decision
+  about what a rules-only re-run does.
+
+#### 10. Three values are locked as "config" with no config file — `[F]`
+Fable B2. Status set (*"Adding one is a config edit, never a code change"*),
+citation quote length (*"A maximum length lives in config"*), and the
+document page limit (*"Document size limit lives in config"*) all promise a
+config home. `config/README.md` lists only `rules.yaml` and `formats.yaml`.
+Configuration-over-code is a graded requirement (task PDF page 12).
+
+- Lands in: `config/README.md` plus whichever config files are chosen;
+  `DECISIONS.md` names them.
+
+#### 11. Intra-file delta is credited to the brief — `[F]`
+Fable M1. `DECISIONS.md`: *"only the changed part of an edited file is
+processed, never the whole document again. This half is the brief's own
+requirement — task PDF page 2."* The PDF actually says: *"Each arrival
+produces a focused update to the deliverable, not a rewrite and not a full
+re-run that happens to reproduce the same bytes; an update should cost like an
+update."* That constrains the deliverable and the run cost, not the reading of
+one edited document. `TASK.md` forbids writing "the brief says" where the PDF
+does not.
+
+- Lands in: `DECISIONS.md` — "Incremental input contract" text fix.
+
+#### 12. The gate rule and its own table disagree — `[C]`
+Codex 2.1. Rule: *"the gate applies where the system is making a judgement or
+changing something that already exists."* Table row 2: *"New evidence added to
+an existing row, same meaning | No | Same fact, more proof; nothing changed."*
+Adding a citation does change an existing row.
+
+- Lands in: `DECISIONS.md` — "Human-gate scope" text fix or a narrowed rule.
+
+#### 13. Reject means two different things — `[C]`
+Codex 2.2. Global: *"Reject = excluded from the register, kept in the run
+record, permanently"* and *"Reject stops it."* But for an uncertain match the
+table says *"Reject | Two separate rows"* — which creates register content
+rather than excluding it.
+
+- Lands in: `DECISIONS.md` — "Human-gate actions" text fix.
+
+#### 14. README claims format support that does not exist yet — `[C]`
+Codex 2.4. README marks `.pdf` `.docx` `.md` `.txt` as ✅ Supported, while
+this file says *"No code yet in this repository"* and the relevant
+`DECISIONS.md` evidence is reasoning-stage. Behaviour #5 says a success claim
+must match the real state.
+
+- Lands in: `README.md`.
+
+#### 15. The `In writing? = No` cell cannot satisfy the citation contract — `[C]`
+Codex 2.5. Citations are locked as *"Three parts: file · place · the words
+themselves"* on every cell, but the worked example for an absence is
+*"`client-requirements-v1.md` read in full, no mention of search"* — no place,
+no quoted words. R1, the rule this system exists for, depends on exactly this
+cell.
+
+- Lands in: `DECISIONS.md` — "Citations" and "Register shape" reconciled;
+  may need a decision on how an absence is cited.
+
+#### 16. The deliverable section still calls locked things open — `[C]`
+Codex 3.1. "Deliverable shape" ends: *"Exact columns, statuses, row-matching
+behaviour, review actions, UI presentation, storage, and export format remain
+open for their own decision blocks."* All of those except UI presentation
+were locked later the same day.
+
+- Lands in: `DECISIONS.md` — text fix.
+
+### Minor
+
+#### 17. The citation locator assumes a quote appears once — `[C]`
+Codex 3.5. *"the code searches the document text for those words and derives
+the page, heading, or line itself"* and *"a wrong one is not possible."* A
+requirements document repeating the same sentence in scope and in acceptance
+criteria would return the first match, which may be the wrong place.
+Judge whether this is real in this domain before acting.
+
+- Lands in: `DECISIONS.md` — "Extract — how documents are read", either a
+  qualified claim or a stated limitation.
+
+#### 18. Lock 2a claims per-file checkpoints the later lock removed — `[F]`
+Fable C3. Lock 2a: *"Kill-resume covers every document boundary via the
+checkpointer."* "Run state and checkpoints": *"Ingest, per file … No — rerun
+the whole stage … Ingest is therefore a single node with no internal
+checkpoint."* Lock 2a predates the six-stage pipeline and was never
+reconciled.
+
+- Lands in: `DECISIONS.md` — Lock 2a text fix.
+
+#### 19. A column name that does not exist — `[F]`
+Fable C4. "Requirement identity": *"which is how First appeared and What
+testing found both get filled on a single row."* "Register shape" has
+`First seen`, not `First appeared`.
+
+- Lands in: `DECISIONS.md` — text fix.
+
+#### 20. A quote from the working notes that is no longer there — `[F]`
+Fable B1. "Review interface — scope": *"The working notes say a human can
+'approve, reject, modify, or resolve' a finding."* The notes now say the
+opposite — *"Human har finding ko approve ya reject kar sake (page 2 — bas
+yahi do)"*. The Decision Log follow-up inherits the same dead pointer.
+
+- Lands in: `DECISIONS.md` — text fix.
+
+#### 21. LangGraph is called the founder's stack — `[F]`
+Fable M2. `DECISIONS.md`: *"The brief names LangGraph as the founder's own
+working stack"*, and AutoGen/CrewAI *"would need a deviation justification"*.
+The PDF page 3 says *"an agent orchestration framework such as LangGraph or
+LangChain"* and *"Comparable tools count as comparable: AutoGen, CrewAI, or a
+hand-rolled agent loop are all legitimate choices."* The LangGraph choice
+stands on its other reasons; this particular reason does not.
+
+- Lands in: `DECISIONS.md` — "Why LangGraph" text fix.
+
+#### 22. The spreadsheet rail is cited backwards — `[both]`
+Fable M3 · Codex 4.3. Lock 2a: *"spreadsheets are out. Acceptable — task PDF
+page 8 rails spreadsheet-output products out anyway."* The PDF says *"We are
+not building spreadsheet editing. Reading a spreadsheet as a source is fine;
+a product whose output is an edited spreadsheet is not."* Excluding `.xlsx`
+input is a fine own choice; the PDF is not support for it.
+
+- Lands in: `DECISIONS.md` — Lock 2a text fix.
+
+#### 23. README owes the default `rules.yaml` note — `[F]`
+Fable B4. "Rules and playbook": *"The repo ships a filled-in `rules.yaml` so a
+fresh clone actually runs … README must state this explicitly."* The README
+does not mention rules at all, while every other README obligation from the
+same date was added.
+
+- Lands in: `README.md`.
+
+#### 24. Two opposite conflict rules both attributed to the PDF — `[C]`
+Codex 4.1. "Human-gate scope": *"The brief's own rule: surface both sides, the
+human chooses."* "Human-gate actions": *"Choosing a side would be resolving
+it, which the brief forbids."* The PDF says only *"the conflict is surfaced,
+not silently resolved"* and *"Conflicts, findings, and updates are approved or
+rejected by a person before they commit."* It neither requires nor forbids the
+human picking a side. Our own position may be right; the attribution is not.
+
+- Lands in: `DECISIONS.md` — both sections' text fixed.
+
+#### 25. A declared type list is not the "fixed script" the PDF warns about — `[C]`
+Codex 4.2. Lock 2b: *"a hardcoded type list is exactly the 'fixed script with
+labels' the task PDF warns against."* The PDF: *"One model call wrapped in a
+user interface is not an agentic system, and neither is a fixed script with
+labels"* — that sentence is about orchestration, not about declaring accepted
+input types.
+
+- Lands in: `DECISIONS.md` — Lock 2b text fix.
+
+### Coverage gaps both reviewers noted
+
+#### 26. Behaviour #6 — one documented command — neither decided nor cut
+Codex marks it unaddressed: `TASK.md` Commands still reads *"Setup: TBD / Run:
+TBD / Test: TBD"*, and this file's "Decide coverage or defended cuts for
+behaviours 6–10" is unticked. The PDF (page 3) allows 6–10 to be cut **with a
+stated reason**; nothing is stated either way. Fable reads the same facts as
+"deferred to build time, logged" rather than a defect.
+
+- Lands in: `TASK.md` Commands once code exists; tracking here.
+
+#### 27. Behaviours #4 (MCP) and #8 (prompt injection) are intent, not decisions — `[F]`
+Both are floor behaviours (1–5 cannot be cut). MCP exists only as four tool
+names inside "Orchestration framework decision"; the injection detector exists
+as a design note and is out of slice 1. Codex reads both as addressed.
+Reviewers disagree — worth resolving.
+
+- Lands in: `DECISIONS.md` when their slices arrive; tracking here meanwhile.
+
 ## Assumptions
 
 Append-only. An assumption that turns out wrong stays on the list and gets
@@ -141,6 +442,14 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-11 — Two independent documentation reviews run; 27 findings recorded**
+Two models, Fable and Codex, reviewed the repository documentation separately
+against the same brief, with no sight of each other's work. Their findings are
+merged into "Review findings — open" above: 6 blocking slice 1, 10 to fix
+before submission, 9 minor, and 2 coverage gaps. Five were raised by both
+reviewers independently. Nothing has been judged or fixed yet; each is decided
+one at a time, and its entry is removed once its fix lands.
 
 **2026-08-11 — Phase 3 architecture: pipeline, state, run identity, database tables, and API locked**
 Locked in `DECISIONS.md`: the six pipeline stages (Ingest through Commit)
