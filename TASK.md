@@ -15,14 +15,30 @@ Built for the SuperDocs Round 2 engineering task, Task 1.
 
 | File | What it holds |
 |---|---|
-| `DECISIONS.md` | Every call we made and why, the alternatives rejected, and the resulting spec. **Read this before writing code.** |
+| `DECISIONS.md` | Append-only decision history plus the current canonical spec. **Read this before writing code.** |
 | `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md` | What the brief requires, interpreted. Their asks, not our choices. |
 | `documentation/superdocs-engineering-task/SuperDocs-Task-Engineer.pdf` | The original brief. Wins over any interpretation. |
 | `PROGRESS.md` | What is built, what is assumed, what is blocked. |
 
-Treat `DECISIONS.md` as the current record, not as immutable history. If a
-decision looks wrong, stop and discuss it; update its existing canonical entry
-rather than silently choosing differently or adding a duplicate decision.
+If a decision looks wrong, stop and discuss it rather than silently choosing
+differently.
+
+## Documentation maintenance
+
+- The `DECISIONS.md` **Decision Log is append-only**. Never delete or replace an
+  old row. Mark a changed row `SUPERSEDED <date> by <new decision>` and add the
+  replacement as a new dated row.
+- The detailed canonical sections in `DECISIONS.md` show only the latest truth.
+  Update them in place and remove conflicting old canonical sections; history
+  belongs in the Decision Log.
+- In `PROGRESS.md`, rewrite current status and checklist state in place. Keep
+  assumptions and the dated log as history.
+- `README.md` and this file describe only the current system and current working
+  rules; they are not decision-history archives.
+- The original PDF brief is never superseded by our documents. If they conflict,
+  the PDF wins.
+- After documentation changes, search for stale terminology and conflicting
+  locks, then run `git diff --check`.
 
 ## Commands
 
@@ -145,7 +161,7 @@ working notes (the brief's requirements).
 - Merge two requests into one row when unsure they match — flag instead.
 - Commit or export anything without human approval.
 - Manufacture a finding in order to look thorough.
-- Re-cut the customer's list — granularity comes from the source.
+- Re-cut the client's list — granularity comes from the source.
 - Rewrite rows that the new document did not affect.
 - Show a state the server has not confirmed.
 

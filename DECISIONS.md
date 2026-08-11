@@ -17,6 +17,11 @@ better with more time.
 
 Rejected alternatives are written down deliberately so they do not resurface.
 
+The **Decision Log is append-only**. When a decision changes, keep its original
+row, mark it `SUPERSEDED <date> by <replacement>`, and add the replacement as a
+new dated row. Detailed sections below are different: they are the canonical
+current spec and must not retain a conflicting old section.
+
 **Nothing here is a claim of evidence.** Where an entry says the reasoning is
 untested, it is untested — those must be upgraded to real evidence before the
 write-up repeats them.
@@ -29,15 +34,22 @@ write-up repeats them.
 |---|---|---|---|---|---|
 | 2026-08-09 | Agent orchestration = **LangGraph** (raw `StateGraph` for Task 1); LangChain only as thin `langchain-core` layer; no legacy chains/`AgentExecutor` | Brief behaviours #1, #2, #3, #9 are LangGraph built-ins; it is the founder's own named stack, so zero deviation cost; checkpointer shares our existing PostgreSQL | More boilerplate than a hand-rolled loop; real learning curve; still leaves ~5.5 of 10 behaviours for us to build | Research-stage only — see "Orchestration framework decision" section | Convert to real evidence via resume test, same-pile concurrency test, and stage-timing numbers before write-up |
 | 2026-08-09 | Task 2 orchestration shape (`create_agent` vs `StateGraph`) **deferred** | `create_agent` runs on the LangGraph runtime, so deciding later is not a rewrite; Task 1 is the current focus | Task 2 stack stays formally open a while longer | — | Decide when Task 2 starts, against the SuperDocs four-call contract |
+| 2026-08-09 | **SUPERSEDED 2026-08-11 by the reviewed register decision:** Task 1 deliverable = register/table (initial proposal) | Stable rows appeared best for focused updates and exact unchanged proof | The choice had not yet been compared carefully with a brief and report | Reasoning-stage only | Reopened, compared, and replaced by the 2026-08-11 decision below |
 | 2026-08-11 | Task 1 deliverable = **Requirements-to-Delivery Register**; one row traces one client requirement | Stable row units make focused updates, exact unchanged proof, item-level review, citations, and machine use simpler than narrative prose | Rows can compress nuance; detailed evidence/history must remain available outside the summary cells | Reasoning-stage; risks reviewed against a worked example | Design columns and prove row-level invariance on sample piles |
 | 2026-08-09 | Accepted formats = **`.pdf`, `.docx`, `.md`, `.txt`** (hardcoded gate) | These are the shapes real project documents arrive in; `.eml` parsing adds cost with no evaluation gain | Images and spreadsheets excluded | — | Declare the list in README (task PDF page 4) |
+| 2026-08-09 | **SUPERSEDED 2026-08-11 by primary / related additional / unrelated:** unrecognised types = known / related-unknown / unrelated | Avoided both strict filename/type filtering and unrestricted processing | `related-unknown` was unclear and sounded unsupported | Reasoning-stage only | Reframed with explicit guarantees in the next decision |
 | 2026-08-11 | Document-type handling = **primary / related additional / unrelated**, decided from content at runtime | A strict type list would discard useful delivery evidence, while processing unrelated files would contaminate the analysis | Related additional types receive best-effort handling rather than a type-specific guarantee | Reasoning-stage | Second-run test must include one related additional and one unrelated file |
+| 2026-08-09 | **SUPERSEDED 2026-08-11 by Software Requirements-to-Delivery:** domain = Software feature delivery; actors = customer and development team | Captured the original feature request → build → testing loop | Too narrow at feature level and actor names did not cover freelancers, agencies, or other providers cleanly | Reasoning-stage only | Replaced after first-principles domain review |
 | 2026-08-11 | Domain = **Software Requirements-to-Delivery**; actors = **Client** and **Software Provider** | Generalises the requirements → clarification → build/configure → client testing → feedback loop Aditya lived without narrowing the system to one company, product, or feature type | Deliberately excludes pre-sales and full project/commercial management | Current domain contract below; build evidence still needed | Validate with two different synthetic client engagements |
+| 2026-08-09 | **SUPERSEDED 2026-08-11 by the current primary types:** meeting notes, feature request list, testing feedback | Each type supplied a distinct part of the proposed register | `feature request list` was narrower than the real written-requirements input | Reasoning-stage only | Replaced by the current primary document types below |
 | 2026-08-11 | Primary document types = **3** (meeting notes, client requirements document, testing feedback); related additional documents are also processed | These are the minimum sources needed for discussion, written scope, and client validation; a delivery summary may add evidence but is not required | Extra related types get best-effort handling rather than a type-specific guarantee | Reasoning-stage | Prove with one related additional document and one unrelated document |
+| 2026-08-09 | **SUPERSEDED 2026-08-11 by blocker as a domain condition:** blocker = register status plus column | A blocked requirement needed to be visible in the original register proposal | It prematurely fixed representation before register fields were designed | Reasoning-stage only | Representation deferred to register-field design |
 | 2026-08-11 | Blocker = a **domain condition**, not a document type; final output representation deferred | A blocker exists when work is explicitly stopped by a missing answer or dependency, regardless of which related document reports it | Column/status design remains open until the deliverable is chosen | Reasoning-stage | Revisit during deliverable design |
+| 2026-08-11 | Target user and human reviewer = one provider-side **Delivery Owner** | One accountable role keeps V1 aligned with the real small-team workflow; the client supplies requirements and clarification evidence but does not operate the system | No client login, shared approval, or multi-role permissions in V1 | Reasoning-stage | Define the exact human-gate actions separately |
 | 2026-08-09 | Request identity = **model matches candidate against the whole register; no embedding layer**. Uncertain → flag, never merge | Register is ~250 tokens, so nothing needs narrowing; an embedding shortlist would add a silent-miss failure mode for no gain | Cost grows with register size — fine at this scale, revisit if a pile ever produces hundreds of rows | v1 starting point, no build evidence yet | Re-examine after the first real run; if vector retrieval ends up unused anywhere, defend that in the write-up |
-| 2026-08-09 | Request granularity = **the source document's own cut**; one written item = one row | Re-cutting the customer's list would be our judgement, not a fact in any document — violates the locked facts-not-judgements rule | A bundled bullet becomes one broad row | v1 starting point | Bundle-detection flag is parked, not built; revisit after the first real pile |
-| 2026-08-09 | **One run = one project**; run starts with a project identifier + folder; out-of-project docs → bucket 3 | Task PDF page 2 assumes *related* documents; mixing projects would corrupt matching and the register; gives bucket-3 decisions a concrete yardstick | Cannot analyse two projects in a single run | — | Idempotency now keys on the project identifier — design and test it |
+| 2026-08-09 | Request granularity = **the source document's own cut**; one written item = one row | Re-cutting the client's list would be our judgement, not a fact in any document — violates the locked facts-not-judgements rule | A bundled bullet becomes one broad row | v1 starting point | Bundle-detection flag is parked, not built; revisit after the first real pile |
+| 2026-08-09 | **SUPERSEDED 2026-08-11 by document-batch processing cycle:** one run = one project | Kept unrelated project documents out of one register | Conflated the continuing project context with an individual execution and made legitimate updates ambiguous | Reasoning-stage only | Project and run are separated in the next decision |
+| 2026-08-11 | **One run = one complete processing cycle for one submitted document batch** | Separates a durable project/register from each initial or later update execution | Every run belongs to one project context; unrelated projects cannot be mixed | Reasoning-stage | Define run identity, idempotency, and concurrency separately |
 | 2026-08-09 | **Review interface scope** — one page, four sections (stages · skipped · register · cost) | Behaviours #1 and #10 land on this screen too, not just #3; an earlier "list and two buttons" sketch was too small | More UI than planned, though still one screen | — | `modify`/`resolve` are beyond the brief — optional only |
 | 2026-08-09 | **Build order = vertical slices**, riskiest property first, interface last | Every graded behaviour is a runtime property and cannot be exercised on a dummy-data scaffold | Interface risks being rushed at the end | — | Slice 1 must prove kill-and-resume before anything widens |
 | 2026-08-09 | **Repository layout** — runnable things at the root, background under `documentation/`; three folders renamed | A stranger must understand the tree from the root listing alone (behaviour #6); the old names would have misled readers | Empty `app/`/`ui/`/`tests/` exist before any code | — | Fill them as code arrives |
@@ -227,6 +239,31 @@ Pre-sales material, product demos, pricing, contracts, SOWs, invoices, payments,
 source-code execution, deployment work, sprint/resource management, and CRM
 integration are not part of this document-analysis domain.
 
+## Target user and human reviewer (LOCKED 2026-08-11)
+
+- **Delivery Owner:** the person on the Software Provider side who owns the
+  client requirements-to-delivery workflow. A freelancer, founder, project
+  lead, or engineer may fill this one role.
+- The Delivery Owner operates the system and performs its mandatory human
+  review. These are two actions by the same person, not two V1 user roles.
+- The client supplies requirements, testing feedback, and clarifications but
+  does not log in to or approve inside the V1 system. Client decisions enter as
+  new source evidence.
+- The exact objects and actions inside approve/reject remain open for the
+  human-gate-scope decision.
+
+## One-run scope (LOCKED 2026-08-11)
+
+- A **project context** owns one continuing Requirements-to-Delivery Register.
+- A **run** is one complete processing cycle for one submitted document batch.
+- The initial document pile creates the first run. Each later batch, such as an
+  updated document, new requirements, or testing feedback, creates another run
+  against the same project register.
+- One run cannot mix documents from unrelated project contexts.
+- Each run will have its own identity, status, timing, cost, and recoverable
+  execution state. Exact identity and duplicate-run behaviour remain open for
+  the architecture decision.
+
 ## Declared set — file formats and document types (LOCKED 2026-08-09)
 
 Terminology, kept separate on purpose (conflating these caused real confusion once):
@@ -290,7 +327,7 @@ document is skipped with a reason.
 |---|---|
 | What was requested? | Should it have been requested? |
 | Is it in writing? | Should it have been? |
-| What did testing find? | Was the customer right? |
+| What did testing find? | Was the client right? |
 
 Every output field asks "what happened," never "what should have happened."
 Judgements belong to the human at review time — the system surfaces a conflict
@@ -302,16 +339,17 @@ or dependency, the blocker may be reported in meeting notes or any other
 related document.
 
 A blocker is a **condition a requirement sits in**, not a document type. Its
-final representation stays open until the deliverable shape is chosen.
+final representation stays open until register fields and statuses are decided.
 
 A blocker is distinct from a conflict:
 - **Conflict** = two documents make incompatible claims.
 - **Blocker** = work is explicitly stopped, waiting on an answer or dependency.
 
-## Register — previous shape proposal (NOT LOCKED)
+## Register fields and statuses — previous proposal (NOT LOCKED)
 
-> Retained only as input to the next deliverable discussion. The columns,
-> statuses, and worked example below are not the current implementation spec.
+> The register itself is locked. The columns, statuses, and worked example
+> below are retained only as input to the upcoming register-design discussion;
+> they are not the current implementation spec.
 
 **Columns:** Request · First appeared · In writing? · Blocker · What testing found · Status
 **Status values:** Delivered · Disputed · Blocked · Not built
@@ -325,7 +363,7 @@ Source pile:
 **`meeting-notes-mar12.md`**
 > Client discussed the intake form. They want an email to go out to the applicant after submission.
 
-**`feature-request-v2.md`**
+**`client-requirements-v2.md`**
 > 1. Intake form with validation
 > 2. Save submissions to database
 > 3. SMS alerts on status change
@@ -342,16 +380,16 @@ Resulting register:
 
 | Request | First appeared | In writing? | Blocker | What testing found | Status |
 |---|---|---|---|---|---|
-| Intake form | `feature-request-v2.md` | ✅ | — | Works | Delivered |
-| DB save | `feature-request-v2.md` | ✅ | — | No issues | Delivered |
+| Intake form | `client-requirements-v2.md` | ✅ | — | Works | Delivered |
+| DB save | `client-requirements-v2.md` | ✅ | — | No issues | Delivered |
 | Email notification | `meeting-notes-mar12.md` | ❌ | — | "not being received" | **Disputed** |
-| SMS alerts | `feature-request-v2.md` | ✅ | Gateway credentials requested from client (`meeting-notes-mar20.md`), no response | — | **Blocked** |
+| SMS alerts | `client-requirements-v2.md` | ✅ | Gateway credentials requested from client (`meeting-notes-mar20.md`), no response | — | **Blocked** |
 
-**Row 3 is the point of the whole system.** The customer calls it a bug; the written record says it was never requested. The system states both and resolves neither — the human decides.
+**Row 3 is the point of the whole system.** The client calls it a bug; the written record says it was never requested. The system states both and resolves neither — the human decides.
 
-**Row 4 is the second kind of finding.** Nothing is in conflict; work is simply stopped and forgotten. Only the blocker column surfaces it.
+**Row 4 shows a blocker, not a conflict or automatically a finding.** A configured rule may later raise a finding if, for example, blocked work was never followed up.
 
-**Worked example — an incremental update on the register above:** later, `meeting-notes-apr15.md` arrives — the customer supplied the SMS gateway credentials, and separately confirmed the email notification was in fact agreed verbally and should be treated as in-scope. The system must touch only two rows: the SMS alerts row (`Blocked` → unblocked) and the email notification row (its conflict now has new evidence). The intake-form and DB-save rows must remain byte-identical, and the system must be able to prove that. Neither change commits without human approval.
+**Worked example — an incremental update on the register above:** later, `meeting-notes-apr15.md` arrives — the client supplied the SMS gateway credentials, and separately confirmed the email notification was in fact agreed verbally and should be treated as in-scope. The system must touch only two rows: the SMS alerts row (`Blocked` → unblocked) and the email notification row (its conflict now has new evidence). The intake-form and DB-save rows must remain byte-identical, and the system must be able to prove that. Neither change commits without human approval.
 
 ## Request identity — how one row is formed (LOCKED 2026-08-09, v1 starting point)
 
@@ -396,12 +434,12 @@ Both extremes hurt:
 
 **Locked rule:**
 
-> Granularity comes from the **source document**, not from us. Whatever the customer wrote as one item is one row.
+> Granularity comes from the **source document**, not from us. Whatever the client wrote as one item is one row.
 
 - `1. Intake form with validation` → **one** row
 - `1. Intake form  2. Validation` → **two** rows
 
-**Why this rule and not our own judgement.** It follows directly from the already-locked principle that the register records facts, not judgements. Splitting a customer's single line into two rows is *us* deciding how the work decomposes — that decision is not a fact present in any document. Taking the customer's own cut keeps every row traceable to something actually written.
+**Why this rule and not our own judgement.** It follows directly from the already-locked principle that the register records facts, not judgements. Splitting a client's single line into two rows is *us* deciding how the work decomposes — that decision is not a fact present in any document. Taking the client's own cut keeps every row traceable to something actually written.
 
 **Sub-part problems still surface.** If testing shows part of a bundled row failing, that lands in the *What testing found* column rather than forcing a new row:
 
@@ -411,36 +449,9 @@ Both extremes hurt:
 
 Nothing is hidden and nothing is invented.
 
-**Defence line if asked why this is one row:** "Because the customer wrote it as one item. Re-cutting their list would be my judgement, not theirs — the register only reports what was written and what happened to it."
+**Defence line if asked why this is one row:** "Because the client wrote it as one item. Re-cutting their list would be my judgement, not theirs — the register only reports what was written and what happened to it."
 
-**Parked for later (not building now):** if a customer bundles many distinct asks into a single bullet, the system could **flag** the row (`this row appears to bundle several asks`) without splitting it, leaving the split to the human at review. Deliberately deferred — the simple rule ships first. Revisit once we see how real bundling behaves on an actual pile.
-
-## Run scope — one run is one project (LOCKED 2026-08-09)
-
-**The question.** Does a pile handed to a run contain one customer's project, or possibly several?
-
-**Why it matters:**
-1. **Register scope** — two projects in one pile means one table holding rows from two unrelated worlds.
-2. **Matching breaks** — Client A's "intake form" and Client B's "intake form" would wrongly merge into one row.
-3. **Behaviour #9** — task PDF page 3 requires that "two runs at the same time stay two runs, whether they are two piles or the same pile hit twice," so a run needs a stable identity.
-
-**Locked:** one run's pile = the documents of **one project**. This follows the task PDF's own framing on page 2 ("takes in **related** documents"), and matches how the work actually ran at Arka — each customer's documents were their own set, never mixed.
-
-**How the system knows which project it is on.** The run is started with a project identifier alongside the folder:
-
-```
-start_run(project = "Acme intake portal", folder = "./piles/acme")
-```
-
-This gives every downstream decision a reference to compare against, and it is machine-drivable, which is what behaviour #4 requires — the same call is exposed as an MCP tool.
-
-**Out-of-project documents are already handled.** A document that is not about the named project falls into **bucket 3** (`unrelated → skip with reason`), which was locked earlier. The project identifier is what makes that decision defensible rather than vague:
-
-> `beta-crm-notes.md` skipped — not about the Acme intake portal; describes a different system.
-
-**Connection to the open concurrency risk.** The previously flagged same-pile-twice risk now has a concrete key: if a run is started twice for the same project identifier, the system must detect it and either refuse or isolate. The idempotency guarantee attaches to the **project identifier**. Still to be designed and tested.
-
----
+**Parked for later (not building now):** if a client bundles many distinct asks into a single bullet, the system could **flag** the row (`this row appears to bundle several asks`) without splitting it, leaving the split to the human at review. Deliberately deferred — the simple rule ships first. Revisit once we see how real bundling behaves on an actual pile.
 
 ## Rules and playbook (LOCKED 2026-08-09)
 
@@ -468,7 +479,7 @@ The `max_days` parameter is the clearest demonstration of configuration-over-cod
 | ID | Rule | What it catches |
 |---|---|---|
 | **R1** | Anything built must have a written request; a verbal mention is not enough | The email-notification case — requested in a meeting, never in any written list |
-| **R2** | Testing feedback asking for new behaviour is a change request, not a bug | Customer calls it a bug; the written record shows it was never requested |
+| **R2** | Testing feedback asking for new behaviour is a change request, not a bug | Client calls it a bug; the written record shows it was never requested |
 | **R3** | No request stays blocked beyond `max_days` without follow-up | The SMS-alerts case — credentials requested, no reply, nobody followed up |
 | **R4** | Every written request must have a testing outcome | Work that quietly fell through and was never verified |
 
@@ -486,7 +497,7 @@ Rule:      R1 — a written request is required
 Found:     Email notification entered scope discussion but appears in no written request list
 Evidence:  meeting-notes-mar12.md, "Discussion"    → requested verbally
            feature-request-v2.md                    → absent
-           testing-feedback-mar28.md, "Issues"      → customer calls it a bug
+           testing-feedback-mar28.md, "Issues"      → client calls it a bug
 Row:       #3 Email notification
 Decision:  Treat as a change request, or accept as agreed scope?
 ```
