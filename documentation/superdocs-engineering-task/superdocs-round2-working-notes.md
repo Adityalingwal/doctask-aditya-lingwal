@@ -285,7 +285,7 @@
 
 
 ## Coverage index
-- **All decisions now live in `DECISIONS.md`**, not here. This file holds the brief's requirements; that file holds our choices. Task 1 scoping is complete as of 2026-08-09 — the next phase is architecture (graph stages, MCP tool surface, watched-folder intake, idempotency, tests, synthetic corpus).
+- **All decisions now live in `DECISIONS.md`**, not here. This file holds the brief's requirements; that file holds our choices. Task 1 scoping is complete as of 2026-08-11 — the next phase is architecture (graph stages, MCP tool surface, watched-folder intake, idempotency, tests, synthetic corpus).
 - Product familiarization and founder-research notes: covered.
 - Task 1 brief interpretation, baseline floor, strong-submission behaviors, repo/readme/evaluation rules: covered.
 - Task 2 assigned build, scope boundary, submission mechanics, product rails, optional paths: covered.

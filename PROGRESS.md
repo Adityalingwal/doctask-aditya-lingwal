@@ -21,33 +21,12 @@ contract now defines what a batch is and who starts a run. The human-gate
 scope and its two actions, Approve/Reject, are locked in `DECISIONS.md`.
 Next: Phase 3, system architecture.
 
-The pending consistency audit covers the review-screen scope, configurable vs
-hardcoded formats, the separate classify stage, citation-preserving extraction,
-run idempotency, and the unverified small-register/short-document assumptions.
-
-Added to that audit on 2026-08-11, recorded only — none of these are resolved,
-and no product decision changed when they were written down:
-
-- **`request` vs `requirement` drift.** `TASK.md` locks the word `request`, while
-  its own opening description, the register lock in `DECISIONS.md`, and the
-  information-design checklist below all say `requirement`. Nothing records
-  whether this is an intended rename or a slip.
-- **The locked vocabulary has no canonical home.** `TASK.md` states the project's
-  words are fixed in `DECISIONS.md`, but `DECISIONS.md` has no vocabulary section.
-- **`pile` vs `batch` drift.** `pile` sits in the locked vocabulary, the run lock
-  says a run consumes one submitted document batch, and `sample-piles/README.md`
-  still says a pile is what a single run consumes.
-- **Stale coverage index in the working notes.** It still states Task 1 scoping is
-  complete as of 2026-08-09 and that the next phase is architecture.
-- **Status mismatch across the two files.** Request identity, request granularity,
-  the rules playbook with its finding shape, and the review-screen scope are
-  labelled LOCKED or `v1 starting point` in `DECISIONS.md`, while the matching
-  items in the roadmap below are still open. Which label is authoritative is
-  undecided.
-- **Review-screen mockup implies per-row approval.** The review-screen scope
-  section in `DECISIONS.md` shows `[✓] [✗]` against the register in its
-  mockup, implying per-row approval, which the human-gate scope locked on
-  2026-08-11 does not require for plain rows.
+The pending consistency audit covers the review-screen redesign, run
+idempotency, and the still-open short-document/pgvector assumption. The
+review screen's `DECISIONS.md` mockup is no longer a silent contradiction —
+it now carries a banner naming the three things about it that are outdated;
+the redesign itself stays deferred to the architecture phase (see "Review
+interface — scope" in `DECISIONS.md`).
 
 `TASK.md` is written apart from its Commands section, which stays empty until
 the project structure exists.
@@ -73,6 +52,19 @@ Claude Code sessions.
 
 This section tracks only status and continuation order. Decision reasoning stays
 in `DECISIONS.md`; implementation detail belongs in code and tests.
+
+**These four are not four gates in a row.** Phases 1 and 2 are closed, but
+phase 3 is not finished before code starts. Only what the first slice needs is
+settled first — components and data flow, and LangGraph state and checkpoints,
+in full; plus the slice's share of run identity, database tables and
+migrations, and the API. The rest — parsing and model boundary, the
+human-review state machine, watched folder and focused update, prompt-injection
+and no-bluff controls, failure and cost behaviour — is decided alongside the
+slice that needs it. Phase 4's items are per-slice too, not a gate before
+implementation. This follows the locked build order: checkpoint granularity
+cannot be designed honestly without watching a real checkpointer behave, and
+every graded behaviour is a runtime property no dummy-data scaffold can
+exercise.
 
 ### 1. Product contract
 
@@ -114,7 +106,7 @@ in `DECISIONS.md`; implementation detail belongs in code and tests.
 ### 4. Proof and implementation plan
 
 - [ ] Build the requirement-to-acceptance traceability matrix.
-- [ ] Design synthetic piles and the edge-case matrix.
+- [ ] Design synthetic projects and the edge-case matrix.
 - [ ] Define the no-live-key automated test strategy.
 - [ ] Plan implementation slices and repository boilerplate.
 - [ ] Plan fresh-clone verification and demo evidence capture.
@@ -126,7 +118,7 @@ marked — the correction is more useful than a clean page.
 
 | Date | Assumption | Why we assumed it | Status |
 |---|---|---|---|
-| 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in request matching; the whole register fits in one model call, so nothing needs narrowing | Register now chosen — seven columns, `DECISIONS.md` "Register shape", 2026-08-11 — still open until measured against real sample piles |
+| 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in requirement matching; the whole register fits in one model call, so nothing needs narrowing | Register now chosen — seven columns, `DECISIONS.md` "Register shape", 2026-08-11 — still open until measured against real sample projects |
 | 2026-08-09 | Source documents are short enough to read whole | Meeting notes, client requirements documents, and testing feedback are expected to be short, so vector retrieval may not be needed | Open — if real documents turn out large, pgvector retrieval comes back in |
 
 ## Blockers
@@ -136,6 +128,29 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-11 — Vocabulary locked; consistency-audit backlog cleared**
+Renamed `request` → `requirement` and `pile` → `project` throughout
+`DECISIONS.md`, `TASK.md`, and `PROGRESS.md` (`batch` was already its own
+word and stays untouched); Decision Log rows, `documentation/`, and the
+frozen review-screen mockup keep the old words on purpose. Added
+`DECISIONS.md`'s `## Vocabulary` section, the canonical home `TASK.md`
+pointed at but that never existed, and fixed the pointer. Renamed
+`sample-piles/` to `sample-projects/` (plain `mv`, no git
+history) and rewrote its README, which had called a project's whole folder
+"what a single run consumes" — that is a batch. Resolved and removed six
+audit items: citation-preserving extraction, the classify-stage remnant,
+`request`/`requirement` drift, the vocabulary-home gap, `pile`/`batch` drift,
+and the status-label mismatch; the short-document/pgvector assumption stays
+open. Superseded the 2026-08-09 "deliberately hardcoded" accepted-format-list
+row: the list now lives in `config/formats.yaml`, the readers stay in
+`app/ingest/`, and a startup check reconciles the two — new Decision Log row
+added. Banner-marked the review-interface mockup as superseded (stale
+`classify` stage, `Delivered` status, per-row `[✓][✗]`); the redesign itself
+stays deferred to the architecture phase, not done now. Corrected the
+working-notes coverage-index date. Added the reject-suppression limitation
+and the run-trigger assumption to `README.md`, and a rule to `TASK.md` on
+what actually earns a `DECISIONS.md` entry.
 
 **2026-08-11 — Phase 1 and Phase 2 closed**
 Locked the remaining decisions in `DECISIONS.md`: human-gate actions

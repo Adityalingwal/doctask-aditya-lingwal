@@ -30,3 +30,21 @@ returns feedback or changes.
 
 Pre-sales demos, pricing, contracts, invoices, and payment records are outside
 this domain.
+
+## Limitations
+
+- **A rejected finding does not come back on its own, even if it later gets
+  stronger.** Once the Delivery Owner rejects a finding, it stays out of the
+  register for good — this is what makes "do not ask again" possible. The
+  common case is safe: new evidence that *resolves* the problem simply stops
+  the rule from breaking, so no finding is produced at all. Only the rarer
+  case — new evidence that makes an already-rejected finding truer — stays
+  silently suppressed in V1.
+
+## Assumptions
+
+- **Who starts a run.** The brief does not say. Our call: the system watches
+  the location and reports what has arrived, but a run itself is
+  started by the Delivery Owner, or by a machine calling the same operation.
+  Reason: auto-starting would break the one-run-one-batch rule and is the
+  easiest route into the duplicate-run problem the brief grades.

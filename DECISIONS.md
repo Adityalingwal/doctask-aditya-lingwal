@@ -36,7 +36,7 @@ write-up repeats them.
 | 2026-08-09 | Task 2 orchestration shape (`create_agent` vs `StateGraph`) **deferred** | `create_agent` runs on the LangGraph runtime, so deciding later is not a rewrite; Task 1 is the current focus | Task 2 stack stays formally open a while longer | — | Decide when Task 2 starts, against the SuperDocs four-call contract |
 | 2026-08-09 | **SUPERSEDED 2026-08-11 by the reviewed register decision:** Task 1 deliverable = register/table (initial proposal) | Stable rows appeared best for focused updates and exact unchanged proof | The choice had not yet been compared carefully with a brief and report | Reasoning-stage only | Reopened, compared, and replaced by the 2026-08-11 decision below |
 | 2026-08-11 | Task 1 deliverable = **Requirements-to-Delivery Register**; one row traces one client requirement | Stable row units make focused updates, exact unchanged proof, item-level review, citations, and machine use simpler than narrative prose | Rows can compress nuance; detailed evidence/history must remain available outside the summary cells | Reasoning-stage; risks reviewed against a worked example | Design columns and prove row-level invariance on sample piles |
-| 2026-08-09 | Accepted formats = **`.pdf`, `.docx`, `.md`, `.txt`** (hardcoded gate) | These are the shapes real project documents arrive in; `.eml` parsing adds cost with no evaluation gain | Images and spreadsheets excluded | — | Declare the list in README (task PDF page 4) |
+| 2026-08-09 | **SUPERSEDED 2026-08-11 by the config/code split:** Accepted formats = **`.pdf`, `.docx`, `.md`, `.txt`** (hardcoded gate) | These are the shapes real project documents arrive in; `.eml` parsing adds cost with no evaluation gain | Images and spreadsheets excluded | — | Declare the list in README (task PDF page 4) |
 | 2026-08-09 | **SUPERSEDED 2026-08-11 by primary / related additional / unrelated:** unrecognised types = known / related-unknown / unrelated | Avoided both strict filename/type filtering and unrestricted processing | `related-unknown` was unclear and sounded unsupported | Reasoning-stage only | Reframed with explicit guarantees in the next decision |
 | 2026-08-11 | Document-type handling = **primary / related additional / unrelated**, decided from content at runtime | A strict type list would discard useful delivery evidence, while processing unrelated files would contaminate the analysis | Related additional types receive best-effort handling rather than a type-specific guarantee | Reasoning-stage | Second-run test must include one related additional and one unrelated file |
 | 2026-08-09 | **SUPERSEDED 2026-08-11 by Software Requirements-to-Delivery:** domain = Software feature delivery; actors = customer and development team | Captured the original feature request → build → testing loop | Too narrow at feature level and actor names did not cover freelancers, agencies, or other providers cleanly | Reasoning-stage only | Replaced after first-principles domain review |
@@ -71,6 +71,30 @@ write-up repeats them.
 | 2026-08-11 | Everything the system produces is in **English** — register, statuses, findings, logs, exports, and repository documentation | Keeps the deliverable and codebase in one language regardless of what language design conversations happen in | — | Reasoning-stage — see "Register shape" section | — |
 | 2026-08-11 | D2 amended: no row marked **`Done`** (not `Delivered`) without a testing outcome | `Delivered` no longer exists once the five-value status set locked; D2 must track the current status set | — | Reasoning-stage — see "Deliverable-side rules" section | Closes the "D2 depends on an unlocked status" audit item |
 | 2026-08-11 | Phase 1's three open items — brief acceptance contract, behaviours 6–10 coverage, React/FastAPI/MCP boundary — **deferred to build time**, not cut | Writing pass/fail checks or a component boundary before the relevant design exists would be guesswork; task PDF page 8's order (never-do → test → code) still holds | Phase 1 counted complete with these three items open | Reasoning-stage | Each item resolved just before its own build slice; a later cut must carry its reason into the Task 4 write-up |
+| 2026-08-11 | Accepted-format list moves to **`config/formats.yaml`**; the reader behind each format stays in code (`app/ingest/`); a startup check reconciles the two | `TASK.md`'s configuration-over-code rule and Lock 2a's "deliberately hardcoded" claim could not both be true; the list and its readers are different things and can each follow the rule that actually fits them | One more startup check to write and keep passing; a reader can still only be added in code | Reasoning-stage — see "Config/code split" section | Write the startup-check test; its error message must name both the missing reader and the fix |
+
+---
+
+## Vocabulary (LOCKED 2026-08-11)
+
+This project's words, fixed here — one word per concept, used exactly this
+way in code, tests, logs, and documentation.
+
+- **Register** — the Requirements-to-Delivery Register: the deliverable itself.
+- **Row** — one line in the register, tracing one requirement.
+- **Requirement** — the client ask that one register row traces.
+- **Finding** — a rule violation raised for human review.
+- **Rule** — one user-supplied line stating what should have been true (R1–R4, D1–D2).
+- **Run** — one complete processing cycle for one submitted document batch.
+- **Blocker** — a domain condition: work explicitly stopped by a missing answer or dependency.
+
+**Project** and **batch** are the pair most likely to be mixed up in code:
+
+> **Project** — one client engagement: one continuing register, one folder of
+> source documents.
+> **Batch** — the files one run picks up. *A project folder holds 10 files;
+> run 1 took the first 3, run 2 took the 2 that arrived later. One project,
+> two batches.*
 
 ---
 
@@ -84,7 +108,7 @@ write-up repeats them.
 - **Trade-off:** 300 KB extra dependency (pypdf). No scanned PDF support — OCR (`pytesseract`) rejected: adds system-level Tesseract dependency, slows processing, unnecessary in this domain.
 - **Evidence:** Tested 7 PDFs on 2026-08-09: 59-page IRS doc (14 tables, 315K chars), 22-page MSA (5 tables), 21-page MSA, 14-page task PDF, IRS W-9 form, encrypted synthetic (detected), scanned synthetic (0 chars, flagged). Zero pages empty. All tables structured.
 - **Limitation:** Scanned PDFs → 0 chars → skipped. Multi-column layouts → best-effort, may garble ordering in edge cases.
-- **Next improvement:** OCR if domain expands to scanned docs. Column-ordering heuristics if real piles surface garbling.
+- **Next improvement:** OCR if domain expands to scanned docs. Column-ordering heuristics if real projects surface garbling.
 
 ## Orchestration framework decision — LangGraph (LOCKED)
 
@@ -152,7 +176,7 @@ Honest accounting across all ten brief behaviours. This table is the antidote to
 | 6 | A stranger can run it | ❌ None | **Entire repo hygiene** — docker-compose, README, seed data |
 | 7 | It proves itself | 🟡 Half | Fake model + InMemorySaver are given; **the tests are ours** |
 | 8 | Takes no orders from documents | 🟡 Marginal | **~90% ours** — data/instruction separation + detector |
-| 9 | Concurrent runs stay separate | ✅ Mostly | Same-pile duplicate-run strategy (see risk below) |
+| 9 | Concurrent runs stay separate | ✅ Mostly | Same-project duplicate-run strategy (see risk below) |
 | 10 | It knows what it cost | 🟡 Half | Token counts via `usage_metadata`; **stage timing + cost roll-up ours** |
 
 **Summary: LangGraph covers ~4.5 of 10; ~5.5 are ours.** That split is acceptable because the 4.5 it covers are the hardest and most failure-prone (durable state, resume, isolation), while what remains is mostly design discipline rather than infrastructure.
@@ -167,8 +191,8 @@ Also entirely ours, outside the ten behaviours: the watched-location intake + in
 
 ### Known risk to test and disclose
 Behaviour #9 has two distinct cases, and LangGraph only covers one of them:
-- **Different piles, different `thread_id`** → handled cleanly; the Postgres checkpointer is multi-worker safe. ✅
-- **The same pile started twice** → **not** handled automatically. Needs our own idempotency key or DB-level lock.
+- **Different projects, different `thread_id`** → handled cleanly; the Postgres checkpointer is multi-worker safe. ✅
+- **The same project started twice** → **not** handled automatically. Needs our own idempotency key or DB-level lock.
 
 This second case must be explicitly tested and documented in the README. Surfacing it is the "proof over assertion" behaviour the brief rewards; leaving it implicit would be the kind of untested claim it penalises.
 
@@ -325,7 +349,7 @@ the system respects every decision."*
 | # | Scenario | System proposes | Approve | Reject |
 |---|---|---|---|---|
 | 3 | New document changes an existing row's meaning | "Attach this opposing claim to row #4, both sides" | Both claims show on the row | Row stays as it was |
-| 4 | Uncertain match | "Merge this new request into row #7?" | One row | Two separate rows |
+| 4 | Uncertain match | "Merge this new requirement into row #7?" | One row | Two separate rows |
 | 5 | Conflict | "Show this conflict on row #3, both sides" | Conflict shows in the register | It does not |
 | 6 | Rule finding | "R1 broken — attach this finding to row #3" | Finding travels with the row | It does not |
 | 7 | Deliverable finding | "D1 broken — this row carries no source citation" | Finding shows | It does not |
@@ -359,7 +383,7 @@ it.
 
 - A **project context** owns one continuing Requirements-to-Delivery Register.
 - A **run** is one complete processing cycle for one submitted document batch.
-- The initial document pile creates the first run. Each later batch, such as an
+- The initial document batch creates the first run. Each later batch, such as an
   updated document, new requirements, or testing feedback, creates another run
   against the same project register.
 - One run cannot mix documents from unrelated project contexts.
@@ -380,12 +404,12 @@ through instead of three.
 
 > **Trigger — v1 starting point, deliberately revisitable.** Locked so the
 > build has a defined place to start. May be reopened during the architecture
-> phase, exactly like request identity.
+> phase, exactly like requirement identity.
 
 The system watches the location and reports what has arrived; the run itself
 is started by the Delivery Owner, or by a machine through the same operation.
 Auto-start was rejected: it would break the one-run-one-batch lock, and is the
-easiest route into the "same pile hit twice" duplicate-run problem behaviour
+easiest route into the "same project hit twice" duplicate-run problem behaviour
 #9 grades. Behaviour #4 is unaffected either way — the trigger is an
 operation a machine can call.
 
@@ -421,7 +445,10 @@ Every incoming file passes two checks, in order: **format first, then type.** A 
 - **Accepted:** `.pdf`, `.docx`, `.md`, `.txt`. Anything else is skipped with reason `unsupported format`.
 - **Reason:** these are the shapes real project documents actually arrive in. Email threads are represented as `.txt`/`.md` files rather than `.eml`, avoiding mail-parsing complexity for no evaluation gain.
 - **Trade-off:** images/screenshots and spreadsheets are out. Acceptable — task PDF page 8 rails spreadsheet-output products out anyway, and screenshots carry no extractable claim text.
-- **This list is deliberately hardcoded.** Task PDF page 12 permits this: intentional hard-coded defences alongside intelligent logic are a legitimate fix, not a patch. Intelligence belongs in the type decision, not the format gate.
+- **This list lives in config, not code.** See "Config/code split" immediately
+  below — the list itself is a data change, while the reader behind each
+  format is a deliberate hard-coded defence. Updated 2026-08-11; see the
+  Decision Log for the earlier hardcoded-gate framing this replaces.
 - **README must declare this list** — task PDF page 4 requires the accepted formats and domains to be stated, because a second run means different documents inside the declared set.
 - **PDF extraction:** `pdfplumber` (text + table extraction) with `pypdf` for encryption detection only. Scanned PDFs and encrypted PDFs are skipped with a message naming the reason and the fix. Full decision and evidence in the PDF library choice section below.
 - **DOCX extraction:** `python-docx` — standard library, extracts paragraphs and table cells. No alternatives needed.
@@ -430,6 +457,28 @@ Every incoming file passes two checks, in order: **format first, then type.** A 
 - **Folder scan:** Top-level files only. Subfolders ignored. Documents read in-place — no copy, no upload.
 - **Pre-processing:** None. pdfplumber and python-docx produce clean output. Text passed raw to next node.
 - **Processing order:** Sequential, one document per node pass. Extraction is fast (~1s for 9 documents); parallelism adds complexity with no meaningful speed gain. Kill-resume covers every document boundary via the checkpointer.
+
+### Config/code split — where the format list lives (LOCKED 2026-08-11)
+
+`TASK.md`'s configuration-over-code rule and Lock 2a's original "deliberately
+hardcoded" claim could not both be true. The task PDF (page 12) actually asks
+for both principles — configuration over code, *and* deliberate hard-coded
+defences — but they apply to different halves of format handling:
+
+- **The accepted-format list lives in config** — `config/formats.yaml`, a
+  plain list of extensions. Removing a line disables that format; adding one
+  only works if the code that opens it already exists.
+- **The code that opens each format stays in code** (`app/ingest/`) —
+  pdfplumber for `.pdf`, python-docx for `.docx`, plain read for `.md`/`.txt`.
+  This is the deliberate hard-coded defence task PDF page 12 permits: nothing
+  opens a format without a reader actually written for it.
+- **A startup check reconciles the two.** If config names a format with no
+  reader behind it, the system says so plainly and does not crash — for
+  example: *"config/formats.yaml lists .xlsx but no reader exists for it —
+  remove the line or add a reader."*
+
+This keeps the configuration-over-code requirement genuinely true while
+preserving the deliberate defence: nothing opens without a reader behind it.
 
 ### Lock 2b — primary, related additional, and unrelated documents
 When a file opens successfully, the system decides — it is not matched against a hardcoded filename list:
@@ -442,7 +491,7 @@ When a file opens successfully, the system decides — it is not matched against
 
 - **Alternatives rejected:** (A) strict — process only the declared types, skip everything else. Rejected: a hardcoded type list is exactly the "fixed script with labels" the task PDF warns against on page 2. (B) open — attempt to process anything. Rejected: irrelevant files would contaminate the analysis.
 - **Reason for the middle path:** the classification decision is made by the system at runtime, satisfying task PDF page 12 ("intelligence in the system deciding, code executing"), while the format gate stays deterministic.
-- **Evidence:** must be proven by a second-run test using a different pile that deliberately contains one bucket-2 and one bucket-3 file.
+- **Evidence:** must be proven by a second-run test using a different project that deliberately contains one bucket-2 and one bucket-3 file.
 
 ---
 
@@ -484,7 +533,8 @@ or dependency, the blocker may be reported in meeting notes or any other
 related document.
 
 A blocker is a **condition a requirement sits in**, not a document type. Its
-final representation stays open until register fields and statuses are decided.
+representation is decided — the register carries a `Blocked` status and its
+own `Blocked on` column; see "Register shape" below.
 
 A blocker is distinct from a conflict:
 - **Conflict** = two documents make incompatible claims.
@@ -643,23 +693,23 @@ merged:**
 - "Did this requirement change at all?" → the fingerprint
 - "What else happened on this row?" → audit history
 
-## Request identity — how one row is formed (LOCKED 2026-08-09, v1 starting point)
+## Requirement identity — how one row is formed (LOCKED 2026-08-09, v1 starting point)
 
-> **Status: v1 starting point, deliberately revisitable.** Locked so the build has a defined place to start. Expect real findings once we run this on an actual pile — revise here, and record what changed and why.
+> **Status: v1 starting point, deliberately revisitable.** Locked so the build has a defined place to start. Expect real findings once we run this on an actual project — revise here, and record what changed and why.
 
-**The problem.** The same request appears across several documents in different wording:
+**The problem.** The same requirement appears across several documents in different wording:
 
 | Document | Wording |
 |---|---|
 | `meeting-notes-mar12.md` | "They want an email to go out to the applicant after submission" |
-| `feature-request-v2.md` | "Email notification on form submit" |
+| `client-requirements-v2.md` | "Email notification on form submit" |
 | `testing-feedback-mar28.md` | "no email is being received by applicants" |
 
-A human sees one request. Without a matching rule the system produces three rows instead of one — and then the conflict is never detected, because the competing claims sit in separate rows.
+A human sees one requirement. Without a matching rule the system produces three rows instead of one — and then the conflict is never detected, because the competing claims sit in separate rows.
 
-The mirror danger matters just as much: *"email notification"* and *"SMS notification"* are close in wording but are **different** requests. Wrongly merging is as damaging as wrongly splitting.
+The mirror danger matters just as much: *"email notification"* and *"SMS notification"* are close in wording but are **different** requirements. Wrongly merging is as damaging as wrongly splitting.
 
-**Locked method:** when a new candidate request is extracted, the current register is passed to the model, which decides: match an existing row, or create a new one. **No embedding/vector layer in this path.**
+**Locked method:** when a new candidate requirement is extracted, the current register is passed to the model, which decides: match an existing row, or create a new one. **No embedding/vector layer in this path.**
 
 - **Match** → no new row; the source citation is *added* to the existing row. One row accumulates several citations, which is how *First appeared* and *What testing found* both get filled on a single row.
 - **Uncertain** → do not merge and do not guess. Flag the row (`possibly the same as row N`) and let the human decide at review. This is behaviour #5 (never bluff) applied to row identity.
@@ -674,11 +724,11 @@ Also rejected: **ticket-ID matching** (Arka had no ticket IDs — building on so
 
 **Note on pgvector.** Task PDF page 3 recommends PostgreSQL with vector search for retrieval. Row matching is not that job. Vector retrieval's real use would be pulling relevant passages out of long source documents — but our declared document types are short and will likely be read whole. **Open:** if we finish the build without needing vector retrieval, say so explicitly in the write-up as a defended decision rather than quietly dropping a recommended stack component.
 
-## Request granularity — how big is one row (LOCKED 2026-08-09, v1 starting point)
+## Requirement granularity — how big is one row (LOCKED 2026-08-09, v1 starting point)
 
-> **Status: v1 starting point.** Same as request identity — locked to give the build a defined place to start, expected to be revisited once we run on a real pile.
+> **Status: v1 starting point.** Same as requirement identity — locked to give the build a defined place to start, expected to be revisited once we run on a real project.
 
-**The problem.** A written list item may bundle several things: `1. Intake form with validation` — one request, or two?
+**The problem.** A written list item may bundle several things: `1. Intake form with validation` — one requirement, or two?
 
 Both extremes hurt:
 - **Too coarse** → a conflict hides inside a row. "The form works but validation is broken" has nowhere to live.
@@ -695,7 +745,7 @@ Both extremes hurt:
 
 **Sub-part problems still surface.** If testing shows part of a bundled row failing, that lands in the *What testing found* column rather than forcing a new row:
 
-| Request | In writing? | What testing found | Status |
+| Requirement | In writing? | What testing found | Status |
 |---|---|---|---|
 | Intake form with validation | ✅ | Form submits fine; validation not catching empty fields | **Disputed** |
 
@@ -703,7 +753,7 @@ Nothing is hidden and nothing is invented.
 
 **Defence line if asked why this is one row:** "Because the client wrote it as one item. Re-cutting their list would be my judgement, not theirs — the register only reports what was written and what happened to it."
 
-**Parked for later (not building now):** if a client bundles many distinct asks into a single bullet, the system could **flag** the row (`this row appears to bundle several asks`) without splitting it, leaving the split to the human at review. Deliberately deferred — the simple rule ships first. Revisit once we see how real bundling behaves on an actual pile.
+**Parked for later (not building now):** if a client bundles many distinct asks into a single bullet, the system could **flag** the row (`this row appears to bundle several asks`) without splitting it, leaving the split to the human at review. Deliberately deferred — the simple rule ships first. Revisit once we see how real bundling behaves on an actual project.
 
 ## Rules and playbook (LOCKED 2026-08-09)
 
@@ -716,10 +766,10 @@ Nothing is hidden and nothing is invented.
 ```yaml
 rules:
   - id: R1
-    text: "Anything built must have a written request. A verbal mention in a meeting is not enough."
+    text: "Anything built must have a written requirement. A verbal mention in a meeting is not enough."
 
   - id: R3
-    text: "No request should stay blocked without follow-up."
+    text: "No requirement should stay blocked without follow-up."
     params:
       max_days: 14
 ```
@@ -730,10 +780,10 @@ The `max_days` parameter is the clearest demonstration of configuration-over-cod
 
 | ID | Rule | What it catches |
 |---|---|---|
-| **R1** | Anything built must have a written request; a verbal mention is not enough | The email-notification case — requested in a meeting, never in any written list |
+| **R1** | Anything built must have a written requirement; a verbal mention is not enough | The email-notification case — requested in a meeting, never in any written list |
 | **R2** | Testing feedback asking for new behaviour is a change request, not a bug | Client calls it a bug; the written record shows it was never requested |
-| **R3** | No request stays blocked beyond `max_days` without follow-up | The SMS-alerts case — credentials requested, no reply, nobody followed up |
-| **R4** | Every written request must have a testing outcome | Work that quietly fell through and was never verified |
+| **R3** | No requirement stays blocked beyond `max_days` without follow-up | The SMS-alerts case — credentials requested, no reply, nobody followed up |
+| **R4** | Every written requirement must have a testing outcome | Work that quietly fell through and was never verified |
 
 **Why only four.** Task PDF page 3 prefers fewer things that genuinely hold over more done as theater. Ten rules are easy to write and hard to demonstrate working; four can each be proven.
 
@@ -745,10 +795,10 @@ Five fields, all required:
 
 ```
 Finding F-03
-Rule:      R1 — a written request is required
-Found:     Email notification entered scope discussion but appears in no written request list
+Rule:      R1 — a written requirement is required
+Found:     Email notification entered scope discussion but appears in no written requirement list
 Evidence:  meeting-notes-mar12.md, "Discussion"    → requested verbally
-           feature-request-v2.md                    → absent
+           client-requirements-v2.md                → absent
            testing-feedback-mar28.md, "Issues"      → client calls it a bug
 Row:       #3 Email notification
 Decision:  Treat as a change request, or accept as agreed scope?
@@ -793,7 +843,7 @@ alone — that is behaviour #6 turned into a folder structure.
 ├── tests/
 ├── migrations/       Alembic
 ├── config/           rules.yaml — everything changeable without touching code
-├── sample-piles/     synthetic corpora: the demo pile and the second-run pile
+├── sample-projects/  synthetic corpora: the demo project and the second-run project
 │
 └── documentation/    background; not needed to run anything
     ├── superdocs-engineering-task/   the task PDF, the working notes,
@@ -817,7 +867,7 @@ someone later:**
   holds Word and PDF files from probing SuperDocs, the other holds our test
   suite. "artifacts" was considered and rejected: in software that word means
   build output, which is not what these are.
-- `sample-piles/` promoted to the root. It is not documentation; it is the data
+- `sample-projects/` promoted to the root. It is not documentation; it is the data
   the run command points at, so a stranger has to find it immediately.
 
 **Folders inside `app/` are named after the work, not the file type** —
@@ -835,6 +885,17 @@ public `superdocsapp/superdocs-builds` repository. This repository is Task 1.
 ---
 
 ## Review interface — scope (LOCKED 2026-08-09)
+
+> **Mockup superseded (2026-08-11).** The screen below is a record of the
+> original thinking, not the current design. Three things in it are now
+> wrong: the `classify` stage (dropped 2026-08-10), the status `Delivered`
+> (not one of the five current status values), and `[✓] [✗]` against the
+> register implying per-row approval (the human-gate scope locked 2026-08-11
+> does not gate plain rows). The redesign is deferred to the architecture
+> phase — the screen's shape depends on the API and register, neither of
+> which exist yet. The reasoning below for **what** belongs on the screen —
+> stages, skipped files with reasons, the register, cost/timing — still
+> holds; only the mockup's own details are stale.
 
 **Decision.** One page, four sections. Not a dashboard product, and not a
 two-button list either — an earlier sketch of "a list and two buttons" was too
@@ -884,7 +945,7 @@ a good-looking interface, and page 3 prefers *"fewer stages that genuinely
 hold"* over theater. The creative decisions are about **what gets shown**: both
 sides of a conflict next to each other so a human can decide without opening a
 file; the *reason* a file was skipped rather than the fact of it; how long a
-blocked request has been stuck. That is judgement, not styling.
+blocked requirement has been stuck. That is judgement, not styling.
 
 **Beyond the brief, marked optional.** The working notes say a human can
 "approve, reject, modify, or resolve" a finding. The brief itself (page 2) only
