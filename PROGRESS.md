@@ -30,10 +30,14 @@ limitation. Logs are JSON lines on stdout, stage timing is measured, and run
 cost is reported as an estimate from token counts in model response metadata
 and a configured rate.
 
-Phase 4 proof and implementation planning is next. The short-document/pgvector
-assumption remains open until real sample projects are measured. `TASK.md` is
-written apart from its Commands section, which stays empty until the project
-structure exists. No code exists in this repository yet.
+Phase 4 proof and implementation planning has started. The demo corpus is
+designed in `sample-projects/README.md` but its four documents are not yet
+written. Slice 1's no-live-key test strategy and the repository boilerplate
+plan are settled; later-slice tests, the second-run project, the edge-case
+matrix, traceability matrix, and fresh-clone verification remain open. The
+short-document/pgvector assumption also remains open until real sample projects
+are measured. `TASK.md`'s Commands section stays empty until its commands have
+actually been verified. No code exists in this repository yet.
 
 ## Planning roadmap
 
@@ -89,9 +93,11 @@ implementation.
 ### 4. Proof and implementation plan
 
 - [ ] Build the requirement-to-acceptance traceability matrix.
-- [ ] Design synthetic projects and the edge-case matrix.
-- [ ] Define the no-live-key automated test strategy.
-- [ ] Plan implementation slices and repository boilerplate.
+- [ ] Design synthetic projects and the edge-case matrix. The demo project is
+      designed; the second-run project and edge-case matrix remain open.
+- [ ] Define the no-live-key automated test strategy. Slice 1 is settled;
+      later slices add their own tests.
+- [x] Plan implementation slices and repository boilerplate.
 - [ ] Plan fresh-clone verification and demo evidence capture.
 
 ## Assumptions
@@ -112,6 +118,13 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-12 — Phase 4 slice 1 proof and boilerplate planned**
+Designed the four-document intake-portal demo corpus without creating its
+files. Locked slice 1's three automated tests with a fake model and real
+PostgreSQL, plus the Docker Compose run/test plan and startup migrations.
+Added one Decision Log row for the test split; left unverified commands out of
+`TASK.md` and the README.
 
 **2026-08-12 — Remaining Phase 3 architecture locked**
 Closed the idempotency decision with its one-call repeat limitation, plus

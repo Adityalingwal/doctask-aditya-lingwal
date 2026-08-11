@@ -102,6 +102,7 @@ write-up repeats them.
 | 2026-08-12 | Prompt-injection resistance is structural: document text is always data, every approval, commit, and export requires a human-gate decision, and only the model reports embedded instructions; no code-side phrase list or regex is built | Structural separation prevents an unauthorised action regardless of wording; string matching is incomplete, dates immediately, and would imitate a defence without strengthening the real one | A swayed model may miss reporting an instruction, but still cannot approve, commit, or export anything | Reasoning-stage — see "Prompt-injection resistance" section | Test that hostile document text cannot record approval, commit, or export, using the fake model |
 | 2026-08-12 | Model calls use two attempts in total, a 5-second default wait, and a 120-second per-call timeout; transient failures retry and then degrade only where a unit can be skipped, while configuration failures and unavailable PostgreSQL stop the run with the cause and fix named | One retry balances recovery against a long provider outage; per-call timeouts keep a hung call from stopping all progress; skipping is honest only for per-document Extract work | A truly hung Extract document can take about four minutes before it is skipped; Match and Examine have no smaller unit to continue with | Reasoning-stage — see "Failure and retry behaviour" section | Config-file naming is left to the build; measure real call durations and lower the timeout only if evidence supports it |
 | 2026-08-12 | Behaviour 10 is built, not cut: stdout JSON-line logs carry `run_id`; each stage records timing; model response token counts multiplied by a configured per-model rate produce an explicitly estimated cost per stage and run | Timing is a small addition at existing stage boundaries, cost is a token-count multiplication, and structured logs are already required for diagnosis | The reported cost is not a provider bill and may drift; the per-stage storage shape remains build-time work | Reasoning-stage — see "Logging, timing, and cost" section | Leave the per-stage table shape to the build; report the estimate method alongside every cost |
+| 2026-08-12 | Slice 1 automated tests use `GenericFakeChatModel` with real PostgreSQL and drive three named behaviours through the real code paths: kill-and-resume without repeated extraction, approved API review through export, and refusal to finish Review while a decision is pending | Tests must run without a live key, but the mock must be only an input generator; the locator, checkpoint/resume path, API gate, database writes, and export are our code and remain the assertions | These tests do not measure model quality; later slices add their own tests rather than extending this plan speculatively | Reasoning-stage — see "Slice 1 automated test strategy" section | Implement the three tests in slice 1 and keep PostgreSQL real in all three |
 
 ---
 
@@ -1781,3 +1782,108 @@ real shape is known.
 rushed. Accepted because it is genuinely one screen and the API behind it will
 already be proven by then — but if the schedule slips, this is the first place
 the damage will show.
+
+## Slice 1 automated test strategy (LOCKED 2026-08-12)
+
+This settles the no-live-key test strategy for slice 1 only. Later slices add
+the tests for the behaviours they introduce.
+
+### Three required tests
+
+1. **`test_killed_run_resumes_without_repeating_extraction`** — kill a run
+   mid-flight, start it again, and assert that documents already extracted are
+   not sent to the model again and that no register row is duplicated. This is
+   the property slice 1 exists to prove and covers behaviour 2 in full.
+2. **`test_approved_run_exports_the_register`** — put one `.md` document in,
+   produce rows, submit approval through the API, and fetch the export. This
+   drives the complete slice end to end.
+3. **`test_finish_review_refused_while_a_decision_is_pending`** — leave one
+   gated decision unanswered, call `finish-review`, and assert that it fails
+   and the run remains at Review.
+
+All three tests use `GenericFakeChatModel`, so none needs an API key. All three
+use real PostgreSQL. The resume test cannot prove process re-entry with an
+in-memory checkpointer, and using the same real database for the other two
+avoids creating a second test-only arrangement.
+
+### Why the fake model is legitimate
+
+The task PDF requires tests that run without a live key and also says that
+tests which only prove their mocks work do not count. Both conditions hold
+when the mock supplies controlled input while the assertions exercise our own
+code.
+
+- **Proving the mock:** the model returned X and the system stored X. Nothing
+  of ours was tested beyond a pass-through.
+- **Proving our code:** the model returned a quote absent from the document and
+  the real locator flagged it; or the model returned a scripted extraction and
+  the real checkpoint, resume, API gate, database, and export paths behaved
+  correctly. The fake model generated the input, but it is not the subject of
+  the assertion.
+
+Model quality is the provider's responsibility, not the property these tests
+claim. Our responsibility is correct system behaviour for whatever the model
+returns, including a wrong answer. A fake model is better for failure-path
+proof because it can produce the same bad answer on demand without cost or
+network variance.
+
+The brief's own examples of claims worth testing — a killed and resumed run,
+two concurrent runs, and a document that tries to give orders — do not require
+a live model. The honest boundary is therefore: scripted model values must
+travel through real code paths. The quote locator, checkpoint, database, API
+gate, and export are not stubbed. Stubbing the locator as well as the model
+would be the mock-testing-mock case the brief rejects.
+
+**Alternative rejected:** live-model automated tests. They need a key and
+money, introduce network and provider variance, and still do not prove our
+failure paths unless the provider happens to return the exact bad answer the
+test needs.
+
+**Trade-off:** these tests prove orchestration, persistence, validation, and
+gate behaviour, not whether a hosted model interprets a requirements document
+well.
+
+**Evidence:** reasoning-stage. No test exists yet.
+
+## One-command setup and test plan (LOCKED 2026-08-12)
+
+Behaviour 6 requires a stranger to reach a working system from a fresh clone
+in minutes with one documented command. The planned commands are:
+
+| Purpose | Command |
+|---|---|
+| Setup | Copy `.env.example` to `.env` and put an OpenRouter API key in it |
+| Run | `docker compose up` |
+| Test | `docker compose run --rm app pytest` |
+
+These commands are **not** published in `TASK.md` or the README until each has
+been run successfully from a fresh clone. Writing them into a current-facing
+command section before verification would make the false success claim that
+behaviour 5 forbids.
+
+One compose file starts both the application and PostgreSQL. LangGraph
+checkpoints and the system's tables use that same database. Alembic migrations
+run on application startup, because requiring a separate migration command
+would turn the promised one-command start into two commands.
+
+`config/formats.yaml`, `config/rules.yaml`, and `config/model.yaml` ship with
+working defaults. The only supplied value is the OpenRouter API key. It lives
+only in git-ignored `.env`; committed `.env.example` carries the variable name
+with no value. The secret never enters code, committed config, logs, commits, or
+screenshots.
+
+Tests also run through compose because the resume test needs real PostgreSQL.
+Running `pytest` directly would require the reader to arrange a database first;
+the compose command gives the application and tests one environment.
+
+**Alternative rejected:** a `Makefile` exposing `make setup`, `make run`, and
+`make test`. It adds another tool and another vocabulary layer while Docker
+Compose is already required for PostgreSQL.
+
+**Trade-off:** Docker Compose is required for both running and testing. This is
+accepted to keep PostgreSQL setup, migrations, and the application in one
+repeatable environment.
+
+**Evidence:** reasoning-stage. No compose file or application exists, and none
+of these commands has been run. They move into `TASK.md` and the README only
+after fresh-clone verification.

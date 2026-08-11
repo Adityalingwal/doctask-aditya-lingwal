@@ -9,7 +9,24 @@ project yields many batches over time.
 
 | Project | Purpose |
 |---|---|
-| _(to be added)_ | The demo project — what the walkthrough and the video use |
-| _(to be added)_ | The second-run project — different documents inside the same declared set, used to prove the system is not built around the demo |
+| `intake-portal/` | The demo project — a client intake portal with notification, WhatsApp, and records-search requirements |
+
+The demo project contains four documents:
+
+| File | What it holds |
+|---|---|
+| `intake-portal/meeting-notes-10-mar.md` | The client asks for a notification on form submit, WhatsApp as well, and search over old records |
+| `intake-portal/client-requirements-v1.md` | The written scope: form with validation, an email notification, and a records list page; no WhatsApp and no search |
+| `intake-portal/meeting-notes-20-mar.md` | WhatsApp is waiting on API credentials the client has not sent |
+| `intake-portal/testing-feedback-25-mar.md` | Form and email work; the list page opens but has no search — "this is essential" |
+
+Slice 1 uses only `meeting-notes-10-mar.md`. The other three documents arrive
+with the later slices that need matching, blocker, testing, and rule-finding
+behaviour. The document descriptions are designed; the files themselves are
+written when their implementation slices are built.
+
+The second-run project is still to be designed. It will use a different
+engagement inside the same declared set and must include one related additional
+document and one unrelated document.
 
 Accepted formats and document types are declared in `DECISIONS.md`.
