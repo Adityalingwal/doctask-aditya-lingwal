@@ -39,9 +39,21 @@ EXPECTED_COLUMNS = {
         "finished_at",
         "stage_timings",
         "estimated_cost_usd",
+        "skipped",
+        "ended_early_reason",
+        "failure_reason",
+        "export_json",
         "created_at",
     },
-    "documents": {"id", "run_id", "source_path", "extracted_text", "created_at"},
+    "documents": {
+        "id",
+        "run_id",
+        "source_path",
+        "extracted_text",
+        "content_hash",
+        "extraction",
+        "created_at",
+    },
     "register_rows": {
         "id",
         "project_id",
@@ -53,7 +65,9 @@ EXPECTED_COLUMNS = {
         "first_seen",
         "last_moved",
         "fingerprint",
+        "row_number",
         "proposed_by_run_id",
+        "merged_into_register_row_id",
         "is_committed",
         "created_at",
     },
@@ -67,7 +81,16 @@ EXPECTED_COLUMNS = {
         "absence_statement",
         "created_at",
     },
-    "decisions": {"id", "run_id", "decision_key", "outcome", "decided_at"},
+    "decisions": {
+        "id",
+        "run_id",
+        "kind",
+        "question",
+        "proposed_register_row_id",
+        "candidate_register_row_id",
+        "outcome",
+        "decided_at",
+    },
     "audit": {
         "id",
         "register_row_id",
@@ -85,6 +108,8 @@ RUN_STATUSES = (
     "waiting for review",
     "done",
     "closed without export",
+    "failed",
+    "ended without changes",
 )
 REGISTER_ROW_STATUSES = (
     "Done",
@@ -187,14 +212,16 @@ def _insert_document(connection: Connection, run_id: UUID) -> UUID:
     document_id = uuid4()
     connection.execute(
         text(
-            "INSERT INTO documents (id, run_id, source_path, extracted_text) "
-            "VALUES (:id, :run_id, :source_path, :extracted_text)"
+            "INSERT INTO documents "
+            "(id, run_id, source_path, extracted_text, content_hash) "
+            "VALUES (:id, :run_id, :source_path, :extracted_text, :content_hash)"
         ),
         {
             "id": document_id,
             "run_id": run_id,
             "source_path": "meeting-notes.md",
             "extracted_text": "A fabricated meeting note.",
+            "content_hash": "0" * 64,
         },
     )
     return document_id
@@ -205,6 +232,7 @@ def _insert_register_row(
     project_id: UUID | None,
     run_id: UUID,
     status: str = "No evidence yet",
+    row_number: int = 1,
 ) -> UUID:
     register_row_id = uuid4()
     connection.execute(
@@ -221,6 +249,7 @@ def _insert_register_row(
                 first_seen,
                 last_moved,
                 fingerprint,
+                row_number,
                 proposed_by_run_id,
                 is_committed
             ) VALUES (
@@ -234,6 +263,7 @@ def _insert_register_row(
                 :first_seen,
                 :last_moved,
                 :fingerprint,
+                :row_number,
                 :proposed_by_run_id,
                 :is_committed
             )
@@ -250,6 +280,7 @@ def _insert_register_row(
             "first_seen": "10 March 2026",
             "last_moved": "10 March 2026",
             "fingerprint": f"fingerprint-{register_row_id}",
+            "row_number": row_number,
             "proposed_by_run_id": run_id,
             "is_committed": False,
         },
@@ -342,6 +373,18 @@ def test_project_refuses_a_second_waiting_run(
             _insert_run(database_connection, project_id, status="waiting")
 
 
+def test_run_refuses_a_second_row_for_the_same_document(
+    database_connection: Connection,
+) -> None:
+    project_id = _insert_project(database_connection)
+    run_id = _insert_run(database_connection, project_id)
+    _insert_document(database_connection, run_id)
+
+    with pytest.raises(IntegrityError):
+        with database_connection.begin_nested():
+            _insert_document(database_connection, run_id)
+
+
 @pytest.mark.parametrize("run_id", [None, uuid4()])
 def test_decision_requires_one_existing_run(
     database_connection: Connection,
@@ -351,13 +394,14 @@ def test_decision_requires_one_existing_run(
         with database_connection.begin_nested():
             database_connection.execute(
                 text(
-                    "INSERT INTO decisions (id, run_id, decision_key, outcome) "
-                    "VALUES (:id, :run_id, :decision_key, :outcome)"
+                    "INSERT INTO decisions (id, run_id, kind, question, outcome) "
+                    "VALUES (:id, :run_id, :kind, :question, :outcome)"
                 ),
                 {
                     "id": uuid4(),
                     "run_id": run_id,
-                    "decision_key": "export",
+                    "kind": "export",
+                    "question": "Export this register?",
                     "outcome": "approved",
                 },
             )

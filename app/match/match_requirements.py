@@ -1,0 +1,141 @@
+from __future__ import annotations
+
+import json
+from typing import Any, NoReturn
+
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel
+
+from app.extract.answer import json_object_in
+
+
+NEW_ROW = "new row"
+EXISTING_ROW = "existing row"
+POSSIBLE_MATCH = "possible match"
+OUTCOMES = (NEW_ROW, EXISTING_ROW, POSSIBLE_MATCH)
+MATCH_PROMPT_MARKER = "Match these requirements against the register"
+INCOMPLETE_ANSWER_FIX = (
+    " Nothing was proposed for the register, because a requirement Match did "
+    "not answer for is not a new row. Start another run so Match is asked "
+    "again; if it keeps answering incompletely, name a stronger model in "
+    "config/model.yaml."
+)
+
+_INSTRUCTIONS = f"""You decide, for each requirement found in this batch of \
+documents, whether the register already has a row for it.
+
+Answer one of three outcomes per requirement:
+- "{NEW_ROW}" — no existing row traces this requirement.
+- "{EXISTING_ROW}" — an existing row traces exactly this requirement; give its \
+row_number.
+- "{POSSIBLE_MATCH}" — it may be the same requirement as an existing row but you \
+are not certain; give that row_number.
+
+Never merge two requirements you are unsure about. Wrongly merging corrupts the \
+register silently, so where there is real doubt answer "{POSSIBLE_MATCH}" and a \
+person will decide. Requirements that are close in wording can still be \
+different asks — "email notification" and "WhatsApp notification" are two \
+requirements, not one.
+
+Reply with a JSON object and nothing else, in this shape:
+
+{{"outcomes": [{{"requirement_index": 0, "outcome": "{NEW_ROW}",
+                 "row_number": null}}]}}"""
+
+
+class MatchOutcome(BaseModel):
+    requirement_index: int
+    outcome: str
+    row_number: int | None = None
+
+
+class MatchAnswer(BaseModel):
+    # Required: a reply without it is a failed Match, not a register in which
+    # every requirement quietly became a new row.
+    outcomes: list[MatchOutcome]
+
+
+class IncompleteMatchAnswer(RuntimeError):
+    """Match answered about a different set of requirements than it was sent."""
+
+
+async def match_requirements(
+    model_client: BaseChatModel,
+    register_rows: list[dict[str, Any]],
+    requirements: list[dict[str, Any]],
+) -> MatchAnswer:
+    reply = await model_client.ainvoke(_match_prompt(register_rows, requirements))
+    answer = MatchAnswer.model_validate_json(json_object_in(str(reply.content)))
+    _refuse_an_incomplete_answer(answer, len(requirements))
+    return answer
+
+
+def _refuse_an_incomplete_answer(answer: MatchAnswer, asked_about: int) -> None:
+    """Check the answer covers every requirement sent, exactly once, usably.
+
+    The shape being valid says nothing about the content: an answer can be
+    well-formed JSON and still leave out the one requirement that mattered.
+    """
+    answered: set[int] = set()
+    for outcome in answer.outcomes:
+        index = outcome.requirement_index
+        if index in answered:
+            _refuse(f"Match answered twice for requirement {index}")
+        answered.add(index)
+
+        if outcome.outcome not in OUTCOMES:
+            _refuse(
+                f"Match answered '{outcome.outcome}' for requirement {index}, "
+                f"which is not one of {', '.join(OUTCOMES)}"
+            )
+        if outcome.outcome == NEW_ROW and outcome.row_number is not None:
+            _refuse(
+                f"Match answered '{NEW_ROW}' for requirement {index} and still "
+                f"named row #{outcome.row_number}"
+            )
+        if outcome.outcome != NEW_ROW and outcome.row_number is None:
+            _refuse(
+                f"Match answered '{outcome.outcome}' for requirement {index} "
+                "without naming the register row it matched"
+            )
+
+    if answered != set(range(asked_about)):
+        _refuse(
+            f"Match was asked about {asked_about} requirement(s), numbered 0 to "
+            f"{asked_about - 1}, and answered for {sorted(answered)}"
+        )
+
+
+def _refuse(cause: str) -> NoReturn:
+    raise IncompleteMatchAnswer(f"{cause}.{INCOMPLETE_ANSWER_FIX}")
+
+
+def _match_prompt(
+    register_rows: list[dict[str, Any]],
+    requirements: list[dict[str, Any]],
+) -> list[BaseMessage]:
+    register_view = [
+        {"row_number": row["row_number"], "what_was_asked": row["what_was_asked"]}
+        for row in register_rows
+    ]
+    requirement_view = [
+        {
+            "requirement_index": index,
+            "summary": requirement["summary"],
+            "source_file": requirement["source_file"],
+            "source_words": requirement["source_words"],
+        }
+        for index, requirement in enumerate(requirements)
+    ]
+    return [
+        SystemMessage(content=_INSTRUCTIONS),
+        HumanMessage(
+            content=(
+                f"{MATCH_PROMPT_MARKER}.\n\n"
+                f"Register rows:\n{json.dumps(register_view, indent=2)}\n\n"
+                f"Requirements found in this batch:\n"
+                f"{json.dumps(requirement_view, indent=2)}"
+            )
+        ),
+    ]
