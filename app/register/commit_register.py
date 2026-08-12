@@ -38,7 +38,8 @@ async def commit_register(
 
     proposals = await connection.execute(
         "SELECT id, row_number, " + ", ".join(CELL_NAMES) + " FROM register_rows "
-        "WHERE proposed_by_run_id = %s AND NOT is_committed ORDER BY row_number",
+        "WHERE proposed_by_run_id = %s AND NOT is_committed "
+        "AND merged_into_register_row_id IS NULL ORDER BY row_number",
         (run_id,),
     )
     committed_row_numbers: list[int] = []
@@ -90,7 +91,9 @@ async def _merge_approved_matches(
     """Approving a possible match moves the new evidence onto the existing row.
 
     The proposal itself is kept uncommitted rather than deleted, so the decision
-    that settled it still points at what the Delivery Owner was shown.
+    that settled it still points at what the Delivery Owner was shown. It
+    records the row its evidence went into, which is both why it is never
+    committed and where a reader is sent to find that evidence.
     """
     merged_row_numbers: list[int] = []
     for decision in await decisions_of_run(connection, run_id):
@@ -106,8 +109,12 @@ async def _merge_approved_matches(
             ),
         )
         merged = await connection.execute(
-            "SELECT row_number FROM register_rows WHERE id = %s",
-            (decision["proposed_register_row_id"],),
+            "UPDATE register_rows SET merged_into_register_row_id = %s "
+            "WHERE id = %s RETURNING row_number",
+            (
+                decision["candidate_register_row_id"],
+                decision["proposed_register_row_id"],
+            ),
         )
         merged_row = await merged.fetchone()
         if merged_row is not None:
