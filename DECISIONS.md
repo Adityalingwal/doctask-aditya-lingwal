@@ -85,7 +85,7 @@ write-up repeats them.
 | 2026-08-11 | Review decisions write straight to the database, one at a time — never through state | A rejected finding must be remembered permanently across runs; state belongs to one run's thread and does not survive into the next | Whether decisions are written one at a time or batched stays deliberately open | Reasoning-stage — see "Run state and checkpoints" section | Revisit batched-vs-individual review writes |
 | 2026-08-11 | **SUPERSEDED 2026-08-12 by the rejected-export terminal status:** Run id = random UUID (also the LangGraph `thread_id`); one run per project via a database lock; a second run queues; only one `waiting` run allowed per project | A waiting run holds no batch — the batch forms only when a run starts — so a second waiting run would repeat identical, empty work; content-derived ids and row-level/optimistic locking were both considered and dropped | A run parked at Review holds the project's lock for as long as the reviewer takes | Reasoning-stage — see "Run identity and concurrency" section | Honest README limitation on the wait |
 | 2026-08-11 | **Seven database tables locked for slice 1** — `projects`, `runs`, `documents`, `register_rows`, `citations`, `decisions`, `audit` | Covers one `.md` file in, two rows out, approval over the API, export, and kill-and-resume; extracted text lives in `documents` rather than in graph state, matching the state-vs-database lock | Rules and findings have no table yet — they arrive with the rules-engine slice; LangGraph's own checkpoint table lives in the same Postgres and is not one of the seven | Reasoning-stage — see "Database tables — slice 1" section | Add rules/findings tables when that slice arrives |
-| 2026-08-11 | **Five API endpoints locked for slice 1** — start a run, poll status, submit one decision, finish review, fetch the export; React and MCP arrive in later slices | `POST /runs` returns the id immediately, matching `TASK.md`'s "a run is not an HTTP request" rule; finishing review is its own endpoint so the Delivery Owner can stop halfway without the system committing behind them | — | Reasoning-stage — see "API — slice 1" section | — |
+| 2026-08-11 | **SUPERSEDED 2026-08-12 by the project-creation decision:** Five API endpoints locked for slice 1 — start a run, poll status, submit one decision, finish review, fetch the export; React and MCP arrive in later slices | `POST /runs` returns the id immediately, matching `TASK.md`'s "a run is not an HTTP request" rule; finishing review is its own endpoint so the Delivery Owner can stop halfway without the system committing behind them | — | Reasoning-stage — see "API — slice 1" section | — |
 | 2026-08-12 | Status values = **six** (`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed` · `No evidence yet`), provisional and defined as a named set in code; the document page limit lives in `config/formats.yaml`; the citation quote-length maximum is a named constant in code | A row created before any delivery or testing evidence exists cannot be described truthfully by any of the original five values; `No evidence yet` reports on the register rather than on the work. The configuration-over-code rule names rules, formats, and thresholds; a status vocabulary is none of those, and treating every constant as configuration turns the config directory into a dumping ground | Adding a seventh status is a code change | Reasoning-stage — see "Register shape", "Citations", and "Extract — how documents are read" sections | — |
 | 2026-08-12 | **Citation location is derived, never modelled, with a duplicate-text limitation** — the mechanism is unchanged: the model returns only the source's exact words and code derives the location; a fabricated quote cannot pass, but where the same words appear more than once in one document, the first match is used and a wrong location is possible | The search proves that the quote exists in the document, not that a repeated occurrence is the passage the model read | The cited place may not be the passage the model read; nothing is built to disambiguate it | Reasoning-stage — see "Extract — how documents are read" section | — |
 | 2026-08-12 | **SUPERSEDED 2026-08-12 by automatic start after the quiet period:** Incremental input contract — **a batch is every new and changed file waiting when a run starts**; a later file is its own run; the Delivery Owner or a machine starts the run; a changed file is re-read in full; intra-file delta processing was considered and rejected | Diffs are unreliable on re-exported files; a changed region loses its surrounding context; deletions have no decided meaning; the saving is only one model call per edited file | A one-line edit to a 10-page document costs a full re-read of that document | Reasoning-stage — see "Incremental input contract" section | — |
@@ -111,6 +111,13 @@ write-up repeats them.
 | 2026-08-13 | `runs.review_finished_at`, written by `claim_review_finished`, read by the Review node on entry and by the decision endpoint | A replayed Review node cannot otherwise tell a first entry from a post-review replay — both read `status = running` — so a resume drives the run's reported status backwards into `waiting for review` | One extra nullable column and one branch in the Review node; the trigger itself is a millisecond-wide crash window, stated honestly rather than inflated | `DECISIONS.md` "Review re-entry after a finished review" | Add `test_finished_review_does_not_reopen_on_resume` |
 | 2026-08-13 | Review screen locked at five sections — stages, skipped, needs your decision, register, cost and timing — with one Approve/Reject component serving all seven gated points | The superseded mockup gated the Register itself, which human-gate scope (2026-08-11) had already ruled out; the gate needs a home that is not the register | The screen grew from four sections to five; the reasoning for the original four is untouched | `DECISIONS.md` "Review interface — scope" | Findings table still owed by the rules slice; it does not change this shape |
 | 2026-08-13 | Brief acceptance contract locked — four lines per graded behaviour: claim, exact check, binary pass condition, and the slice from which the check can run | Deferred on 2026-08-11 because the design did not exist; it does now, and a check written after the build only confirms whatever was built (task PDF page 8's never-do → test → code order) | Every slice is now measured against a check written before it; three behaviours have no runnable check yet, which the contract states rather than hides | `DECISIONS.md` "Brief acceptance contract" | Closes the Phase 1 deferral in `PROGRESS.md` |
+| 2026-08-12 | Project creation = **`POST /projects` plus startup seeding, one function behind both**; the endpoint takes a name and a source-folder path and returns the project id; startup creates the demo project only when the `projects` table is empty | Behaviour 6 needs `docker compose up` alone to reach a working system; behaviour 4 needs a machine to complete the whole flow without a shell — a seed script leaves it without one, and a config file makes one project two versions of the truth | This deliberately changes the locked endpoint list from five to six | Reasoning-stage — see "API — slice 1" section | Decide in the build how the demo name and folder are supplied, and what `POST /projects` does for a folder that does not exist |
+| 2026-08-12 | `decisions` is the **review queue**: one row carries both the question, in full words, and its answer; the row's own id is the key the client answers with | A question and its answer stored apart can drift; a free-text key can be misspelled; a question stored only as pointers misrepresents what the person saw when they answered | One row per gated item, where the frozen question sentence duplicates part of what it points at | Reasoning-stage — see "Human-gate actions" section | Findings keep the same shape rule when their table arrives |
+| 2026-08-12 | Commit writes the row fingerprint and the cell-level audit entries **from the very first run**, not from the incremental-update slice that needs them | Reopening the atomic Commit transaction in a later slice is the most dangerous change the system can make, and runs completed before the change would leave a gap in the audit history | The first run pays for writes it does not yet use | Reasoning-stage — see "Export, audit history, and unchanged proof" section | The unchanged-rows proof itself stays with the incremental-update slice |
+| 2026-08-12 | A cell whose answer is not yet known says so in plain words with the reason — never left blank, never guessed | A blank cell cannot be told apart from "nothing to report", and writing "No" against a written requirements document nobody read would be the bluffing behaviour 5 forbids | The register reads slightly heavier while unknowns remain | Reasoning-stage — see "Register shape" section | D1 stays satisfied: a committed row still carries at least one citation |
+| 2026-08-12 | The kill-and-resume test kills a **real separate process** with `SIGKILL` and starts the application again; an in-process simulated kill was rejected | The startup resume path — finding a stranded run, taking over its lock, continuing it — is the code a real crash depends on, and a simulated kill never executes it; the test would stay green while the real behaviour was broken | The hardest test in the slice: a child process, a signal, a second application start | Reasoning-stage — see "Slice 1 automated test strategy" section | The one honest gap — one Extract call possibly paid twice — stays declared, not reopened |
+| 2026-08-12 | Slice 1b builds **both** the durable per-project lock and the waiting-run queue; their proofs wait for the concurrency slice | The kill-and-resume test rests on the durable lock — without it there is nothing to take over; refusing a second run would be a quiet departure from the locked queue decision | Built is not proven: neither mechanism is tested until the concurrency slice lands | Reasoning-stage — see "Run identity and concurrency" section | Neither README nor reports may claim concurrency is proven until that slice lands |
+| 2026-08-12 | An unfindable quote **drops its requirement** — no row is created, and the run's skip list names the document and the reason | A row whose evidence could not be verified is exactly the unsupported claim behaviour 5 forbids, and D1 requires a committed row to carry a citation | A genuine requirement is occasionally dropped because the model paraphrased; the error falls on the safe side | Reasoning-stage — see "Extract — how documents are read" section | The prompt already instructs verbatim copying, which keeps the drop rare |
 
 ---
 
@@ -431,6 +438,55 @@ changes, not about keeping rejected findings. Keeping them is our own choice,
 made for the repeat-suppression reason above — the PDF is not the source for
 it.
 
+### The review queue — `decisions` (LOCKED 2026-08-12)
+
+`decisions` is the review queue. One row per gated item, and that row carries
+both the question and its answer:
+
+| Column | Holds |
+|---|---|
+| `id` | The identity of this gated item — and therefore the key the client answers with |
+| `run_id` | Which run raised it |
+| kind | `possible match` or `export` in slice 1 |
+| the question, in words | *"Merge 'notification jaye jab form bhara jaye' into row #2 — Email notification on form submit?"* |
+| proposed row | The register row the question is about |
+| candidate row | The existing row it may be the same as (empty for an export decision) |
+| outcome | `approved` / `rejected` / empty while pending |
+| decided at | When the answer arrived |
+
+**What this settles for free:** *what is pending?* — every row with an empty
+outcome; `GET /runs/{id}` returns exactly those. `finish-review` refused while
+a decision is missing becomes one query for empty outcomes, with no separate
+counter to keep in step. The client never invents a key — the row's own `id`
+is the key, where a free-text key could be misspelled and accepted. And no new
+table: the seven stay seven.
+
+**Two rules that must hold, now and later:**
+
+1. **The question and its answer are never stored apart.** They are one row.
+2. **The question is stored in full words, not only as pointers.** Six months
+   on, an audit must show what the person actually saw when they answered.
+   Pointers are stored *as well*, so a machine can follow the link — but the
+   sentence is the record of what was asked.
+
+This is not duplication — it is the same reason an order stores the price paid
+rather than looking up today's price. When findings arrive they get their own
+table with their own shape; the decision row will then point at the finding
+**and still keep the frozen sentence it presented**. The shape evolves; rule 1
+does not.
+
+**Alternative rejected:** a separate small table holding the possible-match
+question, with `decisions` holding only the answer. It splits one pair across
+two tables, makes reading "what was asked and what was answered" a join, and
+creates the exact drift risk rule 1 exists to prevent.
+
+**Not a departure from the attachment lock.** The possible-match flag is not a
+column of `register_rows` — keeping the question in `decisions` honours that
+lock, and nothing was added to `register_rows`.
+
+> **V1 starting point, deliberately revisitable** — as the decision-storage
+> shape already is.
+
 ## One-run scope (LOCKED 2026-08-11)
 
 - A **project context** owns one continuing Requirements-to-Delivery Register.
@@ -727,6 +783,47 @@ Four reasons, the last two load-bearing:
 The "possibly the same as row N" flag attaches the same way, for the same
 reasons — it is a question for the human, not a property of the requirement.
 
+### A cell whose answer is not yet known says so in words (LOCKED 2026-08-12)
+
+Slice 1 runs on one document only, `meeting-notes-10-mar.md`. It records three
+asks — a notification on form submit, WhatsApp as well, and search over old
+records — so the first run produces three rows. The `In writing?` cell of a
+first-run row cannot be answered truthfully: `client-requirements-v1.md` has
+never been read.
+
+**Decision.** A cell whose answer is not yet known says so in plain words,
+with the reason. For example: *"Not known yet — no written requirements
+document has been read for this project."* It is never left blank, and it is
+never filled with a guess.
+
+**Reasons:**
+
+- Writing **"No"** in `In writing?` would be a lie: "No" means *the written
+  requirements document was read in full and this is not in it*, and that cell
+  must carry exactly that evidence, because it is where rule R1 fires and
+  where the argument with the client actually happens. Claiming absence from a
+  document nobody opened is precisely the bluffing behaviour 5 forbids.
+- **A blank cell has two meanings** — "not known" and "nothing to report" —
+  and a reader cannot tell which. The register is read by a person; an empty
+  box tells them nothing.
+- **It makes the later change legible.** When that document is finally read
+  and the cell becomes *"No — `client-requirements-v1.md` read in full, no
+  mention of a notification"*, the audit entry shows a real move from one
+  stated thing to another, rather than from emptiness to a claim.
+- It is the same principle already locked for the status value `No evidence
+  yet`: reporting honestly on the state of the register rather than inventing
+  a claim about the work.
+
+**Alternative rejected:** leave the cell blank until something is known.
+Simpler to write, but it hides the difference between ignorance and absence —
+the exact distinction this cell exists to carry.
+
+**Consequence for D1:** every committed row still carries at least one
+citation. The `What was asked` cell has a real citation from the meeting note,
+so the row is honest. An unknown cell carries no citation because there is
+nothing to cite — that is correct, and D1 is a rule about the row, not about
+every cell.
+
 **Everything the system produces is in English.** The register, its status
 values, findings, logs, exports, and all repository documentation are
 English. Hinglish is only how Aditya and Claude talk while deciding — it
@@ -804,6 +901,43 @@ look false when it is not.
 merged:**
 - "Did this requirement change at all?" → the fingerprint
 - "What else happened on this row?" → audit history
+
+### Commit writes both from the very first run (LOCKED 2026-08-12)
+
+The first run finishes, the human approves, and Commit makes a row permanent.
+Two further things are written at that moment, and both already have a home
+built in slice 1a — the `fingerprint` column on `register_rows`, and the whole
+`audit` table:
+
+1. **The fingerprint** — a hash over the row's seven cells, and only the
+   cells. This is what later proves a row did not move by a single byte.
+2. **The audit entries** — cell level: *"row #2, `what was asked` went from
+   empty to 'Email notification on form submit', in run 1, because of
+   `client-requirements-v1.md`."*
+
+Slice 1b does not strictly need either — it is the first run, nothing is being
+changed, and there is no earlier register to compare against. Their real use
+arrives in the incremental-update slice. They are written from run one anyway,
+for three reasons:
+
+- The work is genuinely small. Commit is already writing the row; the
+  fingerprint is a hash of seven values it already has in hand, and an audit
+  entry is one insert per cell it just filled.
+- Adding it later means reopening the most dangerous transaction in the
+  system. **Commit is atomic** — rows, audit and export succeed together or
+  not at all.
+- Every run completed before that change would have no audit at all, leaving
+  a hole in the history exactly where the brief expects the audit trail to
+  answer "what changed, when, and because of which source". A history with a
+  gap is worse than one that starts empty.
+
+**Boundaries kept:** writing the fingerprint is not the same as *proving*
+anything with it. The unchanged-rows comparison, and the test that
+demonstrates it, still belong to the incremental-update slice. 1b only makes
+sure the data those proofs will need exists from run one. The fingerprint
+covers the seven cells only — attachments are excluded, exactly as locked, so
+a question or a finding landing on a row never makes that row look changed
+when the client's requirement did not move.
 
 ## Pipeline stages (LOCKED 2026-08-11)
 
@@ -900,6 +1034,21 @@ quote cannot pass.
 
 Where the same words appear more than once in one document, the first match
 is used, so the cited place may not be the one the model read.
+
+### An unfindable quote drops that requirement (LOCKED 2026-08-12)
+
+When the search fails — the document says *"they also want search over old
+records"* and the model returned *"the client wants search on old records"* —
+**that extracted requirement is dropped**. No row is created. The run's skip
+list names the document and the reason, so a person can see it and add it by
+hand.
+
+**Reason:** D1 says a committed row carries at least one citation, and a row
+whose evidence could not be verified is exactly the unsupported claim
+behaviour 5 forbids. Matching is a plain substring search after normalising
+whitespace — **no fuzzy matching**. A genuine requirement is occasionally
+dropped because the model paraphrased; the error falls on the safe side, and
+the prompt tells the model to copy wording verbatim.
 
 This doubles as a fabrication detector: words the model invented will not
 be found in the text, and the extraction is flagged. The two error
@@ -1365,6 +1514,34 @@ run parked at Review holds the lock for as long as the human takes.
 Acceptable here — the domain is one Delivery Owner per project — but it must
 be stated, or a queued run looks like a hang.
 
+### The durable lock and the queue are both built in slice 1b; their proofs wait (LOCKED 2026-08-12)
+
+Slice 1b builds **both** parts of the locked concurrency design. The tests
+come with the concurrency slice.
+
+**The durable lock is not optional in 1b.** The kill-and-resume test rests on
+it: the process dies, the application restarts, finds a run stranded in
+`running`, and **takes over that run's lock** before continuing it. Without
+the lock there is nothing to take over and the resume path is not the locked
+design.
+
+**The queue is built too, for a smaller but real reason.** If it were left
+out, `POST /runs` would still have to do *something* when a run is already
+active, and the only simple alternative is to refuse — which is a direct
+departure from the locked queue decision and would need its own explicit
+reversal. The work itself is small: create the run as `waiting`, and start it
+when the lock is released — which is close to the logic startup resume is
+already writing.
+
+**What genuinely stays in the concurrency slice:** the proofs. Two different
+projects running side by side without touching each other's state, the same
+project hit twice behaving correctly, and the tests that demonstrate both. 1b
+builds the mechanism; the later slice proves it.
+
+**Consequence to keep honest:** because these paths are built but not yet
+tested, neither the README nor any report may claim concurrency is proven
+until that slice lands. Built is not proven.
+
 ## Review re-entry after a finished review (LOCKED 2026-08-13)
 
 **Decision.** `runs` gains a nullable `review_finished_at` timestamp.
@@ -1510,6 +1687,7 @@ slices, per the build order's "interface last".
 
 | Endpoint | Does |
 |---|---|
+| `POST /projects` | Create a project from a name and a source-folder path; returns the id that `POST /runs` needs |
 | `POST /runs` | Start a run against a `project_id`. Reads the source folder recorded on that project and returns the id immediately; the work continues in the accepting FastAPI process |
 | `GET /runs/{id}` | Status — which stage, what it cost, what was skipped and why |
 | `POST /runs/{id}/decisions` | One decision: "F-01 approved" |
@@ -1524,11 +1702,52 @@ progress is polled."*
 per-run input. A project owns one continuing register, so keeping its folder
 on the `projects` row prevents two runs from reading different folders into
 that register. In slice 1, Ingest reads the folder directly; a later watcher
-uses the same project property. Passing a folder path in each run request was
-rejected because it would allow one register to describe unrelated source
-folders. Slice 1 needs one project to exist, but whether it is created by a
-seed fixture, migration, or another build-time mechanism is left to
-implementation. No project-creation endpoint is decided.
+uses the same project property.
+
+### How a project comes to exist (LOCKED 2026-08-12)
+
+Project creation is **one function with two triggers**:
+
+1. **`POST /projects`** — takes a name and a source-folder path, creates the
+   project, returns its id. That id is what `POST /runs` needs.
+2. **Startup seeding** — when the application starts and the `projects` table
+   is completely empty, it creates the demo project (`Acme intake portal`,
+   folder `sample-projects/intake-portal`) and logs plainly that it did. If
+   the table is not empty it does nothing, so restarting never produces a
+   duplicate.
+
+These are not two write paths. The endpoint calls the same function startup
+calls — the same rule `TASK.md` already applies to the UI and the MCP server.
+
+**Why both, and not one.** Behaviour 6 is graded: from a fresh clone to a
+working system in minutes with one documented command. If the evaluator has to
+run `docker compose up` **and then** a curl before anything can happen, that is
+not one command — the startup seed makes `docker compose up` genuinely enough.
+Behaviour 4 is graded too: another program can run the whole flow end to end
+without a human clicking through the interface. If a project could only be
+created by a seed script or a CLI, a machine driving the flow would need shell
+access rather than the API — the endpoint closes that. The endpoint does not
+weaken the human gate: approve, reject, commit and export still require a
+human decision; creating a project is an API operation like everything else.
+
+**Alternatives rejected:**
+
+- **Seed script only** (`docker compose run --rm app python -m app.seed …`).
+  It keeps the earlier endpoint list untouched, but it opens a second way of
+  writing to the database beside the API, and it leaves a machine unable to
+  complete the flow without a shell.
+- **`config/projects.yaml`** read at startup. A project owns runtime state —
+  its register, its lock, its runs — so a config file and a database row would
+  become two versions of the truth and drift apart. Config is for rules,
+  formats, and the model; a project is not configuration.
+- **A fixed project inserted by a migration.** Mixes schema with data, and
+  gives no way to create a second project at all.
+
+This makes the locked endpoint list **six**, a deliberate change from the
+earlier five-endpoint decision — recorded in the Decision Log, not slipped in.
+The demo project's name and folder are constants in code; `POST /projects`
+refuses a folder that does not exist with a `400` naming the cause and the
+fix.
 
 `GET /runs/{id}` reports `closed without export` like any other status; the
 endpoint set does not change.
@@ -2322,6 +2541,49 @@ All three tests use `GenericFakeChatModel`, so none needs an API key. All three
 use real PostgreSQL. The resume test cannot prove process re-entry with an
 in-memory checkpointer, and using the same real database for the other two
 avoids creating a second test-only arrangement.
+
+### The kill test kills a real process, it does not simulate one (LOCKED 2026-08-12)
+
+This is the property slice 1 exists to prove, so how it is proved is not a
+detail. The brief asks: *"Kill the process in the middle of a run and start it
+again. It continues from where it left off, and no finished work is lost."*
+And there is no resume endpoint — runs left in `running` are picked up **on
+application startup**, which also takes ownership of the project's durable
+lock.
+
+`test_killed_run_resumes_without_repeating_extraction` starts the run in a
+**separate real process**, kills that process with `SIGKILL` mid-run — no
+cleanup, no graceful shutdown, nothing given a chance to run — then starts the
+application again and asserts that:
+
+- the run continues from its checkpoint rather than restarting;
+- documents already extracted are **not** sent to the model again;
+- no register row is duplicated.
+
+The fake model records which documents it was asked about, so the assertion is
+about real observed calls rather than an inference from the register's
+contents.
+
+**Alternative rejected: an in-process simulated kill** — running the graph
+inside the test process, raising an exception partway through Extract, then
+calling resume. It is far easier to write, and it is the wrong test. It proves
+only that the resume function works when called. The startup path — the code
+that finds a run stranded in `running`, takes over its lock and continues it —
+would never execute, and that is exactly the path a real crash depends on. The
+test would stay green while the real behaviour was broken.
+
+**Accepted cost:** this is the hardest test in the slice — a child process, a
+signal, and a second application start. It is one test, and it is the one the
+whole slice is for. Everything about it still holds to the locked test
+strategy: `GenericFakeChatModel` so no live key is needed, and real
+PostgreSQL, because an in-memory checkpointer dies with the process it is
+meant to outlive.
+
+**The one honest gap, already locked and not reopened here:** if the process
+dies after a model answer arrives but before that document's checkpoint is
+written, that single document is read again on resume — one call may be paid
+for twice. The test shows the *earlier* documents are not repeated and no row
+is duplicated — not that zero calls are ever repeated.
 
 ### Why the fake model is legitimate
 
