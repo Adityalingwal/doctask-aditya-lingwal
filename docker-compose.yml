@@ -18,7 +18,8 @@ services:
   app:
     build: .
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/register
+      DATABASE_URL: postgresql+psycopg://postgres@db:5432/register
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     depends_on:
       db:
         condition: service_healthy
