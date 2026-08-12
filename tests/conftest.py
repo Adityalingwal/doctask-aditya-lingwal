@@ -19,6 +19,14 @@ from alembic.config import Config
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 
+from app.model.scripted_client import (
+    ANSWER_KEY,
+    ERROR_KEY,
+    ERROR_MESSAGE_KEY,
+    ERROR_STATUS_CODE_KEY,
+    PROMPT_MARKER_KEY,
+)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
@@ -128,15 +136,20 @@ class ApplicationProcess:
 
 
 def write_script(script_path: Path, answers: dict[str, dict]) -> None:
-    script_path.write_text(
-        json.dumps(
-            [
-                {"when_prompt_contains": marker, "answer": json.dumps(answer)}
-                for marker, answer in answers.items()
-            ]
-        ),
-        encoding="utf-8",
-    )
+    entries = []
+    for marker, answer in answers.items():
+        scripted = (
+            answer
+            if ERROR_KEY in answer
+            else {ANSWER_KEY: json.dumps(answer)}
+        )
+        entries.append({PROMPT_MARKER_KEY: marker, **scripted})
+    script_path.write_text(json.dumps(entries), encoding="utf-8")
+
+
+def model_call_failure(message: str, status_code: int | None = None) -> dict[str, Any]:
+    """A scripted call that fails the way the provider's SDK fails."""
+    return {ERROR_KEY: {ERROR_MESSAGE_KEY: message, ERROR_STATUS_CODE_KEY: status_code}}
 
 
 def recorded_markers(call_log_path: Path) -> list[str]:

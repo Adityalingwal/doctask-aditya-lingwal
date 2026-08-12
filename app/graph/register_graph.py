@@ -21,8 +21,10 @@ from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import (
     EXISTING_ROW,
     POSSIBLE_MATCH,
+    IncompleteMatchAnswer,
     match_requirements,
 )
+from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
 from app.register.commit_register import commit_register
 from app.register.propose_rows import committed_rows, propose_rows
 from app.review.review_queue import ensure_export_decision, export_was_approved
@@ -146,11 +148,16 @@ def build_register_graph(
             answer = await read_one_document(
                 model_client, source_file, document["extracted_text"]
             )
-        except Exception as error:  # the run degrades rather than stopping
+        except Exception as error:
+            # One document degrades the run; a broken setup stops it, because
+            # skipping every document would export an empty register instead
+            # of the practical explanation.
+            raise_if_configuration_failure(error)
             reason = (
                 f"{source_file} was skipped after the model call failed "
                 f"({describe_unreadable_answer(error)}) — the other documents "
-                "in the batch continue; run again once the model answers."
+                "in the batch continue, and the next run reads this document "
+                "again."
             )
             _log(logging.ERROR, "extract_document_skipped", reason, run_id)
             async with pool.connection() as connection:
@@ -222,7 +229,19 @@ def build_register_graph(
             requirements = await _requirements_of_batch(connection, run_id)
             register = await committed_rows(connection, project_id)
 
-        answer = await match_requirements(model_client, register, requirements)
+        try:
+            answer = await match_requirements(model_client, register, requirements)
+        except IncompleteMatchAnswer:
+            raise  # it already names its own cause and fix
+        except Exception as error:
+            raise_if_configuration_failure(error)
+            # Match answers for the whole batch in one call, so there is no
+            # single document to skip the way Extract skips one.
+            raise ModelCallFailed(
+                "Match could not be answered for this batch "
+                f"({describe_unreadable_answer(error)}) — no register row was "
+                "proposed. Start another run once the model is answering."
+            ) from error
         # A confident match still goes to the Delivery Owner: attaching this
         # batch's evidence to a committed row is not the system's to decide.
         outcome_by_requirement = {

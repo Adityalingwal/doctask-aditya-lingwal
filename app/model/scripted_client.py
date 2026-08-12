@@ -17,6 +17,21 @@ CALL_LOG_PATH_ENVIRONMENT_VARIABLE = "SCRIPTED_MODEL_CALL_LOG"
 DELAY_ENVIRONMENT_VARIABLE = "SCRIPTED_MODEL_DELAY_SECONDS"
 PROMPT_MARKER_KEY = "when_prompt_contains"
 ANSWER_KEY = "answer"
+ERROR_KEY = "error"
+ERROR_MESSAGE_KEY = "message"
+ERROR_STATUS_CODE_KEY = "status_code"
+
+
+class ScriptedModelFailure(RuntimeError):
+    """A call failure a script asked for, carrying the provider's status code.
+
+    The status code is where it sits on the provider SDK's own exceptions, so
+    the code that classifies a failure is driven exactly as it is in a run.
+    """
+
+    def __init__(self, message: str, status_code: int | None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class ScriptedChatModel(GenericFakeChatModel):
@@ -29,7 +44,7 @@ class ScriptedChatModel(GenericFakeChatModel):
     about.
     """
 
-    script: list[dict[str, str]]
+    script: list[dict[str, Any]]
     call_log_path: Path | None = None
     delay_seconds: float = 0.0
 
@@ -41,19 +56,27 @@ class ScriptedChatModel(GenericFakeChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         prompt = "\n".join(str(message.content) for message in messages)
-        marker, answer = self._answer_for(prompt)
+        marker, scripted = self._answer_for(prompt)
         self._record_call(marker)
         if self.delay_seconds:
             time.sleep(self.delay_seconds)
+        failure = scripted.get(ERROR_KEY)
+        if failure is not None:
+            raise ScriptedModelFailure(
+                failure[ERROR_MESSAGE_KEY],
+                failure.get(ERROR_STATUS_CODE_KEY),
+            )
         return ChatResult(
-            generations=[ChatGeneration(message=AIMessage(content=answer))]
+            generations=[
+                ChatGeneration(message=AIMessage(content=scripted[ANSWER_KEY]))
+            ]
         )
 
-    def _answer_for(self, prompt: str) -> tuple[str, str]:
+    def _answer_for(self, prompt: str) -> tuple[str, dict[str, Any]]:
         for scripted_answer in self.script:
             marker = scripted_answer[PROMPT_MARKER_KEY]
             if marker in prompt:
-                return marker, scripted_answer[ANSWER_KEY]
+                return marker, scripted_answer
         markers = ", ".join(entry[PROMPT_MARKER_KEY] for entry in self.script)
         raise RuntimeError(
             "The scripted model has no answer for this call — its prompt matches "
