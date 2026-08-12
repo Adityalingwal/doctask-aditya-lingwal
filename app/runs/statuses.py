@@ -6,8 +6,13 @@ RUNNING = "running"
 WAITING_FOR_REVIEW = "waiting for review"
 DONE = "done"
 CLOSED_WITHOUT_EXPORT = "closed without export"
+FAILED = "failed"
+ENDED_WITHOUT_CHANGES = "ended without changes"
 
-TERMINAL_STATUSES = (DONE, CLOSED_WITHOUT_EXPORT)
+TERMINAL_STATUSES = (DONE, CLOSED_WITHOUT_EXPORT, FAILED, ENDED_WITHOUT_CHANGES)
+# The project's durable lock is exactly these two: a run in any other status
+# holds nothing, which is why every terminal status frees the project.
+ACTIVE_STATUSES = (RUNNING, WAITING_FOR_REVIEW)
 
 INGEST_STAGE = "ingest"
 EXTRACT_STAGE = "extract"

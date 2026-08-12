@@ -38,6 +38,7 @@ from app.runs.statuses import (
     CLOSED_WITHOUT_EXPORT,
     COMMIT_STAGE,
     DONE,
+    ENDED_WITHOUT_CHANGES,
     EXTRACT_STAGE,
     INGEST_STAGE,
     MATCH_STAGE,
@@ -316,7 +317,7 @@ def build_register_graph(
         run_id = UUID(state["run_id"])
         reason = state.get("ended_early_reason") or _early_reason(state)
         async with pool.connection() as connection:
-            await set_run_status(connection, run_id, DONE, reason)
+            await set_run_status(connection, run_id, ENDED_WITHOUT_CHANGES, reason)
         _log(logging.INFO, "run_ended_early", reason, run_id)
         return {"ended_early_reason": reason}
 

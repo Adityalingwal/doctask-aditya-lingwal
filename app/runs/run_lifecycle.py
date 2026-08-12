@@ -14,6 +14,7 @@ from psycopg.errors import UniqueViolation
 from psycopg_pool import AsyncConnectionPool
 
 from app.run_logging import log_run_event
+from app.runs.run_records import record_run_failure
 from app.runs.statuses import RUNNING, WAITING
 
 
@@ -139,15 +140,18 @@ async def _execute(
     try:
         await engine.graph.ainvoke(graph_input, configuration)
     except Exception as error:  # the top of the run: report, never disappear
-        log_run_event(
-            logging.ERROR,
-            "run_stopped",
-            f"The run stopped on {type(error).__name__}: {error}. It still "
-            "holds its project's lock and stays in 'running', so restarting "
-            "the application continues it from its last checkpoint once the "
-            "cause is fixed.",
-            str(run_id),
+        # A run that stopped deliberately is never resumed: the same input
+        # would stop it again. A killed process leaves 'running' behind
+        # instead, and that is what startup resume takes over.
+        failure_reason = (
+            f"The run stopped on {type(error).__name__}: {error} It is "
+            "'failed' and is not started again by itself — fix the cause "
+            "named here and start another run. Nothing this run read counts "
+            "as read, so the next run reads those documents again."
         )
+        log_run_event(logging.ERROR, "run_failed", failure_reason, str(run_id))
+        async with engine.pool.connection() as connection:
+            await record_run_failure(connection, run_id, failure_reason)
     await _start_waiting_run(engine, project_id)
 
 

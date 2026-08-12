@@ -99,6 +99,7 @@ async def read_run_status(request: Request, run_id: UUID) -> dict[str, Any]:
         "stage": run["current_stage"],
         "skipped": run["skipped"],
         "ended_early_reason": run["ended_early_reason"],
+        "failure_reason": run["failure_reason"],
         "decisions": [
             {
                 "decision_id": str(decision["id"]),

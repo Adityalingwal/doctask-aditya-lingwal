@@ -151,6 +151,31 @@ def recorded_markers(call_log_path: Path) -> list[str]:
     return markers
 
 
+def wait_for_run_status(
+    client: httpx.Client,
+    run_id: str,
+    status: str,
+) -> dict[str, Any]:
+    return wait_until(
+        lambda: _run_in_status(client, run_id, status),
+        f"run {run_id} reports '{status}'",
+    )
+
+
+def approve_every_decision_and_finish_review(
+    client: httpx.Client,
+    run_id: str,
+) -> None:
+    for decision in client.get(f"/runs/{run_id}").json()["decisions"]:
+        if decision["outcome"] is not None:
+            continue
+        client.post(
+            f"/runs/{run_id}/decisions",
+            json={"decision_id": decision["decision_id"], "outcome": "approved"},
+        ).raise_for_status()
+    client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+
+
 def wait_until(
     condition: Callable[[], Any],
     description: str,
@@ -163,6 +188,15 @@ def wait_until(
             return answer
         time.sleep(POLL_SECONDS)
     raise TimeoutError(f"timed out waiting until {description}")
+
+
+def _run_in_status(
+    client: httpx.Client,
+    run_id: str,
+    status: str,
+) -> dict[str, Any] | None:
+    run = client.get(f"/runs/{run_id}").json()
+    return run if run["status"] == status else None
 
 
 def _free_port() -> int:
