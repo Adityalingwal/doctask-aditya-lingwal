@@ -10,12 +10,15 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection, Engine, create_engine, inspect, text
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import IntegrityError
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres@db:5432/register"
+POSTGRES_MAINTENANCE_DATABASE = "postgres"
+TEST_DATABASE_PREFIX = "register_test_"
 DOMAIN_TABLES = {
     "projects",
     "runs",
@@ -95,31 +98,57 @@ REGISTER_ROW_STATUSES = (
 
 @pytest.fixture(scope="session")
 def database_engine() -> Iterator[Engine]:
-    database_url = os.environ.get(
-        DATABASE_URL_ENVIRONMENT_VARIABLE,
-        DEFAULT_DATABASE_URL,
+    application_database_url = make_url(
+        os.environ.get(
+            DATABASE_URL_ENVIRONMENT_VARIABLE,
+            DEFAULT_DATABASE_URL,
+        )
     )
-    alembic_config = Config(PROJECT_ROOT / "alembic.ini")
-    alembic_config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(alembic_config, "head")
+    test_database_name = f"{TEST_DATABASE_PREFIX}{uuid4().hex}"
+    test_database_url = application_database_url.set(database=test_database_name)
+    maintenance_database_url = application_database_url.set(
+        database=POSTGRES_MAINTENANCE_DATABASE
+    )
+    maintenance_engine = create_engine(
+        maintenance_database_url,
+        isolation_level="AUTOCOMMIT",
+    )
+    test_database_created = False
+    engine: Engine | None = None
 
-    engine = create_engine(database_url)
     try:
+        with maintenance_engine.connect() as connection:
+            connection.exec_driver_sql(f'CREATE DATABASE "{test_database_name}"')
+        test_database_created = True
+
+        alembic_config = Config(PROJECT_ROOT / "alembic.ini")
+        alembic_config.set_main_option(
+            "sqlalchemy.url",
+            test_database_url.render_as_string(hide_password=False),
+        )
+        command.upgrade(alembic_config, "head")
+
+        engine = create_engine(test_database_url)
         yield engine
     finally:
-        engine.dispose()
+        if engine is not None:
+            engine.dispose()
+        if test_database_created:
+            with maintenance_engine.connect() as connection:
+                connection.exec_driver_sql(
+                    f'DROP DATABASE "{test_database_name}" WITH (FORCE)'
+                )
+        maintenance_engine.dispose()
 
 
 @pytest.fixture
 def database_connection(database_engine: Engine) -> Iterator[Connection]:
-    with database_engine.begin() as connection:
-        connection.execute(
-            text(
-                "TRUNCATE audit, citations, decisions, register_rows, "
-                "documents, runs, projects CASCADE"
-            )
-        )
-        yield connection
+    with database_engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            yield connection
+        finally:
+            transaction.rollback()
 
 
 def _insert_project(connection: Connection, project_id: UUID | None = None) -> UUID:
@@ -226,6 +255,22 @@ def _insert_register_row(
         },
     )
     return register_row_id
+
+
+def test_schema_tests_do_not_use_the_application_database(
+    database_engine: Engine,
+) -> None:
+    application_database_url: URL = make_url(
+        os.environ.get(
+            DATABASE_URL_ENVIRONMENT_VARIABLE,
+            DEFAULT_DATABASE_URL,
+        )
+    )
+    test_database_name = database_engine.url.database
+
+    assert test_database_name is not None
+    assert test_database_name.startswith(TEST_DATABASE_PREFIX)
+    assert test_database_name != application_database_url.database
 
 
 def test_all_seven_domain_tables_have_the_expected_columns(
