@@ -8,15 +8,29 @@ from typing import Any
 import yaml
 from alembic import command
 from alembic.config import Config
+from sqlalchemy.exc import OperationalError
 
 
 STARTUP_LOGGER_NAME = "register.startup"
+DATABASE_CONNECTION_FAILURE_MESSAGE = (
+    "Could not connect to PostgreSQL while running startup migrations — confirm "
+    "the database service is running and the database environment settings are "
+    "correct, then restart the application."
+)
 
 
 def migrate_database(project_root: Path, database_url: str) -> None:
     alembic_config = Config(project_root / "alembic.ini")
     alembic_config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(alembic_config, "head")
+    try:
+        command.upgrade(alembic_config, "head")
+    except OperationalError:
+        log_startup_event(
+            logging.ERROR,
+            "database_connection_failed",
+            DATABASE_CONNECTION_FAILURE_MESSAGE,
+        )
+        raise RuntimeError(DATABASE_CONNECTION_FAILURE_MESSAGE) from None
     log_startup_event(
         logging.INFO,
         "database_migrated",
