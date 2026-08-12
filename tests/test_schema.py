@@ -41,6 +41,7 @@ EXPECTED_COLUMNS = {
         "estimated_cost_usd",
         "skipped",
         "ended_early_reason",
+        "failure_reason",
         "export_json",
         "created_at",
     },
@@ -66,6 +67,7 @@ EXPECTED_COLUMNS = {
         "fingerprint",
         "row_number",
         "proposed_by_run_id",
+        "merged_into_register_row_id",
         "is_committed",
         "created_at",
     },
@@ -106,6 +108,8 @@ RUN_STATUSES = (
     "waiting for review",
     "done",
     "closed without export",
+    "failed",
+    "ended without changes",
 )
 REGISTER_ROW_STATUSES = (
     "Done",
@@ -367,6 +371,18 @@ def test_project_refuses_a_second_waiting_run(
     with pytest.raises(IntegrityError):
         with database_connection.begin_nested():
             _insert_run(database_connection, project_id, status="waiting")
+
+
+def test_run_refuses_a_second_row_for_the_same_document(
+    database_connection: Connection,
+) -> None:
+    project_id = _insert_project(database_connection)
+    run_id = _insert_run(database_connection, project_id)
+    _insert_document(database_connection, run_id)
+
+    with pytest.raises(IntegrityError):
+        with database_connection.begin_nested():
+            _insert_document(database_connection, run_id)
 
 
 @pytest.mark.parametrize("run_id", [None, uuid4()])
