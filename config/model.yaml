@@ -4,3 +4,6 @@ base_url: https://openrouter.ai/api/v1
 rates_usd_per_token:
   prompt: 0.0000004
   completion: 0.0000016
+call:
+  attempts: 2
+  timeout_seconds: 120
