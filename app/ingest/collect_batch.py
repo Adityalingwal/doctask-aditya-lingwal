@@ -9,7 +9,6 @@ from uuid import UUID, uuid4
 from psycopg import AsyncConnection
 
 from app.ingest.read_markdown import MARKDOWN_EXTENSION, read_markdown
-from app.runs.statuses import DONE
 
 
 READER_EXTENSIONS = frozenset({MARKDOWN_EXTENSION})
@@ -74,8 +73,9 @@ async def collect_batch(
             skipped.append(
                 _skipped(
                     path.name,
-                    "unchanged since the last completed run — an unchanged "
-                    "document is never read or sent to a model again.",
+                    "unchanged since an earlier run read it and exported the "
+                    "register — an unchanged document is never read or sent to "
+                    "a model again.",
                 )
             )
             continue
@@ -106,15 +106,16 @@ async def _already_read_unchanged(
     source_path: str,
     content_hash: str,
 ) -> bool:
-    # Only a run that finished with an export counts as having read a document:
-    # a run closed without export left no rows behind, so its documents must be
-    # readable again.
+    # A document counts as read only where both halves happened: Extract read
+    # this document, and that run exported its register. A document Extract
+    # skipped, or a run that exported nothing, leaves the work still to do.
     result = await connection.execute(
         "SELECT 1 FROM documents "
         "JOIN runs ON runs.id = documents.run_id "
-        "WHERE runs.project_id = %s AND runs.status = %s "
+        "WHERE runs.project_id = %s AND runs.export_json IS NOT NULL "
+        "AND documents.extraction IS NOT NULL "
         "AND documents.source_path = %s AND documents.content_hash = %s "
         "LIMIT 1",
-        (project_id, DONE, source_path, content_hash),
+        (project_id, source_path, content_hash),
     )
     return await result.fetchone() is not None
