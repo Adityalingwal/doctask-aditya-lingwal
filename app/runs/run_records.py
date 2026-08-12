@@ -6,7 +6,13 @@ from uuid import UUID
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
-from app.runs.statuses import ACTIVE_STATUSES, FAILED, TERMINAL_STATUSES
+from app.runs.statuses import (
+    ACTIVE_STATUSES,
+    FAILED,
+    RUNNING,
+    TERMINAL_STATUSES,
+    WAITING_FOR_REVIEW,
+)
 
 
 async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] | None:
@@ -57,6 +63,24 @@ async def set_run_status(
         f"finished_at = {finished_at} WHERE id = %s",
         (status, ended_early_reason, run_id),
     )
+
+
+async def claim_review_finished(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> dict[str, Any] | None:
+    """Take one run out of review, or report that another caller already did.
+
+    Checking the status and writing it is one statement on purpose: between a
+    read and a later write, a second caller finishes the same review and the
+    graph is driven twice over one run.
+    """
+    result = await connection.execute(
+        "UPDATE runs SET status = %s WHERE id = %s AND status = %s "
+        "RETURNING project_id",
+        (RUNNING, run_id, WAITING_FOR_REVIEW),
+    )
+    return await result.fetchone()
 
 
 async def record_run_failure(

@@ -27,7 +27,7 @@ from app.runs.run_lifecycle import (
     resume_after_review,
     start_or_queue_run,
 )
-from app.runs.run_records import read_project, read_run
+from app.runs.run_records import claim_review_finished, read_project, read_run
 from app.runs.statuses import WAITING_FOR_REVIEW
 
 
@@ -162,25 +162,37 @@ async def finish_review(request: Request, run_id: UUID) -> dict[str, str]:
                 ),
             )
         outstanding = await unanswered_decisions(connection, run_id)
+        if outstanding:
+            # Finishing with an unanswered gate would claim the review completed
+            # while an approved output may not exist.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"review cannot finish while {len(outstanding)} decision(s) "
+                    "are unanswered: "
+                    + "; ".join(
+                        f"{decision['id']} — {decision['question']}"
+                        for decision in outstanding
+                    )
+                    + f". Answer each with POST /runs/{run_id}/decisions, then "
+                    "finish the review again."
+                ),
+            )
+        # The run leaves review here, before anything is launched: a 200 that
+        # nothing in the database records would be a false success.
+        claimed = await claim_review_finished(connection, run_id)
 
-    if outstanding:
-        # Finishing with an unanswered gate would claim the review completed
-        # while an approved output may not exist.
+    if claimed is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                f"review cannot finish while {len(outstanding)} decision(s) "
-                "are unanswered: "
-                + "; ".join(
-                    f"{decision['id']} — {decision['question']}"
-                    for decision in outstanding
-                )
-                + f". Answer each with POST /runs/{run_id}/decisions, then "
-                "finish the review again."
+                "this run's review was finished by another call a moment ago, "
+                f"so this one changed nothing — poll GET /runs/{run_id} for "
+                "what that run does next."
             ),
         )
 
-    resume_after_review(engine, run_id, run["project_id"])
+    resume_after_review(engine, run_id, claimed["project_id"])
     return {"run_id": str(run_id), "status": "review finished"}
 
 

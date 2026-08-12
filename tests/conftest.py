@@ -175,10 +175,7 @@ def wait_for_run_status(
     )
 
 
-def approve_every_decision_and_finish_review(
-    client: httpx.Client,
-    run_id: str,
-) -> None:
+def approve_every_decision(client: httpx.Client, run_id: str) -> None:
     for decision in client.get(f"/runs/{run_id}").json()["decisions"]:
         if decision["outcome"] is not None:
             continue
@@ -186,6 +183,13 @@ def approve_every_decision_and_finish_review(
             f"/runs/{run_id}/decisions",
             json={"decision_id": decision["decision_id"], "outcome": "approved"},
         ).raise_for_status()
+
+
+def approve_every_decision_and_finish_review(
+    client: httpx.Client,
+    run_id: str,
+) -> None:
+    approve_every_decision(client, run_id)
     client.post(f"/runs/{run_id}/finish-review").raise_for_status()
 
 
