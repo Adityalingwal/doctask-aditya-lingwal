@@ -39,6 +39,28 @@ def extraction_answer(summary: str, quote: str) -> dict[str, Any]:
     }
 
 
+def unrelated_extraction_answer(summary: str, quote: str) -> dict[str, Any]:
+    """A document Extract judged unrelated, which still listed a requirement.
+
+    The Extract node already guards against this shape by forcing the
+    requirement count to zero for an unrelated document, so a batch can end
+    with nothing found while the stored extraction is not empty.
+    """
+    return extraction_answer(summary, quote) | {"document_type": "unrelated"}
+
+
+def extraction_answer_without_requirements() -> dict[str, Any]:
+    """A document of this engagement that simply asks for nothing."""
+    return {
+        "document_type": "meeting notes",
+        "document_date": None,
+        "requirements": [],
+        "testing_observations": [],
+        "blockers": [],
+        "embedded_instructions": [],
+    }
+
+
 def match_answer(requirement_count: int) -> dict[str, Any]:
     return {
         "outcomes": [

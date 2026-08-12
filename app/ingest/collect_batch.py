@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection
 
+from app.extract.answer import UNRELATED_DOCUMENT
 from app.ingest.read_markdown import MARKDOWN_EXTENSION, read_markdown
 
 
@@ -75,9 +76,9 @@ async def collect_batch(
                 skipped.append(
                     _skipped(
                         path.name,
-                        "unchanged since an earlier run read it and exported "
-                        "the register — an unchanged document is never read or "
-                        "sent to a model again.",
+                        "unchanged since an earlier run read it and finished "
+                        "with what it said — an unchanged document is never "
+                        "read or sent to a model again.",
                     )
                 )
                 continue
@@ -133,16 +134,22 @@ async def _already_read_unchanged(
     source_path: str,
     content_hash: str,
 ) -> bool:
-    # A document counts as read only where both halves happened: Extract read
-    # this document, and that run exported its register. A document Extract
-    # skipped, or a run that exported nothing, leaves the work still to do.
+    # A document is finished with when Extract read it and nothing is left to
+    # do with what it said: either that run exported its register, or the
+    # document held nothing the register could ever take. Demanding an export
+    # in the second case would send an unrelated document to the model again,
+    # and pay for it, on every run for as long as the file sits in the folder.
+    # The second half asks what Match asks of the same column.
     result = await connection.execute(
         "SELECT 1 FROM documents "
         "JOIN runs ON runs.id = documents.run_id "
-        "WHERE runs.project_id = %s AND runs.export_json IS NOT NULL "
+        "WHERE runs.project_id = %s "
         "AND documents.extraction IS NOT NULL "
+        "AND (runs.export_json IS NOT NULL "
+        "OR documents.extraction ->> 'document_type' = %s "
+        "OR jsonb_array_length(documents.extraction -> 'requirements') = 0) "
         "AND documents.source_path = %s AND documents.content_hash = %s "
         "LIMIT 1",
-        (project_id, source_path, content_hash),
+        (project_id, UNRELATED_DOCUMENT, source_path, content_hash),
     )
     return await result.fetchone() is not None
