@@ -124,6 +124,15 @@ marked — the correction is more useful than a clean page.
   unexpected type is accepted and treated as related. Open since the slice 1b
   implementation report raised it.
 
+- **The broad worktree bind mount stays for local development, on purpose.**
+  `docker-compose.yml` mounts `.` at `/workspace`, so the git-ignored `.env`
+  is readable inside the container and local files override what is baked into
+  the image. Accepted deliberately so local iteration stays fast. Before final
+  whole-project verification the mount must be removed or narrowed and the
+  verification rerun against the image alone. The development PostgreSQL
+  volume also holds stale pre-review data and should be wiped once so the demo
+  starts from a genuinely empty database.
+
 ## Log
 
 Newest first.

@@ -1883,6 +1883,10 @@ before becomes accepted now.
 **Attribution.** Ours. The task PDF requires resume without duplicated side
 effects; how the run records that its review finished is our choice.
 
+**Evidence:** reasoning-stage. None of the five pieces exists in code yet;
+the column, the migration, and the test arrive with the slice that builds
+them.
+
 ## Extract-call idempotency (LOCKED 2026-08-12)
 
 **Decision.** No mechanism is built to prevent one Extract call being paid for
