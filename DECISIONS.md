@@ -107,6 +107,13 @@ write-up repeats them.
 | 2026-08-12 | MCP server **mounted in the FastAPI process**, calling core functions directly; **validation and error semantics live in the core function**, with the HTTP route a thin adapter over it | If validation lives in the route and MCP calls the core directly, MCP silently skips those checks and the two paths drift; in-process mounting keeps setup to one command and the transport simple for the evaluator | The MCP surface and the API live and die together — not a real cost at this size | Reasoning-stage — see "MCP server — placement and validation" section | If validation has ended up in the route handlers by the MCP slice, moving it into the core is part of that slice's work |
 | 2026-08-12 | **One findings table, no rules table**; rules stay in `config/rules.yaml`; configuration is read once when a run starts and frozen for that run; each finding stores the rule id plus the rule text as it was at that moment; a run records a fingerprint of the **parsed** rules | A finding must keep the meaning of the rule that raised it even if the rule's wording is later edited; a fingerprint over the parsed structure moves only when a rule actually moves, not on comment or whitespace edits; per-rule change detection is deliberately not built — a rule-versioning engine to save one Examine call is not worth it | A rules-triggered run re-examines the whole register rather than only the rows the changed rule touches | Reasoning-stage — see "Findings storage and run configuration" section | Build the findings table and the rules fingerprint when the rules-engine slice arrives |
 | 2026-08-12 | Prompt injection is proved by **an automated test with its own fixture** plus **one hostile line buried in a demo document** (`intake-portal/meeting-notes-20-mar.md`), deliberately **not** in the second-run corpus | The test runs every time, needs no key, and can be made to fail on demand; a live run visibly catching an instruction buried in an ordinary document is more convincing than a green test; the second-run corpus has one job — prove the system works on unseen documents — and mixing injection in would make one run prove two unrelated things | The behaviour-8 proof lands as two artefacts rather than one | Reasoning-stage — see "Prompt-injection resistance" section | Add the embedded line to `intake-portal/meeting-notes-20-mar.md` when that document arrives with its slice |
+| 2026-08-12 | Run terminal statuses gain **`failed`** and **`ended without changes`**; `failed` carries the cause and fix on the run and is never resumed, `ended without changes` covers the four early-exit routes with the reason kept in `ended_early_reason` | A run that stops on an error had no honest status — leaving it `running` holds the project lock forever, and a broken setup was reported `done` with an empty register; an early-exit run marked `done` looks identical to an exported one in run history | Two new values sit beside `done` and `closed without export`, whose meanings are unchanged | Reasoning-stage — see "Run identity and concurrency" section | `failed` runs' documents must not count as read — settled by the F5 conditions |
+| 2026-08-12 | F1 fix: an approved possible match **marks the merged proposal** (`merged_into_register_row_id`) instead of deleting it, and the commit loop skips marked proposals | Deleting the proposal would add a destructive operation to the most dangerous transaction in the system; the marker makes the row explain why it never committed | Row numbers can have gaps where a proposal merged away | Reasoning-stage — see "Match and Examine" section | The marker settles the previously open deleted-versus-retained build-time choice |
+| 2026-08-12 | Codex 2 fix: an incomplete Match answer is a **Match failure — the run stops, it never guesses**; every index sent must come back exactly once with a valid outcome and the right `row_number` presence | Defaulting a missing index to `new row` states something Match never said — silent register corruption; defaulting to `possible match` cannot be built because a missing answer supplies no candidate row to name; finishing anyway would mark unread documents as read and lose requirements silently | A failing Match now ends the run `failed` instead of producing a partial register | Reasoning-stage — see "Match and Examine" section | No content-level re-ask added; revisit if live runs show the model is often incomplete |
+| 2026-08-12 | F5 fix: a document counts as already read only when **its extraction succeeded and either its run exported or it held nothing the register could ever take** (unrelated, or no requirement) | Keying on `done` treated never-read documents as read when Extract skipped them after a failed call; keying on `export_json` alone still missed it, because the run did export; the nothing-to-take half was added when the two conditions re-read unrelated documents forever | None stated beyond the narrowed skip | Reasoning-stage — see "Incremental input contract" section | Two tests: an unrelated and an empty document each reach the model exactly once across two runs |
+| 2026-08-12 | F3 fix: model-call failures are classified **by HTTP status code**, never by matching message text, in one place both Extract and Match use; configuration failures end the run `failed`, transient failures keep the per-document skip | The locked failure table is already written in status codes, so the mapping is a transcription, not a judgement; a string check is incomplete the day it is written and breaks when a provider rewords a response | None stated beyond one shared classifier | Reasoning-stage — see "Failure and retry behaviour" section | Only 401 is driven by a test; 402/403/404 share the same dictionary lookup |
+| 2026-08-12 | F4 fix: `finish-review` **claims the status transition atomically** (compare-and-set from `waiting for review` to `running`) before launching anything; zero rows updated returns 409 | The old read-then-launch shape answered `200 "review finished"` while nothing in the database recorded it — the false success `TASK.md` forbids — and two accepted calls could both invoke the graph | The decision-change window closes as a side effect, because `submit_decision` gates on `waiting for review` | Reasoning-stage — see "API — slice 1" section | F4's proposed second change (removing the review node's post-interrupt write) was deliberately not applied — LangGraph replays the node from the top and removing it re-opens the hole |
+| 2026-08-12 | F2 fix: **whatever this run already wrote, it does not write again** — Ingest upserts on `(run_id, source_path)` and keeps the existing row in the batch; Match clears this run's own uncommitted proposals, citations and unanswered decisions before writing fresh; each node's writes are one transaction | A kill between our writes and LangGraph's checkpoint re-runs the whole node; Ingest inserts duplicated documents and Match duplicates proposals into the exported register — a wrong deliverable, not just a repeated cost | None stated beyond the transaction and constraint | Reasoning-stage — see "Run state and checkpoints" section | The Extract-window one-call limitation is unaffected and stays in the README |
 | 2026-08-13 | Application binds loopback only by default (`APP_HOST`, default `127.0.0.1`); Compose sets `APP_HOST=0.0.0.0` inside the container and pins `ports: ["127.0.0.1:8000:8000"]` | Slice 1b added six unauthenticated endpoints including approve/reject and export; an open bind lets any device on the same network push the human gate, which undermines behaviour #3 | Exposing the application on a LAN needs two deliberate config edits | `DECISIONS.md` "Network bind" | Add the README exposure line when the change lands |
 | 2026-08-13 | `runs.review_finished_at`, written by `claim_review_finished`, read by the Review node on entry and by the decision endpoint | A replayed Review node cannot otherwise tell a first entry from a post-review replay — both read `status = running` — so a resume drives the run's reported status backwards into `waiting for review` | One extra nullable column and one branch in the Review node; the trigger itself is a millisecond-wide crash window, stated honestly rather than inflated | `DECISIONS.md` "Review re-entry after a finished review" | Add `test_finished_review_does_not_reopen_on_resume` |
 | 2026-08-13 | Review screen locked at five sections — stages, skipped, needs your decision, register, cost and timing — with one Approve/Reject component serving all seven gated points | The superseded mockup gated the Register itself, which human-gate scope (2026-08-11) had already ruled out; the gate needs a home that is not the register | The screen grew from four sections to five; the reasoning for the original four is untouched | `DECISIONS.md` "Review interface — scope" | Findings table still owed by the rules slice; it does not change this shape |
@@ -594,6 +601,52 @@ deliberately not built:
 **A file removed from the watched location changes nothing.** Its rows stay
 in the register. The document did arrive once; deleting the file does not
 make that untrue.
+
+### What counts as "already read" (LOCKED 2026-08-12)
+
+Ingest skips a file whose content hash matches one already recorded, so an
+unchanged document is never read or paid for twice. The reviewed build
+decided "already read" by testing `runs.status = 'done'` — and an early-exit
+run was also `done`, so the test did not mean what its own comment said
+("only a run that finished with an export counts as having read a document").
+
+The trigger that matters does not depend on model quality at all: Ingest
+writes a document's text and hash into `documents` **before** Extract runs. If
+Extract's model call then fails both attempts — a timeout or a 429 — that
+document is skipped and the batch continues, which is the locked degradation
+behaviour. The document row stays behind with its hash and an empty
+`extraction`. A later run found it "unchanged against a `done` run" and
+skipped it forever — the document was never read, its requirements never
+reached the register, and nothing surfaced it again.
+
+**Decision.** A document counts as already read only when **both** are true:
+
+1. **That document was successfully extracted** — `documents.extraction IS
+   NOT NULL`.
+2. **That run's register was actually exported** — `runs.export_json IS NOT
+   NULL`.
+
+Condition 2 alone (the review's own fix) does not catch the case above — the
+run *did* export. Condition 1 is what Match already asks of the same column;
+Ingest and Match now agree on what "read" means.
+
+**Correction, applied the same day.** The two conditions ANDed re-read an
+unrelated document forever: a run holding only an unrelated document never
+exports, so condition 2 could never be satisfied, and the document was sent to
+the model again on every later run for as long as the file sat in the folder.
+The condition now reads: a document counts as read when its extraction
+succeeded **and** either its run exported, **or** that document held nothing
+the register could ever take — judged `unrelated`, or carrying no requirement
+at all. The second half asks what Match already asks of the same column, so
+Ingest and Match agree on what "read" means. The skip reason changed with it,
+from "read it and exported the register" to "read it and finished with what it
+said", which is now the truth.
+
+**Not changed:** unchanged documents are still never re-read — the brief's
+"an update should cost like an update" standard is the reason the skip exists
+at all; this narrows when it applies. The Extract per-document degradation
+stays: one failing document skipping while the batch continues is locked
+behaviour; the fix is that the next run picks that document up again.
 
 ## Declared set — file formats and document types (LOCKED 2026-08-09)
 
@@ -1186,6 +1239,74 @@ nothing.**
 - The saving is one call out of eleven, on a ~250-token register — not
   worth it.
 
+### An incomplete Match answer is a Match failure (LOCKED 2026-08-12)
+
+Match is sent the committed register plus the batch's requirements, each
+carrying an index — 0, 1, 2. It must answer for every index: `new row`,
+`existing row`, or `possible match`. Shape validation alone does not prove
+coverage: an answer whose `outcomes` list is present but omits an index — or
+is empty — parsed fine and quietly defaulted every missing index to a new row,
+so the register could hold the same requirement twice while the Delivery
+Owner was never asked.
+
+**Decision.** An incomplete Match answer is a Match failure. The run stops;
+it never guesses. Every index sent must come back exactly once, with no
+unknown index, a valid outcome, and `row_number` present for `existing row`
+and `possible match` and absent for `new row`.
+
+**Alternatives considered and rejected:**
+
+- **Default a missing index to `new row`** — today's behaviour. It states
+  something Match never said, and a wrong new row is the silent register
+  corruption the possible-match gate exists to prevent.
+- **Default a missing index to `possible match` and ask the Delivery Owner** —
+  sounds like the safe middle, but it cannot be built. A possible-match
+  question needs a candidate row number to name, and a missing answer supplies
+  none. There is no question to write.
+- **Skipping Match and letting the run finish** — a run that ends normally
+  marks its documents as read, and the next run then skips them as unchanged.
+  Those requirements would be lost until the file itself changed — a silent
+  loss, which is worse than a stopped run.
+
+Stopping is already the locked behaviour: Extract can skip one document and
+continue, but Match operates on the whole batch and has no smaller unit to
+skip, so a failed Match stops the run before Review and does not report
+`done`.
+
+**Not changed:** the deliberate `EXISTING_ROW` → `POSSIBLE_MATCH` downgrade —
+a confident match still goes to the human rather than silently attaching
+evidence to a committed row. And no content-level re-ask is added: the locked
+two-attempt retry covers transport failures through the SDK; re-asking the
+model because its answer was incomplete is new machinery with no live-model
+evidence behind it yet. If real runs show the model is often incomplete, that
+is the moment to add it.
+
+### An approved possible match marks the merged proposal (LOCKED 2026-08-12)
+
+When the Delivery Owner approves a possible-match merge, Commit moves the
+proposal's citations onto the candidate row. In the reviewed build the emptied
+proposal was still selected by the commit loop, failed the D1 citation check,
+rolled the whole transaction back, and crashed again on resume — permanently,
+because the run held the project's lock.
+
+**Decision.** The merged proposal is **kept and marked** with
+`merged_into_register_row_id` pointing at the row its evidence went into, and
+the commit loop skips marked proposals. Deleting the proposal was rejected:
+the `decisions` row points at it through `proposed_register_row_id`, and
+Commit is the most dangerous transaction in the system — adding a destructive
+operation there is the wrong trade for saving one column.
+
+The marker is not a boolean. The proposal records **which row its evidence
+went into**, so the row itself explains why it was never committed. Same work,
+more information, and it settles the previously open build-time choice of
+whether a rejected proposal is deleted or retained.
+
+**Not changed:** reject already behaves correctly — no merge happens, the
+citations stay on the proposal, and the commit loop commits it as a new row.
+The row's cells are never rewritten on merge; approving a merge moves evidence
+and nothing else. Row numbers can still have gaps where a proposal merged
+away — accepted, not part of the fix.
+
 ## Model provider and client (LOCKED 2026-08-12)
 
 Development and demo runs call models through **OpenRouter**, using its
@@ -1299,8 +1420,50 @@ The existing 5–15 second Extract-call figure is an unmeasured estimate, not
 evidence. Once real calls and tests exist, measure their durations and lower
 the timeout only if those measurements support it.
 
-**Evidence:** reasoning-stage. No model call has been made from this
-repository.
+**Evidence:** reasoning-stage. No live model call has been made from this
+repository; every run so far used the scripted client, so the classification
+below is proven against failures shaped like the SDK's, with only the 401 path
+driven by a test.
+
+### Classification is by status code, never by message text (LOCKED 2026-08-12)
+
+A model call can fail for two entirely different reasons, and they need
+opposite treatment:
+
+| Kind | Examples | Fixed by trying again? | Treatment |
+|---|---|---|---|
+| Transient | timeout, 429 rate limit, provider 500/502/503 | Yes, often | Retry, then skip that one document and let the batch continue |
+| Configuration | 401/403 wrong or missing key, 402 no credits, 404 model name wrong | Never — every document hits the same wall | **Stop the run** as `failed`, naming the cause and the fix |
+
+The reviewed build did not make the split: one `except Exception` routed every
+model-call failure to the per-document skip. A stranger with an expired key
+saw every document skipped and the run end **`done`** — a success status on a
+completely broken setup, with an empty register.
+
+**Decision.** One place classifies a model-call exception as configuration or
+transient, **by HTTP status code, never by matching text in the error
+message**, and both Extract and Match use it, so the two paths cannot drift. A
+string check like `if "invalid api key" in str(error)` is incomplete the day
+it is written and breaks the moment a provider rewords its response — a pile
+of special cases pretending to be intelligence, which this repository's
+standards already reject. The SDK's typed exceptions carry the status code;
+the locked table above is already written in status codes, so the mapping is a
+direct transcription, not a judgement.
+
+The message is per failure class: 401/403 → put a valid OpenRouter key in
+`.env`; 402 → the account has no credits left; 404 → correct the model name in
+`config/model.yaml`; timeout or 429 → this document was skipped, run again
+shortly. Match gets the same treatment: it uses the same client and has no
+smaller unit to skip, so it stops either way — but it stops as `failed` with
+the right cause and fix, not stalled in `running`.
+
+**Not changed:** the per-document skip for transient failures stays — it is
+locked degradation behaviour. A model answer that cannot be parsed is not a
+configuration failure; malformed JSON from the model is per-document, and
+skipping that document is the honest response. The application still starts
+without a key — refusing to start would break the one-command promise
+behaviour 6 grades; this fix is about a key that exists and is wrong, not a
+key that is absent.
 
 ## Logging, timing, and cost (LOCKED 2026-08-12)
 
@@ -1439,6 +1602,73 @@ show a state the server has not recorded.
 > build has a defined starting point — Aditya wants to reopen it later and
 > compare.
 
+### Whatever this run already wrote, it does not write again (LOCKED 2026-08-12)
+
+Two separate writes happen for every node, in this order, and the order is not
+a choice:
+
+1. **Our own data**, written by our code inside the node — `documents` rows in
+   Ingest, `register_rows`, `citations` and `decisions` in Match.
+2. **LangGraph's checkpoint**, written by the framework after the node returns
+   — the mark that says "this node finished".
+
+A checkpoint records that the work is done, so it can only be written after
+the work. Between the two writes there is a window. A process killed inside it
+leaves our data written while the checkpoint says the node never ran, so
+resume executes the whole node again.
+
+Re-execution is only harmful where the node **inserts**:
+
+| Node | What re-running does | Harmful |
+|---|---|---|
+| Extract | `UPDATE documents SET extraction = …` | No — the same value is written twice |
+| Ingest | `INSERT INTO documents …` | **Yes** — every document appears twice |
+| Match | `INSERT` into `register_rows`, `citations`, `decisions` | **Yes** — a second full set of proposals, and Commit commits both |
+
+The Match case is the worse of the two: row numbers simply climb, so no
+constraint fires, and the **exported register contains every requirement
+twice** — a wrong deliverable, not a repeated cost.
+
+**Decision.**
+
+> **Whatever this run already wrote, it does not write again.**
+
+- **Ingest — do not insert a document this run already inserted.** A unique
+  constraint on `(run_id, source_path)` makes the duplicate structurally
+  impossible, and an upsert returns the existing row's id in the same
+  statement. The guarantee must come from the constraint, not from a check
+  that a race could slip past.
+- **Ingest — a skipped insert must still stay in the batch.** If Ingest's
+  checkpoint never landed, Extract never ran, so those documents have no
+  `extraction` yet. Returning only the newly inserted ids would leave them
+  unread forever — a "silently lost" defect replacing a "silently duplicated"
+  one. The rule is *do not create a second row; put the existing row's id into
+  the batch*.
+- **Match — clear this run's own uncommitted work, then write it fresh.**
+  Skipping per row does not work: Match answers for the whole batch in one
+  call, and matching a half-written proposal back to the requirement it came
+  from is not reliable. Deleting first is simple and exact. What is deleted is
+  strictly this run's own uncommitted proposals, their citations, and its
+  unanswered decisions — never a committed row, never another run's work.
+- **Each node's writes go in one transaction.** This is a hardening, not the
+  fix itself: a half-written batch never exists, so the rule above has less to
+  clean up.
+
+**Alternatives considered and rejected:** writing to the database only after
+the checkpoint — there is no such place, our code runs inside the node and
+deferring the write into the next node only moves the window, and for Ingest
+it would force the extracted text through graph state, which the locked
+state-vs-database decision forbids. Checkpointing after every file in Ingest —
+locked against already (a file costs ~0.1s and no money), and a smaller
+checkpoint makes the window smaller, never closes it. Collecting everything in
+memory and writing once at the end of the node — shrinks the window, does not
+close it.
+
+**Not changed:** Extract stays as it is — its `UPDATE` is harmless under
+re-execution, and its declared one-repeated-call limitation is unaffected.
+The locked "no checkpoint inside Ingest" decision stands; this makes re-running
+harmless, it does not add checkpoints. Nothing committed is ever deleted.
+
 ## Run identity and concurrency (LOCKED 2026-08-11)
 
 **Run id is a random UUID**, doubling as the LangGraph `thread_id`. Its only
@@ -1462,10 +1692,12 @@ that guarantee correct even if the API later runs multiple processes.
 **A second run is queued, not refused.** It is created immediately and
 returns its id with status `waiting`; when the first run reaches a terminal
 status, it starts on its own. A run's status moves `waiting` → `running` →
-`waiting for review`, then ends as either `done` after export or `closed
-without export` after the Delivery Owner rejects export. The status is polled,
-matching `TASK.md`'s "a run is not an HTTP request" rule. Either terminal
-status releases the lock and allows the queued run to start.
+`waiting for review`, then ends as `done` after export, `closed
+without export` after the Delivery Owner rejects export, `failed` after a
+deliberate stop on an unrecoverable error, or `ended without changes` after an
+early exit. The status is polled, matching `TASK.md`'s "a run is not an HTTP
+request" rule. Any terminal status releases the lock and allows the queued run
+to start.
 
 **Only one `waiting` run per project.** Pressing again returns the same
 waiting run's id rather than creating another, because **a waiting run
@@ -1513,6 +1745,51 @@ instead of allowing another run to write the same register.
 run parked at Review holds the lock for as long as the human takes.
 Acceptable here — the domain is one Delivery Owner per project — but it must
 be stated, or a queued run looks like a hang.
+
+### Terminal statuses `failed` and `ended without changes` (LOCKED 2026-08-12)
+
+Two further terminal values sit beside `done` and `closed without export`,
+whose meanings are unchanged:
+
+**`failed`** — a run that stopped deliberately on an error it cannot recover
+from: an incomplete Match answer, a wrong or missing API key, no credits, a
+nonexistent model. It is terminal, never `done` — a stopped run must not claim
+success. It releases the project's lock (the partial unique index only counts
+`running` and `waiting for review`, so a status outside that set frees the
+project automatically). It carries the cause and the practical fix, and
+`GET /runs/{id}` reports both. Its documents do **not** count as read, so the
+next run reads them again and nothing is silently lost.
+
+**`ended without changes`** — a run that ended on one of the four locked
+early-exit routes before Review, so no export exists: nothing new or changed
+at Ingest with unchanged rules; every file skipped at Ingest; nothing found in
+any document at Extract; the register unchanged at Match. The four reasons
+stay in `ended_early_reason` — one status, four reasons. Neither `done`
+("after export") nor `closed without export` ("the Delivery Owner rejected the
+export") described it, and both assume the run reached Review, which an
+early-exit run never does.
+
+**The distinction that must be preserved:**
+
+| What happened | Status | On the next application start |
+|---|---|---|
+| The process died — kill, crash, power loss | stays `running` | **Resumed** from its checkpoint. This is the locked behaviour slice 1 exists to prove; do not touch it. |
+| The run stopped deliberately — incomplete Match answer, wrong API key, no credits | `failed` | **Not resumed.** The same input would produce the same failure. A person fixes the cause and starts a new run. |
+
+Getting this wrong in either direction is expensive: resuming a `failed` run
+recreates the crash loop, and marking a killed run `failed` would break the
+kill-and-resume proof.
+
+**Alternatives rejected:** loosening `done` to mean "reached the end" was
+rejected — its meaning is written down, and redefining it quietly is departing
+from a locked decision without saying so. The precedent is ours already: the
+register's sixth status value `No evidence yet` was added for exactly this
+reason — no existing value could honestly describe the state, so one was added
+deliberately rather than stretching another.
+
+**No hidden consequence.** Change detection was already moved off the run
+status onto `export_json IS NOT NULL`, so nothing downstream keys on `done`
+any more. Both values are purely honest reporting.
 
 ### The durable lock and the queue are both built in slice 1b; their proofs wait (LOCKED 2026-08-12)
 
@@ -1777,6 +2054,69 @@ that review had finished successfully. That is the false completion forbidden
 by `TASK.md`. The refusal also preserves the reason this endpoint exists: the
 Delivery Owner can stop halfway and return later without the system committing
 behind them.
+
+### `finish-review` claims the transition before launching anything (LOCKED 2026-08-12)
+
+**The defect.** The reviewed endpoint read the run's status, checked for
+unanswered decisions, launched a background task, and returned
+`200 "review finished"` — while nothing in the database recorded that the
+review finished. The run's status only became `running` later, inside the
+resumed review node. That breaks two rules this project holds everywhere else:
+*never report success before the operation has actually completed*, and *never
+show a state the server has not confirmed*. And slice 1b has no UI — the API
+*is* the interface, because behaviour 4 requires a machine to drive the whole
+flow, so "we will handle it on the client" does not apply.
+
+The scenario worth fixing for, with no button involved: the Delivery Owner
+calls `finish-review`, the API returns `200 "review finished"`, the background
+task has barely started when the process dies. On restart, startup resume
+selects `status = 'running'` only; this run is still `waiting for review`, so
+it is **not** resumed — parked, holding the project's lock, with no decision
+left to answer. It is recoverable — calling `finish-review` again works — but
+the system told a person the review had finished when nothing had been
+recorded.
+
+**Decision.** `finish-review` claims the transition itself, atomically, before
+launching anything:
+
+```
+UPDATE runs SET status = 'running'
+WHERE id = %s AND status = 'waiting for review'
+```
+
+One row updated means this caller won and may launch the graph. Zero rows
+means someone else already finished the review, and this caller gets a 409
+saying so. The status check and the claim become one step instead of two, so
+there is no window between them.
+
+The decision-change window closes as a side effect: `submit_decision` already
+refuses anything that is not `waiting for review`, and after the claim the run
+is `running`.
+
+**A proposed second change was deliberately not applied.** The review entry
+called the review node's post-interrupt `set_run_status(RUNNING)` "redundant"
+once the API claims the transition. It is not: LangGraph re-executes an
+interrupted node **from the top** on resume, so
+`set_run_status(WAITING_FOR_REVIEW)` runs again and overwrites the API's
+claim. Removing the post-interrupt write would put the run back in
+`waiting for review` for the whole commit path, and `submit_decision` gates on
+exactly that status — the fix would re-open the hole it closes. The evidence
+is in the run logs: `review_waiting` is logged twice for one run, once on
+entry and once on resume. Both writes are therefore kept, and the atomic claim
+— the actual fix — is in place. The double-`finish-review` hole is closed; the
+decision-change window is narrowed to the milliseconds between the review
+node's re-entry write and its post-interrupt write, and is not closed. Closing
+it needs a durable "the review is finished" fact that survives node
+re-execution — a design decision, not an implementation detail. That fact is
+`runs.review_finished_at`, locked in "Review re-entry after a finished
+review".
+
+**Not changed:** `finish-review` stays its own endpoint, for the reason it
+exists — the Delivery Owner must be able to stop halfway without the system
+committing behind them. The refusal while a decision is unanswered stays
+exactly as it is, error message included. This is not the deferred concurrency
+work: it is a same-run race between the API and the run task, which no
+deferred test would have covered.
 
 ## MCP server — tool surface (LOCKED 2026-08-12)
 
