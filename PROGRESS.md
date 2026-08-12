@@ -118,6 +118,12 @@ marked — the correction is more useful than a clean page.
   slice 1b has no findings. Must be named in the rules-and-findings slice's
   brief before that slice starts.
 
+- **The document-type buckets are not enforced anywhere.** `DECISIONS.md`
+  locks primary / related additional / unrelated, and Extract is asked for one
+  of five values, but only `unrelated` changes behaviour; a model returning an
+  unexpected type is accepted and treated as related. Open since the slice 1b
+  implementation report raised it.
+
 ## Log
 
 Newest first.
