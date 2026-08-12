@@ -310,15 +310,25 @@ def test_run_requires_one_existing_project(
             _insert_run(database_connection, project_id)
 
 
+@pytest.mark.parametrize(
+    ("first_status", "second_status"),
+    [
+        ("running", "running"),
+        ("waiting for review", "running"),
+        ("running", "waiting for review"),
+    ],
+)
 def test_project_refuses_a_second_active_run(
     database_connection: Connection,
+    first_status: str,
+    second_status: str,
 ) -> None:
     project_id = _insert_project(database_connection)
-    _insert_run(database_connection, project_id, status="running")
+    _insert_run(database_connection, project_id, status=first_status)
 
     with pytest.raises(IntegrityError):
         with database_connection.begin_nested():
-            _insert_run(database_connection, project_id, status="running")
+            _insert_run(database_connection, project_id, status=second_status)
 
 
 def test_project_refuses_a_second_waiting_run(
