@@ -5,7 +5,7 @@ from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.extract.answer import json_object_in
 
@@ -44,7 +44,9 @@ class MatchOutcome(BaseModel):
 
 
 class MatchAnswer(BaseModel):
-    outcomes: list[MatchOutcome] = Field(default_factory=list)
+    # Required: a reply without it is a failed Match, not a register in which
+    # every requirement quietly became a new row.
+    outcomes: list[MatchOutcome]
 
 
 async def match_requirements(
