@@ -30,14 +30,20 @@ limitation. Logs are JSON lines on stdout, stage timing is measured, and run
 cost is reported as an estimate from token counts in model response metadata
 and a configured rate.
 
-Phase 4 proof and implementation planning has started. The demo corpus is
-designed in `sample-projects/README.md` but its four documents are not yet
-written. Slice 1's no-live-key test strategy and the repository boilerplate
-plan are settled; later-slice tests, the second-run project, the edge-case
-matrix, traceability matrix, and fresh-clone verification remain open. The
+**Where the code stands.** Slice 1a is merged into `main` — the repository and
+schema foundation. Slice 1b — the Ingest-to-Commit graph, the API endpoints,
+the one model client, and the three locked slice 1 tests — is merged into
+`main` through pull request #2. The demo corpus's first document exists
+(`sample-projects/intake-portal/meeting-notes-10-mar.md`); the other three demo
+documents are not yet written.
+
+Phase 4 proof and implementation planning continues. The demo corpus and the
+second-run corpus are designed in `sample-projects/README.md`; their remaining
+document files are not yet written. Later-slice tests, the edge-case matrix,
+traceability matrix, and fresh-clone verification remain open. The
 short-document/pgvector assumption also remains open until real sample projects
 are measured. `TASK.md`'s Commands section stays empty until its commands have
-actually been verified. No code exists in this repository yet.
+actually been verified.
 
 ## Planning roadmap
 
@@ -118,6 +124,18 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-13 — Handoff design locks transcribed into the canonical documents**
+Moved the finished design decisions from `handoff/` working files into the
+canonical documents. `DECISIONS.md` gained the three architecture locks
+(the six-tool MCP surface mirroring the API, the in-process MCP server with
+validation owned by the core function, and one findings table with
+run-frozen configuration) and the prompt-injection proof placement, each
+with its Decision Log row and canonical section. `sample-projects/README.md`
+now describes the Northside Dental second-run corpus. `config/README.md`
+lists the three config files as present and records `model.yaml`'s `call:`
+block. This status section now names slice 1a and slice 1b as merged. No
+checklist item is ticked by this work — none of it completes a roadmap item.
 
 **2026-08-12 — Phase 4 slice 1 proof and boilerplate planned**
 Designed the four-document intake-portal demo corpus without creating its
