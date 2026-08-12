@@ -61,9 +61,7 @@ async def propose_rows(
     gated_row_numbers: list[int] = []
 
     for index, requirement in enumerate(requirements):
-        outcome, candidate_number = outcome_by_requirement.get(
-            index, (NEW_ROW, None)
-        )
+        outcome, candidate_number = outcome_by_requirement[index]
         candidate = candidate_by_number.get(candidate_number or -1)
 
         row_id = await _insert_proposed_row(

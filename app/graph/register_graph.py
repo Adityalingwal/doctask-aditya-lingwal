@@ -20,7 +20,6 @@ from app.extract.read_document import locate_extraction, read_one_document
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import (
     EXISTING_ROW,
-    NEW_ROW,
     POSSIBLE_MATCH,
     match_requirements,
 )
@@ -224,13 +223,14 @@ def build_register_graph(
             register = await committed_rows(connection, project_id)
 
         answer = await match_requirements(model_client, register, requirements)
+        # A confident match still goes to the Delivery Owner: attaching this
+        # batch's evidence to a committed row is not the system's to decide.
         outcome_by_requirement = {
             outcome.requirement_index: (
                 POSSIBLE_MATCH if outcome.outcome == EXISTING_ROW else outcome.outcome,
                 outcome.row_number,
             )
             for outcome in answer.outcomes
-            if outcome.outcome in (NEW_ROW, EXISTING_ROW, POSSIBLE_MATCH)
         }
 
         async with pool.connection() as connection:
