@@ -13,9 +13,10 @@ are complete. The final deliverable remains the seven-column
 values, and the provider-side Delivery Owner as both system user and human
 reviewer.
 
-Phase 3 (system architecture) is closed apart from two remainders that belong
-to later build slices: the rules and findings tables, and the MCP tool surface
-plus React screen shape. The seven slice-1 database tables, migrations from the
+Phase 3 (system architecture) is closed apart from one remainder that belongs
+to a later build slice: the React screen shape. The findings table is designed
+and arrives with the rules-engine slice; the MCP tool surface and placement are
+locked in `DECISIONS.md`. The seven slice-1 database tables, migrations from the
 first table, five slice-1 API endpoints, pipeline, LangGraph state and
 checkpoints, review state machine, watched-folder trigger, focused-update
 contract, prompt-injection boundary, failure handling, retry, logging, timing,
@@ -86,21 +87,21 @@ implementation.
 - [x] Define run identity, idempotency, and concurrency behaviour.
 - [x] Define LangGraph state, nodes, edges, and checkpoints.
 - [ ] Define database tables, migrations, versions, and audit trail. The
-      slice-1 tables are settled; the rules and findings tables arrive with
-      the rules-engine slice.
+      slice-1 tables are settled; the findings table arrives with the
+      rules-engine slice.
 - [x] Define the human-review state machine.
 - [x] Define watched-folder and focused-update architecture.
 - [x] Define prompt-injection, no-bluff, and security controls.
 - [ ] Define FastAPI, MCP, and React contracts. The five slice-1 endpoints are
-      settled; the MCP tool surface and React screen shape arrive with their
-      slices.
+      settled; the MCP tool surface is locked and the React screen shape
+      arrives with its slice.
 - [x] Define failure, retry, logging, timing, and cost behaviour.
 
 ### 4. Proof and implementation plan
 
 - [ ] Build the requirement-to-acceptance traceability matrix.
-- [ ] Design synthetic projects and the edge-case matrix. The demo project is
-      designed; the second-run project and edge-case matrix remain open.
+- [ ] Design synthetic projects and the edge-case matrix. The demo project and
+      the second-run project are designed; the edge-case matrix remains open.
 - [ ] Define the no-live-key automated test strategy. Slice 1 is settled;
       later slices add their own tests.
 - [x] Plan implementation slices and repository boilerplate.
