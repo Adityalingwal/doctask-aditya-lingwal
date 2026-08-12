@@ -1921,9 +1921,10 @@ preserve every completed Extract call before the interrupted one.
 **Trade-off:** one call can be paid for twice. The simpler checkpoint and
 single-source-of-truth design is kept.
 
-**Evidence:** reasoning-stage. No code exists yet. The kill-and-resume test
-must show that earlier documents are not called again and the register does
-not gain duplicate rows.
+**Evidence:** the kill-and-resume test drives the real code path: earlier
+documents are not called again and the register gains no duplicate rows. The
+Ingest and Match re-run windows are separately closed by the F2 fix — see
+"Whatever this run already wrote, it does not write again".
 
 **Limitation:** a kill in the answer-to-checkpoint window repeats that one
 document. The Task 4 write-up must name this cut and why it was made.
@@ -2654,7 +2655,7 @@ already proven.
 **Slice 1, made concrete now the architecture is settled:**
 
 - **In:** Ingest (`.md` only) · Extract · Match · Review · Commit; Postgres
-  with migrations and the seven tables; the five endpoints; the
+  with migrations and the seven tables; the six endpoints; the
   kill-and-resume test.
 - **Out:** Examine and the rules engine · `.pdf`/`.docx`/`.txt` · the watched
   folder · MCP · React · cost and timing · the behaviour-8 structural test.
