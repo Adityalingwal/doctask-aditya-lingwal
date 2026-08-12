@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -9,6 +8,8 @@ import yaml
 from alembic import command
 from alembic.config import Config
 from sqlalchemy.exc import OperationalError
+
+from app.run_logging import log_json_line
 
 
 STARTUP_LOGGER_NAME = "register.startup"
@@ -93,10 +94,5 @@ def log_startup_event(
     message: str,
     **fields: Any,
 ) -> None:
-    payload: dict[str, Any] = {
-        "event": event,
-        "message": message,
-        "run_id": None,
-        **fields,
-    }
-    logging.getLogger(STARTUP_LOGGER_NAME).log(level, json.dumps(payload))
+    # Startup happens before any run exists, so these lines carry no run_id.
+    log_json_line(STARTUP_LOGGER_NAME, level, event, message, None, **fields)
