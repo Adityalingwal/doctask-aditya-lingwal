@@ -10,7 +10,6 @@ POSSIBLE_MATCH_DECISION = "possible match"
 EXPORT_DECISION = "export"
 APPROVED = "approved"
 REJECTED = "rejected"
-OUTCOMES = (APPROVED, REJECTED)
 
 
 async def raise_possible_match_decision(

@@ -16,6 +16,8 @@ from app.register.export_register import (
     export_as_markdown,
 )
 from app.review.review_queue import (
+    APPROVED,
+    REJECTED,
     answer_decision,
     decisions_of_run,
     unanswered_decisions,
@@ -43,7 +45,7 @@ class StartRun(BaseModel):
 
 class SubmitDecision(BaseModel):
     decision_id: UUID
-    outcome: Literal["approved", "rejected"]
+    outcome: Literal[APPROVED, REJECTED]
 
 
 @router.post("/projects", status_code=status.HTTP_201_CREATED)

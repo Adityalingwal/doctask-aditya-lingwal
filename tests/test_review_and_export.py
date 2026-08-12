@@ -173,3 +173,77 @@ def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> No
     assert after_refusal["status"] == "waiting for review"
     assert after_refusal["exported"] is False
     assert export_attempt.status_code == 409
+
+
+def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
+    tmp_path: Path,
+) -> None:
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+    paraphrased = "the client wants search on old records"
+    answer = extraction_answer(REQUIREMENT, quote)
+    answer["requirements"].append(
+        {"summary": "Search over old intake records", "quote": paraphrased}
+    )
+    script_path = tmp_path / "script.json"
+    write_script(
+        script_path,
+        {
+            match_marker(): match_answer(1),
+            extract_marker(SOURCE_FILE): answer,
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=tmp_path / "model-calls.jsonl",
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Paraphrased intake portal",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                status = wait_until(
+                    lambda: (
+                        client.get(f"/runs/{run_id}").json()
+                        if client.get(f"/runs/{run_id}").json()["status"]
+                        == "waiting for review"
+                        else None
+                    ),
+                    "the run reaches Review",
+                )
+        finally:
+            application.stop()
+
+        engine = create_engine(database_url)
+        with engine.connect() as connection:
+            proposed = (
+                connection.execute(
+                    text(
+                        "SELECT what_was_asked FROM register_rows "
+                        "WHERE proposed_by_run_id = :run_id"
+                    ),
+                    {"run_id": run_id},
+                )
+                .scalars()
+                .all()
+            )
+        engine.dispose()
+
+    # The paraphrase cannot be verified against the source, so no row carries it.
+    assert list(proposed) == [REQUIREMENT]
+    dropped = [entry for entry in status["skipped"] if entry["kind"] == "requirement"]
+    assert len(dropped) == 1
+    assert dropped[0]["quote"] == paraphrased
+    assert SOURCE_FILE in dropped[0]["reason"]
