@@ -75,7 +75,7 @@ engine that never fires on the second corpus proves nothing.
 | Rule | What fires it here |
 |---|---|
 | **R1** — anything built must have a written requirement | SMS reminder is asked for in the 05 June meeting and appears nowhere in `client-requirements-v1.docx` |
-| **R2** — testing feedback asking for new behaviour is a change request, not a bug | The client reports the missing SMS as a bug; the written record shows it was never requested |
+| **R2** — testing feedback asking for new behaviour is a change request, not a bug | The client reports the missing SMS as a bug; the written requirements never mention it |
 | **R3** — no requirement stays blocked beyond `max_days` | SMS is blocked on the clinic's SMS provider account from 18 June, and is still blocked at the testing date |
 | **R4** — every written requirement has a testing outcome | One written requirement — a cancel/reschedule link — is not mentioned in the testing feedback at all |
 
