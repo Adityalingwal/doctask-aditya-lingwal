@@ -146,6 +146,13 @@ def test_an_incomplete_match_answer_fails_the_run_and_proposes_nothing(
                 after_failure = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()
+
+            # The same input would fail the same way, so startup resume must
+            # leave this run alone — only a killed 'running' run is taken over.
+            application.stop()
+            application.start()
+            with application.client() as client:
+                after_restart = client.get(f"/runs/{run_id}").json()
         finally:
             application.stop()
 
@@ -165,3 +172,4 @@ def test_an_incomplete_match_answer_fails_the_run_and_proposes_nothing(
     assert "IncompleteMatchAnswer" in failed["failure_reason"]
     assert "answered for [1, 2]" in failed["failure_reason"]
     assert after_failure["status"] == "running"
+    assert after_restart["status"] == "failed"
