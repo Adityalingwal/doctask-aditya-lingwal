@@ -7,59 +7,44 @@ Locked decisions and their reasoning live in `DECISIONS.md`, not here.
 
 _Rewritten in place — this section always describes the present, not the past._
 
-**2026-08-12.** Phase 1 (product contract) and Phase 2 (information design)
-are complete. The final deliverable remains the seven-column
-**Requirements-to-Delivery Register**, with per-cell citations, six status
-values, and the provider-side Delivery Owner as both system user and human
-reviewer.
+**2026-08-13.** Slice 1 is complete and merged into `main` — slice 1a, slice
+1b, and the eight fixes from a two-reviewer round. 51 tests, all runnable with
+no live API key. No live model has ever been called from this repository;
+every run and every test used the scripted client.
 
-Phase 3 (system architecture) is closed apart from one remainder that belongs
-to a later build slice: the React screen shape. The findings table is designed
-and arrives with the rules-engine slice; the MCP tool surface and placement are
-locked in `DECISIONS.md`. The seven slice-1 database tables, migrations from the
-first table, five slice-1 API endpoints, pipeline, LangGraph state and
-checkpoints, review state machine, watched-folder trigger, focused-update
-contract, prompt-injection boundary, failure handling, retry, logging, timing,
-and estimated cost behaviour are locked in `DECISIONS.md`.
+Phase 1 and Phase 3 are closed. Phase 1's two deferred items — the brief
+acceptance contract and the React/FastAPI/MCP boundary — and Phase 3's two
+remainders — the database tables and the FastAPI/MCP/React contracts — are
+locked in `DECISIONS.md`. Phase 4 is what remains, plus the seven build slices
+after slice 1.
 
-Runs use random UUIDs, a durable per-project database lock, and one waiting
-run. The project folder is polled every 10 seconds and starts a run after 30
-seconds of quiet when new or changed files are waiting and no run is active.
-Extract has one retry and a 120-second per-call timeout; the narrow
-answer-to-checkpoint kill window is documented as a one-call repeat
-limitation. Logs are JSON lines on stdout, stage timing is measured, and run
-cost is reported as an estimate from token counts in model response metadata
-and a configured rate.
+Slice 1's proven scope: the Ingest-to-Commit graph for `.md` documents, the
+six API endpoints, project creation by `POST /projects` and startup seeding,
+the review queue, kill-and-resume from a real `SIGKILL`, the two new terminal
+run statuses, configuration-vs-transient failure classification, and the
+durable project lock with its waiting-run queue. The lock and queue are built
+but not yet proven — their tests arrive with the concurrency slice. Built is
+not proven.
 
-**Where the code stands.** Slice 1a is merged into `main` — the repository and
-schema foundation. Slice 1b — the Ingest-to-Commit graph, the API endpoints,
-the one model client, and the three locked slice 1 tests — is merged into
-`main` through pull request #2. The demo corpus's first document exists
+The demo corpus's first document exists
 (`sample-projects/intake-portal/meeting-notes-10-mar.md`); the other three demo
-documents are not yet written.
-
-Phase 4 proof and implementation planning continues. The demo corpus and the
-second-run corpus are designed in `sample-projects/README.md`; their remaining
-document files are not yet written. Later-slice tests, the edge-case matrix,
-traceability matrix, and fresh-clone verification remain open. The
-short-document/pgvector assumption also remains open until real sample projects
-are measured. `TASK.md`'s Commands section stays empty until its commands have
-actually been verified.
+documents and all six second-run documents are designed but not written. The
+edge-case matrix, traceability matrix, and fresh-clone verification remain
+open. `TASK.md`'s Commands section stays empty until its commands have
+actually been verified from a fresh clone.
 
 ## Planning roadmap
 
 This section tracks only status and continuation order. Decision reasoning stays
 in `DECISIONS.md`; implementation detail belongs in code and tests.
 
-**These four are not four gates in a row.** Phases 1 and 2 are closed. Phase 3
-is closed except for the database and interface remainders explicitly kept
-with their later slices below. Phase 4's items are per-slice, not a gate before
-implementation.
+**These four are not four gates in a row.** Phases 1, 2 and 3 are closed.
+Phase 4's items are per-slice, not a gate before implementation.
 
 ### 1. Product contract
 
-- [ ] Define the brief acceptance contract with exact pass/fail checks.
-      Deferred to build time — decision recorded in `DECISIONS.md`.
+- [x] Define the brief acceptance contract with exact pass/fail checks.
+      Locked in `DECISIONS.md` "Brief acceptance contract".
 - [x] Lock domain, actors, workflow boundary, and document types.
 - [x] Select the Requirements-to-Delivery Register.
 - [x] Choose the actual system user and human reviewer.
@@ -68,8 +53,9 @@ implementation.
 - [x] Define the incremental input contract.
 - [x] Decide coverage or defended cuts for behaviours 6–10. Nothing is cut;
       each behaviour is assigned to a slice in `DECISIONS.md`'s build order.
-- [ ] Lock the React, FastAPI, and MCP boundary. Deferred to build time —
-      decision recorded in `DECISIONS.md`.
+- [x] Lock the React, FastAPI, and MCP boundary. Locked in `DECISIONS.md`
+      "MCP server — tool surface", "MCP server — placement and validation",
+      and "Review interface — scope".
 
 ### 2. Information design
 
@@ -86,15 +72,15 @@ implementation.
 - [x] Define document parsing and model/provider boundaries.
 - [x] Define run identity, idempotency, and concurrency behaviour.
 - [x] Define LangGraph state, nodes, edges, and checkpoints.
-- [ ] Define database tables, migrations, versions, and audit trail. The
-      slice-1 tables are settled; the findings table arrives with the
-      rules-engine slice.
+- [x] Define database tables, migrations, versions, and audit trail. The
+      slice-1 tables and the findings table design are locked; the findings
+      table itself arrives with the rules-engine slice.
 - [x] Define the human-review state machine.
 - [x] Define watched-folder and focused-update architecture.
 - [x] Define prompt-injection, no-bluff, and security controls.
-- [ ] Define FastAPI, MCP, and React contracts. The five slice-1 endpoints are
-      settled; the MCP tool surface is locked and the React screen shape
-      arrives with its slice.
+- [x] Define FastAPI, MCP, and React contracts. The six endpoints, the MCP
+      tool surface and placement, and the five-section review screen are
+      locked in `DECISIONS.md`.
 - [x] Define failure, retry, logging, timing, and cost behaviour.
 
 ### 4. Proof and implementation plan
@@ -117,6 +103,9 @@ marked — the correction is more useful than a clean page.
 | 2026-08-09 | The register stays small — roughly 15 rows, ~250 tokens | Basis for rejecting an embedding shortlist in requirement matching; the whole register fits in one model call, so nothing needs narrowing | Register now chosen — seven columns, `DECISIONS.md` "Register shape", 2026-08-11 — still open until measured against real sample projects |
 | 2026-08-09 | Source documents are short enough to read whole | Meeting notes, client requirements documents, and testing feedback are expected to be short, so vector retrieval may not be needed | Open — if real documents turn out large, pgvector retrieval comes back in |
 | 2026-08-11 | Source documents run 5–10 pages (40–50 would already be unusual) | The domain is small teams and freelancers | A config page-limit plus a stated README limitation cover documents beyond it — chunking was therefore not built |
+| 2026-08-12 | The model client's configuration-failure classification is correct for real SDK exceptions | The classifier reads `status_code` off the SDK's typed exceptions; only the 401 path is driven by a test, and 402/403/404 share the same dictionary lookup | Open — no live model call has ever been made, so no real SDK exception has been seen |
+| 2026-08-12 | The two-attempt retry policy matches the OpenAI SDK's own behaviour closely enough | The SDK's own policy (retries on 408/409/429/5xx, no retry on 400/401/402/404, exponential backoff) is used; the locked 5-second fixed wait is not hand-implemented | Open — matches the locked table's shape but not its exact wait |
+| 2026-08-12 | The concurrency mechanism works as designed | The durable lock is exercised only indirectly through kill-and-resume; the waiting-run queue and two-projects-side-by-side have no test at all | Open — built is not proven; tests arrive with the concurrency slice |
 
 ## Blockers
 
@@ -125,6 +114,23 @@ _None open._
 ## Log
 
 Newest first.
+
+**2026-08-13 — Slice 1b built, reviewed, and fixed; handoff transcribed**
+Slice 1b landed in pull request #2 (merged into `main`): the Ingest-to-Commit
+graph, the six API endpoints with project creation, the review queue, the
+durable lock and waiting-run queue, and the kill-and-resume test over a real
+`SIGKILL`. Two independent reviewers then raised six distinct findings (F1–F5
+plus Codex 2). Eight decided fixes landed on top: the merged-proposal marker
+(F1), the Match coverage check (Codex 2), the `failed` and
+`ended without changes` terminal statuses, configuration-vs-transient failure
+classification (F3), the read-and-exported change-detection conditions with
+their same-day correction (F5), the atomic `finish-review` claim (F4), and the
+re-run-idempotent Ingest and Match writes (F2). The suite grew from 35 to 51
+tests, all key-free; one run was driven through the API by hand. No live model
+has ever been called. Concurrency stays unproven — built, tests deferred to
+the concurrency slice. `DECISIONS.md` now carries every slice 1b lock and fix
+decision, plus the four architecture-closing locks (network bind, review
+re-entry, the five-section review screen, and the brief acceptance contract).
 
 **2026-08-13 — Handoff design locks transcribed into the canonical documents**
 Moved the finished design decisions from `handoff/` working files into the
