@@ -31,65 +31,92 @@ async def collect_batch(
     document_ids: list[UUID] = []
     skipped: list[dict[str, str]] = []
 
-    for path in sorted(_top_level_files(source_folder)):
-        extension = path.suffix.lower()
-        if extension not in accepted_extensions:
-            skipped.append(
-                _skipped(
-                    path.name,
-                    f"unsupported format — {extension or 'no extension'} is not "
-                    "listed in config/formats.yaml; add it there and add a "
-                    "reader for it.",
+    # One transaction, so a killed process never leaves half a batch behind.
+    async with connection.transaction():
+        for path in sorted(_top_level_files(source_folder)):
+            extension = path.suffix.lower()
+            if extension not in accepted_extensions:
+                skipped.append(
+                    _skipped(
+                        path.name,
+                        f"unsupported format — {extension or 'no extension'} is "
+                        "not listed in config/formats.yaml; add it there and add "
+                        "a reader for it.",
+                    )
                 )
-            )
-            continue
-        if extension not in READER_EXTENSIONS:
-            skipped.append(
-                _skipped(
-                    path.name,
-                    f"no reader for {extension} in this release — only "
-                    f"{MARKDOWN_EXTENSION} documents are read so far.",
+                continue
+            if extension not in READER_EXTENSIONS:
+                skipped.append(
+                    _skipped(
+                        path.name,
+                        f"no reader for {extension} in this release — only "
+                        f"{MARKDOWN_EXTENSION} documents are read so far.",
+                    )
                 )
-            )
-            continue
+                continue
 
-        try:
-            text = await asyncio.to_thread(read_markdown, path)
-        except OSError as error:
-            skipped.append(
-                _skipped(
-                    path.name,
-                    f"could not be read from {source_folder} ({error.strerror}) "
-                    "— check the file is still present and readable, then run "
-                    "again.",
+            try:
+                text = await asyncio.to_thread(read_markdown, path)
+            except OSError as error:
+                skipped.append(
+                    _skipped(
+                        path.name,
+                        f"could not be read from {source_folder} "
+                        f"({error.strerror}) — check the file is still present "
+                        "and readable, then run again.",
+                    )
+                )
+                continue
+
+            content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            if await _already_read_unchanged(
+                connection, project_id, path.name, content_hash
+            ):
+                skipped.append(
+                    _skipped(
+                        path.name,
+                        "unchanged since an earlier run read it and exported "
+                        "the register — an unchanged document is never read or "
+                        "sent to a model again.",
+                    )
+                )
+                continue
+
+            document_ids.append(
+                await _write_document(
+                    connection, run_id, path.name, text, content_hash
                 )
             )
-            continue
-
-        content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
-        if await _already_read_unchanged(
-            connection, project_id, path.name, content_hash
-        ):
-            skipped.append(
-                _skipped(
-                    path.name,
-                    "unchanged since an earlier run read it and exported the "
-                    "register — an unchanged document is never read or sent to "
-                    "a model again.",
-                )
-            )
-            continue
-
-        document_id = uuid4()
-        await connection.execute(
-            "INSERT INTO documents "
-            "(id, run_id, source_path, extracted_text, content_hash) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            (document_id, run_id, path.name, text, content_hash),
-        )
-        document_ids.append(document_id)
 
     return CollectedBatch(document_ids=document_ids, skipped=skipped)
+
+
+async def _write_document(
+    connection: AsyncConnection,
+    run_id: UUID,
+    source_path: str,
+    text: str,
+    content_hash: str,
+) -> UUID:
+    """Write one document of this run's batch, or take back the one already there.
+
+    Ingest runs again whole when its checkpoint was lost, and this run may
+    already have written this file. The unique key makes a second row
+    impossible, and the existing row still goes into the batch — Extract has
+    not read it yet.
+    """
+    result = await connection.execute(
+        "INSERT INTO documents "
+        "(id, run_id, source_path, extracted_text, content_hash) "
+        "VALUES (%s, %s, %s, %s, %s) "
+        "ON CONFLICT (run_id, source_path) DO UPDATE SET "
+        "extracted_text = EXCLUDED.extracted_text, "
+        "content_hash = EXCLUDED.content_hash "
+        "RETURNING id",
+        (uuid4(), run_id, source_path, text, content_hash),
+    )
+    written = await result.fetchone()
+    return written["id"]
 
 
 def _top_level_files(source_folder: Path) -> list[Path]:

@@ -53,41 +53,70 @@ async def propose_rows(
     Nothing here is settled: a proposed row becomes part of the register only
     when Commit runs after the Delivery Owner has approved the export.
     """
-    register = await committed_rows(connection, project_id)
-    candidate_by_number = {row["row_number"]: row for row in register}
-    next_row_number = await _next_row_number(connection, project_id)
-
     proposed_row_ids: list[UUID] = []
     gated_row_numbers: list[int] = []
 
-    for index, requirement in enumerate(requirements):
-        outcome, candidate_number = outcome_by_requirement[index]
-        candidate = candidate_by_number.get(candidate_number or -1)
+    async with connection.transaction():
+        await _clear_what_this_run_proposed_before(connection, run_id)
+        register = await committed_rows(connection, project_id)
+        candidate_by_number = {row["row_number"]: row for row in register}
+        next_row_number = await _next_row_number(connection, project_id)
 
-        row_id = await _insert_proposed_row(
-            connection,
-            run_id,
-            project_id,
-            next_row_number,
-            requirement,
-        )
-        proposed_row_ids.append(row_id)
+        for index, requirement in enumerate(requirements):
+            outcome, candidate_number = outcome_by_requirement[index]
+            candidate = candidate_by_number.get(candidate_number or -1)
 
-        if outcome != NEW_ROW and candidate is not None:
-            await raise_possible_match_decision(
+            row_id = await _insert_proposed_row(
                 connection,
                 run_id,
-                _merge_question(requirement, candidate),
-                row_id,
-                candidate["id"],
+                project_id,
+                next_row_number,
+                requirement,
             )
-            gated_row_numbers.append(next_row_number)
+            proposed_row_ids.append(row_id)
 
-        next_row_number += 1
+            if outcome != NEW_ROW and candidate is not None:
+                await raise_possible_match_decision(
+                    connection,
+                    run_id,
+                    _merge_question(requirement, candidate),
+                    row_id,
+                    candidate["id"],
+                )
+                gated_row_numbers.append(next_row_number)
+
+            next_row_number += 1
 
     return ProposedRegister(
         proposed_row_ids=proposed_row_ids,
         gated_row_numbers=gated_row_numbers,
+    )
+
+
+async def _clear_what_this_run_proposed_before(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> None:
+    """Drop this run's own earlier proposals, so a re-run replaces rather than adds.
+
+    Match answers for the whole batch at once, so a half-written batch cannot be
+    matched back requirement by requirement. What goes is strictly this run's
+    uncommitted rows, their citations and its unanswered decisions; a committed
+    row, an answered decision and another run's work are all out of reach.
+    """
+    await connection.execute(
+        "DELETE FROM decisions WHERE run_id = %s AND outcome IS NULL",
+        (run_id,),
+    )
+    await connection.execute(
+        "DELETE FROM citations WHERE register_row_id IN (SELECT id FROM "
+        "register_rows WHERE proposed_by_run_id = %s AND NOT is_committed)",
+        (run_id,),
+    )
+    await connection.execute(
+        "DELETE FROM register_rows WHERE proposed_by_run_id = %s "
+        "AND NOT is_committed",
+        (run_id,),
     )
 
 
