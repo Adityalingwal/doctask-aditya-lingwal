@@ -109,7 +109,14 @@ marked — the correction is more useful than a clean page.
 
 ## Blockers
 
-_None open._
+- **The audit table cannot represent an attachment event.** `ck_audit_cell_name`
+  plus a `NOT NULL cell_name` on `audit` means an entry like "finding F-02
+  attached to row 5" cannot be written at all — and `DECISIONS.md`'s audit
+  section explicitly says attachments arriving or leaving are recorded there.
+  Found by Fable in the slice 1a review (its N2) and deliberately not fixed
+  then, because nothing that could hit it existed yet. That is still true —
+  slice 1b has no findings. Must be named in the rules-and-findings slice's
+  brief before that slice starts.
 
 ## Log
 
