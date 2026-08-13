@@ -103,6 +103,15 @@ def _copy_in(source_folder: Path, file_name: str, requirement: str) -> None:
     write_meeting_note(source_folder, file_name, requirement)
 
 
+def _let_the_watcher_see_the_folder() -> None:
+    """Wait out one poll, so what is in the folder counts as already there.
+
+    The watcher calls a file an arrival by comparing the folder against the way
+    it last saw it, so a file written before it has ever looked is not one.
+    """
+    time.sleep(POLL_SECONDS * 5)
+
+
 def _runs(database_url: str, project_id: str) -> list[tuple[str, str]]:
     return runs_of_project(database_url, project_id)
 
@@ -124,6 +133,7 @@ def test_the_watcher_starts_a_run_once_an_arriving_file_has_settled(
         project_id,
         source_folder,
     ):
+        _let_the_watcher_see_the_folder()
         started_before_anything_arrived = _runs(database_url, project_id)
         _copy_in(source_folder, ARRIVING, SECOND_REQUIREMENT)
         started = wait_until(
@@ -151,6 +161,7 @@ def test_the_watcher_does_not_start_a_second_run_while_one_is_active(
         project_id,
         source_folder,
     ):
+        _let_the_watcher_see_the_folder()
         _copy_in(source_folder, ARRIVING, SECOND_REQUIREMENT)
         started = wait_until(
             lambda: _runs(database_url, project_id),

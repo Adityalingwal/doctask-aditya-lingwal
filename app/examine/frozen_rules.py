@@ -84,6 +84,35 @@ async def freeze_rules_for_run(
     return await frozen_rules_of_run(connection, run_id)
 
 
+async def rules_changed_since_the_register_was_last_examined(
+    connection: AsyncConnection,
+    run_id: UUID,
+    project_id: UUID,
+) -> bool:
+    """Are this run's frozen rules different from the ones last judged this register?
+
+    The comparison is between fingerprints of the parsed rules, so re-wording a
+    comment or moving a line never sends a register back through Examine, and
+    changing a value such as max_days always does.
+    """
+    last_examined = await connection.execute(
+        "SELECT rules_fingerprint FROM runs WHERE project_id = %s AND id <> %s "
+        "AND examined_row_count IS NOT NULL AND rules_fingerprint IS NOT NULL "
+        "ORDER BY created_at DESC LIMIT 1",
+        (project_id, run_id),
+    )
+    judged_against = await last_examined.fetchone()
+    if judged_against is None:
+        return False
+
+    frozen = await connection.execute(
+        "SELECT rules_fingerprint FROM runs WHERE id = %s",
+        (run_id,),
+    )
+    this_run = await frozen.fetchone()
+    return this_run["rules_fingerprint"] != judged_against["rules_fingerprint"]
+
+
 async def frozen_rules_of_run(
     connection: AsyncConnection,
     run_id: UUID,

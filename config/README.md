@@ -7,9 +7,25 @@ Everything that should be changeable without touching code lives here.
 | `rules.yaml` | The rules the register is judged against in Examine. A default set ships with the repo so a fresh clone runs; set `RULES_CONFIG_PATH` to point at your own file instead. |
 | `formats.yaml` | The accepted file-format extensions (`.pdf`, `.docx`, `.md`, `.txt`) and the document page limit. Removing a format disables it; adding one only works if a reader for it exists in `app/ingest/` — a startup check says so if not. |
 | `model.yaml` | The OpenRouter model name, base URL, and per-token rates. Its `call:` block holds the model-call attempt count and per-call timeout. A working default ships with the repo; the API key is not stored here and comes from the environment. |
+| `watcher.yaml` | `poll_seconds`, how often each project's source folder is looked at, and `quiet_seconds`, how long that folder must stop changing before the run reading it starts by itself. Set `WATCHER_CONFIG_PATH` to point at your own file instead. |
 
-Adding a rule, or changing which formats are accepted, is an edit here, never
-a code change.
+Adding a rule, changing which formats are accepted, or changing how quickly the
+watcher reacts, is an edit here, never a code change.
+
+## Editing `watcher.yaml`
+
+The shipped values are `poll_seconds: 10` and `quiet_seconds: 30`. Both must be
+numbers above zero; anything else stops the application at startup, naming the
+key and what is wrong with it.
+
+- Whatever the watcher first sees in a project's folder is not an arrival. It
+  starts nothing by itself, and `POST /runs` reads it exactly as before.
+- A file that arrives afterwards starts a run once the folder has stopped
+  changing for `quiet_seconds`.
+- Nothing starts while that project already has a run running, at review, or
+  queued. Files that arrive during a review wait for the run after it.
+- The watcher forgets what it has seen when the application restarts, so files
+  that arrived while it was down are read by the next run started by hand.
 
 ## Editing `rules.yaml`
 

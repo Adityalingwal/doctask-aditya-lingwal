@@ -9,8 +9,30 @@ from psycopg import AsyncConnection
 POSSIBLE_MATCH_DECISION = "possible match"
 EXPORT_DECISION = "export"
 FINDING_DECISION = "finding"
+WITHDRAWAL_DECISION = "withdrawal"
 APPROVED = "approved"
 REJECTED = "rejected"
+
+
+async def raise_withdrawal_decision(
+    connection: AsyncConnection,
+    run_id: UUID,
+    question: str,
+    candidate_register_row_id: UUID,
+) -> UUID:
+    decision_id = uuid4()
+    await connection.execute(
+        "INSERT INTO decisions (id, run_id, kind, question, "
+        "candidate_register_row_id) VALUES (%s, %s, %s, %s, %s)",
+        (
+            decision_id,
+            run_id,
+            WITHDRAWAL_DECISION,
+            question,
+            candidate_register_row_id,
+        ),
+    )
+    return decision_id
 
 
 async def raise_finding_decision(

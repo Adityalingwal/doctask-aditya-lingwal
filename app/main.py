@@ -20,6 +20,7 @@ from app.model.client import build_model_client
 from app.projects.create_project import ensure_demo_project
 from app.run_logging import log_run_event
 from app.runs.run_lifecycle import RunEngine, resume_unfinished_runs
+from app.runs.watch_source_folders import load_watcher_settings, watch_source_folders
 from app.startup import (
     load_formats_config,
     migrate_database,
@@ -33,6 +34,8 @@ FORMATS_CONFIG_PATH = PROJECT_ROOT / "config" / "formats.yaml"
 MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE = "RULES_CONFIG_PATH"
 DEFAULT_RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
+WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE = "WATCHER_CONFIG_PATH"
+DEFAULT_WATCHER_CONFIG_PATH = PROJECT_ROOT / "config" / "watcher.yaml"
 
 
 def database_url_from_environment() -> str:
@@ -55,6 +58,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         READER_EXTENSIONS,
     )
     formats = await asyncio.to_thread(load_formats_config, FORMATS_CONFIG_PATH)
+    watcher_settings = await asyncio.to_thread(
+        load_watcher_settings,
+        _config_path(
+            os.environ,
+            WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE,
+            DEFAULT_WATCHER_CONFIG_PATH,
+        ),
+    )
 
     pool = build_connection_pool(database_url)
     await pool.open(wait=True)
@@ -68,30 +79,44 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         checkpointer,
         frozenset(formats.accepted_extensions),
         formats.page_limit,
-        _rules_config_path(os.environ),
+        _config_path(
+            os.environ,
+            RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE,
+            DEFAULT_RULES_CONFIG_PATH,
+        ),
     )
 
     async with pool.connection() as connection:
         await ensure_demo_project(connection, PROJECT_ROOT)
 
     engine = app.state.run_engine
+    watching: asyncio.Task | None = None
     if engine is not None:
         # Not awaited: a resumed run heads for human review and would never
         # return, leaving the application unable to answer anything.
         resuming = asyncio.create_task(resume_unfinished_runs(engine))
         engine.background_runs.add(resuming)
         resuming.add_done_callback(engine.background_runs.discard)
+        watching = asyncio.create_task(
+            watch_source_folders(engine, PROJECT_ROOT, watcher_settings)
+        )
 
     # The mounted MCP server is not started by its own lifespan, so this one
     # runs its session manager for as long as the application answers at all.
     async with app.state.mcp_server.session_manager.run():
         yield
+    if watching is not None:
+        watching.cancel()
     await pool.close()
 
 
-def _rules_config_path(environment: Mapping[str, str]) -> Path:
-    named = environment.get(RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE)
-    return Path(named) if named else DEFAULT_RULES_CONFIG_PATH
+def _config_path(
+    environment: Mapping[str, str],
+    variable_name: str,
+    shipped_default: Path,
+) -> Path:
+    named = environment.get(variable_name)
+    return Path(named) if named else shipped_default
 
 
 def _build_run_engine(

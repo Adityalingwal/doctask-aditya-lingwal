@@ -23,7 +23,11 @@ from app.extract.answer import (
 )
 from app.examine.deliverable_checks import DELIVERABLE_CHECKS, deliverable_findings
 from app.examine.examine_register import UnusableExamineAnswer, examine_register
-from app.examine.frozen_rules import freeze_rules_for_run, frozen_rules_of_run
+from app.examine.frozen_rules import (
+    freeze_rules_for_run,
+    frozen_rules_of_run,
+    rules_changed_since_the_register_was_last_examined,
+)
 from app.examine.record_findings import record_findings
 from app.examine.register_under_examination import register_under_examination
 from app.extract.read_document import locate_extraction, read_one_document
@@ -37,6 +41,10 @@ from app.match.match_requirements import (
 from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
 from app.register.commit_register import commit_register
 from app.register.propose_rows import committed_rows, propose_rows
+from app.register.withdraw_rows import (
+    batch_reads_a_document_a_row_came_from,
+    propose_withdrawals,
+)
 from app.review.review_queue import ensure_export_decision, export_was_approved
 from app.run_logging import log_run_event
 from app.runs.run_records import (
@@ -90,7 +98,10 @@ class RunState(TypedDict, total=False):
     document_ids: list[str]
     next_document_index: int
     requirements_found: int
+    reads_a_row_source_again: bool
+    examine_changed_rules: bool
     proposed_rows: int
+    withdrawals_proposed: int
     findings_raised: int
     ended_early_reason: str
     export_approved: bool
@@ -135,6 +146,16 @@ def build_register_graph(
                 page_limit,
             )
             await append_skipped(connection, run_id, batch.skipped)
+            reads_again = await batch_reads_a_document_a_row_came_from(
+                connection, run_id, project_id
+            )
+            examine_changed_rules = (
+                not batch.document_ids
+                and bool(await committed_rows(connection, project_id))
+                and await rules_changed_since_the_register_was_last_examined(
+                    connection, run_id, project_id
+                )
+            )
 
         _log(
             logging.INFO,
@@ -148,6 +169,8 @@ def build_register_graph(
             "document_ids": [str(document_id) for document_id in batch.document_ids],
             "next_document_index": 0,
             "requirements_found": 0,
+            "reads_a_row_source_again": reads_again,
+            "examine_changed_rules": examine_changed_rules,
         }
 
     async def extract(state: RunState) -> dict[str, Any]:
@@ -274,31 +297,21 @@ def build_register_graph(
             requirements = await _requirements_of_batch(connection, run_id)
             register = await committed_rows(connection, project_id)
 
-        try:
-            answer = await match_requirements(model_client, register, requirements)
-        except IncompleteMatchAnswer:
-            raise  # it already names its own cause and fix
-        except Exception as error:
-            raise_if_configuration_failure(error)
-            # Match answers for the whole batch in one call, so there is no
-            # single document to skip the way Extract skips one.
-            raise ModelCallFailed(
-                "Match could not be answered for this batch "
-                f"({describe_unreadable_answer(error)}) — no register row was "
-                "proposed. Start another run once the model is answering."
-            ) from error
-        # A confident match still goes to the Delivery Owner: attaching this
-        # batch's evidence to a committed row is not the system's to decide.
-        outcome_by_requirement = {
-            outcome.requirement_index: (
-                POSSIBLE_MATCH if outcome.outcome == EXISTING_ROW else outcome.outcome,
-                outcome.row_number,
-            )
-            for outcome in answer.outcomes
-        }
+        outcome_by_requirement = await _settle_against_the_register(
+            model_client, register, requirements
+        )
 
         async with pool.connection() as connection:
             proposed = await propose_rows(
+                connection,
+                run_id,
+                project_id,
+                requirements,
+                outcome_by_requirement,
+            )
+            # After the proposals, so a row already under a possible-match
+            # question is not asked about twice.
+            withdrawn = await propose_withdrawals(
                 connection,
                 run_id,
                 project_id,
@@ -309,12 +322,17 @@ def build_register_graph(
         _log(
             logging.INFO,
             "match_finished",
-            f"Match proposed {len(proposed.proposed_row_ids)} row(s) and asked "
-            f"the Delivery Owner about {len(proposed.gated_row_numbers)}.",
+            f"Match proposed {len(proposed.proposed_row_ids)} row(s), asked the "
+            f"Delivery Owner about {len(proposed.gated_row_numbers)} and "
+            f"proposed withdrawing {len(withdrawn)}.",
             run_id,
             gated_rows=proposed.gated_row_numbers,
+            withdrawal_rows=withdrawn,
         )
-        return {"proposed_rows": len(proposed.proposed_row_ids)}
+        return {
+            "proposed_rows": len(proposed.proposed_row_ids),
+            "withdrawals_proposed": len(withdrawn),
+        }
 
     async def examine(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
@@ -378,8 +396,9 @@ def build_register_graph(
                     connection,
                     run_id,
                     f"Export the Requirements-to-Delivery Register for "
-                    f"{project['name']}, with {state['proposed_rows']} row(s) "
-                    "proposed by this run?",
+                    f"{project['name']}, with "
+                    f"{state.get('proposed_rows', 0)} row(s) proposed by this "
+                    "run?",
                 )
                 await enter_stage(connection, run_id, REVIEW_STAGE)
                 await set_run_status(connection, run_id, WAITING_FOR_REVIEW)
@@ -427,6 +446,7 @@ def build_register_graph(
             run_id,
             committed_rows=result.committed_row_numbers,
             merged_rows=result.merged_row_numbers,
+            withdrawn_rows=result.withdrawn_row_numbers,
         )
         return {}
 
@@ -489,7 +509,7 @@ def build_register_graph(
     graph.add_conditional_edges(
         INGEST_NODE,
         _route_after_ingest,
-        [EXTRACT_NODE, END_EARLY_NODE],
+        [EXTRACT_NODE, EXAMINE_NODE, END_EARLY_NODE],
     )
     graph.add_conditional_edges(
         EXTRACT_NODE,
@@ -513,18 +533,63 @@ def build_register_graph(
     return graph.compile(checkpointer=checkpointer)
 
 
+async def _settle_against_the_register(
+    model_client: BaseChatModel,
+    register: list[dict[str, Any]],
+    requirements: list[dict[str, Any]],
+) -> dict[int, tuple[str, int | None]]:
+    """What Match says about each requirement this batch found.
+
+    A batch that found none is never sent to the model: there is nothing to
+    match, and it reached this stage only because a document it read again may
+    have stopped asking for something.
+    """
+    if not requirements:
+        return {}
+    try:
+        answer = await match_requirements(model_client, register, requirements)
+    except IncompleteMatchAnswer:
+        raise  # it already names its own cause and fix
+    except Exception as error:
+        raise_if_configuration_failure(error)
+        # Match answers for the whole batch in one call, so there is no single
+        # document to skip the way Extract skips one.
+        raise ModelCallFailed(
+            "Match could not be answered for this batch "
+            f"({describe_unreadable_answer(error)}) — no register row was "
+            "proposed. Start another run once the model is answering."
+        ) from error
+    # A confident match still goes to the Delivery Owner: attaching this
+    # batch's evidence to a committed row is not the system's to decide.
+    return {
+        outcome.requirement_index: (
+            POSSIBLE_MATCH if outcome.outcome == EXISTING_ROW else outcome.outcome,
+            outcome.row_number,
+        )
+        for outcome in answer.outcomes
+    }
+
+
 def _route_after_ingest(state: RunState) -> str:
-    return EXTRACT_NODE if state.get("document_ids") else END_EARLY_NODE
+    if state.get("document_ids"):
+        return EXTRACT_NODE
+    # No document changed, but the rules this run froze are not the ones the
+    # register was last judged against, so it is examined again.
+    return EXAMINE_NODE if state.get("examine_changed_rules") else END_EARLY_NODE
 
 
 def _route_after_extract(state: RunState) -> str:
     if state["next_document_index"] < len(state["document_ids"]):
         return EXTRACT_NODE
-    return MATCH_NODE if state.get("requirements_found") else END_EARLY_NODE
+    if state.get("requirements_found") or state.get("reads_a_row_source_again"):
+        return MATCH_NODE
+    return END_EARLY_NODE
 
 
 def _route_after_match(state: RunState) -> str:
-    return EXAMINE_NODE if state.get("proposed_rows") else END_EARLY_NODE
+    if state.get("proposed_rows") or state.get("withdrawals_proposed"):
+        return EXAMINE_NODE
+    return END_EARLY_NODE
 
 
 def _route_after_review(state: RunState) -> str:
