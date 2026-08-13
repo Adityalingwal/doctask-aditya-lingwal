@@ -1,38 +1,44 @@
 from __future__ import annotations
 
 from pathlib import Path
+from zipfile import BadZipFile
 
 from docx import Document
+from docx.opc.exceptions import PackageNotFoundError
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-from app.ingest.locate_quote import HEADING_MARKER
+from app.ingest.unreadable_document import DocumentUnreadable
 
 
 DOCX_EXTENSION = ".docx"
-HEADING_STYLE_PREFIX = "Heading"
-CELL_SEPARATOR = " | "
 
 
 def read_docx(path: Path) -> str:
-    """Paragraphs and table cells, in the order Word stores them."""
+    """Paragraphs and table cells, in the order Word stores them.
+
+    Nothing is added to the text. A citation quotes these words back and the
+    model reads them as evidence, so a separator or marker invented here would
+    become evidence the document does not contain. Each cell takes its own
+    line, which is why a quote spanning two cells is not found and its
+    requirement is dropped rather than supported by assembled words.
+    """
+    try:
+        document = Document(str(path))
+    except (PackageNotFoundError, BadZipFile) as damaged:
+        raise DocumentUnreadable(
+            f"{path.name} could not be opened as a Word document — the file is "
+            "damaged, or something that is not a Word file was given a .docx "
+            "name; open it in Word, save a working copy into the project "
+            "folder, and start another run."
+        ) from damaged
+
     lines: list[str] = []
-    for content in Document(str(path)).iter_inner_content():
+    for content in document.iter_inner_content():
         if isinstance(content, Paragraph):
-            lines.append(_paragraph_line(content))
+            lines.append(content.text)
         elif isinstance(content, Table):
             lines.extend(
-                CELL_SEPARATOR.join(cell.text.strip() for cell in row.cells)
-                for row in content.rows
+                cell.text.strip() for row in content.rows for cell in row.cells
             )
     return "\n".join(lines)
-
-
-def _paragraph_line(paragraph: Paragraph) -> str:
-    # Word stores no page numbers, so a heading is the only place a citation
-    # can honestly name. Marking one the way Markdown does lets a single
-    # place-finder serve both formats instead of two that can drift apart.
-    style = paragraph.style
-    if style is not None and style.name.startswith(HEADING_STYLE_PREFIX):
-        return f"{HEADING_MARKER} {paragraph.text}"
-    return paragraph.text

@@ -33,6 +33,10 @@ DOCX_REQUIREMENT = "exporting one record as a PDF"
 TEXT_REQUIREMENT = "a weekly digest of new intake records"
 
 LAST_HEADING = "Open questions"
+# Word keeps no page numbers and its headings live in styling rather than in
+# the text, so a Word citation names the line the reader put the quote on:
+# "Scope", its paragraph, "Open questions", then the quote.
+DOCX_PLACE = "line 4"
 
 
 def test_a_citation_names_only_a_place_the_reader_actually_produced(
@@ -120,5 +124,5 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
         if citation["cell"] == "what_was_asked"
     }
     assert place_by_file[PDF_FILE] == "page 3"
-    assert place_by_file[DOCX_FILE] == LAST_HEADING
+    assert place_by_file[DOCX_FILE] == DOCX_PLACE
     assert place_by_file[TEXT_FILE] == "line 5"

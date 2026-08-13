@@ -65,6 +65,16 @@ def write_encrypted_pdf(path: Path, pages: list[list[str]]) -> None:
         writer.write(encrypted_file)
 
 
+def write_corrupt_pdf(path: Path) -> None:
+    """A file the folder accepts as a PDF and no PDF library can open."""
+    path.write_bytes(b"%PDF-1.4\nthis file was truncated before it was written")
+
+
+def write_corrupt_docx(path: Path) -> None:
+    """A `.docx` that is not a Word package at all — Word files are zips."""
+    path.write_bytes(b"this was renamed to .docx and is not a Word file")
+
+
 def write_docx(
     path: Path,
     sections: list[tuple[str, list[str]]],

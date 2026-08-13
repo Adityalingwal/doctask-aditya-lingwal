@@ -23,10 +23,13 @@ def line_number_at(document_text: str, character_offset: int) -> str:
 
 
 # A citation may only name a place its own reader produced: pages exist in a
-# PDF, headings in Markdown and Word, and a line number is all plain text has.
+# PDF and headings are written into Markdown itself. Word keeps a heading in
+# its styling rather than its text, so naming one would mean marking it in the
+# text and putting characters into the evidence the document does not contain.
+# Word therefore names the same line number plain text does.
 _PLACE_FINDERS: dict[str, Callable[[str, int], str]] = {
     MARKDOWN_EXTENSION: nearest_heading_above,
-    DOCX_EXTENSION: nearest_heading_above,
+    DOCX_EXTENSION: line_number_at,
     PDF_EXTENSION: page_number_at,
     TEXT_EXTENSION: line_number_at,
 }

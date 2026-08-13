@@ -39,7 +39,7 @@ resourcing, and CRM work are outside this domain.
 |---|---:|---:|---|
 | `.md` | Yes | **Yes** | Nearest heading |
 | `.pdf` | Yes | **Yes** | Page number |
-| `.docx` | Yes | **Yes** | Nearest heading |
+| `.docx` | Yes | **Yes** | Line number |
 | `.txt` | Yes | **Yes** | Line number |
 | `.xlsx`, `.pptx`, `.eml`, images | No | Skipped with reason | — |
 

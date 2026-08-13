@@ -54,7 +54,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] Document type as a Pydantic enum; an invented type skips that document.
 - [x] Related additional read and labelled but never a row on its own.
 - [x] Page limit lowered to 20 and enforced in the dispatch.
-- [x] Per-format citation places: PDF page, DOCX/Markdown heading, TXT line.
+- [x] Per-format citation places: PDF page, Markdown heading, DOCX/TXT line.
+- [x] Reader text carries no invented characters, and a damaged PDF or Word
+      file is skipped with its reason instead of ending the batch.
 - [x] Both synthetic corpora written, with the binaries generated from a
       committed script.
 
@@ -99,6 +101,13 @@ working claim only after its own implementation and proof land.
 
 - The 20-page limit binds `.pdf` only; Markdown, plain text and Word report no
   page count and none is invented for them.
+- A `.docx` citation names a line of the extracted text, not a line Word
+  displays, so it cannot be jumped to inside Word; the quoted words are how the
+  passage is found. Naming the Word heading instead needs headings to leave the
+  reader without being written into the text — deferred to a later improvement,
+  not refused.
+- A quote spanning two `.docx` table cells is not found, because each cell is
+  its own line; that requirement is dropped with its reason.
 - A related additional document that lists requirements, in a run that never
   exports, is not counted as already read, so the next run reads and pays for
   it again. A related additional document that lists none is unaffected.

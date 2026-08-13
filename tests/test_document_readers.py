@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, text
 
+from app.ingest.read_docx import read_docx
+from app.ingest.read_source_document import read_source_document
+from app.ingest.unreadable_document import DocumentUnreadable
 from conftest import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -17,6 +21,8 @@ from register_documents import (
     match_answer,
     match_marker,
     requirement_extraction_answer,
+    write_corrupt_docx,
+    write_corrupt_pdf,
     write_docx,
     write_encrypted_pdf,
     write_meeting_note,
@@ -34,6 +40,7 @@ DOCX_FILE = "client-requirements.docx"
 TEXT_FILE = "call-note.txt"
 PDF_FILE = "testing-feedback.pdf"
 SPREADSHEET_FILE = "budget.xlsx"
+PAGE_LIMIT = 20
 
 MARKDOWN_REQUIREMENT = "an email to the operations team on intake form submit"
 DOCX_REQUIREMENT = "a records list page with a search box"
@@ -269,6 +276,97 @@ def test_only_the_extensions_the_config_accepts_reach_a_reader(
     assert sorted(row["cells"]["what_was_asked"] for row in export["rows"]) == sorted(
         [MARKDOWN_REQUIREMENT, DOCX_REQUIREMENT, TEXT_REQUIREMENT, PDF_REQUIREMENT]
     )
+
+
+def test_a_docx_reader_never_adds_words_the_document_does_not_contain(
+    tmp_path: Path,
+) -> None:
+    """Whatever the reader hands over becomes both the model's evidence and the
+    words a citation quotes back, so it may hold only the document's own text."""
+    path = tmp_path / DOCX_FILE
+    heading = "Out of scope"
+    paragraph = "The provider will build the intake portal."
+    table_rows = [["Requirement", "Detail"], ["Records list", DOCX_QUOTE]]
+    write_docx(path, [(heading, [paragraph])], table_rows=table_rows)
+
+    document_text = read_docx(path)
+
+    written = {heading, paragraph, *(cell for row in table_rows for cell in row)}
+    assert [line for line in document_text.splitlines() if line.strip()] != []
+    for line in document_text.splitlines():
+        assert line in written or not line.strip(), (
+            f"the reader produced {line!r}, which is not in the document"
+        )
+
+
+def test_a_corrupt_docx_is_skipped_with_a_reason_naming_the_cause_and_the_fix(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / DOCX_FILE
+    write_corrupt_docx(path)
+
+    with pytest.raises(DocumentUnreadable) as unreadable:
+        read_source_document(path, PAGE_LIMIT)
+
+    reason = str(unreadable.value)
+    assert DOCX_FILE in reason
+    assert "Word" in reason
+    assert "run" in reason
+
+
+def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
+    tmp_path: Path,
+) -> None:
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    quote = write_meeting_note(source_folder, MARKDOWN_FILE, MARKDOWN_REQUIREMENT)
+    write_corrupt_pdf(source_folder / PDF_FILE)
+    script_path = tmp_path / "script.json"
+    write_script(
+        script_path,
+        {
+            extract_marker(MARKDOWN_FILE): requirement_extraction_answer(
+                MARKDOWN_REQUIREMENT, quote
+            ),
+            match_marker(): match_answer(1),
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=tmp_path / "model-calls.jsonl",
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Intake portal with a truncated PDF",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                wait_for_run_status(client, run_id, "waiting for review")
+                approve_every_decision_and_finish_review(client, run_id)
+                finished = wait_for_run_status(client, run_id, "done")
+                export = client.get(f"/runs/{run_id}/export").json()
+        finally:
+            application.stop()
+
+        read_files = _documents_in(database_url)
+
+    skipped = _skipped_entry(finished, PDF_FILE)
+    assert "PDF" in skipped["reason"]
+    # One damaged file loses its own document, never the rest of the batch.
+    assert read_files == [MARKDOWN_FILE]
+    assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
+        MARKDOWN_REQUIREMENT
+    ]
 
 
 def _skipped_entry(run: dict, source_file: str) -> dict:

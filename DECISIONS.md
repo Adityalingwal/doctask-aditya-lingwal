@@ -205,9 +205,14 @@ and its buckets are:
 
 - **Must preserve:** Accepted-format list is config; actual readers are code;
   startup warns when config names a format with no reader.
-- **Word headings:** the DOCX reader writes a heading paragraph out with
-  Markdown's `#`, so one place-finder serves both formats rather than two that
-  drift apart. No page number is invented for Word.
+- **Word text is copied, never marked up:** the DOCX reader adds no heading
+  marker and no cell separator, because whatever it produces is both what the
+  model reads as evidence and what a citation quotes back. Each table cell
+  takes its own line, so a quote spanning two cells is not found and its
+  requirement is dropped rather than supported by assembled words.
+- **Damaged files are one document's problem:** a `.pdf` or `.docx` that no
+  library can open is skipped with its reason, like an encrypted or scanned
+  one, instead of ending the batch.
 - **Limitation:** the page limit binds `.pdf` only, because only a paginated
   format can report a page count. Markdown, plain text and Word have none and
   none is invented for them; the shared gate in the dispatch limits any
@@ -244,17 +249,22 @@ Statuses are fixed in code:
 
 - Present evidence = source file + usable place + exact source words.
 - Absence evidence = exact file read plus explicit absence statement.
-- Locator by format: PDF page, Markdown nearest heading, DOCX nearest heading,
-  TXT line. Do not invent DOCX page numbers.
+- Locator by format: PDF page, Markdown nearest heading, DOCX line, TXT line.
+  Do not invent DOCX page numbers.
 - The model supplies exact words; code derives the place. Repeated words use
   the first occurrence.
 - An unfindable quote drops that requirement and records a skip reason. Plain
   normalized substring matching is intentional; no fuzzy match.
 - **Evidence/status:** Markdown quote location, multi-line normalization,
   invented quote rejection, first occurrence, and Latin-1 read are verified.
-  The PDF page, DOCX heading, and TXT line locators are implemented and
-  verified by `tests/test_citation_places.py`; each citation may only name a
-  place its own reader produced.
+  The PDF page, DOCX line, and TXT line locators are implemented and verified
+  by `tests/test_citation_places.py`; each citation may only name a place its
+  own reader produced.
+- **Limitation:** a DOCX line number counts lines of the text this system
+  extracted, not lines Word displays, so a reader cannot open the file and
+  jump to it — the quoted words remain the reliable way to find the passage.
+  A Word citation names its heading only once headings can travel out of the
+  reader without being written into the text; that is deferred, not refused.
 
 ### Export, audit, and fingerprints
 
@@ -280,7 +290,7 @@ Full locked pipeline:
 
 | Stage | Job | Model call | Current status |
 |---|---|---|---|
-| Ingest | Read new/changed supported files | No | Implemented and verified for `.md` |
+| Ingest | Read new/changed supported files | No | Implemented and verified for all four formats |
 | Extract | One document: type/date/requirements/testing/blockers/instructions | One per document | Implemented and verified with scripted model |
 | Match | Whole batch against current register | One per batch | Implemented and verified with scripted model |
 | Examine | Whole register against frozen rules | One per register | Locked, not implemented |
