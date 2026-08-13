@@ -11,7 +11,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - Slice 1, the formats and types slice, the rules and findings slice, and the
   MCP slice are merged into `main`.
 - The incremental update slice is built on `incremental-update`, not yet merged.
-- 115 tests pass without a live API key.
+- 116 tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
@@ -196,7 +196,7 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-14, `incremental-update` branch | 115 passed, no live key |
+| `docker compose run --rm app pytest` | 2026-08-14, `incremental-update` branch | 116 passed, no live key |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
 | API flow | Slice 1 | One run driven by hand through review/export |
 | Northside Dental corpus run | 2026-08-13, `formats-and-types` branch | 6 documents read across `.md`/`.docx`/`.pdf`; unrelated skipped, related additional labelled without a row; 7 rows exported |

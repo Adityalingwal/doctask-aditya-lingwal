@@ -24,7 +24,7 @@ last judged against; and requirement withdrawal end to end — migration
 and the first absence citation this system has written. Extract now routes on
 to Match when the batch read a document a committed row came from, even with no
 requirement found, and Match makes no model call when there is nothing to
-match. Proof: 115 passed, no live API key; both corpora driven through a first
+match. Proof: 116 passed, no live API key; both corpora driven through a first
 and a second run with the unaffected rows compared as stored.
 
 **2026-08-13.** Built the two decisions locked earlier the same day and

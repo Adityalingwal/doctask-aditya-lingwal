@@ -640,7 +640,7 @@ slice-1 scope.
 | 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 115 tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 116 tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
