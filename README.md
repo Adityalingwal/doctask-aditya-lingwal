@@ -7,8 +7,8 @@ a human approval gate prevent unsupported rows from being exported.
 
 ## Current working scope
 
-Slice 1, the formats and types slice, the rules and findings slice, and the
-MCP slice are implemented:
+Slice 1, the formats and types slice, the rules and findings slice, the MCP
+slice, and the incremental update slice are implemented:
 
 `Document folder → Ingest → Extract → Match → Examine → Review → Commit → JSON/Markdown export`
 
@@ -17,6 +17,10 @@ MCP slice are implemented:
 - FastAPI exposes six endpoints, and the same six operations are MCP tools
   served by the same process over the same core functions.
 - A run returns immediately, continues in the app process, and is polled.
+- A run reads only the new and changed files in the folder, and leaves every
+  row they do not affect byte-identical, fingerprint included.
+- Each project's folder is watched, and a file that arrives there starts a run
+  by itself once the folder has settled.
 - Review decisions are one proposal at a time; export is unavailable until
   approved.
 - Examine judges the whole register against the rules the run froze and raises
@@ -45,6 +49,47 @@ change the row's fingerprint, which covers the seven cells only.
 A run with nothing wrong says so: `GET /runs/{id}` and both exports name the
 rules that ran and how many rows they ran against, alongside an empty findings
 list.
+
+## The watched folder
+
+Each project's source folder is looked at every **10 seconds**, and a run
+starts by itself once that folder has stopped changing for **30 seconds** —
+provided the project has no run already running, at review, or queued. Both
+numbers live in [`config/watcher.yaml`](config/watcher.yaml), and changing
+either is an edit there, never a code change.
+
+Whatever the watcher first sees in a folder is not an arrival, so a project
+created over a folder of documents starts nothing by itself. `POST /runs`
+reads it exactly as before, and starting a run by hand is unchanged.
+
+A file that arrives while a run is at review waits for the run after it.
+
+## Withdrawal — when a document stops asking for something
+
+When a document is read again and its new content no longer contains a
+requirement **it itself supplied**, the run raises one withdrawal proposal for
+that row, through the same review queue as every other decision.
+
+- **Approve** moves that row's `Status` cell to `Withdrawn`, writes the cell
+  audit, updates `Last moved`, and cites the absence: the file that was read
+  again and what is no longer in it. The row's other cells, its existing
+  citations and its `First seen` do not move.
+- **Reject** leaves the row byte-identical, fingerprint included, and the
+  rejected proposal stays in the run record.
+- The row is never deleted, and neither is its history. A withdrawn row still
+  appears in both exports, with its `Withdrawn` status.
+
+Only the document a row's `What was asked` citation quotes can withdraw that
+row. Another document's silence proposes nothing, because a document that never
+asked for something cannot stop asking for it. Deleting a file from the folder
+deletes nothing either — the rows its earlier content produced stay.
+
+## Rules that changed and documents that did not
+
+When no document has changed but the rules in `config/rules.yaml` have, the run
+skips Extract and Match and examines the existing register against the new
+rules. It is the same run, routed differently, and it ends at the same export
+gate.
 
 ## Domain
 
@@ -154,8 +199,8 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `mcp-tools` branch: **100 passed**, real PostgreSQL, no
-live model key. Fresh-clone and image-only verification remain
+Last verified on the `incremental-update` branch: **115 passed**, real
+PostgreSQL, no live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
 
@@ -166,6 +211,7 @@ a fresh-machine claim.
 | `config/formats.yaml` | Declared extensions and document page limit |
 | `config/model.yaml` | OpenRouter model, endpoint, rates, attempts, timeout |
 | `config/rules.yaml` | User-editable R1–R4 rule set Examine judges against |
+| `config/watcher.yaml` | Folder poll interval and the quiet period before a run auto-starts |
 
 Adding or changing a rule is an edit to `config/rules.yaml`, never a code
 change. A run freezes the parsed rules when it starts, so an edit applies to
@@ -185,8 +231,13 @@ the next run and never to one already under way or already finished. Point
 - A kill after a model response but before its checkpoint can repeat that one
   paid call; earlier completed calls and register rows do not duplicate.
 - A run waiting for Review holds the project lock; later files wait.
-- Watched-folder auto-start, React, focused incremental updates,
-  unchanged-row proof, and cost/timing reporting are later slices.
+- The watcher forgets what it has seen when the application restarts, so a file
+  that arrived while it was down starts no run of its own; the next run started
+  by hand reads it.
+- A row two documents both asked for raises a withdrawal proposal when either
+  of them drops it. The proposal is a question, never a change, and the
+  Delivery Owner answers it.
+- React and cost/timing reporting are later slices.
 - Neither the endpoints nor the MCP tools authenticate a caller, and the MCP
   endpoint answers `421 Misdirected Request` to a request whose `Host` is
   neither `localhost` nor `127.0.0.1`, so a client on another machine cannot

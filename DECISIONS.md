@@ -53,10 +53,10 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 |---|---|---|---|
 | D01 | Deliverable, domain, user, and run scope | Implemented and verified in slice-1 scope | Product contract |
 | D02 | Human-gate scope, actions, and review queue | Implemented and verified for slice-1 gates | Human review |
-| D03 | Incremental batching, watched-folder trigger, and already-read rule | Mixed | Input and incremental updates |
+| D03 | Incremental batching, watched-folder trigger, already-read rule, and withdrawal | Implemented and verified | Input and incremental updates |
 | D04 | Formats, document types, and parsing | Mixed | Input and incremental updates |
 | D05 | Register cells, statuses, attachments, citations, and exports | Mixed | Register and evidence |
-| D06 | Audit trail and unchanged-row proof | Mixed | Register and evidence |
+| D06 | Audit trail and unchanged-row proof | Implemented and verified | Register and evidence |
 | D07 | Pipeline stages and conditional routes | Mixed | Pipeline |
 | D08 | Extract, quote location, prompt injection | Mixed | Extract |
 | D09 | Match, requirement identity, and granularity | Implemented and verified in slice-1 scope | Match |
@@ -165,10 +165,23 @@ export is always gated.
   starts. A changed file is read in full; untouched files are never re-read.
 - **Removed file:** Deleting a watched file does not delete its historical rows.
 - **Watcher:** Poll every 10 seconds and auto-start after 30 seconds of quiet,
-  provided the project has no active run. Manual `POST /runs` remains.
-  **Locked, not implemented.** Files arriving during Review wait for next run.
-- **Rules-only run:** When parsed rules change, skip Extract/Match and run
-  Examine against the existing register. **Locked, not implemented.**
+  provided the project has no run running, at review, or queued. Manual
+  `POST /runs` remains. Files arriving during Review wait for the next run.
+  Both numbers are `config/watcher.yaml`, read through `WATCHER_CONFIG_PATH`.
+  **Implemented and verified** by `tests/test_watched_folder.py`.
+- **Baseline, not backlog:** whatever the watcher first sees in a folder is not
+  an arrival, so a project created over a folder of documents starts nothing by
+  itself and never surprises a fresh `docker compose up` with a paid run. The
+  cost is that a restart forgets what it saw; see PROGRESS limitations.
+- **Rules-only run:** When the rules a run froze differ from the ones the
+  register was last examined against and no document changed, skip
+  Extract/Match and run Examine against the existing register. It is the same
+  run object, routed differently. **Implemented and verified** by
+  `test_a_changed_rules_file_re_examines_the_register_without_reading_a_document`.
+- **Unchanged-row proof:** a second run leaves every row its documents did not
+  affect byte-identical — cells, citations and fingerprint. **Implemented and
+  verified** on both synthetic corpora by `tests/test_second_run_on_corpora.py`
+  and `tests/test_incremental_updates.py`.
 
 ### Withdrawal — when a changed document drops a requirement
 
@@ -195,8 +208,19 @@ export is always gated.
 - **Limitation:** `Withdrawn` describes the requirement, while the other six
   statuses describe delivery. One `Status` cell carries both, because it is
   the one cell every export, gate, and reader already consults.
-- **Status:** **Locked, not implemented** — 2026-08-14. Ours, not the brief's;
-  the task PDF says nothing about removed requirements.
+- **Detection costs no model call:** Match already reports what the changed
+  document's new extraction matched, so a row that document supplied with
+  neither a match nor a possible match in that output is the candidate. Asking
+  a model "was this removed?" would be a second answer to a question the
+  pipeline has already answered, free to disagree with the first.
+- **Suppression is the trigger itself:** a rejected withdrawal is not raised
+  again because the document is not read again until it changes again. No
+  second piece of state remembers the rejection.
+- **Status:** **Implemented and verified** — 2026-08-14. Ours, not the brief's;
+  the task PDF says nothing about removed requirements. Proven by
+  `tests/test_withdrawal.py` and
+  `test_the_re_issued_corpus_requirements_document_withdraws_the_row_it_dropped`,
+  including the answer submitted through the MCP `submit_decision` tool.
 - **History:** [`decision-history.md`](documentation/decision-history.md),
   "Withdrawing a requirement a changed document dropped".
 
@@ -271,10 +295,11 @@ Statuses are fixed in code and in a database check constraint:
 
 - `Never happened` is a positive evidenced claim; `No evidence yet` makes no
   such claim.
-- `Withdrawn` is set only by an approved withdrawal proposal (D03) and is
-  **locked, not implemented**; the six statuses before it are implemented and
-  verified. Adding it changes `REGISTER_ROW_STATUS_CHECK`, so it needs its own
-  migration.
+- `Withdrawn` is set only by an approved withdrawal proposal (D03).
+  **Implemented and verified**; migration `20260814_0007` widened
+  `REGISTER_ROW_STATUS_CHECK` and `ck_decisions_kind` together, and its
+  downgrade refuses rather than force a withdrawn row into a status that would
+  claim something its evidence does not support.
 - Unknown cells say why they are unknown; they are never blank or guessed.
 - Dates come from documents, not run time. Unknown date stays unknown and R3
   does not run on it.
@@ -322,8 +347,14 @@ Statuses are fixed in code and in a database check constraint:
   backfills every existing row as a cell change; its downgrade drops
   attachment rows, which the older shape cannot represent. Proven by
   `tests/test_schema.py`.
-- **Proof pending:** Later incremental slice must compare fingerprints and
-  prove unaffected rows byte-identical.
+- **Implemented and verified:** a second run's unaffected rows come back with
+  the same cells, the same citations and the same fingerprint, compared as
+  stored rather than as rendered. An approved merge moves citations onto the
+  candidate row without moving its fingerprint, because a citation is not a
+  cell.
+- **Withdrawal writes the first absence citation this system has produced:** no
+  quote, so no `locate_quote` and no place — `source_place` and `source_words`
+  stay null and the statement names the file and what is not in it.
 
 ## Pipeline
 
@@ -349,8 +380,12 @@ always continues to Review.
 
 Early exits are honest terminal `ended without changes` states with reasons:
 no readable new/changed file; everything skipped; nothing traceable extracted;
-or Match changes no register cell. A future rules-only change routes directly
-to Examine rather than exiting.
+or Match neither proposes a row nor proposes a withdrawal. Ingest routes
+straight to Examine instead when no document changed but the rules did, and
+Extract routes on to Match even with no requirement found when the batch read a
+document some committed row was asked for in — a document that dropped its last
+requirement is exactly what a withdrawal is for. Match makes no model call when
+there is nothing to match.
 
 ## Extract
 
@@ -588,9 +623,12 @@ slice-1 scope.
   frozen per run, D1/D2 in code, and the attachment audit event.
 - The MCP slice is built: six tools mounted in the same process over the same
   core functions the endpoints call.
-- Later slices: incremental proof → concurrency/
-  injection → React → cost/timing. Exact scheduling may combine safe adjacent
-  work, but proof claims stay separate.
+- The incremental update slice is built: the watched folder, the rules-only
+  route, requirement withdrawal, and the byte-identical unchanged-row proof on
+  both corpora. The tool list stayed at six; a withdrawal is another decision
+  the existing decision tools carry.
+- Later slices: concurrency/injection → React → cost/timing. Exact scheduling
+  may combine safe adjacent work, but proof claims stay separate.
 
 ### Brief-behaviour acceptance summary
 
@@ -602,7 +640,7 @@ slice-1 scope.
 | 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 100 tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 115 tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
@@ -648,8 +686,12 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- Watched folder, requirement withdrawal, React, incremental unchanged-row
-  proof, and cost/timing are locked but not implemented.
+- React and cost/timing are locked but not implemented.
+- The watcher holds what it last saw in memory, so a restart re-baselines every
+  folder and a file that arrived while the application was down starts no run
+  of its own.
+- A row two documents both supplied raises a withdrawal proposal when either of
+  them drops it; the proposal is a question, never a change.
 - Neither door authenticates a caller, and the MCP endpoint answers `421` to a
   `Host` header other than `localhost` or `127.0.0.1`.
 - A finding raised against a register row is never re-examined by a later run;
@@ -670,7 +712,7 @@ ideas from resurfacing without duplicating their full prose here.
 | Blocker as document type/undecided representation | D01 condition + D05 status and `Blocked on` |
 | One run equals one project | D01 project context + document-batch run |
 | Manual-only run trigger | D03 auto-start watcher plus manual endpoint |
-| Five register statuses | D05 six statuses including `No evidence yet` |
+| Five register statuses | D05 seven statuses including `No evidence yet` and `Withdrawn` |
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
 | Five API endpoints | D14 six endpoints including project creation |

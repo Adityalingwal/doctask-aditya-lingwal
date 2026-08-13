@@ -8,10 +8,10 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## Snapshot — 2026-08-14
 
-- Slice 1, the formats and types slice, and the rules and findings slice are
-  merged into `main`.
-- The MCP slice is built on `mcp-tools`, not yet merged.
-- 100 tests pass without a live API key.
+- Slice 1, the formats and types slice, the rules and findings slice, and the
+  MCP slice are merged into `main`.
+- The incremental update slice is built on `incremental-update`, not yet merged.
+- 115 tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
@@ -26,6 +26,13 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   Northside Dental documents in `.md`, `.docx` and `.pdf`.
 - Rules are frozen per run, findings are gated one by one, and an approved
   finding attaches to its row without moving that row's fingerprint.
+- A second run reads only what changed and leaves every row it did not affect
+  byte-identical, proven on both corpora against the stored rows.
+- Each project's folder is watched: poll and quiet period come from
+  `config/watcher.yaml`, and nothing starts behind a run that is already in
+  flight.
+- A document read again that stopped asking for something raises one withdrawal
+  proposal for the row it supplied, and only for that row.
 
 ## Completed
 
@@ -66,6 +73,20 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       the run record and never reaches the export.
 - [x] Attachment audit event naming no cell, and findings in both exports.
 
+### Incremental update slice (branch `incremental-update`)
+
+- [x] Seven never-do tests written and run at the baseline commit before any
+      implementation; three failed there, four passed as regression guards.
+- [x] Byte-identical unchanged-row proof, comparing stored cells, citations and
+      fingerprints rather than what a screen renders.
+- [x] Watched folder in `app/runs/watch_source_folders.py`, starting runs
+      through the same `start_or_queue_run` the endpoint calls.
+- [x] Rules-only route: Ingest straight to Examine when only the rules changed.
+- [x] Withdrawal end to end — migration `20260814_0007`, the fourth review-queue
+      kind, the `Withdrawn` status, the first absence citation, and the export
+      that shows it.
+- [x] Both corpora driven through a first and a second run inside the suite.
+
 ### MCP slice (branch `mcp-tools`)
 
 - [x] Every existence check, refusal and reported shape moved out of the routes
@@ -96,11 +117,10 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 | Order | Slice | Scope | Current state |
 |---|---|---|---|
-| 1 | MCP | Six thin in-process tools over shared core functions | Built on `mcp-tools`; awaiting review and merge |
-| 2 | Incremental proof | Watched folder, focused proposals, byte-identical unchanged-row proof | Designed |
-| 3 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
-| 4 | React | One-page five-section review surface | Designed |
-| 5 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
+| 1 | Incremental proof | Watched folder, rules-only route, withdrawal, byte-identical unchanged-row proof | Built on `incremental-update`; awaiting review and merge |
+| 2 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
+| 3 | React | One-page five-section review surface | Designed |
+| 4 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -144,8 +164,21 @@ working claim only after its own implementation and proof land.
 - D1 and D2 cannot fire on the register slice 1 produces: every proposed row is
   written with a `what_was_asked` citation and no stage yet sets a row to
   `Done`. Both were driven against seeded rows instead.
-- Files arriving during Review wait; that run holds the project lock.
-- No watcher, React, cost/timing, or unchanged-row proof yet.
+- Files arriving during Review wait; that run holds the project lock, and the
+  watcher starts nothing behind it.
+- The watcher keeps what it last saw in memory, so restarting the application
+  re-baselines every folder: a file that arrived while it was down starts no run
+  of its own and is read by the next run started by hand.
+- Whatever the watcher first sees in a folder is not an arrival, so a project
+  created over a folder of documents is read by `POST /runs`, not by itself.
+- A row two documents both supplied raises a withdrawal proposal when either of
+  them drops it. It is a question the Delivery Owner answers, never a change.
+- A document read again whose new extraction comes back a related additional or
+  unrelated document withdraws nothing: it never reaches Match, and silence from
+  it is silence.
+- A withdrawn row is examined like any other, so a rule such as R4 can still
+  raise a finding against it.
+- No React or cost/timing reporting yet.
 - Neither door authenticates a caller; the MCP endpoint additionally answers
   `421` to a `Host` header other than `localhost` or `127.0.0.1`, so a client
   on another machine cannot reach it as it stands.
@@ -153,8 +186,9 @@ working claim only after its own implementation and proof land.
 
 ## Next three actions
 
-1. Review and merge the MCP branch.
-2. Start the incremental-update slice.
+1. Review and merge the incremental-update branch.
+2. Start the reliability slice: two-project concurrency, same-project queue, and
+   the prompt-injection proof.
 3. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
@@ -162,12 +196,16 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-14, `mcp-tools` branch | 100 passed, no live key |
+| `docker compose run --rm app pytest` | 2026-08-14, `incremental-update` branch | 115 passed, no live key |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
 | API flow | Slice 1 | One run driven by hand through review/export |
 | Northside Dental corpus run | 2026-08-13, `formats-and-types` branch | 6 documents read across `.md`/`.docx`/`.pdf`; unrelated skipped, related additional labelled without a row; 7 rows exported |
 | Intake-portal rules run | 2026-08-14, `rules-and-findings` branch | 5 rows examined against R1–R4 plus D1–D2; two R1 findings gated; `finish-review` refused while they were unanswered; one approved and one rejected; export carried the approved finding only, and row 4's fingerprint stayed the seven-cell hash |
 | MCP flow | 2026-08-14, `mcp-tools` branch | One run created, started, polled, decided, finished and exported through the six tools; the export refused before approval |
+| Intake-portal second run | 2026-08-14, `incremental-update` branch | Meeting notes read first, then the written scope; rows 2 and 3 byte-identical, row 1's cells and fingerprint unmoved while an approved merge added its citations, rows 4 and 6 new |
+| Northside Dental second run | 2026-08-14, `incremental-update` branch | Meeting notes read first, then `.docx` scope and `.pdf` testing feedback; the SMS row byte-identical, rows 1 and 3 unmoved through their merges, rows 5 and 7 new |
+| Withdrawal on the corpus | 2026-08-14, `incremental-update` branch | The re-issued 26 March scope raised exactly one proposal, on the records-list row it dropped; approving it wrote `Withdrawn`, its cell audit and the absence citation, and the three meeting-note rows were byte-identical |
+| Watched folder | 2026-08-14, `incremental-update` branch | An arriving file started a run by itself; a second file arriving during that run's review started nothing until the review finished |
 | Live model | Never | Unverified |
 | Concurrency suite | Not run/built yet | Mechanism exists; proof pending |
 | Fresh clone/image-only | Not run yet | Open release gate |
