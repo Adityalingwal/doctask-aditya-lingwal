@@ -7,9 +7,9 @@ a human approval gate prevent unsupported rows from being exported.
 
 ## Current working scope
 
-Slice 1 is implemented:
+Slice 1 and the formats and types slice are implemented:
 
-`Markdown folder → Ingest → Extract → Match → Review → Commit → JSON/Markdown export`
+`Document folder → Ingest → Extract → Match → Review → Commit → JSON/Markdown export`
 
 - PostgreSQL stores projects, runs, documents, register rows, citations,
   review decisions, audit entries, and LangGraph checkpoints.
@@ -35,16 +35,23 @@ resourcing, and CRM work are outside this domain.
 
 ## Formats
 
-| Format | Declared V1 set | Working now |
-|---|---:|---:|
-| `.md` | Yes | **Yes** |
-| `.pdf` | Yes | No — later formats slice |
-| `.docx` | Yes | No — later formats slice |
-| `.txt` | Yes | No — later formats slice |
-| `.xlsx`, `.pptx`, `.eml`, images | No | Skipped with reason |
+| Format | Declared V1 set | Working now | Citation place |
+|---|---:|---:|---|
+| `.md` | Yes | **Yes** | Nearest heading |
+| `.pdf` | Yes | **Yes** | Page number |
+| `.docx` | Yes | **Yes** | Nearest heading |
+| `.txt` | Yes | **Yes** | Line number |
+| `.xlsx`, `.pptx`, `.eml`, images | No | Skipped with reason | — |
 
-Only `.md` should be used for the current build. `config/formats.yaml` declares
-the intended set, while startup warns that the other readers do not exist yet.
+`config/formats.yaml` declares which extensions are accepted and the document
+page limit, currently 20 pages. A file whose extension is not listed there
+never reaches a reader, and startup warns if the file names a format no reader
+exists for.
+
+A document is skipped, with its reason recorded on the run, when it is longer
+than the page limit, when a PDF is encrypted, and when a PDF has no text layer
+because it was scanned. The page limit applies to PDFs, the only declared
+format that reports a page count.
 
 ## Run locally
 
@@ -75,7 +82,8 @@ operations:
 - `GET /runs/{id}/export?format=json|markdown`
 
 The application currently reads project folders from inside the repository.
-The included demo folder is `sample-projects/intake-portal`.
+The included demo folder is `sample-projects/intake-portal`; a second synthetic
+project in mixed formats is `sample-projects/northside-dental`.
 
 The application listens on `127.0.0.1` only by default; to expose it beyond
 this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
@@ -87,7 +95,7 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `bind-and-review-replay` branch: **55 passed**, real
+Last verified on the `formats-and-types` branch: **62 passed**, real
 PostgreSQL, no live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
@@ -105,9 +113,11 @@ does not change current Slice-1 output yet.
 
 ## Current limitations
 
-- Only Markdown ingestion works; PDF/DOCX/TXT readers are not built.
-- Document-type bucket validation is incomplete; only `unrelated` currently
-  changes control flow.
+- The 20-page limit applies to PDFs only; the other formats report no page
+  count and none is invented for them.
+- Scanned PDFs are skipped rather than read; there is no OCR.
+- A related additional document that lists requirements, in a run that never
+  exports, is read again by the next run.
 - The durable per-project lock and waiting queue are built, but dedicated
   concurrency tests are pending.
 - A kill after a model response but before its checkpoint can repeat that one

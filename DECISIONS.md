@@ -185,27 +185,36 @@ re-reading completed unrelated/no-requirement documents forever.
 
 | Concern | Current contract | Status |
 |---|---|---|
-| Declared formats | `.pdf`, `.docx`, `.md`, `.txt` in `config/formats.yaml` | Declared; only `.md` reader implemented |
-| Unsupported format | Skip with `unsupported format` reason | Implemented for the current reader set |
-| Page limit | 50 pages in config; oversized documents skip | Locked, not implemented for future readers |
-| PDF | `pdfplumber` extraction, `pypdf` encryption check; scanned/encrypted skip | Library decision tested historically; reader not implemented |
-| DOCX | `python-docx`, paragraphs and table cells | Locked, not implemented |
-| TXT | UTF-8 with Latin-1 fallback | Locked, not implemented |
-| Folder scan | Top-level files only, read in place | Implemented for `.md` |
+| Declared formats | `.pdf`, `.docx`, `.md`, `.txt` in `config/formats.yaml` | All four readers implemented and verified |
+| Unsupported format | Skip with `unsupported format` reason | Implemented and verified |
+| Page limit | 20 pages in config; oversized documents skip | Implemented in `app/ingest/read_source_document.py`; binds `.pdf` only |
+| PDF | `pdfplumber` extraction, `pypdf` encryption check; scanned/encrypted skip | Implemented and verified for encrypted, scanned, and oversized skips |
+| DOCX | `python-docx`, paragraphs and table cells in document order | Implemented and verified |
+| TXT | UTF-8 with Latin-1 fallback | Implemented and verified |
+| Folder scan | Top-level files only, read in place | Implemented for all four formats |
 
-Format is checked before type. Type is inferred from content into:
+Format is checked before type. Type is a Pydantic enum at the model boundary,
+and its buckets are:
 
-| Bucket | Action |
-|---|---|
-| Primary: meeting notes, client requirements document, testing feedback | Full declared processing |
-| Related additional | Extract relevant facts, label as related additional |
-| Unrelated | Skip with reason |
+| Bucket | Action | Status |
+|---|---|---|
+| Primary: meeting notes, client requirements document, testing feedback | Full declared processing | Implemented |
+| Related additional | Read, labelled and stored; never creates a register row on its own | Implemented |
+| Unrelated | Skip with reason | Implemented |
+| Outside the enum | Skip that document with `document type not recognised`; the run continues | Implemented |
 
-- **Known blocker:** Live code only gives special behaviour to `unrelated`;
-  unexpected type values are accepted as related. Bucket enforcement remains
-  for the formats/type slice.
 - **Must preserve:** Accepted-format list is config; actual readers are code;
   startup warns when config names a format with no reader.
+- **Word headings:** the DOCX reader writes a heading paragraph out with
+  Markdown's `#`, so one place-finder serves both formats rather than two that
+  drift apart. No page number is invented for Word.
+- **Limitation:** the page limit binds `.pdf` only, because only a paginated
+  format can report a page count. Markdown, plain text and Word have none and
+  none is invented for them; the shared gate in the dispatch limits any
+  paginated reader added later.
+- **Evidence:** `tests/test_document_readers.py`,
+  `tests/test_document_type_buckets.py`, and one run over the six-document
+  Northside Dental corpus.
 
 ## Register and evidence
 
@@ -243,7 +252,9 @@ Statuses are fixed in code:
   normalized substring matching is intentional; no fuzzy match.
 - **Evidence/status:** Markdown quote location, multi-line normalization,
   invented quote rejection, first occurrence, and Latin-1 read are verified.
-  Other-format locators are locked, not implemented.
+  The PDF page, DOCX heading, and TXT line locators are implemented and
+  verified by `tests/test_citation_places.py`; each citation may only name a
+  place its own reader produced.
 
 ### Export, audit, and fingerprints
 
@@ -479,9 +490,12 @@ slice-1 scope.
 - Build thin end-to-end slices, risky runtime properties first, UI last.
 - Slice 1 is complete: `.md` Ingest → Extract → Match → Review → Commit,
   PostgreSQL, six endpoints, human gate, export, and real-process resume.
-- Later slices: formats/type buckets → rules/findings → MCP → incremental proof
-  → concurrency/injection → React → cost/timing. Exact scheduling may combine
-  safe adjacent work, but proof claims stay separate.
+- The formats and types slice is built: four readers, the page limit, the
+  document-type enum and its buckets, per-format citation places, and both
+  synthetic corpora.
+- Later slices: rules/findings → MCP → incremental proof → concurrency/
+  injection → React → cost/timing. Exact scheduling may combine safe adjacent
+  work, but proof claims stay separate.
 
 ### Brief-behaviour acceptance summary
 
@@ -493,7 +507,7 @@ slice-1 scope.
 | 4 | Machine drive | Full API flow, then same flow through MCP | API half verified; MCP later |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 51 tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 62 tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
@@ -531,15 +545,16 @@ slice-1 scope.
   cost are unverified.
 - Register-size and short-document assumptions remain unmeasured on full demo
   and second-run corpora.
-- Only `.md` is implemented although four formats are declared.
-- Document-type bucket enforcement is incomplete.
+- The page limit binds `.pdf` only; no other declared format reports pages.
+- A related additional document that lists requirements, in a run that never
+  exports, is read again by the next run.
 - Audit cannot yet represent attachment events.
 - Concurrency mechanism is built but dedicated proof is pending.
 - One Extract call can repeat in the answer-to-checkpoint kill window.
 - Rejected findings stay suppressed even if later evidence strengthens them.
 - Files arriving during Review wait; the project lock may be held a long time.
-- Oversized documents will be skipped once later readers implement the limit;
-  chunking/OCR are not planned for V1.
+- Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
+  rather than read; chunking and OCR are not planned for V1.
 - Watched folder, rules/findings, MCP, React, incremental unchanged-row proof,
   and cost/timing are locked but not implemented.
 

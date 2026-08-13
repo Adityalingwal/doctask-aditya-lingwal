@@ -17,6 +17,7 @@ from register_documents import write_meeting_note
 
 
 MARKDOWN_ONLY = frozenset({".md"})
+PAGE_LIMIT = 20
 COMMITTED_ROW_NUMBER = 1
 COMMITTED_REQUIREMENT = "Send a notification when the intake form is submitted."
 
@@ -55,10 +56,20 @@ async def _collect_batch_twice(source_folder: Path) -> dict[str, Any]:
             async with pool.connection() as connection:
                 project_id, run_id = await _project_with_a_running_run(connection)
                 first = await collect_batch(
-                    connection, run_id, project_id, source_folder, MARKDOWN_ONLY
+                    connection,
+                    run_id,
+                    project_id,
+                    source_folder,
+                    MARKDOWN_ONLY,
+                    PAGE_LIMIT,
                 )
                 second = await collect_batch(
-                    connection, run_id, project_id, source_folder, MARKDOWN_ONLY
+                    connection,
+                    run_id,
+                    project_id,
+                    source_folder,
+                    MARKDOWN_ONLY,
+                    PAGE_LIMIT,
                 )
                 written = await connection.execute(
                     "SELECT count(*) AS written FROM documents WHERE run_id = %s",

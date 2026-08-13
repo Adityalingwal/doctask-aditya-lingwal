@@ -38,6 +38,7 @@ from register_documents import (
 SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
 ACCEPTED_EXTENSIONS = frozenset({".md"})
+PAGE_LIMIT = 20
 
 
 @contextmanager
@@ -241,7 +242,12 @@ async def _drive_review_replay(
             await checkpointer.setup()
             model_client = build_scripted_client(script_path, None, 0.0)
             graph = build_register_graph(
-                model_client, pool, checkpointer, PROJECT_ROOT, ACCEPTED_EXTENSIONS
+                model_client,
+                pool,
+                checkpointer,
+                PROJECT_ROOT,
+                ACCEPTED_EXTENSIONS,
+                PAGE_LIMIT,
             )
 
             project_id, run_id = uuid4(), uuid4()
