@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.ingest.locate_quote import PLACE_BEFORE_FIRST_HEADING, locate_quote
-from app.ingest.read_markdown import read_markdown
+from app.ingest.read_text_document import read_text_document
 
 
 MEETING_NOTE = """# Intake Portal Meeting Notes
@@ -68,4 +68,4 @@ def test_document_written_in_latin_1_is_still_read(tmp_path: Path) -> None:
     document_path = tmp_path / "notes.md"
     document_path.write_bytes("# Notes\n\nCafé rota agreed.\n".encode("latin-1"))
 
-    assert "Caf" in read_markdown(document_path)
+    assert "Caf" in read_text_document(document_path)

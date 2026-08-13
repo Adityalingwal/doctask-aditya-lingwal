@@ -94,6 +94,7 @@ def build_register_graph(
     checkpointer: AsyncPostgresSaver,
     project_root: Path,
     accepted_extensions: frozenset[str],
+    page_limit: int,
 ) -> CompiledStateGraph:
     """Wire the five slice 1b stages, with everything they need passed in."""
 
@@ -119,6 +120,7 @@ def build_register_graph(
                 project_id,
                 source_folder,
                 accepted_extensions,
+                page_limit,
             )
             await append_skipped(connection, run_id, batch.skipped)
 
