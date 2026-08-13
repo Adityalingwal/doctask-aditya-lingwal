@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
+from app.examine.read_findings import findings_of_run
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
 from app.register.export_register import build_export
 from app.review.review_queue import (
@@ -76,6 +77,7 @@ async def commit_register(
         )
         committed_row_numbers.append(row["row_number"])
 
+    await _write_attachment_audit(connection, run_id)
     export = await build_export(connection, project, run_id, exported_at)
     await connection.execute(
         "UPDATE runs SET export_json = %s WHERE id = %s",
@@ -124,6 +126,31 @@ async def _merge_approved_matches(
         if merged_row is not None:
             merged_row_numbers.append(merged_row["row_number"])
     return merged_row_numbers
+
+
+async def _write_attachment_audit(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> None:
+    """Record each approved finding as attached to its row, naming no cell.
+
+    A finding is an attachment, not a cell change: it says nothing about what
+    any of the seven cells holds, which is why the row's fingerprint does not
+    move when one arrives.
+    """
+    for finding in await findings_of_run(connection, run_id, approved_only=True):
+        await connection.execute(
+            "INSERT INTO audit (id, register_row_id, cell_name, event_kind, "
+            "old_value, new_value, run_id, source_document_id) "
+            "VALUES (%s, %s, NULL, %s, NULL, %s, %s, NULL)",
+            (
+                uuid4(),
+                finding["register_row_id"],
+                ATTACHMENT_EVENT,
+                f"{finding['rule_id']} — {finding['issue']}",
+                run_id,
+            ),
+        )
 
 
 async def _documents_of_run(

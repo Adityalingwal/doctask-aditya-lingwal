@@ -27,10 +27,12 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_marker,
+    no_findings_answer,
     write_meeting_note,
 )
 
@@ -39,6 +41,7 @@ SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
 ACCEPTED_EXTENSIONS = frozenset({".md"})
 PAGE_LIMIT = 20
+RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
 
 
 @contextmanager
@@ -55,6 +58,7 @@ def _run_ready_to_finish(
         script_path,
         {
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
             extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
         },
     )
@@ -221,6 +225,7 @@ def test_finished_review_does_not_reopen_on_resume(tmp_path: Path) -> None:
         script_path,
         {
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
             extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
         },
     )
@@ -248,6 +253,7 @@ async def _drive_review_replay(
                 PROJECT_ROOT,
                 ACCEPTED_EXTENSIONS,
                 PAGE_LIMIT,
+                RULES_CONFIG_PATH,
             )
 
             project_id, run_id = uuid4(), uuid4()

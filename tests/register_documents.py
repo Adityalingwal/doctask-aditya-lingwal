@@ -7,6 +7,7 @@ from docx import Document
 from pypdf import PdfWriter
 from reportlab.pdfgen import canvas
 
+from app.examine.examine_register import EXAMINE_PROMPT_MARKER
 from app.extract.answer import MEETING_NOTES
 from app.match.match_requirements import MATCH_PROMPT_MARKER
 
@@ -178,6 +179,15 @@ def extract_marker(source_file: str) -> str:
 
 def match_marker() -> str:
     return MATCH_PROMPT_MARKER
+
+
+def examine_marker() -> str:
+    return EXAMINE_PROMPT_MARKER
+
+
+def no_findings_answer() -> dict[str, Any]:
+    """Examine reporting an honest empty result for a register with nothing wrong."""
+    return {"findings": []}
 
 
 def match_marker_for_batch_with(source_file: str) -> str:

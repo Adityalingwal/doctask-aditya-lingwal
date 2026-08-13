@@ -13,10 +13,12 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_marker,
+    no_findings_answer,
     write_meeting_note,
 )
 
@@ -119,6 +121,7 @@ def test_a_timed_out_document_is_skipped_while_the_batch_continues(
                 SECOND_REQUIREMENT, quote
             ),
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
         },
         "Timed out intake portal",
         "waiting for review",

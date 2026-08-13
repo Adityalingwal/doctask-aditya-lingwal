@@ -17,9 +17,11 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     match_answer,
     match_marker,
+    no_findings_answer,
     requirement_extraction_answer,
     write_corrupt_docx,
     write_corrupt_pdf,
@@ -112,6 +114,7 @@ def test_an_encrypted_pdf_is_skipped_with_the_reason_and_the_batch_continues(
                 MARKDOWN_REQUIREMENT, quote
             ),
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
         },
     )
 
@@ -237,6 +240,7 @@ def test_only_the_extensions_the_config_accepts_reach_a_reader(
                 PDF_REQUIREMENT, PDF_QUOTE
             ),
             match_marker(): match_answer(4),
+            examine_marker(): no_findings_answer(),
         },
     )
 
@@ -329,6 +333,7 @@ def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
                 MARKDOWN_REQUIREMENT, quote
             ),
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
         },
     )
 

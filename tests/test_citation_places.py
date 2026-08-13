@@ -10,9 +10,11 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     match_answer,
     match_marker,
+    no_findings_answer,
     requirement_extraction_answer,
     write_docx,
     write_pdf,
@@ -88,6 +90,7 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
                 TEXT_REQUIREMENT, TEXT_QUOTE
             ),
             match_marker(): match_answer(3),
+            examine_marker(): no_findings_answer(),
         },
     )
 

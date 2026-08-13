@@ -21,7 +21,11 @@ from app.extract.answer import (
     UnrecognisedDocumentType,
     describe_unreadable_answer,
 )
-from app.examine.frozen_rules import freeze_rules_for_run
+from app.examine.deliverable_checks import DELIVERABLE_CHECKS, deliverable_findings
+from app.examine.examine_register import UnusableExamineAnswer, examine_register
+from app.examine.frozen_rules import freeze_rules_for_run, frozen_rules_of_run
+from app.examine.record_findings import record_findings
+from app.examine.register_under_examination import register_under_examination
 from app.extract.read_document import locate_extraction, read_one_document
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import (
@@ -47,6 +51,7 @@ from app.runs.statuses import (
     COMMIT_STAGE,
     DONE,
     ENDED_WITHOUT_CHANGES,
+    EXAMINE_STAGE,
     EXTRACT_STAGE,
     INGEST_STAGE,
     MATCH_STAGE,
@@ -58,6 +63,7 @@ from app.runs.statuses import (
 INGEST_NODE = "ingest"
 EXTRACT_NODE = "extract"
 MATCH_NODE = "match"
+EXAMINE_NODE = "examine"
 REVIEW_NODE = "review"
 COMMIT_NODE = "commit"
 END_EARLY_NODE = "end_early"
@@ -85,6 +91,7 @@ class RunState(TypedDict, total=False):
     next_document_index: int
     requirements_found: int
     proposed_rows: int
+    findings_raised: int
     ended_early_reason: str
     export_approved: bool
 
@@ -309,6 +316,49 @@ def build_register_graph(
         )
         return {"proposed_rows": len(proposed.proposed_row_ids)}
 
+    async def examine(state: RunState) -> dict[str, Any]:
+        run_id = UUID(state["run_id"])
+        project_id = UUID(state["project_id"])
+        async with pool.connection() as connection:
+            await enter_stage(connection, run_id, EXAMINE_STAGE)
+            rules = await frozen_rules_of_run(connection, run_id)
+            rows = await register_under_examination(connection, project_id, run_id)
+
+        try:
+            found = await examine_register(model_client, rules, rows)
+        except UnusableExamineAnswer:
+            raise  # it already names its own cause and fix
+        except Exception as error:
+            raise_if_configuration_failure(error)
+            # Examine judges the whole register in one call, so there is no
+            # single row to drop the way Extract drops one document.
+            raise ModelCallFailed(
+                "The register could not be examined against this run's rules "
+                f"({describe_unreadable_answer(error)}) — no finding was "
+                "recorded and nothing was exported. Start another run once the "
+                "model is answering."
+            ) from error
+
+        found += deliverable_findings(rows)
+        async with pool.connection() as connection:
+            await record_findings(connection, run_id, found)
+            await connection.execute(
+                "UPDATE runs SET examined_row_count = %s WHERE id = %s",
+                (len(rows), run_id),
+            )
+
+        _log(
+            logging.INFO,
+            "examine_finished",
+            f"Examine judged {len(rows)} register row(s) against "
+            f"{len(rules) + len(DELIVERABLE_CHECKS)} rule(s) and raised "
+            f"{len(found)} finding(s).",
+            run_id,
+            rules_that_ran=[rule["id"] for rule in rules]
+            + [check["id"] for check in DELIVERABLE_CHECKS],
+        )
+        return {"findings_raised": len(found)}
+
     async def review(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
         project_id = UUID(state["project_id"])
@@ -429,6 +479,7 @@ def build_register_graph(
     graph.add_node(INGEST_NODE, ingest)
     graph.add_node(EXTRACT_NODE, extract)
     graph.add_node(MATCH_NODE, match)
+    graph.add_node(EXAMINE_NODE, examine)
     graph.add_node(REVIEW_NODE, review)
     graph.add_node(COMMIT_NODE, commit)
     graph.add_node(END_EARLY_NODE, end_early)
@@ -448,8 +499,9 @@ def build_register_graph(
     graph.add_conditional_edges(
         MATCH_NODE,
         _route_after_match,
-        [REVIEW_NODE, END_EARLY_NODE],
+        [EXAMINE_NODE, END_EARLY_NODE],
     )
+    graph.add_edge(EXAMINE_NODE, REVIEW_NODE)
     graph.add_conditional_edges(
         REVIEW_NODE,
         _route_after_review,
@@ -472,7 +524,7 @@ def _route_after_extract(state: RunState) -> str:
 
 
 def _route_after_match(state: RunState) -> str:
-    return REVIEW_NODE if state.get("proposed_rows") else END_EARLY_NODE
+    return EXAMINE_NODE if state.get("proposed_rows") else END_EARLY_NODE
 
 
 def _route_after_review(state: RunState) -> str:

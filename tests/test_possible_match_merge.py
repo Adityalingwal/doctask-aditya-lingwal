@@ -12,12 +12,14 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_answer_existing_row,
     match_marker,
     match_marker_for_batch_with,
+    no_findings_answer,
     write_meeting_note,
 )
 
@@ -46,6 +48,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                 COMMITTED_ROW_NUMBER
             ),
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
             extract_marker(FIRST_FILE): extraction_answer(
                 FIRST_REQUIREMENT, first_quote
             ),

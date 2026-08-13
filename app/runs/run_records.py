@@ -19,7 +19,7 @@ async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] 
     result = await connection.execute(
         "SELECT id, project_id, status, current_stage, started_at, finished_at, "
         "skipped, ended_early_reason, failure_reason, export_json, "
-        "review_finished_at FROM runs WHERE id = %s",
+        "review_finished_at, examined_row_count FROM runs WHERE id = %s",
         (run_id,),
     )
     return await result.fetchone()

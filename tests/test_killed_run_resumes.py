@@ -12,10 +12,12 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_marker,
+    no_findings_answer,
     write_meeting_note,
 )
 
@@ -34,7 +36,10 @@ def test_killed_run_resumes_without_repeating_extraction(tmp_path: Path) -> None
     script_path = tmp_path / "script.json"
     call_log_path = tmp_path / "model-calls.jsonl"
 
-    answers = {match_marker(): match_answer(len(DOCUMENTS))}
+    answers = {
+        match_marker(): match_answer(len(DOCUMENTS)),
+        examine_marker(): no_findings_answer(),
+    }
     for source_file, requirement in DOCUMENTS.items():
         quote = write_meeting_note(source_folder, source_file, requirement)
         answers[extract_marker(source_file)] = extraction_answer(requirement, quote)
