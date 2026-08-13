@@ -1,96 +1,130 @@
 # doctask-aditya-lingwal
 
-## What this system does
+An agentic system that reads software requirements-to-delivery documents and
+builds a grounded **Requirements-to-Delivery Register**. Each row traces one
+client requirement through written scope and testing. Exact source evidence and
+a human approval gate prevent unsupported rows from being exported.
 
-An agentic system that reads documents from a software requirements-to-delivery
-workflow and produces a grounded **Requirements-to-Delivery Register**. Each
-row traces one client requirement through delivery and testing, with gaps,
-blockers, conflicting evidence, and rule findings surfaced for human review
-before anything commits.
+## Current working scope
 
-## Document formats accepted
+Slice 1 is implemented:
 
-The system is not yet implemented; this table declares the intended set rather
-than reporting working behaviour.
+`Markdown folder → Ingest → Extract → Match → Review → Commit → JSON/Markdown export`
 
-| Format | Declared set? | Notes |
-|---|---|---|
-| `.pdf` | Included | Text-based PDFs only. Scanned, encrypted, and image-based PDFs are skipped with reason. |
-| `.docx` | Included | Standard Word documents. |
-| `.md` | Included | Markdown files. |
-| `.txt` | Included | Plain text files. |
-| `.xlsx`, `.pptx`, `.eml`, images | Excluded | Skipped — `unsupported format`. |
+- PostgreSQL stores projects, runs, documents, register rows, citations,
+  review decisions, audit entries, and LangGraph checkpoints.
+- FastAPI exposes six machine-drivable endpoints.
+- A run returns immediately, continues in the app process, and is polled.
+- Review decisions are item-by-item; export is unavailable until approved.
+- Startup resumes a run killed mid-flight from its durable checkpoint.
+- Automated tests use a scripted model and no live API key.
 
-**PDF limitations:** Tables are extracted with structure preserved. Multi-column
-layouts are best-effort — some column ordering may be garbled.
-
-## Rules
-
-A filled-in `rules.yaml` ships with the repository so a fresh clone runs
-without supplying one. The evaluator can edit it or point the system at their
-own file. Adding or changing a rule is a config edit, not a code change.
-
-## Model access
-
-Runs require an OpenRouter API key in `.env`. No model or offline model runtime
-is bundled. Automated tests use a fake model and require no API key.
+No live hosted-model run has been completed yet. Current proof is for the
+orchestration, persistence, validation, review, and export paths using the
+scripted client.
 
 ## Domain
 
-**Software Requirements-to-Delivery** — the documents created after a client
-starts sharing software requirements, while a software provider clarifies,
-builds or configures and delivers the work, and while the client tests it and
+**Software Requirements-to-Delivery** — documents created after a client
+starts sharing software requirements, while a Software Provider clarifies,
+builds/configures and delivers the work, and while the client tests it and
 returns feedback or changes.
 
-Pre-sales demos, pricing, contracts, invoices, and payment records are outside
-this domain.
+Pre-sales demos, pricing, contracts, invoices, payments, deployment, project
+resourcing, and CRM work are outside this domain.
 
-## Limitations
+## Formats
 
-- **A rejected finding does not come back on its own, even if it later gets
-  stronger.** Once the Delivery Owner rejects a finding, it stays out of the
-  register for good — this is what makes "do not ask again" possible. The
-  common case is safe: new evidence that *resolves* the problem simply stops
-  the rule from breaking, so no finding is produced at all. Only the rarer
-  case — new evidence that makes an already-rejected finding truer — stays
-  silently suppressed in V1.
+| Format | Declared V1 set | Working now |
+|---|---:|---:|
+| `.md` | Yes | **Yes** |
+| `.pdf` | Yes | No — later formats slice |
+| `.docx` | Yes | No — later formats slice |
+| `.txt` | Yes | No — later formats slice |
+| `.xlsx`, `.pptx`, `.eml`, images | No | Skipped with reason |
 
-- **R3 cannot fire on time.** The rule "no requirement stays blocked beyond
-  `max_days`" turns on elapsed time, but a run only starts when a document
-  arrives. A blocker passing its threshold during a quiet spell raises
-  nothing until the next document lands — late, not lost.
+Only `.md` should be used for the current build. `config/formats.yaml` declares
+the intended set, while startup warns that the other readers do not exist yet.
 
-- **One run at a time per project.** A second run queues rather than
-  failing. A run parked at human review holds that place for as long as the
-  reviewer takes, so a queued run may wait a long time — it is waiting, not
-  stuck.
+## Run locally
 
-- **A process kill can repeat one model call.** If the process is killed
-  between a model call returning and its checkpoint being written, that one
-  document is read again on resume. No work is lost and nothing is duplicated
-  in the register — only that single call is repeated.
+Requirements: Docker with Docker Compose.
 
-- **Files arriving during human review wait for the next run.** They wait for
-  that review to finish and are then collected into the next batch; they are
-  not lost.
+```bash
+cp .env.example .env
+```
 
-- **Documents beyond the configured page limit are skipped**, with the
-  reason given, rather than being split up.
+Set a non-empty `POSTGRES_PASSWORD`. For a real run, also set
+`OPENROUTER_API_KEY`; the service can start without it, but `POST /runs` reports
+why runs are unavailable. Then start the app and database:
 
-- **A changed document is re-read in full**, rather than only its edited
-  part. Documents that have not changed are never re-read.
+```bash
+docker compose up --build
+```
 
-- **Reported run cost is an estimate.** It is the token count from the model's
-  response multiplied by a configured rate, not a bill.
+The API is at `http://localhost:8000`; `GET /health` returns
+`{"status":"healthy"}`. Startup creates the synthetic **Acme intake portal**
+project if it is missing. The generated API schema at `/docs` shows the six
+operations:
 
-## Run start
+- `POST /projects`
+- `POST /runs`
+- `GET /runs/{id}`
+- `POST /runs/{id}/decisions`
+- `POST /runs/{id}/finish-review`
+- `GET /runs/{id}/export?format=json|markdown`
 
-The system polls each project's folder every 10 seconds. When at least one file
-is new or changed, no run is active on that project, and the folder has been
-quiet for 30 seconds, a run starts by itself. Manual start through `POST /runs`
-remains available.
+The application currently reads project folders from inside the repository.
+The included demo folder is `sample-projects/intake-portal`.
 
-## Network exposure
+## Test
 
-The application listens on localhost only. To expose it, change the Compose
-port mapping (`127.0.0.1:8000:8000`) and set `APP_HOST`.
+```bash
+docker compose run --rm app pytest
+```
+
+Last verified before this documentation compaction: **51 passed**, real
+PostgreSQL, no live model key. Fresh-clone and image-only verification remain
+open release checks; this is a verified development-worktree command, not yet
+a fresh-machine claim.
+
+## Configuration
+
+| File | Purpose |
+|---|---|
+| `config/formats.yaml` | Declared extensions and document page limit |
+| `config/model.yaml` | OpenRouter model, endpoint, rates, attempts, timeout |
+| `config/rules.yaml` | User-editable R1–R4 rule set for the later Examine slice |
+
+Rules/findings are designed but not implemented. Editing `rules.yaml` therefore
+does not change current Slice-1 output yet.
+
+## Current limitations
+
+- Only Markdown ingestion works; PDF/DOCX/TXT readers are not built.
+- Document-type bucket validation is incomplete; only `unrelated` currently
+  changes control flow.
+- The durable per-project lock and waiting queue are built, but dedicated
+  concurrency tests are pending.
+- A kill after a model response but before its checkpoint can repeat that one
+  paid call; earlier completed calls and register rows do not duplicate.
+- A run waiting for Review holds the project lock; later files wait.
+- Findings/rules, watched-folder auto-start, MCP, React, focused incremental
+  updates, unchanged-row proof, and cost/timing reporting are later slices.
+- The audit schema cannot yet record finding-attachment events.
+- A rejected finding will not automatically return if later evidence makes it
+  stronger.
+- The development Compose file bind-mounts the worktree and currently publishes
+  port 8000 broadly. Loopback-only publication is locked but not implemented;
+  do not expose this unauthenticated V1 service to a shared network.
+
+## Project truth
+
+- [`DECISIONS.md`](DECISIONS.md) — compact current decisions and limitations.
+- [`PROGRESS.md`](PROGRESS.md) — current status, blockers, and next actions.
+- [`documentation/decision-history.md`](documentation/decision-history.md) —
+  detailed append-only decision history.
+- [`documentation/progress-history.md`](documentation/progress-history.md) —
+  completed progress narrative.
+- `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md`
+  — interpreted brief requirements, separate from our decisions.
