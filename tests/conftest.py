@@ -30,6 +30,7 @@ from app.model.scripted_client import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
+RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE = "RULES_CONFIG_PATH"
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres@db:5432/register"
 POSTGRES_MAINTENANCE_DATABASE = "postgres"
 TEST_DATABASE_PREFIX = "register_test_"
@@ -74,6 +75,7 @@ class ApplicationProcess:
     script_path: Path
     call_log_path: Path
     delay_seconds: float = 0.0
+    rules_config_path: Path | None = None
     port: int = field(default_factory=lambda: _free_port())
     _process: subprocess.Popen | None = None
 
@@ -82,6 +84,18 @@ class ApplicationProcess:
         return f"http://127.0.0.1:{self.port}"
 
     def start(self) -> None:
+        environment = {
+            **os.environ,
+            DATABASE_URL_ENVIRONMENT_VARIABLE: self.database_url,
+            "MODEL_CLIENT": "scripted",
+            "SCRIPTED_MODEL_SCRIPT": str(self.script_path),
+            "SCRIPTED_MODEL_CALL_LOG": str(self.call_log_path),
+            "SCRIPTED_MODEL_DELAY_SECONDS": str(self.delay_seconds),
+        }
+        if self.rules_config_path is not None:
+            environment[RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE] = str(
+                self.rules_config_path
+            )
         self._process = subprocess.Popen(
             [
                 "uvicorn",
@@ -92,14 +106,7 @@ class ApplicationProcess:
                 str(self.port),
             ],
             cwd=str(PROJECT_ROOT),
-            env={
-                **os.environ,
-                DATABASE_URL_ENVIRONMENT_VARIABLE: self.database_url,
-                "MODEL_CLIENT": "scripted",
-                "SCRIPTED_MODEL_SCRIPT": str(self.script_path),
-                "SCRIPTED_MODEL_CALL_LOG": str(self.call_log_path),
-                "SCRIPTED_MODEL_DELAY_SECONDS": str(self.delay_seconds),
-            },
+            env=environment,
         )
         self._wait_until_healthy()
 

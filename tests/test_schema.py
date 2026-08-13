@@ -27,6 +27,7 @@ DOMAIN_TABLES = {
     "citations",
     "decisions",
     "audit",
+    "findings",
 }
 EXPECTED_COLUMNS = {
     "projects": {"id", "name", "source_folder_path", "created_at"},
@@ -44,6 +45,9 @@ EXPECTED_COLUMNS = {
         "failure_reason",
         "export_json",
         "review_finished_at",
+        "rules_snapshot",
+        "rules_fingerprint",
+        "examined_row_count",
         "created_at",
     },
     "documents": {
@@ -96,10 +100,23 @@ EXPECTED_COLUMNS = {
         "id",
         "register_row_id",
         "cell_name",
+        "event_kind",
         "old_value",
         "new_value",
         "run_id",
         "source_document_id",
+        "created_at",
+    },
+    "findings": {
+        "id",
+        "run_id",
+        "register_row_id",
+        "rule_id",
+        "rule_text",
+        "issue",
+        "evidence",
+        "question",
+        "decision_key",
         "created_at",
     },
 }
@@ -494,6 +511,74 @@ def test_audit_change_requires_one_existing_run(
                     "source_document_id": document_id,
                 },
             )
+
+
+def _insert_audit_event(
+    connection: Connection,
+    register_row_id: UUID,
+    run_id: UUID,
+    event_kind: str,
+    cell_name: str | None,
+) -> None:
+    connection.execute(
+        text(
+            "INSERT INTO audit (id, register_row_id, cell_name, event_kind, "
+            "old_value, new_value, run_id, source_document_id) "
+            "VALUES (:id, :register_row_id, :cell_name, :event_kind, "
+            ":old_value, :new_value, :run_id, NULL)"
+        ),
+        {
+            "id": uuid4(),
+            "register_row_id": register_row_id,
+            "cell_name": cell_name,
+            "event_kind": event_kind,
+            "old_value": None,
+            "new_value": "R1 — the requirement is not written down anywhere.",
+            "run_id": run_id,
+        },
+    )
+
+
+def test_attachment_audit_event_refuses_to_name_a_changed_cell(
+    database_connection: Connection,
+) -> None:
+    project_id = _insert_project(database_connection)
+    run_id = _insert_run(database_connection, project_id)
+    register_row_id = _insert_register_row(database_connection, project_id, run_id)
+
+    _insert_audit_event(
+        database_connection, register_row_id, run_id, "attachment", None
+    )
+
+    # A finding attaches to a row, so there is no honest cell name to write.
+    with pytest.raises(IntegrityError):
+        with database_connection.begin_nested():
+            _insert_audit_event(
+                database_connection, register_row_id, run_id, "attachment", "status"
+            )
+
+
+def test_cell_change_audit_event_still_names_one_of_the_seven_cells(
+    database_connection: Connection,
+) -> None:
+    project_id = _insert_project(database_connection)
+    run_id = _insert_run(database_connection, project_id)
+    register_row_id = _insert_register_row(database_connection, project_id, run_id)
+
+    _insert_audit_event(
+        database_connection, register_row_id, run_id, "cell change", "status"
+    )
+
+    for refused_cell_name in (None, "findings"):
+        with pytest.raises(IntegrityError):
+            with database_connection.begin_nested():
+                _insert_audit_event(
+                    database_connection,
+                    register_row_id,
+                    run_id,
+                    "cell change",
+                    refused_cell_name,
+                )
 
 
 def test_run_refuses_status_outside_the_locked_set(
