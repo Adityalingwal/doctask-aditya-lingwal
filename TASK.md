@@ -15,10 +15,12 @@ Built for the SuperDocs Round 2 engineering task, Task 1.
 
 | File | What it holds |
 |---|---|
-| `DECISIONS.md` | Append-only decision history plus the current canonical spec. **Read this before writing code.** |
+| `DECISIONS.md` | Compact current canonical decisions, statuses, limitations, and open choices. **Read this before writing code.** |
+| `documentation/decision-history.md` | Append-only decision chronology, superseded wording, alternatives, and detailed rationale. Read the relevant entry when changing a decision. |
 | `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md` | What the brief requires, interpreted. Their asks, not our choices. |
 | `documentation/superdocs-engineering-task/SuperDocs-Task-Engineer.pdf` | The original brief. Wins over any interpretation. |
-| `PROGRESS.md` | What is built, what is assumed, what is blocked. |
+| `PROGRESS.md` | Current dashboard: built, pending, assumptions, blockers, next actions, and verification. |
+| `documentation/progress-history.md` | Completed dated progress narrative and resolved blockers. |
 
 If a decision looks wrong, stop and discuss it rather than silently choosing
 differently.
@@ -39,24 +41,29 @@ differently.
 
 ## Documentation maintenance
 
-- The `DECISIONS.md` **Decision Log is append-only**. Never delete or replace an
-  old row. Mark a changed row `SUPERSEDED <date> by <new decision>` and add the
-  replacement as a new dated row.
-- The detailed canonical sections in `DECISIONS.md` show only the latest truth.
-  Update them in place and remove conflicting old canonical sections; history
-  belongs in the Decision Log.
+- Root `DECISIONS.md` shows only current truth. Add or update the existing
+  D-family in compact bullets: decision, why, must preserve, evidence/status,
+  limitation/open point, and history link. Create a new family only for a new
+  subject. Keep detailed alternatives and provenance once in
+  `documentation/decision-history.md`; before replacing a decision, append its
+  old wording, reason, date, and replacement there. Never rewrite history.
 - Record a decision only if someone could reverse it without knowing why, a
   real alternative was rejected, or the founder might ask why it was done. Do
   not record what the code already shows, what had no alternative, or an
   obvious simplification — writing those up reads as padding.
-- In `PROGRESS.md`, rewrite current status and checklist state in place. Keep
-  assumptions and the dated log as history.
-- `README.md` and this file describe only the current system and current working
-  rules; they are not decision-history archives.
+- Keep `PROGRESS.md`'s dashboard structure and update entries in place. Each
+  active item states status, evidence, and next action briefly; completed dated
+  narrative and resolved blockers move to `documentation/progress-history.md`,
+  newest first.
+- `README.md` describes only verified current user-facing behaviour, setup,
+  commands, formats, and limitations; it is not a plan or history archive.
 - The original PDF brief is never superseded by our documents. If they conflict,
   the PDF wins.
-- After documentation changes, search for stale terminology and conflicting
-  locks, then run `git diff --check`.
+- Do not repeat one rationale across active files. After documentation changes,
+  run `wc -l -c DECISIONS.md PROGRESS.md README.md`; if growth is material,
+  remove duplication or move historical detail without deleting unique
+  information. Then search for stale/conflicting claims and run
+  `git diff --check`.
 
 ## Commands
 

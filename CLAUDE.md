@@ -11,9 +11,12 @@ every session.
    founder's original brief.
 2. `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md`
    — our interpretation of the brief.
-3. `DECISIONS.md` — current product decisions and superseded decision history.
-4. `PROGRESS.md` — current position, open work, assumptions, and blockers.
-5. `README.md` — the current user-facing description.
+3. `DECISIONS.md` — compact current product decisions and status labels.
+4. `PROGRESS.md` — current position, open work, assumptions, blockers, and proof.
+5. `documentation/decision-history.md` and
+   `documentation/progress-history.md` — relevant superseded or completed
+   context; do not load them end to end by default.
+6. `README.md` — the current user-facing description.
 
 Claude auto-memory is historical context, not project truth. If memory conflicts
 with the live repository, follow the source priority above, report the stale
@@ -23,7 +26,8 @@ memory, and correct it only after the live files are verified.
 
 - Before changing anything, inspect Git status plus staged and unstaged diffs.
 - Read the current-status section and relevant checklist in `PROGRESS.md`.
-- Read the relevant current section and related history in `DECISIONS.md`.
+- Read the relevant current section in `DECISIONS.md`; open only the matching
+  entry in `documentation/decision-history.md` when history affects the work.
 - Continue from the relevant open item; do not silently reopen or reinterpret a
   locked decision.
 - If the brief, current decisions, and requested work disagree, stop and ask
@@ -43,10 +47,12 @@ memory, and correct it only after the live files are verified.
 ## Keeping project knowledge current
 
 - Follow the documentation-maintenance rules imported from `TASK.md`.
-- When a decision changes, preserve the old Decision Log row as `SUPERSEDED`,
-  add the replacement row, and update the canonical section to current truth.
-- After a decision is locked or work completes, update `PROGRESS.md` current
-  status, checklist, and dated log without turning it into a second decision log.
+- When a decision changes, append the old wording, rationale, and supersession
+  link to `documentation/decision-history.md`, then update root
+  `DECISIONS.md` to current truth.
+- After work completes, update root `PROGRESS.md` and move completed dated
+  narrative to `documentation/progress-history.md`; do not turn either file
+  into a second decision log.
 - If a genuinely reusable repository working rule is discovered, discuss it
   with Aditya first. Once agreed, add or update it in `TASK.md`; do not promote a
   one-off correction or preference into a permanent rule.
