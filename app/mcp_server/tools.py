@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+from uuid import UUID
+
+from fastapi import FastAPI
+from mcp.server.fastmcp import FastMCP
+
+from app.projects.create_project import create_project
+from app.register.export_register import JSON_FORMAT
+from app.register.read_export import read_export
+from app.review.finish_review import finish_review
+from app.review.review_queue import APPROVED, REJECTED
+from app.review.submit_decision import submit_decision
+from app.runs.run_lifecycle import RunEngine, require_run_engine, start_run
+from app.runs.run_status import read_run_status
+
+
+MCP_SERVER_NAME = "requirements-delivery-register"
+MCP_PATH = "/mcp"
+MCP_INSTRUCTIONS = (
+    "Drive the Requirements-to-Delivery Register: create a project, start a "
+    "run, poll its status, answer each decision it raises, finish the review, "
+    "then read the export. A run is not one call — start_run returns a run id "
+    "and get_run_status is polled until the run reports it is done."
+)
+
+
+def build_mcp_server(application: FastAPI) -> FastMCP:
+    """The six endpoints as six tools over the same core functions they call.
+
+    The tools close over the running application, so they share its connection
+    pool and its run engine instead of holding a second copy of either.
+    """
+    server = FastMCP(
+        MCP_SERVER_NAME,
+        instructions=MCP_INSTRUCTIONS,
+        stateless_http=True,
+        streamable_http_path="/",
+    )
+
+    @server.tool(name="create_project")
+    async def create_project_tool(name: str, source_folder_path: str) -> dict[str, str]:
+        """Create one project reading a source folder, and return its id."""
+        async with application.state.pool.connection() as connection:
+            project_id = await create_project(
+                connection,
+                name,
+                source_folder_path,
+                application.state.project_root,
+            )
+        return {"project_id": str(project_id)}
+
+    @server.tool(name="start_run")
+    async def start_run_tool(project_id: UUID) -> dict[str, str]:
+        """Start or queue one run of a project, and return its id at once."""
+        return await start_run(_run_engine(application), project_id)
+
+    @server.tool(name="get_run_status")
+    async def get_run_status_tool(run_id: UUID) -> dict[str, Any]:
+        """Read one run's durable status, stage, skips, decisions and findings."""
+        async with application.state.pool.connection() as connection:
+            return await read_run_status(connection, run_id)
+
+    @server.tool(name="submit_decision")
+    async def submit_decision_tool(
+        run_id: UUID,
+        decision_id: UUID,
+        outcome: Literal[APPROVED, REJECTED],
+    ) -> dict[str, str]:
+        """Answer one decision this run raised, approving or rejecting it."""
+        async with application.state.pool.connection() as connection:
+            return await submit_decision(connection, run_id, decision_id, outcome)
+
+    @server.tool(name="finish_review")
+    async def finish_review_tool(run_id: UUID) -> dict[str, str]:
+        """Finish one run's review once every decision it raised is answered."""
+        return await finish_review(_run_engine(application), run_id)
+
+    @server.tool(name="get_export")
+    async def get_export_tool(
+        run_id: UUID,
+        export_format: str = JSON_FORMAT,
+    ) -> Any:
+        """Read the register one run exported, as json or as markdown."""
+        async with application.state.pool.connection() as connection:
+            return await read_export(connection, run_id, export_format)
+
+    return server
+
+
+def _run_engine(application: FastAPI) -> RunEngine:
+    return require_run_engine(
+        application.state.run_engine,
+        application.state.run_engine_unavailable,
+    )
