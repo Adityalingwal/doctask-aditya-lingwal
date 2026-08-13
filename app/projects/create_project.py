@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection
 
+from app.refusal import UnusableRequest
 from app.run_logging import log_run_event
 
 
@@ -13,7 +14,7 @@ DEMO_PROJECT_NAME = "Acme intake portal"
 DEMO_PROJECT_FOLDER = "sample-projects/intake-portal"
 
 
-class SourceFolderMissing(Exception):
+class SourceFolderMissing(UnusableRequest):
     """Raised when a project is asked to watch a folder that is not there."""
 
 

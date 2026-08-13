@@ -13,8 +13,9 @@ from psycopg import AsyncConnection
 from psycopg.errors import UniqueViolation
 from psycopg_pool import AsyncConnectionPool
 
+from app.refusal import RunsUnavailable, UnknownId
 from app.run_logging import log_run_event
-from app.runs.run_records import record_run_failure
+from app.runs.run_records import read_project, record_run_failure
 from app.runs.statuses import RUNNING, WAITING
 
 
@@ -29,6 +30,28 @@ class RunEngine:
     pool: AsyncConnectionPool
     checkpointer: AsyncPostgresSaver
     background_runs: set[asyncio.Task] = field(default_factory=set)
+
+
+def require_run_engine(
+    engine: RunEngine | None,
+    unavailable_reason: str | None,
+) -> RunEngine:
+    """The engine a run needs, or the reason no run can start yet."""
+    if engine is None:
+        raise RunsUnavailable(unavailable_reason)
+    return engine
+
+
+async def start_run(engine: RunEngine, project_id: UUID) -> dict[str, str]:
+    """Start or queue one run against a project that exists, and say which."""
+    async with engine.pool.connection() as connection:
+        if await read_project(connection, project_id) is None:
+            raise UnknownId(
+                f"no project has id {project_id} — create one with POST "
+                "/projects and start the run against the id it returns."
+            )
+    started = await start_or_queue_run(engine, project_id)
+    return {"run_id": str(started["run_id"]), "status": started["status"]}
 
 
 async def start_or_queue_run(engine: RunEngine, project_id: UUID) -> dict[str, Any]:

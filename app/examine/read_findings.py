@@ -26,6 +26,83 @@ _SELECT_FINDINGS = (
 _ORDER_FINDINGS = " ORDER BY reported_row.row_number, findings.rule_id"
 
 
+async def examine_under_review(
+    connection: AsyncConnection,
+    run: dict[str, Any],
+) -> dict[str, Any] | None:
+    """What Examine judged and found, or nothing while it has not run yet."""
+    if run["examined_row_count"] is None:
+        return None
+    findings = await findings_of_run(connection, run["id"])
+    return await _examine_summary(
+        connection,
+        run["id"],
+        run["examined_row_count"],
+        [_finding_under_review(finding) for finding in findings],
+    )
+
+
+async def examine_as_exported(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> dict[str, Any]:
+    """The rules that ran, how much they ran against, and what they found.
+
+    An empty findings list is the honest result D10 asks for, and it is only
+    honest because the rules and the row count sit beside it.
+    """
+    examined = await connection.execute(
+        "SELECT examined_row_count FROM runs WHERE id = %s",
+        (run_id,),
+    )
+    findings = await findings_of_run(connection, run_id, approved_only=True)
+    return await _examine_summary(
+        connection,
+        run_id,
+        (await examined.fetchone())["examined_row_count"],
+        [exported_finding(finding) for finding in findings],
+    )
+
+
+def exported_finding(finding: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "row_number": finding["row_number"],
+        "rule_id": finding["rule_id"],
+        "rule_text": finding["rule_text"],
+        "issue": finding["issue"],
+        "evidence": finding["evidence"],
+        "question": finding["question"],
+    }
+
+
+async def _examine_summary(
+    connection: AsyncConnection,
+    run_id: UUID,
+    rows_examined: int | None,
+    findings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "rules": await rules_that_ran(connection, run_id),
+        "rows_examined": rows_examined,
+        "findings": findings,
+    }
+
+
+def _finding_under_review(finding: dict[str, Any]) -> dict[str, Any]:
+    """A finding as the person answering its gate is shown it."""
+    return {
+        "finding_id": str(finding["finding_id"]),
+        "decision_id": str(finding["decision_id"]),
+        "row_number": finding["row_number"],
+        "rule_id": finding["rule_id"],
+        "rule_text": finding["rule_text"],
+        "issue": finding["issue"],
+        "evidence": finding["evidence"],
+        "question": finding["question"],
+        "outcome": finding["outcome"],
+    }
+
+
 async def findings_of_run(
     connection: AsyncConnection,
     run_id: UUID,

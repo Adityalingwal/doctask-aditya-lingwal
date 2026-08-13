@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
-from app.api.routes import router
+from app.api.routes import add_refusal_responses, router
 from app.database import build_connection_pool
 from app.graph.register_graph import build_register_graph
 from app.ingest.read_source_document import READER_EXTENSIONS
@@ -128,6 +128,7 @@ def _build_run_engine(
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
+add_refusal_responses(app)
 
 
 @app.get("/health")

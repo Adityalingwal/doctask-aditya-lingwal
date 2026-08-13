@@ -1,38 +1,34 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
-from fastapi.responses import PlainTextResponse
-from psycopg import AsyncConnection
+from fastapi import APIRouter, FastAPI, Query, Request, status
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from app.examine.read_findings import findings_of_run, rules_that_ran
-from app.projects.create_project import SourceFolderMissing, create_project
-from app.register.export_register import (
-    EXPORT_FORMATS,
-    JSON_FORMAT,
-    MARKDOWN_FORMAT,
-    export_as_markdown,
-)
-from app.review.review_queue import (
-    APPROVED,
-    REJECTED,
-    answer_decision,
-    decisions_of_run,
-    unanswered_decisions,
-)
-from app.runs.run_lifecycle import (
-    RunEngine,
-    resume_after_review,
-    start_or_queue_run,
-)
-from app.runs.run_records import claim_review_finished, read_project, read_run
-from app.runs.statuses import WAITING_FOR_REVIEW
+from app.projects.create_project import create_project
+from app.refusal import NotPossibleNow, RunsUnavailable, UnknownId, UnusableRequest
+from app.register.export_register import JSON_FORMAT, MARKDOWN_FORMAT
+from app.register.read_export import read_export
+from app.review.finish_review import finish_review
+from app.review.review_queue import APPROVED, REJECTED
+from app.review.submit_decision import submit_decision
+from app.runs.run_lifecycle import RunEngine, require_run_engine, start_run
+from app.runs.run_status import read_run_status
 
 
 router = APIRouter()
+
+# The one place a core refusal becomes an HTTP status code; the message it
+# carries is never rewritten here.
+REFUSAL_STATUS_CODES = (
+    (UnusableRequest, status.HTTP_400_BAD_REQUEST),
+    (UnknownId, status.HTTP_404_NOT_FOUND),
+    (NotPossibleNow, status.HTTP_409_CONFLICT),
+    (RunsUnavailable, status.HTTP_503_SERVICE_UNAVAILABLE),
+)
 
 
 class CreateProject(BaseModel):
@@ -49,245 +45,82 @@ class SubmitDecision(BaseModel):
     outcome: Literal[APPROVED, REJECTED]
 
 
+def add_refusal_responses(application: FastAPI) -> None:
+    """Answer each kind of core refusal with the status code that matches it."""
+    for refused_kind, status_code in REFUSAL_STATUS_CODES:
+        application.add_exception_handler(refused_kind, _refusal_response(status_code))
+
+
 @router.post("/projects", status_code=status.HTTP_201_CREATED)
 async def create_one_project(
     request: Request,
     payload: CreateProject,
 ) -> dict[str, str]:
-    pool = request.app.state.pool
-    async with pool.connection() as connection:
-        try:
-            project_id = await create_project(
-                connection,
-                payload.name,
-                payload.source_folder_path,
-                request.app.state.project_root,
-            )
-        except SourceFolderMissing as missing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(missing),
-            ) from missing
+    async with request.app.state.pool.connection() as connection:
+        project_id = await create_project(
+            connection,
+            payload.name,
+            payload.source_folder_path,
+            request.app.state.project_root,
+        )
     return {"project_id": str(project_id)}
 
 
 @router.post("/runs", status_code=status.HTTP_202_ACCEPTED)
-async def start_run(request: Request, payload: StartRun) -> dict[str, str]:
-    engine = _run_engine(request)
-    async with engine.pool.connection() as connection:
-        if await read_project(connection, payload.project_id) is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=(
-                    f"no project has id {payload.project_id} — create one with "
-                    "POST /projects and start the run against the id it returns."
-                ),
-            )
-    started = await start_or_queue_run(engine, payload.project_id)
-    return {"run_id": str(started["run_id"]), "status": started["status"]}
+async def start_one_run(request: Request, payload: StartRun) -> dict[str, str]:
+    return await start_run(_run_engine(request), payload.project_id)
 
 
 @router.get("/runs/{run_id}")
-async def read_run_status(request: Request, run_id: UUID) -> dict[str, Any]:
-    pool = request.app.state.pool
-    async with pool.connection() as connection:
-        run = await _run_or_404(connection, run_id)
-        decisions = await decisions_of_run(connection, run_id)
-        examine = await _what_examine_ran(connection, run)
-    return {
-        "run_id": str(run_id),
-        "project_id": str(run["project_id"]),
-        "status": run["status"],
-        "stage": run["current_stage"],
-        "skipped": run["skipped"],
-        "ended_early_reason": run["ended_early_reason"],
-        "failure_reason": run["failure_reason"],
-        "decisions": [
-            {
-                "decision_id": str(decision["id"]),
-                "kind": decision["kind"],
-                "question": decision["question"],
-                "outcome": decision["outcome"],
-            }
-            for decision in decisions
-        ],
-        "examine": examine,
-        "exported": run["export_json"] is not None,
-    }
+async def read_one_run(request: Request, run_id: UUID) -> dict[str, Any]:
+    async with request.app.state.pool.connection() as connection:
+        return await read_run_status(connection, run_id)
 
 
 @router.post("/runs/{run_id}/decisions")
-async def submit_decision(
+async def submit_one_decision(
     request: Request,
     run_id: UUID,
     payload: SubmitDecision,
 ) -> dict[str, str]:
-    pool = request.app.state.pool
-    async with pool.connection() as connection:
-        run = await _run_or_404(connection, run_id)
-        if run["status"] != WAITING_FOR_REVIEW:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"this run is '{run['status']}', not at review, so no "
-                    "decision can be recorded against it — poll GET "
-                    f"/runs/{run_id} until it is '{WAITING_FOR_REVIEW}'."
-                ),
-            )
-        if run["review_finished_at"] is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"this run's review has already finished, so no decision "
-                    f"can be recorded against it — poll GET /runs/{run_id} for "
-                    "what it did next."
-                ),
-            )
-        answered = await answer_decision(
+    async with request.app.state.pool.connection() as connection:
+        return await submit_decision(
             connection,
             run_id,
             payload.decision_id,
             payload.outcome,
         )
-    if not answered:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                f"this run has no decision with id {payload.decision_id} — read "
-                f"GET /runs/{run_id} for the decisions it is actually waiting on."
-            ),
-        )
-    return {"decision_id": str(payload.decision_id), "outcome": payload.outcome}
 
 
 @router.post("/runs/{run_id}/finish-review")
-async def finish_review(request: Request, run_id: UUID) -> dict[str, str]:
-    engine = _run_engine(request)
-    async with engine.pool.connection() as connection:
-        run = await _run_or_404(connection, run_id)
-        if run["status"] != WAITING_FOR_REVIEW:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"this run is '{run['status']}', not at review, so there is "
-                    "no review to finish."
-                ),
-            )
-        outstanding = await unanswered_decisions(connection, run_id)
-        if outstanding:
-            # Finishing with an unanswered gate would claim the review completed
-            # while an approved output may not exist.
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"review cannot finish while {len(outstanding)} decision(s) "
-                    "are unanswered: "
-                    + "; ".join(
-                        f"{decision['id']} — {decision['question']}"
-                        for decision in outstanding
-                    )
-                    + f". Answer each with POST /runs/{run_id}/decisions, then "
-                    "finish the review again."
-                ),
-            )
-        # The run leaves review here, before anything is launched: a 200 that
-        # nothing in the database records would be a false success.
-        claimed = await claim_review_finished(connection, run_id)
-
-    if claimed is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "this run's review was finished by another call a moment ago, "
-                f"so this one changed nothing — poll GET /runs/{run_id} for "
-                "what that run does next."
-            ),
-        )
-
-    resume_after_review(engine, run_id, claimed["project_id"])
-    return {"run_id": str(run_id), "status": "review finished"}
+async def finish_one_review(request: Request, run_id: UUID) -> dict[str, str]:
+    return await finish_review(_run_engine(request), run_id)
 
 
 @router.get("/runs/{run_id}/export")
-async def read_export(
+async def read_one_export(
     request: Request,
     run_id: UUID,
     export_format: str = Query(JSON_FORMAT, alias="format"),
 ) -> Any:
-    if export_format not in EXPORT_FORMATS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"'{export_format}' is not an export format — ask for "
-                f"{' or '.join(EXPORT_FORMATS)}."
-            ),
-        )
-    pool = request.app.state.pool
-    async with pool.connection() as connection:
-        run = await _run_or_404(connection, run_id)
-    if run["export_json"] is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "this run has exported nothing — the register is exported only "
-                "after the Delivery Owner approves the export decision and "
-                f"POST /runs/{run_id}/finish-review commits the run."
-            ),
-        )
+    async with request.app.state.pool.connection() as connection:
+        exported = await read_export(connection, run_id, export_format)
     if export_format == MARKDOWN_FORMAT:
-        return PlainTextResponse(export_as_markdown(run["export_json"]))
-    return run["export_json"]
+        return PlainTextResponse(exported)
+    return exported
 
 
-async def _what_examine_ran(
-    connection: AsyncConnection,
-    run: dict[str, Any],
-) -> dict[str, Any] | None:
-    """What Examine judged and found, or nothing while it has not run yet."""
-    if run["examined_row_count"] is None:
-        return None
-    findings = await findings_of_run(connection, run["id"])
-    return {
-        "rules": await rules_that_ran(connection, run["id"]),
-        "rows_examined": run["examined_row_count"],
-        "findings": [
-            {
-                "finding_id": str(finding["finding_id"]),
-                "decision_id": str(finding["decision_id"]),
-                "row_number": finding["row_number"],
-                "rule_id": finding["rule_id"],
-                "rule_text": finding["rule_text"],
-                "issue": finding["issue"],
-                "evidence": finding["evidence"],
-                "question": finding["question"],
-                "outcome": finding["outcome"],
-            }
-            for finding in findings
-        ],
-    }
+def _refusal_response(
+    status_code: int,
+) -> Callable[[Request, Exception], Awaitable[JSONResponse]]:
+    async def refused(_: Request, refusal: Exception) -> JSONResponse:
+        return JSONResponse(status_code=status_code, content={"detail": str(refusal)})
+
+    return refused
 
 
 def _run_engine(request: Request) -> RunEngine:
-    engine = request.app.state.run_engine
-    if engine is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=request.app.state.run_engine_unavailable,
-        )
-    return engine
-
-
-async def _run_or_404(
-    connection: AsyncConnection,
-    run_id: UUID,
-) -> dict[str, Any]:
-    run = await read_run(connection, run_id)
-    if run is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                f"no run has id {run_id} — start one with POST /runs and poll "
-                "the id it returns."
-            ),
-        )
-    return run
+    return require_run_engine(
+        request.app.state.run_engine,
+        request.app.state.run_engine_unavailable,
+    )
