@@ -21,6 +21,7 @@ from app.extract.answer import (
     UnrecognisedDocumentType,
     describe_unreadable_answer,
 )
+from app.examine.frozen_rules import freeze_rules_for_run
 from app.extract.read_document import locate_extraction, read_one_document
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import (
@@ -95,14 +96,18 @@ def build_register_graph(
     project_root: Path,
     accepted_extensions: frozenset[str],
     page_limit: int,
+    rules_config_path: Path,
 ) -> CompiledStateGraph:
-    """Wire the five slice 1b stages, with everything they need passed in."""
+    """Wire the six pipeline stages, with everything they need passed in."""
 
     async def ingest(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
         project_id = UUID(state["project_id"])
         async with pool.connection() as connection:
             await enter_stage(connection, run_id, INGEST_STAGE)
+            # Frozen before a single document is read, so that everything
+            # downstream judges this run against these rules, not the file.
+            await freeze_rules_for_run(connection, run_id, rules_config_path)
             project = await read_project(connection, project_id)
             source_folder = _resolve_folder(project_root, project)
             if not source_folder.is_dir():

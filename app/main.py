@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -30,6 +30,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
 FORMATS_CONFIG_PATH = PROJECT_ROOT / "config" / "formats.yaml"
 MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
+RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE = "RULES_CONFIG_PATH"
+DEFAULT_RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
 
 
 def database_url_from_environment() -> str:
@@ -65,6 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         checkpointer,
         frozenset(formats.accepted_extensions),
         formats.page_limit,
+        _rules_config_path(os.environ),
     )
 
     async with pool.connection() as connection:
@@ -82,11 +85,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await pool.close()
 
 
+def _rules_config_path(environment: Mapping[str, str]) -> Path:
+    named = environment.get(RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE)
+    return Path(named) if named else DEFAULT_RULES_CONFIG_PATH
+
+
 def _build_run_engine(
     pool: AsyncConnectionPool,
     checkpointer: AsyncPostgresSaver,
     accepted_extensions: frozenset[str],
     page_limit: int,
+    rules_config_path: Path,
 ) -> tuple[RunEngine | None, str | None]:
     """Build the one model client and the graph that is handed it.
 
@@ -112,6 +121,7 @@ def _build_run_engine(
         PROJECT_ROOT,
         accepted_extensions,
         page_limit,
+        rules_config_path,
     )
     return RunEngine(graph=graph, pool=pool, checkpointer=checkpointer), None
 
