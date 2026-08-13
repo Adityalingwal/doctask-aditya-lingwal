@@ -77,13 +77,17 @@ operations:
 The application currently reads project folders from inside the repository.
 The included demo folder is `sample-projects/intake-portal`.
 
+The application listens on `127.0.0.1` only by default; to expose it beyond
+this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
+`docker-compose.yml`.
+
 ## Test
 
 ```bash
 docker compose run --rm app pytest
 ```
 
-Last verified before this documentation compaction: **51 passed**, real
+Last verified on the `bind-and-review-replay` branch: **55 passed**, real
 PostgreSQL, no live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
@@ -114,9 +118,9 @@ does not change current Slice-1 output yet.
 - The audit schema cannot yet record finding-attachment events.
 - A rejected finding will not automatically return if later evidence makes it
   stronger.
-- The development Compose file bind-mounts the worktree and currently publishes
-  port 8000 broadly. Loopback-only publication is locked but not implemented;
-  do not expose this unauthenticated V1 service to a shared network.
+- The development Compose file bind-mounts the worktree, which exposes local
+  `.env` and lets local files override the image; this is retained for
+  iteration and is not yet removed for final image-only verification.
 
 ## Project truth
 

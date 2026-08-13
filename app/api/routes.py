@@ -131,6 +131,15 @@ async def submit_decision(
                     f"/runs/{run_id} until it is '{WAITING_FOR_REVIEW}'."
                 ),
             )
+        if run["review_finished_at"] is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"this run's review has already finished, so no decision "
+                    f"can be recorded against it — poll GET /runs/{run_id} for "
+                    "what it did next."
+                ),
+            )
         answered = await answer_decision(
             connection,
             run_id,

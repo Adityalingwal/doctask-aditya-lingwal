@@ -9,7 +9,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 ## Snapshot — 2026-08-13
 
 - Slice 1 (1a + 1b + eight review fixes) is merged into `main`.
-- 51 tests pass without a live API key.
+- 55 tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md` Ingest → Extract → Match → Review → Commit.
 - Implemented interface: six FastAPI endpoints, startup demo-project seed,
@@ -44,6 +44,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] Already-read correction for failed, unrelated, and no-requirement docs.
 - [x] Ingest/Match node re-entry idempotency and merged-proposal marker.
 - [x] Real child-process kill/startup-resume proof.
+- [x] `review_finished_at` replay guard and loopback-only network bind.
 
 ## In progress / next slices
 
@@ -53,7 +54,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 | 2 | Rules and findings | Examine, findings table, config snapshot/fingerprint, R1–R4/D1–D2 | Waiting on audit-schema blocker |
 | 3 | MCP | Six thin in-process tools over shared core functions | Designed |
 | 4 | Incremental proof | Watched folder, focused proposals, byte-identical unchanged-row proof | Designed |
-| 5 | Reliability proof | Two-project concurrency, same-project queue, injection test, review replay guard | Partly built |
+| 5 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
 | 6 | React | One-page five-section review surface | Designed |
 | 7 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
 
@@ -92,8 +93,6 @@ working claim only after its own implementation and proof land.
 - A rejected finding stays suppressed if later evidence strengthens it.
 - Files arriving during Review wait; that run holds the project lock.
 - No watcher, rules/findings, MCP, React, cost/timing, or unchanged-row proof yet.
-- `review_finished_at` replay protection and loopback-only bind are locked but
-  not implemented.
 - Fresh-clone and image-only verification remain open.
 
 ## Next three actions
@@ -109,7 +108,7 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-13 pre-compaction baseline | 51 passed, no live key |
+| `docker compose run --rm app pytest` | 2026-08-13, `bind-and-review-replay` branch | 55 passed, no live key |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
 | API flow | Slice 1 | One run driven by hand through review/export |
 | Live model | Never | Unverified |

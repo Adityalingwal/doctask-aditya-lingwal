@@ -33,6 +33,7 @@ from app.runs.run_records import (
     append_skipped,
     enter_stage,
     read_project,
+    read_run,
     set_run_status,
 )
 from app.runs.statuses import (
@@ -275,25 +276,35 @@ def build_register_graph(
         run_id = UUID(state["run_id"])
         project_id = UUID(state["project_id"])
         async with pool.connection() as connection:
-            project = await read_project(connection, project_id)
-            await ensure_export_decision(
-                connection,
-                run_id,
-                f"Export the Requirements-to-Delivery Register for "
-                f"{project['name']}, with {state['proposed_rows']} row(s) "
-                "proposed by this run?",
-            )
-            await enter_stage(connection, run_id, REVIEW_STAGE)
-            await set_run_status(connection, run_id, WAITING_FOR_REVIEW)
+            run = await read_run(connection, run_id)
 
-        _log(
-            logging.INFO,
-            "review_waiting",
-            "Review is waiting for the Delivery Owner; nothing commits or "
-            "exports until every gated decision is answered.",
-            run_id,
-        )
-        interrupt({"run_id": state["run_id"], "stage": REVIEW_STAGE})
+        # LangGraph replays an interrupted node from its start on every
+        # resume, so this node cannot otherwise tell a first entry from a
+        # post-review replay. review_finished_at is the durable fact that
+        # tells them apart: once it is set, raising the export decision,
+        # entering the stage, reporting 'waiting for review', and the
+        # interrupt itself must not happen again.
+        if run["review_finished_at"] is None:
+            async with pool.connection() as connection:
+                project = await read_project(connection, project_id)
+                await ensure_export_decision(
+                    connection,
+                    run_id,
+                    f"Export the Requirements-to-Delivery Register for "
+                    f"{project['name']}, with {state['proposed_rows']} row(s) "
+                    "proposed by this run?",
+                )
+                await enter_stage(connection, run_id, REVIEW_STAGE)
+                await set_run_status(connection, run_id, WAITING_FOR_REVIEW)
+
+            _log(
+                logging.INFO,
+                "review_waiting",
+                "Review is waiting for the Delivery Owner; nothing commits or "
+                "exports until every gated decision is answered.",
+                run_id,
+            )
+            interrupt({"run_id": state["run_id"], "stage": REVIEW_STAGE})
 
         async with pool.connection() as connection:
             await set_run_status(connection, run_id, RUNNING)

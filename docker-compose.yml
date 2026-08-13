@@ -20,11 +20,16 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://postgres@db:5432/register
       PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Inside the container the app must bind every interface or the
+      # published port below is unreachable; that port is itself
+      # loopback-qualified, so the application is still not reachable from
+      # another machine on the network.
+      APP_HOST: 0.0.0.0
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test:
         - CMD
