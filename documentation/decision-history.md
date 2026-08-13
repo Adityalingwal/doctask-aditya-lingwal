@@ -3073,3 +3073,41 @@ binding or exposure.
 
 **Evidence:** reasoning-stage. The bind change is a later-slice build item;
 nothing in the code reads `APP_HOST` yet.
+
+---
+
+## Audit event kinds — superseding the cell-only audit row (2026-08-13)
+
+**Superseded wording**, from root `DECISIONS.md` under D06 until this date:
+
+> **Known blocker:** Current `audit.cell_name NOT NULL` plus its seven-cell
+> check cannot store attachment events. Fix schema before findings attach.
+
+**Replaced by:** D06's implemented shape — `audit.event_kind` holding
+`cell change` or `attachment`, with `cell_name` nullable and the seven-cell
+check applying only to a cell change.
+
+**Reason:** a finding attaches to a **row**, not a cell, so no cell name it
+could carry would be true. Writing one of the seven anyway would make the audit
+trail claim a cell changed when nothing about that cell did, which is exactly
+the kind of quiet false statement the audit exists to prevent.
+
+**Alternative rejected:** a separate `attachments` table with its own history.
+It splits one question — "what happened to this row, and when?" — across two
+tables, so every honest answer becomes a union of both. The audit trail is
+small and one column carries the distinction.
+
+**Alternative rejected:** a PostgreSQL `ENUM` type for `event_kind`. The
+repository already expresses closed sets as a text column plus a
+`CheckConstraint` (`RUN_STATUS_CHECK`, `REGISTER_CELL_CHECK`); an `ENUM` would
+be a second pattern for the same job and is harder to extend in a migration.
+
+**Trade-off:** the downgrade of migration `20260813_0005` deletes attachment
+rows, because the older shape genuinely cannot represent an event that names no
+cell. Losing them on a downgrade is stated in the migration rather than hidden
+by backfilling a cell name that was never true.
+
+**Evidence:** `tests/test_schema.py` —
+`test_attachment_audit_event_refuses_to_name_a_changed_cell`,
+`test_cell_change_audit_event_still_names_one_of_the_seven_cells`, and
+`test_this_slice_downgrades_and_upgrades_again_with_attachments_written`.

@@ -6,22 +6,24 @@ exact pre-compaction source is
 [`documentation/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
-## Snapshot — 2026-08-13
+## Snapshot — 2026-08-14
 
-- Slice 1 (1a + 1b + eight review fixes) is merged into `main`.
-- The formats and types slice is built on `formats-and-types`, not yet merged.
-- 62 tests pass without a live API key.
+- Slice 1 and the formats and types slice are merged into `main`.
+- The rules and findings slice is built on `rules-and-findings`, not yet merged.
+- 93 tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
-  Match → Review → Commit.
+  Match → Examine → Review → Commit.
 - Implemented interface: six FastAPI endpoints, startup demo-project seed,
-  review queue, JSON/Markdown export.
+  review queue including finding gates, JSON/Markdown export.
 - Verified reliability: real-process `SIGKILL` resume, no repeated completed
   extraction, Ingest/Match re-entry safety, honest terminal statuses.
 - Durable per-project lock and one waiting-run queue are built; dedicated
   concurrency proof is pending.
 - Both synthetic corpora are written: four intake-portal documents and the six
   Northside Dental documents in `.md`, `.docx` and `.pdf`.
+- Rules are frozen per run, findings are gated one by one, and an approved
+  finding attaches to its row without moving that row's fingerprint.
 
 ## Completed
 
@@ -48,6 +50,20 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] Real child-process kill/startup-resume proof.
 - [x] `review_finished_at` replay guard and loopback-only network bind.
 
+### Rules and findings slice (branch `rules-and-findings`)
+
+- [x] `audit.event_kind`, nullable `cell_name`, and the conditional cell check.
+- [x] `findings` table, plus `rules_snapshot`, `rules_fingerprint` and
+      `examined_row_count` on `runs`.
+- [x] Rules parsed and frozen at the run's first stage; an unusable file fails
+      the run at the boundary and is never read as "no rules".
+- [x] Examine between Match and Review: one model call for the whole register,
+      safe to re-enter after a crash.
+- [x] D1 and D2 computed in code; R1–R4 judged by the model.
+- [x] Findings gated through the existing review queue; a rejected one stays in
+      the run record and never reaches the export.
+- [x] Attachment audit event naming no cell, and findings in both exports.
+
 ### Formats and types slice (branch `formats-and-types`)
 
 - [x] PDF, DOCX and plain-text readers behind one format dispatch.
@@ -64,24 +80,19 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 | Order | Slice | Scope | Current state |
 |---|---|---|---|
-| 1 | Formats and types | PDF/DOCX/TXT readers, page limit, bucket enforcement, second corpus files | Built on `formats-and-types`; awaiting review and merge |
-| 2 | Rules and findings | Examine, findings table, config snapshot/fingerprint, R1–R4/D1–D2 | Waiting on audit-schema blocker |
-| 3 | MCP | Six thin in-process tools over shared core functions | Designed |
-| 4 | Incremental proof | Watched folder, focused proposals, byte-identical unchanged-row proof | Designed |
-| 5 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
-| 6 | React | One-page five-section review surface | Designed |
-| 7 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
+| 1 | Rules and findings | Examine, findings table, frozen rules snapshot/fingerprint, R1–R4/D1–D2 | Built on `rules-and-findings`; awaiting review and merge |
+| 2 | MCP | Six thin in-process tools over shared core functions | Designed |
+| 3 | Incremental proof | Watched folder, focused proposals, byte-identical unchanged-row proof | Designed |
+| 4 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
+| 5 | React | One-page five-section review surface | Designed |
+| 6 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
 
 ## Active blockers
 
-1. **Audit cannot store attachment events.** `audit.cell_name` is `NOT NULL`
-   and constrained to seven register cells, while the contract requires events
-   such as a finding attached to a row. Resolve in the rules/findings slice
-   before attachments are written.
-2. **Development Compose mount is too broad for final proof.** `.:/workspace`
+1. **Development Compose mount is too broad for final proof.** `.:/workspace`
    is intentionally retained for iteration, exposes local `.env`, and lets
    local files override the image. Remove/narrow it and wipe stale dev DB
    before final image-only/fresh-clone verification.
@@ -113,15 +124,19 @@ working claim only after its own implementation and proof land.
   it again. A related additional document that lists none is unaffected.
 - One Extract call may repeat in the answer-to-checkpoint kill window.
 - A rejected finding stays suppressed if later evidence strengthens it.
+- A finding already approved onto a row is not re-examined by a later run; a
+  rules change is applied the next time a run examines that register.
+- D1 and D2 cannot fire on the register slice 1 produces: every proposed row is
+  written with a `what_was_asked` citation and no stage yet sets a row to
+  `Done`. Both were driven against seeded rows instead.
 - Files arriving during Review wait; that run holds the project lock.
-- No watcher, rules/findings, MCP, React, cost/timing, or unchanged-row proof yet.
+- No watcher, MCP, React, cost/timing, or unchanged-row proof yet.
 - Fresh-clone and image-only verification remain open.
 
 ## Next three actions
 
-1. Review and merge the formats and types branch.
-2. Start rules/findings only after its brief explicitly includes the audit
-   attachment-schema blocker.
+1. Review and merge the rules and findings branch.
+2. Start the MCP slice over the same core functions the API already calls.
 3. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
@@ -129,10 +144,11 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-13, `formats-and-types` branch | 62 passed, no live key |
+| `docker compose run --rm app pytest` | 2026-08-14, `rules-and-findings` branch | 93 passed, no live key |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
 | API flow | Slice 1 | One run driven by hand through review/export |
 | Northside Dental corpus run | 2026-08-13, `formats-and-types` branch | 6 documents read across `.md`/`.docx`/`.pdf`; unrelated skipped, related additional labelled without a row; 7 rows exported |
+| Intake-portal rules run | 2026-08-14, `rules-and-findings` branch | 5 rows examined against R1–R4 plus D1–D2; two R1 findings gated; `finish-review` refused while they were unanswered; one approved and one rejected; export carried the approved finding only, and row 4's fingerprint stayed the seven-cell hash |
 | Live model | Never | Unverified |
 | Concurrency suite | Not run/built yet | Mechanism exists; proof pending |
 | Fresh clone/image-only | Not run yet | Open release gate |
