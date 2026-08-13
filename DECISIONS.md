@@ -60,7 +60,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D07 | Pipeline stages and conditional routes | Mixed | Pipeline |
 | D08 | Extract, quote location, prompt injection | Mixed | Extract |
 | D09 | Match, requirement identity, and granularity | Implemented and verified in slice-1 scope | Match |
-| D10 | Rules, Examine, findings, and no-findings | Locked, not implemented | Examine and findings |
+| D10 | Rules, Examine, findings, and no-findings | Implemented and verified with the scripted model | Examine and findings |
 | D11 | Model provider, retry, failure classification | Mixed | Model boundary and failure handling |
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
 | D13 | Run identity, statuses, lock, and queue | Mixed | Reliability and concurrency |
@@ -138,6 +138,12 @@ export is always gated.
   the rule firing.
 - **Review queue:** One `decisions` row stores the frozen question and answer.
   Its UUID is the API key; question and answer are never stored apart.
+- **A finding's answer lives only here.** `findings` carries the `decision_key`
+  of its gated question and no `review_state` of its own, because an answer may
+  change until `finish-review` and a second copy would have to be kept in step
+  on every edit. Findings raised by Examine reach this same queue as
+  `kind = 'finding'`, so `finish-review` already refuses while one is
+  unanswered.
 - **Change window:** An answer may change until `finish-review`. That endpoint
   refuses unanswered decisions and atomically claims the transition before it
   launches graph continuation.
@@ -243,7 +249,8 @@ Statuses are fixed in code:
 - Conflicts, findings, and possible-match questions attach to rows but are not
   row cells. This preserves gate separation and cell-only fingerprints.
 - **Implemented and verified:** Slice-1 proposal/commit/export shape and six
-  statuses. Attachments beyond possible-match await later slices.
+  statuses, plus finding attachments, which appear on the row in the export and
+  leave its cells and fingerprint untouched.
 
 ### Citations
 
@@ -275,10 +282,16 @@ Statuses are fixed in code:
 - Audit answers: which cell/attachment, before, after, run, and source.
 - **Implemented:** First-run cell audit and fingerprints are written; JSON and
   Markdown exports are verified.
+- **Audit events:** `audit.event_kind` holds `cell change` or `attachment`
+  (plain text plus a `CheckConstraint`, never a PostgreSQL `ENUM`).
+  `cell_name` is nullable, and the seven-cell check applies only to a cell
+  change; an attachment must name no cell, because a finding attaches to a row
+  and there is no honest cell name to write. Migration `20260813_0005`
+  backfills every existing row as a cell change; its downgrade drops
+  attachment rows, which the older shape cannot represent. Proven by
+  `tests/test_schema.py`.
 - **Proof pending:** Later incremental slice must compare fingerprints and
   prove unaffected rows byte-identical.
-- **Known blocker:** Current `audit.cell_name NOT NULL` plus its seven-cell
-  check cannot store attachment events. Fix schema before findings attach.
 
 ## Pipeline
 
@@ -293,13 +306,14 @@ Full locked pipeline:
 | Ingest | Read new/changed supported files | No | Implemented and verified for all four formats |
 | Extract | One document: type/date/requirements/testing/blockers/instructions | One per document | Implemented and verified with scripted model |
 | Match | Whole batch against current register | One per batch | Implemented and verified with scripted model |
-| Examine | Whole register against frozen rules | One per register | Locked, not implemented |
+| Examine | Whole register against frozen rules | One per register | Implemented and verified with scripted model |
 | Review | Present gated proposals and wait | No | Implemented and verified for slice-1 proposals |
 | Commit | Atomic durable rows/audit/export | No | Implemented and verified |
 
 All documents complete one stage before the batch moves on. Extract loops with
-a per-document checkpoint. Current graph has five implemented stages because
-Examine belongs to the rules slice.
+a per-document checkpoint. All six stages are built: Match routes to Examine
+when it proposed a row and to the early exit when it did not, and Examine
+always continues to Review.
 
 Early exits are honest terminal `ended without changes` states with reasons:
 no readable new/changed file; everything skipped; nothing traceable extracted;
@@ -356,14 +370,35 @@ to Examine rather than exiting.
 - Deliverable checks D1/D2 require every row to cite a source and forbid
   `Done` without a testing outcome.
 - One findings table, no rules table. Each finding freezes rule id and text,
-  found issue, evidence, row, human question, and review state.
+  found issue, evidence, row, and human question; its answer is read from the
+  decision it names (D02), not stored again.
 - Configuration is frozen per run. A fingerprint covers parsed rules, ignoring
   comments/whitespace. Per-rule change detection is deliberately not built;
   a rules change re-examines the whole small register in one model call.
 - `No findings` is first-class and must state what actually ran; never
   manufacture a weak finding.
-- **Status:** Locked, not implemented. The audit attachment blocker must be
-  resolved in this slice.
+- **The frozen rules live on `runs`:** `rules_snapshot` (JSONB) and
+  `rules_fingerprint`, not a separate table — `rules.yaml` is small and `runs`
+  already carries JSONB. The whole snapshot is stored, not only the
+  fingerprint, because an honest `No findings` result must name what actually
+  ran and a run with no findings has that rule text nowhere else. Ingest
+  freezes it once, guarded on `rules_snapshot IS NULL`, so a resumed run reads
+  what it froze rather than the file.
+- **Who computes what:** R1–R4 are judged by the model in one Examine call;
+  the deliverable checks D1 and D2 are computed in code, because each is a
+  mechanical fact about the stored register — a row's citations are there or
+  they are not. An unusable rules file fails the run at the boundary and is
+  never read as "no rules".
+- **`examined_row_count` on `runs`** records how many rows Examine judged, so
+  the `No findings` result can state it after the run ends and whether or not
+  an export exists.
+- **Status:** Implemented and verified with the scripted model. Findings reach
+  the human gate through the existing review queue, a rejected finding stays in
+  the run record and never reaches the export, and Examine re-entry after a
+  crash replaces this run's unanswered findings rather than adding to them.
+  Proven by `tests/test_examine_findings.py`, `tests/test_examine_answer.py`,
+  `tests/test_frozen_rules.py`, `tests/test_deliverable_checks.py`, and
+  `test_examine_rerun_does_not_duplicate_findings_for_the_same_run`.
 
 ## Model boundary and failure handling
 
@@ -446,9 +481,10 @@ false-success `done` run.
 
 ### D14 — database and API
 
-Seven domain tables: `projects`, `runs`, `documents`, `register_rows`,
-`citations`, `decisions`, `audit`. LangGraph owns separate checkpoint tables in
-the same PostgreSQL. Alembic migrations exist from the first table.
+Eight domain tables: `projects`, `runs`, `documents`, `register_rows`,
+`citations`, `decisions`, `audit`, `findings`. LangGraph owns separate
+checkpoint tables in the same PostgreSQL. Alembic migrations exist from the
+first table.
 
 Six slice-1 API endpoints:
 
@@ -503,7 +539,9 @@ slice-1 scope.
 - The formats and types slice is built: four readers, the page limit, the
   document-type enum and its buckets, per-format citation places, and both
   synthetic corpora.
-- Later slices: rules/findings → MCP → incremental proof → concurrency/
+- The rules and findings slice is built: Examine, the `findings` table, rules
+  frozen per run, D1/D2 in code, and the attachment audit event.
+- Later slices: MCP → incremental proof → concurrency/
   injection → React → cost/timing. Exact scheduling may combine safe adjacent
   work, but proof claims stay separate.
 
@@ -511,13 +549,13 @@ slice-1 scope.
 
 | # | Behaviour | Minimum proof | Current status |
 |---|---|---|---|
-| 1 | Visible branching stages | Status output plus uncertain-match route | Partly verified; Examine later |
+| 1 | Visible branching stages | Status output plus uncertain-match route | Verified across all six stages |
 | 2 | Stop/resume | Real `SIGKILL`, startup resume, no repeated finished work/rows | Verified in slice 1 |
 | 3 | Human gate | Mixed decisions, incomplete-review refusal, export gate | Verified in slice 1 scope |
 | 4 | Machine drive | Full API flow, then same flow through MCP | API half verified; MCP later |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 62 tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 93 tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
@@ -558,15 +596,16 @@ slice-1 scope.
 - The page limit binds `.pdf` only; no other declared format reports pages.
 - A related additional document that lists requirements, in a run that never
   exports, is read again by the next run.
-- Audit cannot yet represent attachment events.
 - Concurrency mechanism is built but dedicated proof is pending.
 - One Extract call can repeat in the answer-to-checkpoint kill window.
 - Rejected findings stay suppressed even if later evidence strengthens them.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- Watched folder, rules/findings, MCP, React, incremental unchanged-row proof,
-  and cost/timing are locked but not implemented.
+- Watched folder, MCP, React, incremental unchanged-row proof, and cost/timing
+  are locked but not implemented.
+- A finding raised against a register row is never re-examined by a later run;
+  a rules change re-examines the register the next run touches it.
 
 ## Superseded index
 
@@ -593,6 +632,7 @@ ideas from resurfacing without duplicating their full prose here.
 | Missing Match outcomes default to new rows | D09 complete exact coverage or failure |
 | Non-atomic finish-review read/launch | D02 atomic claim plus future replay marker |
 | Non-idempotent Ingest/Match re-entry | D12 unique/upsert Ingest + replace-own-uncommitted Match |
+| `audit.cell_name NOT NULL` for every event | D06 `event_kind` with a nullable cell name for attachments |
 
 For full chronology, alternatives, trade-offs, evidence language, and all 93
 original Decision Log rows, use `documentation/decision-history.md`.

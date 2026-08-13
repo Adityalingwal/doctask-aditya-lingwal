@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
+from app.examine.read_findings import findings_of_run
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
 from app.register.export_register import build_export
 from app.review.review_queue import (
@@ -13,6 +14,10 @@ from app.review.review_queue import (
     POSSIBLE_MATCH_DECISION,
     decisions_of_run,
 )
+
+
+CELL_CHANGE_EVENT = "cell change"
+ATTACHMENT_EVENT = "attachment"
 
 
 class CommitResult(NamedTuple):
@@ -72,6 +77,7 @@ async def commit_register(
         )
         committed_row_numbers.append(row["row_number"])
 
+    await _write_attachment_audit(connection, run_id)
     export = await build_export(connection, project, run_id, exported_at)
     await connection.execute(
         "UPDATE runs SET export_json = %s WHERE id = %s",
@@ -122,6 +128,31 @@ async def _merge_approved_matches(
     return merged_row_numbers
 
 
+async def _write_attachment_audit(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> None:
+    """Record each approved finding as attached to its row, naming no cell.
+
+    A finding is an attachment, not a cell change: it says nothing about what
+    any of the seven cells holds, which is why the row's fingerprint does not
+    move when one arrives.
+    """
+    for finding in await findings_of_run(connection, run_id, approved_only=True):
+        await connection.execute(
+            "INSERT INTO audit (id, register_row_id, cell_name, event_kind, "
+            "old_value, new_value, run_id, source_document_id) "
+            "VALUES (%s, %s, NULL, %s, NULL, %s, %s, NULL)",
+            (
+                uuid4(),
+                finding["register_row_id"],
+                ATTACHMENT_EVENT,
+                f"{finding['rule_id']} — {finding['issue']}",
+                run_id,
+            ),
+        )
+
+
 async def _documents_of_run(
     connection: AsyncConnection,
     run_id: UUID,
@@ -158,13 +189,14 @@ async def _write_audit_entries(
     for cell_name, new_value in cells.items():
         source_file = source_file_by_cell.get(cell_name)
         await connection.execute(
-            "INSERT INTO audit (id, register_row_id, cell_name, old_value, "
-            "new_value, run_id, source_document_id) "
-            "VALUES (%s, %s, %s, NULL, %s, %s, %s)",
+            "INSERT INTO audit (id, register_row_id, cell_name, event_kind, "
+            "old_value, new_value, run_id, source_document_id) "
+            "VALUES (%s, %s, %s, %s, NULL, %s, %s, %s)",
             (
                 uuid4(),
                 register_row_id,
                 cell_name,
+                CELL_CHANGE_EVENT,
                 new_value,
                 run_id,
                 document_id_by_file.get(source_file) if source_file else None,

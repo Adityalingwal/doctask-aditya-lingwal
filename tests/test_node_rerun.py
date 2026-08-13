@@ -8,6 +8,8 @@ from uuid import UUID, uuid4
 from psycopg import AsyncConnection
 
 from app.database import build_connection_pool
+from app.examine.found_issue import finding_on_row
+from app.examine.record_findings import record_findings
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH
 from app.register.propose_rows import propose_rows
@@ -46,6 +48,68 @@ def test_match_rerun_does_not_duplicate_proposed_rows(tmp_path: Path) -> None:
     assert proposed["row_numbers"] == [2, 3]
     # The committed row is not this run's to clear.
     assert proposed["committed_rows"] == 1
+
+
+def test_examine_rerun_does_not_duplicate_findings_for_the_same_run() -> None:
+    recorded = asyncio.run(_record_findings_twice())
+
+    # Re-entering Examine after a crash replaces what this run found; it never
+    # asks the Delivery Owner the same question a second time.
+    assert recorded["findings"] == 1
+    assert recorded["decisions"] == 1
+
+
+async def _record_findings_twice() -> dict[str, Any]:
+    with temporary_database() as database_url:
+        pool = build_connection_pool(database_url)
+        await pool.open(wait=True)
+        try:
+            async with pool.connection() as connection:
+                project_id, run_id = await _project_with_a_running_run(connection)
+                await _insert_committed_row(connection, project_id, run_id)
+                committed = await connection.execute(
+                    "SELECT id, row_number, what_was_asked FROM register_rows "
+                    "WHERE proposed_by_run_id = %s",
+                    (run_id,),
+                )
+                row = await committed.fetchone()
+                found = [
+                    finding_on_row(
+                        "R1",
+                        "Anything built must have a written requirement.",
+                        {
+                            "id": row["id"],
+                            "row_number": row["row_number"],
+                            "cells": {"what_was_asked": row["what_was_asked"]},
+                        },
+                        "No client requirements document states this in writing.",
+                        f"Row #{row['row_number']} cites a meeting note only.",
+                    )
+                ]
+                await record_findings(connection, run_id, found)
+                await record_findings(connection, run_id, found)
+                return await _finding_counts(connection, run_id)
+        finally:
+            await pool.close()
+
+
+async def _finding_counts(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> dict[str, Any]:
+    findings = await connection.execute(
+        "SELECT count(*) AS written FROM findings WHERE run_id = %s",
+        (run_id,),
+    )
+    decisions = await connection.execute(
+        "SELECT count(*) AS written FROM decisions WHERE run_id = %s "
+        "AND kind = 'finding'",
+        (run_id,),
+    )
+    return {
+        "findings": (await findings.fetchone())["written"],
+        "decisions": (await decisions.fetchone())["written"],
+    }
 
 
 async def _collect_batch_twice(source_folder: Path) -> dict[str, Any]:

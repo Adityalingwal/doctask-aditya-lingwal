@@ -15,11 +15,13 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     extraction_answer,
     extraction_answer_without_requirements,
     match_answer,
     match_marker,
+    no_findings_answer,
     unrelated_extraction_answer,
     write_meeting_note,
 )
@@ -52,6 +54,7 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
                 READ_REQUIREMENT, read_quote
             ),
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
         },
     )
 

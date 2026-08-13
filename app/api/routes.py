@@ -8,6 +8,7 @@ from fastapi.responses import PlainTextResponse
 from psycopg import AsyncConnection
 from pydantic import BaseModel, Field
 
+from app.examine.read_findings import findings_of_run, rules_that_ran
 from app.projects.create_project import SourceFolderMissing, create_project
 from app.register.export_register import (
     EXPORT_FORMATS,
@@ -92,6 +93,7 @@ async def read_run_status(request: Request, run_id: UUID) -> dict[str, Any]:
     async with pool.connection() as connection:
         run = await _run_or_404(connection, run_id)
         decisions = await decisions_of_run(connection, run_id)
+        examine = await _what_examine_ran(connection, run)
     return {
         "run_id": str(run_id),
         "project_id": str(run["project_id"]),
@@ -109,6 +111,7 @@ async def read_run_status(request: Request, run_id: UUID) -> dict[str, Any]:
             }
             for decision in decisions
         ],
+        "examine": examine,
         "exported": run["export_json"] is not None,
     }
 
@@ -234,6 +237,34 @@ async def read_export(
     if export_format == MARKDOWN_FORMAT:
         return PlainTextResponse(export_as_markdown(run["export_json"]))
     return run["export_json"]
+
+
+async def _what_examine_ran(
+    connection: AsyncConnection,
+    run: dict[str, Any],
+) -> dict[str, Any] | None:
+    """What Examine judged and found, or nothing while it has not run yet."""
+    if run["examined_row_count"] is None:
+        return None
+    findings = await findings_of_run(connection, run["id"])
+    return {
+        "rules": await rules_that_ran(connection, run["id"]),
+        "rows_examined": run["examined_row_count"],
+        "findings": [
+            {
+                "finding_id": str(finding["finding_id"]),
+                "decision_id": str(finding["decision_id"]),
+                "row_number": finding["row_number"],
+                "rule_id": finding["rule_id"],
+                "rule_text": finding["rule_text"],
+                "issue": finding["issue"],
+                "evidence": finding["evidence"],
+                "question": finding["question"],
+                "outcome": finding["outcome"],
+            }
+            for finding in findings
+        ],
+    }
 
 
 def _run_engine(request: Request) -> RunEngine:

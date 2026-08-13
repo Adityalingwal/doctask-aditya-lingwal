@@ -13,10 +13,12 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_marker,
+    no_findings_answer,
     write_meeting_note,
 )
 
@@ -39,6 +41,7 @@ def _application_at_review(
         script_path,
         {
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
             extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
         },
     )
@@ -191,6 +194,7 @@ def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
         script_path,
         {
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
             extract_marker(SOURCE_FILE): answer,
         },
     )

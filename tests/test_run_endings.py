@@ -10,10 +10,12 @@ from conftest import (
     write_script,
 )
 from register_documents import (
+    examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_marker,
+    no_findings_answer,
     write_meeting_note,
 )
 
@@ -31,6 +33,7 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
         script_path,
         {
             match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
             extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
         },
     )

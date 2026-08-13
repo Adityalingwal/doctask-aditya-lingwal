@@ -7,21 +7,43 @@ a human approval gate prevent unsupported rows from being exported.
 
 ## Current working scope
 
-Slice 1 and the formats and types slice are implemented:
+Slice 1, the formats and types slice, and the rules and findings slice are
+implemented:
 
-`Document folder → Ingest → Extract → Match → Review → Commit → JSON/Markdown export`
+`Document folder → Ingest → Extract → Match → Examine → Review → Commit → JSON/Markdown export`
 
 - PostgreSQL stores projects, runs, documents, register rows, citations,
-  review decisions, audit entries, and LangGraph checkpoints.
+  review decisions, findings, audit entries, and LangGraph checkpoints.
 - FastAPI exposes six machine-drivable endpoints.
 - A run returns immediately, continues in the app process, and is polled.
-- Review decisions are item-by-item; export is unavailable until approved.
+- Review decisions are one proposal at a time; export is unavailable until
+  approved.
+- Examine judges the whole register against the rules the run froze and raises
+  a finding as a question, never as an edit.
 - Startup resumes a run killed mid-flight from its durable checkpoint.
 - Automated tests use a scripted model and no live API key.
 
 No live hosted-model run has been completed yet. Current proof is for the
 orchestration, persistence, validation, review, and export paths using the
 scripted client.
+
+## Rules and findings
+
+`config/rules.yaml` holds the rules the register is judged against; R1–R4 ship
+with the repository. Two further checks, D1 and D2, are owed by the deliverable
+itself and live in code: every row cites a source, and no row is `Done` without
+a testing outcome.
+
+Examine runs once per run, between Match and Review, in a single model call for
+the whole register. Each finding names its rule, the row it is about, what it
+found, and the evidence — and becomes a question the Delivery Owner answers.
+Approving one attaches it to the row; rejecting one keeps it in the run record
+and out of the export. A finding never edits a cell, and attaching one does not
+change the row's fingerprint, which covers the seven cells only.
+
+A run with nothing wrong says so: `GET /runs/{id}` and both exports name the
+rules that ran and how many rows they ran against, alongside an empty findings
+list.
 
 ## Domain
 
@@ -95,7 +117,7 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `formats-and-types` branch: **62 passed**, real
+Last verified on the `rules-and-findings` branch: **93 passed**, real
 PostgreSQL, no live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
@@ -106,10 +128,13 @@ a fresh-machine claim.
 |---|---|
 | `config/formats.yaml` | Declared extensions and document page limit |
 | `config/model.yaml` | OpenRouter model, endpoint, rates, attempts, timeout |
-| `config/rules.yaml` | User-editable R1–R4 rule set for the later Examine slice |
+| `config/rules.yaml` | User-editable R1–R4 rule set Examine judges against |
 
-Rules/findings are designed but not implemented. Editing `rules.yaml` therefore
-does not change current Slice-1 output yet.
+Adding or changing a rule is an edit to `config/rules.yaml`, never a code
+change. A run freezes the parsed rules when it starts, so an edit applies to
+the next run and never to one already under way or already finished. Point
+`RULES_CONFIG_PATH` at another file to use your own rule set. See
+[`config/README.md`](config/README.md).
 
 ## Current limitations
 
@@ -123,11 +148,11 @@ does not change current Slice-1 output yet.
 - A kill after a model response but before its checkpoint can repeat that one
   paid call; earlier completed calls and register rows do not duplicate.
 - A run waiting for Review holds the project lock; later files wait.
-- Findings/rules, watched-folder auto-start, MCP, React, focused incremental
-  updates, unchanged-row proof, and cost/timing reporting are later slices.
-- The audit schema cannot yet record finding-attachment events.
+- Watched-folder auto-start, MCP, React, focused incremental updates,
+  unchanged-row proof, and cost/timing reporting are later slices.
 - A rejected finding will not automatically return if later evidence makes it
-  stronger.
+  stronger, and a finding already approved onto a row is not re-examined by a
+  later run.
 - The development Compose file bind-mounts the worktree, which exposes local
   `.env` and lets local files override the image; this is retained for
   iteration and is not yet removed for final image-only verification.
