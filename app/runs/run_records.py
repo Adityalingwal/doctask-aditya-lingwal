@@ -18,8 +18,8 @@ from app.runs.statuses import (
 async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] | None:
     result = await connection.execute(
         "SELECT id, project_id, status, current_stage, started_at, finished_at, "
-        "skipped, ended_early_reason, failure_reason, export_json FROM runs "
-        "WHERE id = %s",
+        "skipped, ended_early_reason, failure_reason, export_json, "
+        "review_finished_at FROM runs WHERE id = %s",
         (run_id,),
     )
     return await result.fetchone()
@@ -73,11 +73,13 @@ async def claim_review_finished(
 
     Checking the status and writing it is one statement on purpose: between a
     read and a later write, a second caller finishes the same review and the
-    graph is driven twice over one run.
+    graph is driven twice over one run. review_finished_at is set in this same
+    statement so it is exactly as durable as the status change: a crash right
+    after this commits still leaves both facts consistent for the next resume.
     """
     result = await connection.execute(
-        "UPDATE runs SET status = %s WHERE id = %s AND status = %s "
-        "RETURNING project_id",
+        "UPDATE runs SET status = %s, review_finished_at = CURRENT_TIMESTAMP "
+        "WHERE id = %s AND status = %s RETURNING project_id",
         (RUNNING, run_id, WAITING_FOR_REVIEW),
     )
     return await result.fetchone()
