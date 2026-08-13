@@ -3111,3 +3111,71 @@ by backfilling a cell name that was never true.
 `test_attachment_audit_event_refuses_to_name_a_changed_cell`,
 `test_cell_change_audit_event_still_names_one_of_the_seven_cells`, and
 `test_this_slice_downgrades_and_upgrades_again_with_attachments_written`.
+
+## Withdrawing a requirement a changed document dropped (LOCKED 2026-08-14)
+
+**Superseded:** the deletion-semantics open decision recorded above — "a
+removed bullet might withdraw a requirement, remove its row, or conflict with
+testing feedback that already refers to it. That behaviour is not decided" —
+open since 2026-08-12, closed here before the incremental slice was built.
+
+**Decision:** when a document is read again and no longer contains a
+requirement it itself supplied, the run raises one withdrawal proposal for
+that row through the existing review queue. Approving it sets that row's
+`Status` cell to a seventh value, `Withdrawn`, with absence evidence naming
+the document that was read in full. Rejecting it leaves the row byte-identical.
+The row is never deleted.
+
+**Problem:** a register that silently keeps a requirement the client has
+dropped reports work that nobody is waiting for; a register that silently
+removes it destroys the record that the requirement was ever asked for. Both
+are the system deciding on the human's behalf.
+
+**What may trigger it:** only the changed document whose words the row's
+`What was asked` citation quotes, and only when that document's new extraction
+produces neither a match nor a possible match for the row. This restriction is
+the whole safety of the mechanism: without it, every newly arriving document
+would propose withdrawing every row it happens not to mention, and the review
+queue would fill with questions no human can answer. A row already carrying a
+possible-match question is excluded, because uncertain identity is a different
+question and is already gated.
+
+**Alternative rejected — delete the row.** It contradicts the locked rule that
+removing a watched file does not delete the rows its earlier content produced,
+and it empties the row's `First seen`, its cell audit, and its fingerprint
+chain. The audit exists to answer "what happened to this row, and when?"; a
+deleted row cannot answer it.
+
+**Alternative rejected — raise it as a conflict.** A conflict is two sources
+disagreeing about the same requirement. Here nothing disagrees; something is
+gone. Naming absence a conflict would make the word mean two different things
+and would put a withdrawal in front of a human labelled as something it is not.
+
+**Alternative rejected — an attachment on the row instead of a cell change.**
+Attachments deliberately do not move a row's fingerprint, so an attachment
+would leave the row reading as live in the register and byte-identical to a row
+nothing happened to. Every export and reader already consults `Status`; a
+second place to look for "is this still being asked for?" is a second truth.
+
+**Trade-off:** `Withdrawn` describes the requirement, while the other six
+statuses describe delivery, so one cell now carries two kinds of claim. It was
+accepted because the alternative — a separate withdrawal column or flag — adds
+an eighth cell to a locked seven-cell row shape and changes every fingerprint
+in the register to say nothing new about most of them.
+
+**Must preserve:** a rejected withdrawal is retained in the run record and is
+not raised again until that document changes again — the trigger itself is the
+suppression, so no extra state is stored. A requirement that reappears in a
+later version of the document is matched to the existing row and moves off
+`Withdrawn` through the ordinary gate; there is no second mechanism for coming
+back.
+
+**Ours, not the brief's:** the task PDF says nothing about a requirement being
+removed. The working notes contain no withdrawal, deletion, or removed-
+requirement language. This decision is entirely our own.
+
+**Evidence:** none yet — locked, not implemented. Its proof belongs to the
+incremental update slice: a second run over a changed document that drops a
+requirement raises exactly one withdrawal proposal, approval writes the
+`Status` cell change with audit, rejection leaves the row byte-identical, and
+no other document's silence raises anything.
