@@ -15,6 +15,10 @@ from app.review.review_queue import (
 )
 
 
+CELL_CHANGE_EVENT = "cell change"
+ATTACHMENT_EVENT = "attachment"
+
+
 class CommitResult(NamedTuple):
     committed_row_numbers: list[int]
     merged_row_numbers: list[int]
@@ -158,13 +162,14 @@ async def _write_audit_entries(
     for cell_name, new_value in cells.items():
         source_file = source_file_by_cell.get(cell_name)
         await connection.execute(
-            "INSERT INTO audit (id, register_row_id, cell_name, old_value, "
-            "new_value, run_id, source_document_id) "
-            "VALUES (%s, %s, %s, NULL, %s, %s, %s)",
+            "INSERT INTO audit (id, register_row_id, cell_name, event_kind, "
+            "old_value, new_value, run_id, source_document_id) "
+            "VALUES (%s, %s, %s, %s, NULL, %s, %s, %s)",
             (
                 uuid4(),
                 register_row_id,
                 cell_name,
+                CELL_CHANGE_EVENT,
                 new_value,
                 run_id,
                 document_id_by_file.get(source_file) if source_file else None,
