@@ -11,10 +11,11 @@ from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
-from app.api.routes import router
+from app.api.routes import add_refusal_responses, router
 from app.database import build_connection_pool
 from app.graph.register_graph import build_register_graph
 from app.ingest.read_source_document import READER_EXTENSIONS
+from app.mcp_server.tools import MCP_PATH, build_mcp_server
 from app.model.client import build_model_client
 from app.projects.create_project import ensure_demo_project
 from app.run_logging import log_run_event
@@ -81,7 +82,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine.background_runs.add(resuming)
         resuming.add_done_callback(engine.background_runs.discard)
 
-    yield
+    # The mounted MCP server is not started by its own lifespan, so this one
+    # runs its session manager for as long as the application answers at all.
+    async with app.state.mcp_server.session_manager.run():
+        yield
     await pool.close()
 
 
@@ -128,6 +132,9 @@ def _build_run_engine(
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
+add_refusal_responses(app)
+app.state.mcp_server = build_mcp_server(app)
+app.mount(MCP_PATH, app.state.mcp_server.streamable_http_app())
 
 
 @app.get("/health")

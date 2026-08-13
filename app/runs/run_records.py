@@ -6,6 +6,7 @@ from uuid import UUID
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
+from app.refusal import UnknownId
 from app.runs.statuses import (
     ACTIVE_STATUSES,
     FAILED,
@@ -13,6 +14,17 @@ from app.runs.statuses import (
     TERMINAL_STATUSES,
     WAITING_FOR_REVIEW,
 )
+
+
+async def require_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any]:
+    """The run a caller named, or the refusal every door reports for it."""
+    run = await read_run(connection, run_id)
+    if run is None:
+        raise UnknownId(
+            f"no run has id {run_id} — start one with POST /runs and poll the "
+            "id it returns."
+        )
+    return run
 
 
 async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] | None:

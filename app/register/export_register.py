@@ -7,8 +7,8 @@ from psycopg import AsyncConnection
 
 from app.examine.read_findings import (
     approved_findings_of_project,
-    findings_of_run,
-    rules_that_ran,
+    examine_as_exported,
+    exported_finding,
 )
 from app.register.cells import CELL_NAMES
 
@@ -69,7 +69,7 @@ async def build_export(
     findings_by_row: dict[UUID, list[dict[str, Any]]] = {}
     for finding in await approved_findings_of_project(connection, project["id"]):
         findings_by_row.setdefault(finding["register_row_id"], []).append(
-            _exported_finding(finding)
+            exported_finding(finding)
         )
 
     return {
@@ -87,43 +87,7 @@ async def build_export(
             }
             for row in rows
         ],
-        "examine": await _what_this_run_examined(connection, run_id),
-    }
-
-
-async def _what_this_run_examined(
-    connection: AsyncConnection,
-    run_id: UUID,
-) -> dict[str, Any]:
-    """The rules that ran, how much they ran against, and what they found.
-
-    An empty findings list is the honest result D10 asks for, and it is only
-    honest because the rules and the row count sit beside it.
-    """
-    examined = await connection.execute(
-        "SELECT examined_row_count FROM runs WHERE id = %s",
-        (run_id,),
-    )
-    return {
-        "rules": await rules_that_ran(connection, run_id),
-        "rows_examined": (await examined.fetchone())["examined_row_count"],
-        "findings": [
-            _exported_finding(finding)
-            for finding in await findings_of_run(
-                connection, run_id, approved_only=True
-            )
-        ],
-    }
-
-
-def _exported_finding(finding: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "row_number": finding["row_number"],
-        "rule_id": finding["rule_id"],
-        "rule_text": finding["rule_text"],
-        "issue": finding["issue"],
-        "evidence": finding["evidence"],
-        "question": finding["question"],
+        "examine": await examine_as_exported(connection, run_id),
     }
 
 
