@@ -68,7 +68,7 @@ def locate_extraction(
         }
 
     extraction: dict[str, Any] = {
-        "document_type": answer.document_type,
+        "document_type": answer.document_type.value,
         "source_file": source_file,
         "document_date": None,
         "requirements": [],
