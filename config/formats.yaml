@@ -3,4 +3,4 @@ accepted_extensions:
   - .docx
   - .md
   - .txt
-document_page_limit: 50
+document_page_limit: 20
