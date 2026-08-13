@@ -169,8 +169,36 @@ export is always gated.
   **Locked, not implemented.** Files arriving during Review wait for next run.
 - **Rules-only run:** When parsed rules change, skip Extract/Match and run
   Examine against the existing register. **Locked, not implemented.**
-- **Deletion semantics:** Whether removing a requirement from a changed
-  document withdraws, deletes, or conflicts is an **open decision**.
+
+### Withdrawal — when a changed document drops a requirement
+
+- **Decision:** A re-read document that no longer contains a requirement it
+  itself supplied raises one **withdrawal proposal** for that row. Approve
+  moves that row's `Status` cell to `Withdrawn` and records absence evidence;
+  Reject leaves the row byte-identical. The row is never deleted.
+- **What may trigger it:** only the changed document whose words the row's
+  `What was asked` citation quotes, and only when that document's new
+  extraction yields neither a match nor a possible match for the row. Another
+  document's silence proposes nothing, because absence of mention is not
+  evidence of removal.
+- **Why not delete:** deleting contradicts the removed-file rule above and
+  empties the row's audit history, `First seen`, and fingerprint chain.
+- **Why not a conflict:** a conflict is two sources disagreeing. Here nothing
+  contradicts anything; something stopped being asked for.
+- **Gate:** the existing review queue as `kind = 'withdrawal'`, one decision
+  per row, Approve or Reject only — D02 scenario 3.
+- **Must preserve:** an approved withdrawal is a `Status` cell change, so it
+  writes cell audit and moves only that row's fingerprint; a rejected one is
+  retained in the run record and is not raised again until that document
+  changes again; a requirement that reappears later moves the row off
+  `Withdrawn` through the ordinary gate, with no second mechanism.
+- **Limitation:** `Withdrawn` describes the requirement, while the other six
+  statuses describe delivery. One `Status` cell carries both, because it is
+  the one cell every export, gate, and reader already consults.
+- **Status:** **Locked, not implemented** — 2026-08-14. Ours, not the brief's;
+  the task PDF says nothing about removed requirements.
+- **History:** [`decision-history.md`](documentation/decision-history.md),
+  "Withdrawing a requirement a changed document dropped".
 
 ### Already-read rule
 
@@ -236,13 +264,17 @@ Seven cells, each with its own citations:
 `What was asked` · `In writing?` · `What testing found` · `Status` ·
 `Blocked on` · `First seen` · `Last moved`
 
-Statuses are fixed in code:
+Statuses are fixed in code and in a database check constraint:
 
 `Done` · `Partial` · `Never happened` · `Blocked` · `Disputed` ·
-`No evidence yet`
+`No evidence yet` · `Withdrawn`
 
 - `Never happened` is a positive evidenced claim; `No evidence yet` makes no
   such claim.
+- `Withdrawn` is set only by an approved withdrawal proposal (D03) and is
+  **locked, not implemented**; the six statuses before it are implemented and
+  verified. Adding it changes `REGISTER_ROW_STATUS_CHECK`, so it needs its own
+  migration.
 - Unknown cells say why they are unknown; they are never blank or guessed.
 - Dates come from documents, not run time. Unknown date stays unknown and R3
   does not run on it.
@@ -595,11 +627,10 @@ slice-1 scope.
 ## Open decisions
 
 1. Task 2 orchestration: high-level `create_agent` versus raw StateGraph.
-2. Changed-document deletion/withdrawal semantics.
-3. Whether review answers stay one-at-a-time or later batch at the API layer.
-4. React visual layout and treatment (content/gates are locked).
-5. Whether real document sizes justify pgvector retrieval or Extract fan-out.
-6. Exact later-slice storage choices where this file explicitly leaves them
+2. Whether review answers stay one-at-a-time or later batch at the API layer.
+3. React visual layout and treatment (content/gates are locked).
+4. Whether real document sizes justify pgvector retrieval or Extract fan-out.
+5. Exact later-slice storage choices where this file explicitly leaves them
    open; do not invent them before their slice.
 
 ## Known limitations and unverified assumptions
@@ -617,8 +648,8 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- Watched folder, React, incremental unchanged-row proof, and cost/timing are
-  locked but not implemented.
+- Watched folder, requirement withdrawal, React, incremental unchanged-row
+  proof, and cost/timing are locked but not implemented.
 - Neither door authenticates a caller, and the MCP endpoint answers `421` to a
   `Host` header other than `localhost` or `127.0.0.1`.
 - A finding raised against a register row is never re-examined by a later run;
