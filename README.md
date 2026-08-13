@@ -7,14 +7,15 @@ a human approval gate prevent unsupported rows from being exported.
 
 ## Current working scope
 
-Slice 1, the formats and types slice, and the rules and findings slice are
-implemented:
+Slice 1, the formats and types slice, the rules and findings slice, and the
+MCP slice are implemented:
 
 `Document folder → Ingest → Extract → Match → Examine → Review → Commit → JSON/Markdown export`
 
 - PostgreSQL stores projects, runs, documents, register rows, citations,
   review decisions, findings, audit entries, and LangGraph checkpoints.
-- FastAPI exposes six machine-drivable endpoints.
+- FastAPI exposes six endpoints, and the same six operations are MCP tools
+  served by the same process over the same core functions.
 - A run returns immediately, continues in the app process, and is polled.
 - Review decisions are one proposal at a time; export is unavailable until
   approved.
@@ -103,6 +104,42 @@ operations:
 - `POST /runs/{id}/finish-review`
 - `GET /runs/{id}/export?format=json|markdown`
 
+## Drive it from a machine
+
+The same six operations are MCP tools, mounted in the running application at
+`http://localhost:8000/mcp/` over the streamable-HTTP transport. Each tool
+calls the core function its endpoint calls, so one operation answers the same
+through either door — including its refusal, which arrives with the cause and
+the practical fix the endpoint would have given.
+
+| Tool | Arguments |
+|---|---|
+| `create_project` | `name`, `source_folder_path` |
+| `start_run` | `project_id` |
+| `get_run_status` | `run_id` |
+| `submit_decision` | `run_id`, `decision_id`, `outcome` (`approved` or `rejected`) |
+| `finish_review` | `run_id` |
+| `get_export` | `run_id`, `export_format` (`json` or `markdown`) |
+
+A run is not one call here either: `start_run` returns a run id at once and
+`get_run_status` is polled until the run says it is done. Nothing commits or
+exports without the export decision being approved first.
+
+Any MCP client that speaks streamable HTTP can point at that URL. With the
+official Python SDK:
+
+```python
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+async with streamable_http_client("http://localhost:8000/mcp/") as (read, write, _):
+    async with ClientSession(read, write) as session:
+        await session.initialize()
+        await session.call_tool("get_run_status", {"run_id": run_id})
+```
+
+The test suite drives the tools exactly this way; see `tests/mcp_client.py`.
+
 The application currently reads project folders from inside the repository.
 The included demo folder is `sample-projects/intake-portal`; a second synthetic
 project in mixed formats is `sample-projects/northside-dental`.
@@ -117,8 +154,8 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `rules-and-findings` branch: **93 passed**, real
-PostgreSQL, no live model key. Fresh-clone and image-only verification remain
+Last verified on the `mcp-tools` branch: **100 passed**, real PostgreSQL, no
+live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
 
@@ -148,8 +185,12 @@ the next run and never to one already under way or already finished. Point
 - A kill after a model response but before its checkpoint can repeat that one
   paid call; earlier completed calls and register rows do not duplicate.
 - A run waiting for Review holds the project lock; later files wait.
-- Watched-folder auto-start, MCP, React, focused incremental updates,
+- Watched-folder auto-start, React, focused incremental updates,
   unchanged-row proof, and cost/timing reporting are later slices.
+- Neither the endpoints nor the MCP tools authenticate a caller, and the MCP
+  endpoint answers `421 Misdirected Request` to a request whose `Host` is
+  neither `localhost` nor `127.0.0.1`, so a client on another machine cannot
+  reach it as it stands.
 - A rejected finding will not automatically return if later evidence makes it
   stronger, and a finding already approved onto a row is not re-examined by a
   later run.

@@ -65,7 +65,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
 | D13 | Run identity, statuses, lock, and queue | Mixed | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
-| D15 | MCP and React surfaces | Locked, not implemented | Storage and interfaces |
+| D15 | MCP and React surfaces | MCP implemented and verified; React locked, not implemented | Storage and interfaces |
 | D16 | Logging, timing, and cost | Mixed | Operations |
 | D17 | Repository layout, build order, tests, setup, and network bind | Mixed | Delivery plan and proof |
 
@@ -503,15 +503,28 @@ slice-1 scope.
 
 ### D15 — MCP and React
 
-- MCP will mirror the six endpoints 1:1: `create_project`, `start_run`,
+- MCP mirrors the six endpoints 1:1: `create_project`, `start_run`,
   `get_run_status`, `submit_decision`, `finish_review`, `get_export`.
-- It mounts in the FastAPI process and calls the same core functions directly.
-  Validation/error semantics belong in core, not only HTTP adapters.
+- It mounts in the FastAPI process at `/mcp` and calls the same core functions
+  the endpoints call. Existence checks, refusals and the shape a caller is told
+  live in core, so a door decides only how to carry a refusal, never what it
+  says: `UnknownId`, `NotPossibleNow`, `UnusableRequest` and `RunsUnavailable`
+  become 404, 409, 400 and 503 over HTTP and reach a tool caller as the same
+  sentence.
+- The dependency is the official `mcp` SDK pinned at `1.29.0`. Its 2.x line was
+  days old and changes the HTTP stack it depends on; `fastmcp` would put a
+  second server framework beside FastAPI.
 - React is one page with five sections: stages, skipped, needs your decision,
   register, cost/timing. One generic question component serves all gates.
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
-- **Status:** Locked, not implemented. Layout/visual treatment remains open.
+- **Status:** MCP **implemented and verified** — `tests/test_mcp_tools.py` and
+  `tests/test_mcp_flow.py`, plus one run driven through the tools by hand.
+  React is **locked, not implemented**; layout/visual treatment remains open.
+- Limitation: the tools inherit the HTTP surface's lack of authentication, and
+  the SDK's own host check answers `421` to a request whose `Host` is neither
+  `localhost` nor `127.0.0.1`, so a client on another machine needs transport
+  work that is not designed yet.
 
 ## Operations
 
@@ -541,7 +554,9 @@ slice-1 scope.
   synthetic corpora.
 - The rules and findings slice is built: Examine, the `findings` table, rules
   frozen per run, D1/D2 in code, and the attachment audit event.
-- Later slices: MCP → incremental proof → concurrency/
+- The MCP slice is built: six tools mounted in the same process over the same
+  core functions the endpoints call.
+- Later slices: incremental proof → concurrency/
   injection → React → cost/timing. Exact scheduling may combine safe adjacent
   work, but proof claims stay separate.
 
@@ -552,10 +567,10 @@ slice-1 scope.
 | 1 | Visible branching stages | Status output plus uncertain-match route | Verified across all six stages |
 | 2 | Stop/resume | Real `SIGKILL`, startup resume, no repeated finished work/rows | Verified in slice 1 |
 | 3 | Human gate | Mixed decisions, incomplete-review refusal, export gate | Verified in slice 1 scope |
-| 4 | Machine drive | Full API flow, then same flow through MCP | API half verified; MCP later |
+| 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 93 tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 100 tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
@@ -602,8 +617,10 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- Watched folder, MCP, React, incremental unchanged-row proof, and cost/timing
-  are locked but not implemented.
+- Watched folder, React, incremental unchanged-row proof, and cost/timing are
+  locked but not implemented.
+- Neither door authenticates a caller, and the MCP endpoint answers `421` to a
+  `Host` header other than `localhost` or `127.0.0.1`.
 - A finding raised against a register row is never re-examined by a later run;
   a rules change re-examines the register the next run touches it.
 
