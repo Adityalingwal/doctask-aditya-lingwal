@@ -89,3 +89,8 @@ The system polls each project's folder every 10 seconds. When at least one file
 is new or changed, no run is active on that project, and the folder has been
 quiet for 30 seconds, a run starts by itself. Manual start through `POST /runs`
 remains available.
+
+## Network exposure
+
+The application listens on localhost only. To expose it, change the Compose
+port mapping (`127.0.0.1:8000:8000`) and set `APP_HOST`.
