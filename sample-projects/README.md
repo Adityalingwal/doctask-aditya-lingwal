@@ -25,6 +25,18 @@ All four documents are written. Slice 1 uses only `meeting-notes-10-mar.md`;
 the other three are read by the later slices that need matching, blocker,
 testing, and rule-finding behaviour.
 
+### The re-issued requirements document
+
+`intake-portal/second-version/client-requirements-v1.md` is the **same file
+later**: the client re-issued the scope on 26 March, and the records list page
+is no longer in it. It is what a withdrawal proposal is raised from, and the
+12 March version stays where it is so the before and the after can both be
+read.
+
+The folder scan reads top-level files only, so a document in this subfolder is
+never part of the demo project's own batch. A test copies it over
+`client-requirements-v1.md` to make that file change.
+
 ## The second-run project — Northside Dental
 
 Designed 2026-08-12, for the second-run test the founder grades: different
