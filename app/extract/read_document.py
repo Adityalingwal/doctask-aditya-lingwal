@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from app.extract.answer import ExtractionAnswer, parse_extraction_answer
 from app.extract.prompt import extraction_prompt
 from app.ingest.locate_quote import locate_quote
+from app.ingest.place_in_document import place_finder_for
 from app.register.cells import shorten_quote
 
 
@@ -43,9 +44,10 @@ def locate_extraction(
     supports is dropped rather than committed as an unsupported claim.
     """
     dropped: list[dict[str, str]] = []
+    place_of = place_finder_for(source_file)
 
     def located(summary: str, quote: str, kind: str) -> dict[str, str] | None:
-        location = locate_quote(document_text, quote)
+        location = locate_quote(document_text, quote, place_of)
         if location is None:
             dropped.append(
                 {

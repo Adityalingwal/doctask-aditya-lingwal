@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import NamedTuple
 
 
@@ -12,7 +13,20 @@ class QuoteLocation(NamedTuple):
     source_words: str
 
 
-def locate_quote(document_text: str, quote: str) -> QuoteLocation | None:
+def nearest_heading_above(document_text: str, character_offset: int) -> str:
+    text_above = document_text[: character_offset + 1]
+    for line in reversed(text_above.splitlines()):
+        stripped_line = line.strip()
+        if stripped_line.startswith(HEADING_MARKER):
+            return stripped_line.lstrip(HEADING_MARKER).strip()
+    return PLACE_BEFORE_FIRST_HEADING
+
+
+def locate_quote(
+    document_text: str,
+    quote: str,
+    place_of: Callable[[str, int], str] = nearest_heading_above,
+) -> QuoteLocation | None:
     """Find where the model's quoted words actually sit in the document."""
     normalised_document, original_offsets = _normalise_with_offsets(document_text)
     normalised_quote = _normalise(quote)
@@ -27,7 +41,7 @@ def locate_quote(document_text: str, quote: str) -> QuoteLocation | None:
     first_character = original_offsets[match_start]
     last_character = original_offsets[match_end]
     return QuoteLocation(
-        place=_nearest_heading_above(document_text, first_character),
+        place=place_of(document_text, first_character),
         source_words=document_text[first_character : last_character + 1],
     )
 
@@ -51,12 +65,3 @@ def _normalise_with_offsets(text: str) -> tuple[str, list[int]]:
         offsets.append(index)
         previous_was_space = False
     return "".join(characters), offsets
-
-
-def _nearest_heading_above(document_text: str, character_offset: int) -> str:
-    text_above = document_text[: character_offset + 1]
-    for line in reversed(text_above.splitlines()):
-        stripped_line = line.strip()
-        if stripped_line.startswith(HEADING_MARKER):
-            return stripped_line.lstrip(HEADING_MARKER).strip()
-    return PLACE_BEFORE_FIRST_HEADING
