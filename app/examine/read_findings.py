@@ -10,16 +10,20 @@ from app.examine.frozen_rules import frozen_rules_of_run
 from app.review.review_queue import APPROVED
 
 
+# A finding follows its row through a merge, so both the id and the number it
+# reports come from the row it ended up on. Reading the number from the
+# proposal instead would sit a finding under one row while naming another.
 _SELECT_FINDINGS = (
     "SELECT findings.id, findings.rule_id, findings.rule_text, findings.issue, "
     "findings.evidence, findings.question, findings.decision_key, "
-    "decisions.outcome, register_rows.row_number, "
-    "COALESCE(register_rows.merged_into_register_row_id, register_rows.id) "
+    "decisions.outcome, reported_row.row_number, reported_row.id "
     "AS register_row_id FROM findings "
     "JOIN decisions ON decisions.id = findings.decision_key "
     "JOIN register_rows ON register_rows.id = findings.register_row_id "
+    "JOIN register_rows AS reported_row ON reported_row.id = COALESCE("
+    "register_rows.merged_into_register_row_id, register_rows.id) "
 )
-_ORDER_FINDINGS = " ORDER BY register_rows.row_number, findings.rule_id"
+_ORDER_FINDINGS = " ORDER BY reported_row.row_number, findings.rule_id"
 
 
 async def findings_of_run(
@@ -60,12 +64,24 @@ async def approved_findings_of_project(
 async def rules_that_ran(
     connection: AsyncConnection,
     run_id: UUID,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Every rule this run was judged against — the user's, then the two owed."""
     frozen = await frozen_rules_of_run(connection, run_id) or []
-    return [{"id": rule["id"], "text": rule["text"]} for rule in frozen] + [
+    return [_rule_as_reported(rule) for rule in frozen] + [
         dict(check) for check in DELIVERABLE_CHECKS
     ]
+
+
+def _rule_as_reported(rule: dict[str, Any]) -> dict[str, Any]:
+    """A rule's text alone does not say what it ran at.
+
+    R3 reads "beyond max_days" and keeps the limit in its params, so reporting
+    the text without them cannot tell a reader whether 14 days applied or 30.
+    """
+    reported: dict[str, Any] = {"id": rule["id"], "text": rule["text"]}
+    if rule.get("params"):
+        reported["params"] = rule["params"]
+    return reported
 
 
 async def _findings_matching(

@@ -481,9 +481,10 @@ false-success `done` run.
 
 ### D14 — database and API
 
-Seven domain tables: `projects`, `runs`, `documents`, `register_rows`,
-`citations`, `decisions`, `audit`. LangGraph owns separate checkpoint tables in
-the same PostgreSQL. Alembic migrations exist from the first table.
+Eight domain tables: `projects`, `runs`, `documents`, `register_rows`,
+`citations`, `decisions`, `audit`, `findings`. LangGraph owns separate
+checkpoint tables in the same PostgreSQL. Alembic migrations exist from the
+first table.
 
 Six slice-1 API endpoints:
 

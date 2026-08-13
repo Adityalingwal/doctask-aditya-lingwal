@@ -152,6 +152,15 @@ def export_as_markdown(export: dict[str, Any]) -> str:
     return "\n".join(lines + _findings_lines(export["examine"]))
 
 
+def _rule_settings(rule: dict[str, Any]) -> str:
+    """R3 reads "beyond max_days", so the limit belongs beside its text here."""
+    params = rule.get("params")
+    if not params:
+        return ""
+    settings = ", ".join(f"{name}: {value}" for name, value in params.items())
+    return f" ({settings})"
+
+
 def _findings_lines(examine: dict[str, Any]) -> list[str]:
     lines = [
         "## Findings",
@@ -159,7 +168,7 @@ def _findings_lines(examine: dict[str, Any]) -> list[str]:
         f"Rules run against {examine['rows_examined']} register row(s):",
     ]
     for rule in examine["rules"]:
-        lines.append(f"- `{rule['id']}` — {rule['text']}")
+        lines.append(f"- `{rule['id']}` — {rule['text']}{_rule_settings(rule)}")
     lines.append("")
     if not examine["findings"]:
         # An empty result is stated, never left as a silent pass.

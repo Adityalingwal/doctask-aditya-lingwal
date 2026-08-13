@@ -40,6 +40,10 @@ SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
 SHIPPED_RULES = ("R1", "R2", "R3", "R4")
 DELIVERABLE_CHECKS = ("D1", "D2")
+# R3's text says "beyond max_days"; the limit itself lives in the rule's
+# params, so reporting the text alone never says which limit a run was judged
+# against.
+R3_MAX_DAYS = 14
 R1_ISSUE = (
     "The register row rests on a meeting note; no client requirements document "
     "read for this project states it in writing."
@@ -199,6 +203,12 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     assert "No findings" in markdown
     for rule_id in SHIPPED_RULES + DELIVERABLE_CHECKS:
         assert rule_id in markdown
+    # Naming R3 is not stating what ran while its limit stays hidden: nothing
+    # here would tell a reader whether 14 days applied or 30.
+    for reported in (waiting["examine"]["rules"], export["examine"]["rules"]):
+        r3 = next(rule for rule in reported if rule["id"] == "R3")
+        assert r3["params"] == {"max_days": R3_MAX_DAYS}
+    assert f"max_days: {R3_MAX_DAYS}" in markdown
 
 
 def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
