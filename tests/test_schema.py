@@ -43,6 +43,7 @@ EXPECTED_COLUMNS = {
         "ended_early_reason",
         "failure_reason",
         "export_json",
+        "review_finished_at",
         "created_at",
     },
     "documents": {
