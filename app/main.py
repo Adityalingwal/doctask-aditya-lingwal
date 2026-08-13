@@ -14,13 +14,13 @@ from psycopg_pool import AsyncConnectionPool
 from app.api.routes import router
 from app.database import build_connection_pool
 from app.graph.register_graph import build_register_graph
-from app.ingest.collect_batch import READER_EXTENSIONS
+from app.ingest.read_source_document import READER_EXTENSIONS
 from app.model.client import build_model_client
 from app.projects.create_project import ensure_demo_project
 from app.run_logging import log_run_event
 from app.runs.run_lifecycle import RunEngine, resume_unfinished_runs
 from app.startup import (
-    load_accepted_extensions,
+    load_formats_config,
     migrate_database,
     report_formats_without_readers,
 )
@@ -51,9 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         FORMATS_CONFIG_PATH,
         READER_EXTENSIONS,
     )
-    accepted_extensions = frozenset(
-        await asyncio.to_thread(load_accepted_extensions, FORMATS_CONFIG_PATH)
-    )
+    formats = await asyncio.to_thread(load_formats_config, FORMATS_CONFIG_PATH)
 
     pool = build_connection_pool(database_url)
     await pool.open(wait=True)
@@ -65,7 +63,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.run_engine, app.state.run_engine_unavailable = _build_run_engine(
         pool,
         checkpointer,
-        accepted_extensions,
+        frozenset(formats.accepted_extensions),
+        formats.page_limit,
     )
 
     async with pool.connection() as connection:
@@ -87,6 +86,7 @@ def _build_run_engine(
     pool: AsyncConnectionPool,
     checkpointer: AsyncPostgresSaver,
     accepted_extensions: frozenset[str],
+    page_limit: int,
 ) -> tuple[RunEngine | None, str | None]:
     """Build the one model client and the graph that is handed it.
 
@@ -111,6 +111,7 @@ def _build_run_engine(
         checkpointer,
         PROJECT_ROOT,
         accepted_extensions,
+        page_limit,
     )
     return RunEngine(graph=graph, pool=pool, checkpointer=checkpointer), None
 

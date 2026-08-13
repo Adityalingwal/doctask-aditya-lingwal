@@ -9,10 +9,10 @@ from uuid import UUID, uuid4
 from psycopg import AsyncConnection
 
 from app.extract.answer import UNRELATED_DOCUMENT
-from app.ingest.read_markdown import MARKDOWN_EXTENSION, read_markdown
+from app.ingest.read_source_document import READER_EXTENSIONS, read_source_document
+from app.ingest.unreadable_document import DocumentUnreadable
 
 
-READER_EXTENSIONS = frozenset({MARKDOWN_EXTENSION})
 SKIPPED_FILE_KIND = "file"
 
 
@@ -27,6 +27,7 @@ async def collect_batch(
     project_id: UUID,
     source_folder: Path,
     accepted_extensions: frozenset[str],
+    page_limit: int,
 ) -> CollectedBatch:
     """Take every new or changed file waiting in the project's folder."""
     document_ids: list[UUID] = []
@@ -50,14 +51,21 @@ async def collect_batch(
                 skipped.append(
                     _skipped(
                         path.name,
-                        f"no reader for {extension} in this release — only "
-                        f"{MARKDOWN_EXTENSION} documents are read so far.",
+                        f"no reader for {extension} in this release — the "
+                        "formats read so far are "
+                        f"{', '.join(sorted(READER_EXTENSIONS))}; remove the "
+                        "line from config/formats.yaml or add a reader for it.",
                     )
                 )
                 continue
 
             try:
-                text = await asyncio.to_thread(read_markdown, path)
+                text = await asyncio.to_thread(
+                    read_source_document, path, page_limit
+                )
+            except DocumentUnreadable as unreadable:
+                skipped.append(_skipped(path.name, str(unreadable)))
+                continue
             except OSError as error:
                 skipped.append(
                     _skipped(

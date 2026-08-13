@@ -15,7 +15,12 @@ from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
-from app.extract.answer import UNRELATED_DOCUMENT, describe_unreadable_answer
+from app.extract.answer import (
+    PRIMARY_DOCUMENT_TYPES,
+    UNRELATED_DOCUMENT,
+    UnrecognisedDocumentType,
+    describe_unreadable_answer,
+)
 from app.extract.read_document import locate_extraction, read_one_document
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import (
@@ -89,6 +94,7 @@ def build_register_graph(
     checkpointer: AsyncPostgresSaver,
     project_root: Path,
     accepted_extensions: frozenset[str],
+    page_limit: int,
 ) -> CompiledStateGraph:
     """Wire the five slice 1b stages, with everything they need passed in."""
 
@@ -114,6 +120,7 @@ def build_register_graph(
                 project_id,
                 source_folder,
                 accepted_extensions,
+                page_limit,
             )
             await append_skipped(connection, run_id, batch.skipped)
 
@@ -149,6 +156,27 @@ def build_register_graph(
             answer = await read_one_document(
                 model_client, source_file, document["extracted_text"]
             )
+        except UnrecognisedDocumentType as unrecognised:
+            reason = (
+                f"{source_file} was skipped: {unrecognised}. The other "
+                "documents in the batch continue and the next run reads this "
+                "one again; if the type keeps coming back invented, name a "
+                "stronger model in config/model.yaml."
+            )
+            _log(logging.WARNING, "extract_document_type_unrecognised", reason, run_id)
+            async with pool.connection() as connection:
+                await append_skipped(
+                    connection,
+                    run_id,
+                    [
+                        {
+                            "kind": SKIPPED_DOCUMENT_KIND,
+                            "file": source_file,
+                            "reason": reason,
+                        }
+                    ],
+                )
+            return {"next_document_index": index + 1}
         except Exception as error:
             # One document degrades the run; a broken setup stops it, because
             # skipping every document would export an empty register instead
@@ -178,8 +206,12 @@ def build_register_graph(
         located = locate_extraction(answer, document["extracted_text"], source_file)
         skipped = list(located.dropped)
         requirements_found = len(located.extraction["requirements"])
-        if answer.document_type == UNRELATED_DOCUMENT:
+        if answer.document_type not in PRIMARY_DOCUMENT_TYPES:
+            # A related additional document is still read, labelled and stored
+            # for what it adds to a row; what it may not do is put a row in the
+            # register by itself.
             requirements_found = 0
+        if answer.document_type == UNRELATED_DOCUMENT:
             skipped.append(
                 {
                     "kind": SKIPPED_DOCUMENT_KIND,
@@ -213,7 +245,7 @@ def build_register_graph(
             f"Extract read {source_file} and traced {requirements_found} "
             f"requirement(s) to its own words.",
             run_id,
-            document_type=answer.document_type,
+            document_type=answer.document_type.value,
             dropped=len(located.dropped),
         )
         return {
@@ -376,7 +408,7 @@ def build_register_graph(
         requirements: list[dict[str, Any]] = []
         for document in await result.fetchall():
             extraction = document["extraction"]
-            if extraction["document_type"] == UNRELATED_DOCUMENT:
+            if extraction["document_type"] not in PRIMARY_DOCUMENT_TYPES:
                 continue
             for requirement in extraction["requirements"]:
                 requirements.append(

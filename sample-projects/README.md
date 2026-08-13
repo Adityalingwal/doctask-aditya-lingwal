@@ -21,10 +21,9 @@ The demo project contains four documents:
 | `intake-portal/meeting-notes-20-mar.md` | WhatsApp is waiting on API credentials the client has not sent. Also carries a buried prompt-injection line the run must report and refuse to follow |
 | `intake-portal/testing-feedback-25-mar.md` | Form and email work; the list page opens but has no search — "this is essential" |
 
-Slice 1 uses only `meeting-notes-10-mar.md`. The other three documents arrive
-with the later slices that need matching, blocker, testing, and rule-finding
-behaviour. The document descriptions are designed; the files themselves are
-written when their implementation slices are built.
+All four documents are written. Slice 1 uses only `meeting-notes-10-mar.md`;
+the other three are read by the later slices that need matching, blocker,
+testing, and rule-finding behaviour.
 
 ## The second-run project — Northside Dental
 
@@ -59,8 +58,9 @@ and comes back.
 | 6 | `clinic-staff-leave-policy.pdf` | Nothing to do with this engagement — must be skipped with its reason recorded | **Unrelated** |
 
 **Formats are deliberately mixed.** `intake-portal` is entirely `.md`. This
-corpus uses `.md`, `.docx` and `.pdf`, so a second run also proves the declared
-format set genuinely works rather than only the one format the demo used.
+corpus uses `.md`, `.docx` and `.pdf`, so a second run reads three of the four
+declared formats rather than only the one the demo used. No corpus carries a
+`.txt` document; that reader is covered by `tests/test_document_readers.py`.
 
 **The related additional and unrelated documents are both present on
 purpose.** The locked document-type handling requires the second-run test to
@@ -106,7 +106,13 @@ corpus has exactly one job: prove the system works on documents it has never
 seen. Put injection in it and one run is proving two unrelated things, so a
 failure no longer says which property broke.
 
-No document file exists here yet. The six files are described now and written
-when their implementation slices arrive, exactly as for the demo project.
+All six files are written, under `northside-dental/`. The `.docx` and the two
+`.pdf` files cannot be hand-edited, so they are produced by
+`write_northside_dental_binaries.py` in this folder rather than committed as
+binaries nobody can review:
+
+```bash
+docker compose run --rm app python sample-projects/write_northside_dental_binaries.py
+```
 
 Accepted formats and document types are declared in `DECISIONS.md`.

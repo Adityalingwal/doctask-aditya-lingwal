@@ -4,11 +4,12 @@ from pathlib import Path
 
 
 MARKDOWN_EXTENSION = ".md"
+TEXT_EXTENSION = ".txt"
 PRIMARY_ENCODING = "utf-8"
 FALLBACK_ENCODING = "latin-1"
 
 
-def read_markdown(path: Path) -> str:
+def read_text_document(path: Path) -> str:
     raw_bytes = path.read_bytes()
     try:
         return raw_bytes.decode(PRIMARY_ENCODING)

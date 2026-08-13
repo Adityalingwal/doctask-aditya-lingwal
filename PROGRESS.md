@@ -9,17 +9,19 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 ## Snapshot — 2026-08-13
 
 - Slice 1 (1a + 1b + eight review fixes) is merged into `main`.
-- 55 tests pass without a live API key.
+- The formats and types slice is built on `formats-and-types`, not yet merged.
+- 62 tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
-- Implemented pipeline: `.md` Ingest → Extract → Match → Review → Commit.
+- Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
+  Match → Review → Commit.
 - Implemented interface: six FastAPI endpoints, startup demo-project seed,
   review queue, JSON/Markdown export.
 - Verified reliability: real-process `SIGKILL` resume, no repeated completed
   extraction, Ingest/Match re-entry safety, honest terminal statuses.
 - Durable per-project lock and one waiting-run queue are built; dedicated
   concurrency proof is pending.
-- Demo corpus has one actual document. Three remaining intake-portal documents
-  and six Northside Dental documents are designed but not written.
+- Both synthetic corpora are written: four intake-portal documents and the six
+  Northside Dental documents in `.md`, `.docx` and `.pdf`.
 
 ## Completed
 
@@ -46,11 +48,23 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] Real child-process kill/startup-resume proof.
 - [x] `review_finished_at` replay guard and loopback-only network bind.
 
+### Formats and types slice (branch `formats-and-types`)
+
+- [x] PDF, DOCX and plain-text readers behind one format dispatch.
+- [x] Document type as a Pydantic enum; an invented type skips that document.
+- [x] Related additional read and labelled but never a row on its own.
+- [x] Page limit lowered to 20 and enforced in the dispatch.
+- [x] Per-format citation places: PDF page, Markdown heading, DOCX/TXT line.
+- [x] Reader text carries no invented characters, and a damaged PDF or Word
+      file is skipped with its reason instead of ending the batch.
+- [x] Both synthetic corpora written, with the binaries generated from a
+      committed script.
+
 ## In progress / next slices
 
 | Order | Slice | Scope | Current state |
 |---|---|---|---|
-| 1 | Formats and types | PDF/DOCX/TXT readers, page limit, bucket enforcement, second corpus files | Next |
+| 1 | Formats and types | PDF/DOCX/TXT readers, page limit, bucket enforcement, second corpus files | Built on `formats-and-types`; awaiting review and merge |
 | 2 | Rules and findings | Examine, findings table, config snapshot/fingerprint, R1–R4/D1–D2 | Waiting on audit-schema blocker |
 | 3 | MCP | Six thin in-process tools over shared core functions | Designed |
 | 4 | Incremental proof | Watched folder, focused proposals, byte-identical unchanged-row proof | Designed |
@@ -67,10 +81,7 @@ working claim only after its own implementation and proof land.
    and constrained to seven register cells, while the contract requires events
    such as a finding attached to a row. Resolve in the rules/findings slice
    before attachments are written.
-2. **Document-type buckets are not enforced.** Extract accepts expected values,
-   but only `unrelated` changes control flow; an unexpected type is treated as
-   related. Resolve in the formats/types slice.
-3. **Development Compose mount is too broad for final proof.** `.:/workspace`
+2. **Development Compose mount is too broad for final proof.** `.:/workspace`
    is intentionally retained for iteration, exposes local `.env`, and lets
    local files override the image. Remove/narrow it and wipe stale dev DB
    before final image-only/fresh-clone verification.
@@ -88,7 +99,18 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
-- Only `.md` is implemented although four formats are declared.
+- The 20-page limit binds `.pdf` only; Markdown, plain text and Word report no
+  page count and none is invented for them.
+- A `.docx` citation names a line of the extracted text, not a line Word
+  displays, so it cannot be jumped to inside Word; the quoted words are how the
+  passage is found. Naming the Word heading instead needs headings to leave the
+  reader without being written into the text — deferred to a later improvement,
+  not refused.
+- A quote spanning two `.docx` table cells is not found, because each cell is
+  its own line; that requirement is dropped with its reason.
+- A related additional document that lists requirements, in a run that never
+  exports, is not counted as already read, so the next run reads and pays for
+  it again. A related additional document that lists none is unaffected.
 - One Extract call may repeat in the answer-to-checkpoint kill window.
 - A rejected finding stays suppressed if later evidence strengthens it.
 - Files arriving during Review wait; that run holds the project lock.
@@ -97,20 +119,20 @@ working claim only after its own implementation and proof land.
 
 ## Next three actions
 
-1. Finish this documentation compaction and independent review; merge only
-   after zero-loss and consistency checks pass.
-2. Build the formats/type slice, including bucket enforcement and the remaining
-   synthetic corpus files needed for its tests.
-3. Start rules/findings only after its brief explicitly includes the audit
+1. Review and merge the formats and types branch.
+2. Start rules/findings only after its brief explicitly includes the audit
    attachment-schema blocker.
+3. Decide whether the already-read rule should settle a related additional
+   document the way it settles an unrelated one.
 
 ## Verification evidence
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-13, `bind-and-review-replay` branch | 55 passed, no live key |
+| `docker compose run --rm app pytest` | 2026-08-13, `formats-and-types` branch | 62 passed, no live key |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
 | API flow | Slice 1 | One run driven by hand through review/export |
+| Northside Dental corpus run | 2026-08-13, `formats-and-types` branch | 6 documents read across `.md`/`.docx`/`.pdf`; unrelated skipped, related additional labelled without a row; 7 rows exported |
 | Live model | Never | Unverified |
 | Concurrency suite | Not run/built yet | Mechanism exists; proof pending |
 | Fresh clone/image-only | Not run yet | Open release gate |

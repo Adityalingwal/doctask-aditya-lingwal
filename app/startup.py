@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import yaml
 from alembic import command
@@ -39,7 +39,12 @@ def migrate_database(project_root: Path, database_url: str) -> None:
     )
 
 
-def load_accepted_extensions(config_path: Path) -> tuple[str, ...]:
+class FormatsConfig(NamedTuple):
+    accepted_extensions: tuple[str, ...]
+    page_limit: int
+
+
+def load_formats_config(config_path: Path) -> FormatsConfig:
     try:
         raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
@@ -67,15 +72,21 @@ def load_accepted_extensions(config_path: Path) -> tuple[str, ...]:
             f"{config_path} accepted_extensions must be a list of strings — "
             "fix that key before starting the application."
         )
-    return tuple(accepted_extensions)
+
+    page_limit = raw_config.get("document_page_limit")
+    if not isinstance(page_limit, int) or page_limit < 1:
+        raise RuntimeError(
+            f"{config_path} document_page_limit must be a whole number of "
+            "pages above zero — fix that key before starting the application."
+        )
+    return FormatsConfig(tuple(accepted_extensions), page_limit)
 
 
 def report_formats_without_readers(
     config_path: Path,
     available_reader_extensions: frozenset[str],
 ) -> None:
-    configured_extensions = load_accepted_extensions(config_path)
-    for extension in configured_extensions:
+    for extension in load_formats_config(config_path).accepted_extensions:
         if extension in available_reader_extensions:
             continue
         relative_path = Path("config") / config_path.name
