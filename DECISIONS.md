@@ -141,13 +141,15 @@ export is always gated.
 - **Change window:** An answer may change until `finish-review`. That endpoint
   refuses unanswered decisions and atomically claims the transition before it
   launches graph continuation.
-- **Review replay:** `review_finished_at` is locked as the durable fact that
-  prevents a finished Review node reopening after a crash. **Locked, not
-  implemented**; add migration, guards, and
-  `test_finished_review_does_not_reopen_on_resume`.
+- **Review replay:** `review_finished_at` (migration `20260813_0004`) is the
+  durable fact that stops a finished Review node reopening after a crash; the
+  Review node and `submit_decision` both gate on it, not on status alone.
+  Proven by `test_finished_review_does_not_reopen_on_resume` and
+  `test_decision_refused_after_review_finished_even_if_status_regresses` in
+  `tests/test_finish_review.py`.
 - **Evidence:** Possible-match and export decisions, incomplete-review refusal,
-  atomic finish claim, merge/reject, and export paths are tested. The narrow
-  post-finish crash window remains unimplemented.
+  atomic finish claim, merge/reject, export paths, and the post-finish
+  crash-replay window are tested.
 
 ## Input and incremental updates
 
@@ -397,9 +399,8 @@ false-success `done` run.
   where execution is, DB answers what was decided.
 - Startup resumes `running` runs from checkpoints; deliberate `failed` runs do
   not resume.
-- **Evidence/status:** Real child-process `SIGKILL` resume and Ingest/Match
-  re-entry are verified. The `review_finished_at` replay guard is locked but
-  not implemented.
+- **Evidence/status:** Real child-process `SIGKILL` resume, Ingest/Match
+  re-entry, and the `review_finished_at` replay guard are verified.
 
 ### D13 — identity, queue, and statuses
 
@@ -505,10 +506,11 @@ slice-1 scope.
   Fresh-clone proof is still open; do not present it as completed.
 - Planned run is `docker compose up`; migrations run on startup. A live run
   needs an OpenRouter key, tests do not.
-- **Network bind:** Loopback-only host exposure is locked: bare app defaults
-  `APP_HOST=127.0.0.1`; Compose binds app internally to `0.0.0.0` but publishes
-  `127.0.0.1:8000:8000`. **Locked, not implemented**: Dockerfile/Compose
-  currently expose `8000`, and code does not read `APP_HOST`.
+- **Network bind:** Loopback-only host exposure is implemented: the
+  Dockerfile's `uvicorn` reads `APP_HOST`, defaulting to `127.0.0.1`; Compose
+  sets `APP_HOST=0.0.0.0` for the app service (required inside the container)
+  and publishes `127.0.0.1:8000:8000`, matching `db`. Proven by
+  `tests/test_loopback_bind.py`.
 - **Known development limitation:** Broad `.:/workspace` bind mount is retained
   for iteration. Remove/narrow it and clear stale dev DB before final
   image-only verification.
@@ -538,9 +540,8 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized documents will be skipped once later readers implement the limit;
   chunking/OCR are not planned for V1.
-- Review-reentry marker, watched folder, rules/findings, MCP, React,
-  incremental unchanged-row proof, cost/timing, and loopback bind are locked
-  but not implemented.
+- Watched folder, rules/findings, MCP, React, incremental unchanged-row proof,
+  and cost/timing are locked but not implemented.
 
 ## Superseded index
 

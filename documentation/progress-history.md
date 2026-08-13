@@ -8,6 +8,21 @@ actions live in root `PROGRESS.md`; the exact byte-for-byte source is
 
 New completed entries are added newest-first below this header.
 
+**2026-08-13.** Built the two decisions locked earlier the same day and
+deliberately left unbuilt: the `review_finished_at` replay guard and the
+loopback-only network bind. Migration `20260813_0004` adds
+`runs.review_finished_at`; `claim_review_finished` sets it in the same
+statement that takes a run out of review; the Review node and `submit_decision`
+both gate on it, so a crash-and-restart resume can no longer replay the
+pre-interrupt work and reopen a finished review. The Dockerfile's `uvicorn` now
+reads `APP_HOST`, defaulting to `127.0.0.1`, via an exec'd shell command so
+`SIGKILL` still reaches `uvicorn` as PID 1; Compose sets `APP_HOST=0.0.0.0` for
+the app service and publishes `127.0.0.1:8000:8000`, matching `db`. Proof:
+`test_finished_review_does_not_reopen_on_resume` and
+`test_decision_refused_after_review_finished_even_if_status_regresses` in
+`tests/test_finish_review.py`; `tests/test_loopback_bind.py`. Full suite: 55
+passed, no live API key.
+
 ---
 
 # PROGRESS.md (historical source)
