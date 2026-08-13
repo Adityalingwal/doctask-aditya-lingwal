@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, FastAPI, Query, Request, status
 from fastapi.responses import JSONResponse, PlainTextResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.projects.create_project import create_project
 from app.refusal import NotPossibleNow, RunsUnavailable, UnknownId, UnusableRequest
@@ -32,8 +32,10 @@ REFUSAL_STATUS_CODES = (
 
 
 class CreateProject(BaseModel):
-    name: str = Field(min_length=1)
-    source_folder_path: str = Field(min_length=1)
+    # Both fields are only carried here. What counts as usable is core's answer,
+    # so that this door and the MCP tool refuse the same request the same way.
+    name: str
+    source_folder_path: str
 
 
 class StartRun(BaseModel):

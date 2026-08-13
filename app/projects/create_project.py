@@ -24,7 +24,26 @@ async def create_project(
     source_folder_path: str,
     project_root: Path,
 ) -> UUID:
-    """The one way a project is created — the endpoint and startup both use it."""
+    """The one way a project is created — every door and startup use this.
+
+    What a project may be called and where it may read from is decided here,
+    not at a door, so the endpoint, the MCP tool and startup all get the same
+    answer to the same request.
+    """
+    if not name.strip():
+        raise UnusableRequest(
+            "a project needs a name — give one that says whose work it tracks, "
+            "then create the project again."
+        )
+    # An empty path resolves to the project root, which is a real directory, so
+    # the folder check below would accept it and the project would end up
+    # watching the whole repository.
+    if not source_folder_path.strip():
+        raise UnusableRequest(
+            "a project needs a source folder — give the path of the folder its "
+            "documents arrive in, then create the project again."
+        )
+
     folder = Path(source_folder_path)
     resolved = folder if folder.is_absolute() else project_root / folder
     if not resolved.is_dir():

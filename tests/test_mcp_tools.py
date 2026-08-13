@@ -117,6 +117,43 @@ def test_a_tool_and_its_endpoint_answer_one_operation_identically(
     assert refused_over_http.json()["detail"] in refused_through_mcp.text
 
 
+def test_neither_door_creates_a_project_with_an_empty_name_or_folder(
+    tmp_path: Path,
+) -> None:
+    """An empty path is the one the folder check cannot catch.
+
+    `Path("")` resolves to the project root, which is a real directory, so the
+    call succeeds and the project watches the whole repository — every
+    supported file in it read as a client document on the next run.
+    """
+    with _application(tmp_path) as (application, database_url, _source_folder):
+        with application.client() as client:
+            refused_over_http = client.post(
+                "/projects", json={"name": "", "source_folder_path": ""}
+            )
+
+        refused_through_mcp = call_tool(
+            application.base_url,
+            "create_project",
+            {"name": "", "source_folder_path": ""},
+        )
+
+        engine = create_engine(database_url)
+        with engine.connect() as connection:
+            folders = (
+                connection.execute(text("SELECT source_folder_path FROM projects"))
+                .scalars()
+                .all()
+            )
+        engine.dispose()
+
+    assert refused_over_http.status_code == 400
+    assert refused_through_mcp.refused is True
+    # One refusal, worded once in core, whichever door asked for it.
+    assert refused_over_http.json()["detail"] in refused_through_mcp.text
+    assert "" not in folders
+
+
 def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
     tmp_path: Path,
 ) -> None:
