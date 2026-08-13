@@ -91,7 +91,10 @@ Phase 4's items are per-slice, not a gate before implementation.
 - [ ] Define the no-live-key automated test strategy. Slice 1 is settled;
       later slices add their own tests.
 - [x] Plan implementation slices and repository boilerplate.
-- [ ] Plan fresh-clone verification and demo evidence capture.
+- [ ] Plan fresh-clone verification and demo evidence capture. One demo step is
+      already chosen: raise R3's `max_days` from 14 to 30 in `config/rules.yaml`,
+      re-run, and show the R3 finding disappear — configuration over code proved
+      on screen rather than asserted.
 
 ## Assumptions
 
