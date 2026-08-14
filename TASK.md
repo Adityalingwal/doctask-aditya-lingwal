@@ -279,9 +279,12 @@ the loop never advances past one of them on its own.
 7. **Ask whether to open and merge the pull request. Gate two.** On his yes,
    open it, merge it, then confirm it actually landed on `main` and pull.
 
-8. **Clean up**: remove the worktree, delete the branch locally and on the
-   remote, and delete the spent `handoff/` briefs. A stale brief read in a
-   later session is worse than no brief.
+8. **Clean up, in this order**: remove the worktree **first**, then delete the
+   branch locally and on the remote, then delete the spent `handoff/` briefs.
+   The order matters — git refuses to delete a branch a worktree still holds,
+   and `gh pr merge --delete-branch` stops at that refusal without ever
+   reaching the remote, leaving a merged branch alive on GitHub. A stale brief
+   read in a later session is worse than no brief.
 
 9. **Then, and only then, start the conversation about the next brief. Gate
    three.**
