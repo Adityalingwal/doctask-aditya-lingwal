@@ -241,13 +241,23 @@ A change is done only when all of these are true:
 
 ## Git
 
-Everything happens on a feature branch. The one button that makes a change
-permanent — merge — stays with Aditya.
+Work happens on a feature branch. **The decision to make a change permanent
+stays with Aditya; pressing the button may not.** He says so in chat, once per
+change, and only then does Claude act on it.
 
-- Work on a feature branch. Never commit directly to `main`.
-- Commit and push freely on that branch.
-- Opening a pull request is fine. Merging one is not.
-- **Never merge.** That is Aditya's call, always.
+- Default to a feature branch. Commit and push freely on it.
+- **A background agent never opens a pull request and never merges**, whatever
+  it was asked to build. It pushes its branch and reports.
+- **Claude may open and merge a pull request only after Aditya says so in
+  chat**, and only for the change being discussed at that moment. One approval
+  covers one merge; it never carries to the next one. Never merge on Claude's
+  own initiative, and never because a task looks finished.
+- **A small change may go straight to `main` — but ask first.** Claude proposes
+  it, Aditya decides; without his answer it goes on a branch like anything
+  else. Anything that touches the pipeline, the schema or a migration takes a
+  branch regardless of size.
+- After a merge: confirm it landed on `main`, pull, then remove the worktree,
+  the branch and the spent `handoff/` brief.
 - Never force-push and never rewrite shared history.
 
 ### Message sizes
