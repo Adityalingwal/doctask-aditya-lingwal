@@ -245,7 +245,7 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `react-review-screen` branch: **119 passed**, real
+Last verified on the `react-review-screen` branch: **124 passed**, real
 PostgreSQL, no live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
@@ -273,8 +273,12 @@ the next run and never to one already under way or already finished. Point
 - Scanned PDFs are skipped rather than read; there is no OCR.
 - A related additional document that lists requirements, in a run that never
   exports, is read again by the next run.
-- The durable per-project lock and waiting queue are built, but dedicated
-  concurrency tests are pending.
+- Text in a document that addresses the system is reported and never acted on,
+  but the only place that report reaches a person is the run's log line: it is
+  in neither the run status nor the export.
+- Run events below `WARNING` are dropped as the application is shipped, because
+  uvicorn's logging configuration gives the run logger no handler; warnings and
+  errors still reach the container's output.
 - A kill after a model response but before its checkpoint can repeat that one
   paid call; earlier completed calls and register rows do not duplicate.
 - A run waiting for Review holds the project lock; later files wait.

@@ -8,6 +8,30 @@ actions live in root `PROGRESS.md`; the exact byte-for-byte source is
 
 New completed entries are added newest-first below this header.
 
+**2026-08-14.** Built the reliability slice on `reliability-proof`, cut from
+`main` at `bb24476`. Written before anything else: the five never-do tests, run
+at that baseline. All five passed there, so this slice added no production code
+and changed none — the lock, the queue and the Extract path were already right
+and are now proven. Built: `tests/test_two_projects_at_once.py`, which runs two
+projects over one database and shows them live together twice over, by a polled
+status and by two model calls started inside the scripted call delay, then
+checks that no row, citation, decision, finding or log line of one appears in
+the other; `tests/test_same_project_queue.py`, which holds one waiting run
+across four requests, proves that run's batch is formed when it starts rather
+than when it was queued, and picks it up after a `done` run and after a
+`failed` one; and `tests/test_document_instruction_is_reported.py`, which
+drives `meeting-notes-20-mar.md` and its buried line through a real run and
+finds it stored and logged as an embedded instruction, with no row, no cell, no
+gated proposal and no export carrying it. The test harness gained a run-event
+log the application can be started with, model-call timestamps, and readers for
+a run's findings and a document's stored extraction. A negative control,
+written and then deleted, confirmed the overlap check reports no overlap when
+the same two projects run one after the other. Two limitations were found and
+recorded rather than fixed: a reported instruction has no surface a person
+reads, and run events below `WARNING` reach nothing under the shipped uvicorn
+logging configuration. Proof: 122 passed, no live API key; the three new files
+five times in a row, five passes.
+
 **2026-08-14.** Built the incremental update slice on `incremental-update`,
 cut from `main` at `4132a2e`. Written before its code: the seven never-do
 tests, run at that baseline. Three of them failed there and now pass — the
