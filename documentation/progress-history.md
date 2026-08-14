@@ -8,6 +8,60 @@ actions live in root `PROGRESS.md`; the exact byte-for-byte source is
 
 New completed entries are added newest-first below this header.
 
+**2026-08-15.** Removed requirement withdrawal on `read-each-document-once`,
+cut from `main` at `826534e`. Written before any implementation: never-do
+tests for an edited document, a renamed document, a deleted document, an
+unsure match staying gated, a document whose model call failed being read
+again, and the rules-only route, run at that baseline. Editing and renaming
+both failed there with a `TimeoutError` waiting for `ended without changes`,
+because the pre-removal already-read check matched on name AND content, so
+either kind of change was still treated as a new document; the other four
+passed as regression guards. Built: `app/ingest/collect_batch.py`'s
+already-read check changed one operator — `AND` to a parenthesised `OR` — so
+a document already read by either its name or its content is skipped, and
+the skip reason now names which of the two matched and what to do about it
+(save an edited document under a new name; a renamed one needs nothing).
+`app/register/withdraw_rows.py` deleted outright; `app/graph/register_graph.py`
+lost the `withdraw_rows` import, `RunState`'s `reads_a_row_source_again` and
+`withdrawals_proposed` fields, and the half of each of `_route_after_extract`
+and `_route_after_match` that existed only for withdrawal —
+`_route_after_ingest` and the rules-only route it drives were read carefully
+and left untouched. `_early_reason`'s `REGISTER_UNCHANGED` string removed
+with it: `app/register/propose_rows.py` inserts one proposed row per
+requirement unconditionally, so once Match runs — which now only happens
+when the batch found a requirement — it always has something to propose, and
+that reason string had become unreachable. `STATUS_WITHDRAWN`,
+`WITHDRAWAL_DECISION`, `raise_withdrawal_decision`,
+`decisions.source_document_id`, and `CommitResult.withdrawn_row_numbers`
+removed with their call sites; each deleted symbol was grepped across the
+repository afterward to confirm nothing was left importing or asserting on
+it. Migration `20260814_0011` (`down_revision = "20260814_0010"`) drops
+`decisions.source_document_id` and its foreign key, deletes any
+`'withdrawal'`-kind decision before narrowing `ck_decisions_kind` back to
+three kinds (the same technique `20260814_0007`'s own downgrade used for that
+constraint), and refuses — naming the row count, the cause, and the fix —
+rather than delete or reguess a `'Withdrawn'` row's status before narrowing
+`ck_register_rows_status`, the same way `20260814_0007`'s downgrade refuses
+for that column. Proven by hand on a real database holding an approved
+withdrawal, built from the pre-removal codebase: the forward migration
+refused exactly as designed, rolled back cleanly, completed once the row's
+status was changed, and the downgrade restored the prior schema exactly.
+`tests/register/test_withdrawal.py` deleted outright — the one deletion this
+phase authorised, the behaviour itself being deliberately removed — along
+with the re-issued-scope test in `tests/incremental/test_second_run_on_corpora.py`
+(its premise, a same-named file re-read on new content, can no longer occur)
+and the fixtures that existed only to support it
+(`sample-projects/intake-portal/second-version/`,
+`write_client_requirements`). Both corpora were hand-driven through a first
+run, a new document, an edited document and a renamed document, matching the
+suite's own proof. `ui/src/Question.jsx` lost the word "withdrawal" from its
+comment and gained no branch on gate kind (D15). `ui/demo/serve_demo_runs.js`
+lost its fourth `demo-review` decision; the four demo runs stayed distinct
+without it. 127 Python tests (was 129) and 27 front-end tests (unchanged)
+pass with no live key. README gained one section, "What this does not do,
+and why," stating the boundary once in the founder's own terms, with the
+workflow answer carried in the same breath as the editing limitation.
+
 **2026-08-14.** Built `runs.finished_stages`, removed timing and cost from the
 application in full, and built `GET /runs` plus its MCP tool `list_runs`, on
 `finished-stages-and-list-runs`, cut from `main` at `d4c9eab`. Written before
