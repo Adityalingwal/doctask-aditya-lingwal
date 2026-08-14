@@ -1,7 +1,7 @@
 // One component for every gate. The kind, the question and the answer are all
 // read off the decision the server froze, so a possible match, a conflict, a
-// withdrawal, a rule finding and the export gate render through this same code
-// with no branch on which of them it is.
+// rule finding and the export gate render through this same code with no
+// branch on which of them it is.
 //
 // The accent is on the left edge of a decision nobody has answered yet, and it
 // is the only accent in the card: Approve and Reject look identical, because a

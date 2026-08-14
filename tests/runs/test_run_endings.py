@@ -76,7 +76,7 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
         finally:
             application.stop()
 
-    assert "no new or changed file" in ended["ended_early_reason"]
+    assert "no new document" in ended["ended_early_reason"]
     assert ended["exported"] is False
     assert ended["failure_reason"] is None
     assert after_ending["status"] == "running"

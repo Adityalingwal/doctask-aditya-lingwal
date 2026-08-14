@@ -3358,3 +3358,116 @@ so a retry after a failed `POST /runs` skips the create and retries only
 create would leave a second project over the same folder and the watcher
 polling it twice. After a successful start the screen re-reads the run list
 and opens the id the server returned, never the values that were submitted.
+
+### Already-read matched by name AND content, to matched by name OR content (2026-08-15, superseding part of D03's batch rule)
+
+**Superseded wording**, from root `DECISIONS.md` D03 as it stood before this
+work: "**Decision:** A batch contains every new or changed file waiting when a
+run starts. A changed file is read in full; untouched files are never
+re-read." Its "Already-read rule" subsection read: "A content-identical
+document counts as read only after extraction succeeded and either: 1. its
+run exported a register; or 2. the extraction showed the document was
+unrelated or contained no requirement the register could take. This keeps a
+transiently failed extraction eligible for the next run without re-reading
+completed unrelated/no-requirement documents forever." The query behind it,
+in `app/ingest/collect_batch.py`'s `_already_read_unchanged`, matched a prior
+document on `documents.source_path = %s AND documents.content_hash = %s` — a
+file already read counted as already read only when *both* its name and its
+content matched an earlier one, so an edited file (same name, new content) or
+a renamed file (new name, same content) was read again.
+
+**Replacement:** the same query now reads
+`documents.source_path = %s OR documents.content_hash = %s`, parenthesised so
+it cannot swallow the surrounding `extraction IS NOT NULL` and
+export/unrelated/no-requirement conditions. A document counts as already read
+once *either* its name or its content matches a document an earlier, finished
+run already read; the renamed function,
+`_already_read_by_name_or_content`, reports which of the two matched so the
+skip reason can say so. A document whose model call failed still has no
+extraction and is read again regardless, unaffected by the change. The
+practical effect: an edited document (same name) is skipped and never sent to
+the model again; a renamed document (same content) is skipped the same way; a
+document new on both counts is the only one Extract still reaches. See
+README's "What this does not do, and why" for the boundary this draws for a
+user, and the next entry below for why the capability that depended on
+re-reading a changed document — withdrawal — was removed in the same piece of
+work.
+
+**Why now:** withdrawal (below) depended on a document being read again when
+it changed, to notice it had stopped asking for something a committed row was
+built on. Removing withdrawal removes the only reason to re-read a changed
+document at all, so the batch rule narrows to match: a document is read once
+per project, for its whole lifetime, by name or by content.
+
+### Requirement withdrawal removed (2026-08-15, superseding D03's Withdrawal subsection, D02's fourth gate kind, and D05's `Withdrawn` status)
+
+**Superseded wording**, from root `DECISIONS.md` D03's "Withdrawal — when a
+changed document drops a requirement" subsection as it stood before this
+work: "**Decision:** A re-read document that no longer contains a requirement
+it itself supplied raises one **withdrawal proposal** for that row. Approve
+moves that row's `Status` cell to `Withdrawn` and records absence evidence;
+Reject leaves the row byte-identical. The row is never deleted." with its
+"What may trigger it", "Why not delete", "Why not a conflict", "Gate" (`kind
+= 'withdrawal'`, `D02 scenario 3`), "Must preserve", "A withdrawal is final in
+V1", "Limitation", "Detection costs no model call" and "Suppression is the
+trigger itself" bullets, marked "**Implemented and verified** — 2026-08-14."
+D05's row-shape section listed `Withdrawn` as the seventh register status,
+set only by an approved withdrawal proposal, and its Export/audit/fingerprints
+section called withdrawal's absence citation "the first absence citation this
+system has produced." In code: `app/register/withdraw_rows.py` (`propose_
+withdrawals`, `apply_approved_withdrawals`, `batch_reads_a_document_a_row_
+came_from`, `_withdraw_one_row`, `_cite_the_absence`), `STATUS_WITHDRAWN` in
+`app/register/cells.py`, `WITHDRAWAL_DECISION`/`raise_withdrawal_decision` in
+`app/review/review_queue.py`, `decisions.source_document_id` (migration
+`20260814_0008`), the `'withdrawal'` member of `ck_decisions_kind` and the
+`'Withdrawn'` member of `ck_register_rows_status` (migration `20260814_0007`),
+`RunState`'s `reads_a_row_source_again`/`withdrawals_proposed` fields and the
+routing they fed in `app/graph/register_graph.py`, `CommitResult.withdrawn_
+row_numbers`, and `tests/register/test_withdrawal.py`.
+
+**Replacement:** the whole capability is deleted, not disabled — no column,
+status, decision kind, module, graph route, or screen branch survives.
+`app/register/withdraw_rows.py` is gone. `app/graph/register_graph.py` no
+longer imports it, no longer carries `reads_a_row_source_again` or
+`withdrawals_proposed` in `RunState`, and its two routing functions lose only
+the half of their condition that existed for withdrawal:
+`_route_after_extract` no longer routes to Match on `reads_a_row_source_
+again` alone (only `requirements_found` still does), and `_route_after_match`
+no longer routes to Examine on `withdrawals_proposed` alone (only
+`proposed_rows` still does) — `_route_after_ingest` and its rules-only route
+are untouched. `_early_reason`'s `REGISTER_UNCHANGED` string is removed with
+it: `app/register/propose_rows.py` inserts one proposed row per requirement
+unconditionally, so once Match runs at all — which now only happens when the
+batch found a requirement — it always has something to propose, and the
+reason a run reaching Match ends early without proposing anything can no
+longer occur. Migration `20260814_0011` (`down_revision = "20260814_0010"`)
+drops `decisions.source_document_id` and its foreign key, narrows
+`ck_decisions_kind` back to `'possible match'`/`'export'`/`'finding'`
+(deleting any `'withdrawal'`-kind decision first, the same way `20260814_0007`'s
+own downgrade dropped what an earlier shape could not hold), and narrows
+`ck_register_rows_status` to drop `'Withdrawn'` — refusing with a named cause
+and fix, the same way `20260814_0007`'s downgrade refuses, if a
+`'Withdrawn'` row exists rather than silently deleting or reguessing its
+status. `tests/register/test_withdrawal.py` is deleted outright (the one
+deletion this phase authorises, because the behaviour itself is deliberately
+removed) along with the corpus test built only to exercise it,
+`test_the_re_issued_corpus_requirements_document_withdraws_the_row_it_
+dropped`, and its supporting fixtures (`sample-projects/intake-portal/second-
+version/`, `tests/documents/register_documents.py`'s `write_client_
+requirements`).
+
+**Why now:** withdrawal has only ever run against the scripted client — no
+live model call has ever been made in this repository — and it is the part
+of the system that changes an already-committed row, the riskiest thing to
+get wrong on unproven ground. This phase cuts scope rather than adds: a
+smaller system that fully works, with its boundary written down (README's
+"What this does not do, and why"), is worth more than a larger one whose
+edges were never exercised. The founder's own working notes (`documentation/
+superdocs-engineering-task/superdocs-round2-working-notes.md`, line 158) ask
+only for "the new file and what it affects" to be processed; nothing in the
+brief asks for a changed document's evidence to be taken back out of the
+register, and D02's scenario 3 ("new document changes an existing row's
+meaning") that withdrawal alone had implemented had never been asked for by
+the brief either — it was our own decision, dated 2026-08-14, now reversed
+the next day once the model-call risk was weighed against how little of the
+brief it served.

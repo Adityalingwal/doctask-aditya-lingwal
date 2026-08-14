@@ -39,7 +39,8 @@ Do not turn our choices into brief claims.
 - **Finding** — a rule violation raised for human review.
 - **Rule** — one user-supplied statement of what should have been true.
 - **Project** — one client engagement, continuing register, and source folder.
-- **Batch** — the new or changed files one run picks up.
+- **Batch** — the files one run picks up that this project has never read
+  before, by name or content.
 - **Run** — one processing cycle for one project batch.
 - **Blocker** — work explicitly stopped by a missing answer or dependency.
 - **Delivery Owner** — the provider-side operator and human reviewer.
@@ -53,7 +54,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 |---|---|---|---|
 | D01 | Deliverable, domain, user, and run scope | Implemented and verified in slice-1 scope | Product contract |
 | D02 | Human-gate scope, actions, and review queue | Implemented and verified for slice-1 gates | Human review |
-| D03 | Incremental batching, watched-folder trigger, already-read rule, and withdrawal | Implemented and verified | Input and incremental updates |
+| D03 | Incremental batching, watched-folder trigger, and read-once rule | Implemented and verified | Input and incremental updates |
 | D04 | Formats, document types, and parsing | Mixed | Input and incremental updates |
 | D05 | Register cells, statuses, attachments, citations, and exports | Mixed | Register and evidence |
 | D06 | Audit trail and unchanged-row proof | Implemented and verified | Register and evidence |
@@ -170,8 +171,12 @@ export is always gated.
 
 ### D03 — batch and trigger
 
-- **Decision:** A batch contains every new or changed file waiting when a run
-  starts. A changed file is read in full; untouched files are never re-read.
+- **Decision:** A batch contains every file waiting when a run starts that
+  this project has never read before — matched by name or by content, either
+  alone is enough. A document already read, by either test, is skipped and
+  never read again. See "Read-once rule" below for what "already read" means,
+  and README's "What this does not do, and why" for the boundary this draws
+  for a user.
 - **Removed file:** Deleting a watched file does not delete its historical rows.
 - **Watcher:** Poll every 10 seconds and auto-start after 30 seconds of quiet,
   provided the project has no run running, at review, or queued. Manual
@@ -183,7 +188,7 @@ export is always gated.
   itself and never surprises a fresh `docker compose up` with a paid run. The
   cost is that a restart forgets what it saw; see PROGRESS limitations.
 - **Rules-only run:** When the rules a run froze differ from the ones the
-  register was last examined against and no document changed, skip
+  register was last examined against and no document is new, skip
   Extract/Match and run Examine against the existing register. It is the same
   run object, routed differently. **Implemented and verified** by
   `test_a_changed_rules_file_re_examines_the_register_without_reading_a_document`.
@@ -193,70 +198,33 @@ export is always gated.
   `tests/incremental/test_second_run_on_corpora.py` and
   `tests/incremental/test_incremental_updates.py`.
 
-### Withdrawal — when a changed document drops a requirement
+### Read-once rule
 
-- **Decision:** A re-read document that no longer contains a requirement it
-  itself supplied raises one **withdrawal proposal** for that row. Approve
-  moves that row's `Status` cell to `Withdrawn` and records absence evidence;
-  Reject leaves the row byte-identical. The row is never deleted.
-- **What may trigger it:** only the changed document whose words the row's
-  `What was asked` citation quotes, and only when that document's new
-  extraction yields neither a match nor a possible match for the row. Another
-  document's silence proposes nothing, because absence of mention is not
-  evidence of removal.
-- **Why not delete:** deleting contradicts the removed-file rule above and
-  empties the row's audit history, `First seen`, and fingerprint chain.
-- **Why not a conflict:** a conflict is two sources disagreeing. Here nothing
-  contradicts anything; something stopped being asked for.
-- **Gate:** the existing review queue as `kind = 'withdrawal'`, one decision
-  per row, Approve or Reject only — D02 scenario 3.
-- **Must preserve:** an approved withdrawal is a `Status` cell change, so it
-  writes cell audit and moves only that row's fingerprint; a rejected one is
-  retained in the run record and is not raised again until that document
-  changes again; the absence is cited to the document the question named,
-  which the decision stores, never to one worked out again afterwards.
-- **A withdrawal is final in V1.** If a later document asks for the
-  requirement again, its evidence merges onto the row as any evidence does,
-  and the row still reads `Withdrawn`. Nothing in this system updates a
-  committed row's cells from later evidence — an approved match moves
-  citations only — so there is no ordinary gate to carry it back, and no
-  honest status to carry it to: `No evidence yet` would deny testing evidence
-  the row may already hold, and the status it had before the withdrawal
-  described a world that has since changed. Deciding what a returning
-  requirement should read as is deferred, not refused.
-- **Limitation:** `Withdrawn` describes the requirement, while the other six
-  statuses describe delivery. One `Status` cell carries both, because it is
-  the one cell every export, gate, and reader already consults.
-- **Detection costs no model call:** Match already reports what the changed
-  document's new extraction matched, so a row that document supplied with
-  neither a match nor a possible match in that output is the candidate. Asking
-  a model "was this removed?" would be a second answer to a question the
-  pipeline has already answered, free to disagree with the first.
-- **Suppression is the trigger itself:** a rejected withdrawal is not raised
-  again because the document is not read again until it changes again. No
-  second piece of state remembers the rejection.
-- **Status:** **Implemented and verified** — 2026-08-14. Ours, not the brief's;
-  the task PDF says nothing about removed requirements. Proven by
-  `tests/register/test_withdrawal.py` and
-  `test_the_re_issued_corpus_requirements_document_withdraws_the_row_it_dropped`,
-  including the answer submitted through the MCP `submit_decision` tool.
-- **History:** [`decision-history.md`](documentation/decision-history.md),
-  "Withdrawing a requirement a changed document dropped".
+A document counts as already read, and is skipped, once an earlier run's
+extraction of it finished with nothing left to do — either that run exported a
+register, or the extraction showed the document was unrelated or held no
+requirement the register could take. That extraction must exist
+(`extraction IS NOT NULL`), so a document whose model call failed has none and
+is read again next run regardless of what its name or content would otherwise
+match.
 
-### Already-read rule
-
-A content-identical document counts as read only after extraction succeeded
-and either:
-
-1. its run exported a register; or
-2. the extraction showed the document was unrelated or contained no
-   requirement the register could take.
-
-This keeps a transiently failed extraction eligible for the next run without
-re-reading completed unrelated/no-requirement documents forever.
-
+- **Matched by name OR content, either alone is enough.** An edited document
+  keeps its old name, so it is skipped by name; a renamed document keeps its
+  old content, so it is skipped by content. Only a document new on both counts
+  reaches Extract. This is the incremental-update slice's one behavioural
+  change from re-reading changed files: one operator, `AND` to `OR`,
+  parenthesised so it cannot swallow the extraction/export conditions around
+  it.
+- **Why not re-read a changed document.** Re-reading a changed file to compare
+  it against the register could change an already-committed row on evidence no
+  person had seen. That capability (withdrawal) never ran against a live
+  model, so this phase removes it along with the re-reading that fed it,
+  rather than carry an unproven capability in the riskiest part of the system.
+  See `documentation/decision-history.md`, "Read-once rule replaces re-reading
+  a changed document, and withdrawal is removed".
 - **Evidence/status:** Implemented and verified by change-detection tests for
-  transient failure, unrelated documents, and no-requirement documents.
+  transient failure, an edited document, a renamed document, a deleted
+  document, an unrelated document, and a document that asks for nothing.
 
 ### D04 — formats and document types
 
@@ -310,15 +278,10 @@ Seven cells, each with its own citations:
 Statuses are fixed in code and in a database check constraint:
 
 `Done` · `Partial` · `Never happened` · `Blocked` · `Disputed` ·
-`No evidence yet` · `Withdrawn`
+`No evidence yet`
 
 - `Never happened` is a positive evidenced claim; `No evidence yet` makes no
   such claim.
-- `Withdrawn` is set only by an approved withdrawal proposal (D03).
-  **Implemented and verified**; migration `20260814_0007` widened
-  `REGISTER_ROW_STATUS_CHECK` and `ck_decisions_kind` together, and its
-  downgrade refuses rather than force a withdrawn row into a status that would
-  claim something its evidence does not support.
 - Unknown cells say why they are unknown; they are never blank or guessed.
 - Dates come from documents, not run time. Unknown date stays unknown and R3
   does not run on it.
@@ -371,9 +334,6 @@ Statuses are fixed in code and in a database check constraint:
   stored rather than as rendered. An approved merge moves citations onto the
   candidate row without moving its fingerprint, because a citation is not a
   cell.
-- **Withdrawal writes the first absence citation this system has produced:** no
-  quote, so no `locate_quote` and no place — `source_place` and `source_words`
-  stay null and the statement names the file and what is not in it.
 
 ## Pipeline
 
@@ -385,7 +345,7 @@ Full locked pipeline:
 
 | Stage | Job | Model call | Current status |
 |---|---|---|---|
-| Ingest | Read new/changed supported files | No | Implemented and verified for all four formats |
+| Ingest | Read files never read before, by name or content | No | Implemented and verified for all four formats |
 | Extract | One document: type/date/requirements/testing/blockers/instructions | One per document | Implemented and verified with scripted model |
 | Match | Whole batch against current register | One per batch | Implemented and verified with scripted model |
 | Examine | Whole register against frozen rules | One per register | Implemented and verified with scripted model |
@@ -398,13 +358,14 @@ when it proposed a row and to the early exit when it did not, and Examine
 always continues to Review.
 
 Early exits are honest terminal `ended without changes` states with reasons:
-no readable new/changed file; everything skipped; nothing traceable extracted;
-or Match neither proposes a row nor proposes a withdrawal. Ingest routes
-straight to Examine instead when no document changed but the rules did, and
-Extract routes on to Match even with no requirement found when the batch read a
-document some committed row was asked for in — a document that dropped its last
-requirement is exactly what a withdrawal is for. Match makes no model call when
-there is nothing to match.
+no readable file this project has never read before; or the batch read one or
+more files but traced no requirement to its own words, so nothing reached
+Match. Ingest routes straight to Examine instead when no document is new but
+the rules the run froze are not the ones the register was last judged
+against. Every requirement Match sees becomes a proposed row (`app/register/
+propose_rows.py` inserts one per requirement, none dropped), so once Match has
+run at all it always has something to propose; Match makes no model call, and
+Extract never routes on to it, when the batch found nothing to match.
 
 ## Extract
 
@@ -771,10 +732,9 @@ slice-1 scope.
   frozen per run, D1/D2 in code, and the attachment audit event.
 - The MCP slice is built: its six tools mounted in the same process over the
   same core functions the endpoints call.
-- The incremental update slice is built: the watched folder, the rules-only
-  route, requirement withdrawal, and the byte-identical unchanged-row proof on
-  both corpora. It added no tool; a withdrawal is another decision the existing
-  decision tools carry.
+- The incremental update slice is built: the watched folder, the read-once
+  rule keyed by name or content, the rules-only route, and the byte-identical
+  unchanged-row proof on both corpora. It added no tool.
 - The reliability slice is built, and it is proof rather than construction: the
   concurrency and injection tests were written against the lock, the queue and
   the Extract path exactly as the earlier slices left them, and none of them
@@ -856,10 +816,6 @@ slice-1 scope.
 - The watcher holds what it last saw in memory, so a restart re-baselines every
   folder and a file that arrived while the application was down starts no run
   of its own.
-- A row two documents both supplied raises a withdrawal proposal when either of
-  them drops it; the proposal is a question, never a change.
-- A withdrawal is final: a requirement asked for again merges its evidence onto
-  the row, which still reads `Withdrawn`.
 - Neither door authenticates a caller, and the MCP endpoint answers `421` to a
   `Host` header other than `localhost` or `127.0.0.1`.
 - A finding raised against a register row is never re-examined by a later run;
@@ -880,12 +836,13 @@ ideas from resurfacing without duplicating their full prose here.
 | Blocker as document type/undecided representation | D01 condition + D05 status and `Blocked on` |
 | One run equals one project | D01 project context + document-batch run |
 | Manual-only run trigger | D03 auto-start watcher plus manual endpoint |
-| Five register statuses | D05 seven statuses including `No evidence yet` and `Withdrawn` |
+| Five register statuses | D05 six statuses including `No evidence yet` |
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
 | Five/six API endpoints | D14 seven endpoints including `GET /runs` |
 | `done` as generic terminal state | D13 honest `failed`/`ended without changes`/`closed without export` |
 | Status-only already-read check | D03 extraction + export/unrelated/no-requirement rule |
+| Already-read matched by name AND content; requirement withdrawal | D03 read-once rule matched by name OR content; withdrawal removed |
 | Unmarked emptied merge proposal | D09 `merged_into_register_row_id` |
 | Missing Match outcomes default to new rows | D09 complete exact coverage or failure |
 | Non-atomic finish-review read/launch | D02 atomic claim plus future replay marker |

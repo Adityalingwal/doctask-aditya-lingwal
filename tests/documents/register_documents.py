@@ -43,31 +43,6 @@ def write_meeting_note(folder: Path, source_file: str, requirement: str) -> str:
     return quote
 
 
-def write_client_requirements(
-    folder: Path,
-    source_file: str,
-    requirements: list[str],
-    date: str,
-) -> list[str]:
-    """One fabricated requirements document, and the words each citation traces to.
-
-    Written so the same file can be written again with one requirement removed,
-    which is what a withdrawal proposal is raised from.
-    """
-    quotes = [f"The client has approved {requirement}." for requirement in requirements]
-    numbered = "\n\n".join(
-        f"{position}. {quote}" for position, quote in enumerate(quotes, start=1)
-    )
-    (folder / source_file).write_text(
-        f"# Intake portal — client requirements\n\n"
-        f"**Date:** {date}\n\n"
-        "## Requirements\n\n"
-        f"{numbered}\n",
-        encoding="utf-8",
-    )
-    return quotes
-
-
 def write_pdf(path: Path, pages: list[list[str]]) -> None:
     """One fabricated PDF with a real text layer — one list of lines per page."""
     pdf = canvas.Canvas(str(path))

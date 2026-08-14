@@ -17,8 +17,9 @@ slice, the incremental update slice, and the review screen are implemented:
 - FastAPI exposes seven endpoints, and the same seven operations are MCP tools
   served by the same process over the same core functions.
 - A run returns immediately, continues in the app process, and is polled.
-- A run reads only the new and changed files in the folder, and leaves every
-  row they do not affect byte-identical, fingerprint included.
+- A run reads only files it has never read before — new by name and by
+  content — and leaves every row an unaffected file supplied byte-identical,
+  fingerprint included.
 - Each project's folder is watched, and a file that arrives there starts a run
   by itself once the folder has settled.
 - Review decisions are one proposal at a time; export is unavailable until
@@ -65,29 +66,33 @@ reads it exactly as before, and starting a run by hand is unchanged.
 
 A file that arrives while a run is at review waits for the run after it.
 
-## Withdrawal — when a document stops asking for something
+## What this does not do, and why
 
-When a document is read again and its new content no longer contains a
-requirement **it itself supplied**, the run raises one withdrawal proposal for
-that row, through the same review queue as every other decision.
+A run reads a document exactly once in a project's lifetime, keyed by its name
+or its content — either alone is enough to count it as already read. This is a
+deliberate boundary, not an oversight: re-reading a changed document to notice
+it stopped asking for something would mean changing an already-committed row
+on evidence no person had seen, and that path has never run against a live
+model. A smaller system that only ever adds to the register, with its
+boundary written down here, is worth more than a larger one whose edges were
+never exercised.
 
-- **Approve** moves that row's `Status` cell to `Withdrawn`, writes the cell
-  audit, updates `Last moved`, and cites the absence: the file that was read
-  again and what is no longer in it. The row's other cells, its existing
-  citations and its `First seen` do not move.
-- **Reject** leaves the row byte-identical, fingerprint included, and the
-  rejected proposal stays in the run record.
-- The row is never deleted, and neither is its history. A withdrawn row still
-  appears in both exports, with its `Withdrawn` status.
+- **Deleting a document does nothing.** The rows it supplied stay in the
+  register exactly as they were.
+- **Renaming a document does nothing.** Its content has already been read,
+  under the old name.
+- **Editing a document does not cause it to be read again.** To have a
+  revision read, save it under a new name.
+- **A requirement removed from a document does not remove its row.** Nothing
+  in this system takes a committed row back.
+- **Replacing a document with an entirely different one under the same name
+  is skipped**, because that name has already been read. Give a new document
+  a new name.
+- **Sub-folders are not read.** Only files directly in the project's folder
+  are.
 
-Only the document a row's `What was asked` citation quotes can withdraw that
-row. Another document's silence proposes nothing, because a document that never
-asked for something cannot stop asking for it. Deleting a file from the folder
-deletes nothing either — the rows its earlier content produced stay.
-
-A withdrawal does not come back. If a later document asks for the requirement
-again, its evidence merges onto the row the way any evidence does, and the row
-still reads `Withdrawn`.
+Every one of these already appears on the run's `Skipped` section with its own
+reason, so none of it is silent.
 
 ## Rules that changed and documents that did not
 
@@ -308,11 +313,6 @@ the next run and never to one already under way or already finished. Point
 - The watcher forgets what it has seen when the application restarts, so a file
   that arrived while it was down starts no run of its own; the next run started
   by hand reads it.
-- A row two documents both asked for raises a withdrawal proposal when either
-  of them drops it. The proposal is a question, never a change, and the
-  Delivery Owner answers it.
-- A withdrawn row stays `Withdrawn` even if a later document asks for the
-  requirement again.
 - `GET /runs/{id}` carries no register rows, so the review screen's register
   section stays empty until that run has exported one.
 - The review screen is built by Node, which the application image does not

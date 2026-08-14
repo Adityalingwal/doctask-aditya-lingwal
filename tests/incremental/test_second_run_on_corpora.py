@@ -32,12 +32,6 @@ from app.extract.answer import (
 
 INTAKE_PORTAL = PROJECT_ROOT / "sample-projects" / "intake-portal"
 NORTHSIDE_DENTAL = PROJECT_ROOT / "sample-projects" / "northside-dental"
-# Only the re-issued scope carries this date, which is how the scripted model
-# tells the second version of that file from the first.
-RE_ISSUED_MARKER = "**Date:** 26 March 2026"
-RECORDS_LIST_ROW = 3
-MEETING_NOTE_ROWS = (4, 5, 6)
-STATUS_CELL = 3
 
 
 def _copy_corpus_file(corpus: Path, source_folder: Path, file_name: str) -> None:
@@ -211,94 +205,6 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
             after_second_run[merged_into].fingerprint
             == after_first_run[merged_into].fingerprint
         )
-
-
-def test_the_re_issued_corpus_requirements_document_withdraws_the_row_it_dropped(
-    tmp_path: Path,
-) -> None:
-    meeting_notes = "meeting-notes-10-mar.md"
-    requirements = "client-requirements-v1.md"
-    source_folder = tmp_path / "corpus"
-    source_folder.mkdir()
-    _copy_corpus_file(INTAKE_PORTAL, source_folder, meeting_notes)
-    _copy_corpus_file(INTAKE_PORTAL, source_folder, requirements)
-
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker_against_an_empty_register(): match_answer(6),
-            RE_ISSUED_MARKER: dated_extraction_answer(
-                [
-                    (
-                        "an intake form that validates every required field",
-                        "An intake form that validates every required field "
-                        "before it submits.",
-                    ),
-                    (
-                        "an email notification to the operations team on submit",
-                        "An email notification to the operations team whenever a "
-                        "visitor submits the intake form.",
-                    ),
-                ],
-                CLIENT_REQUIREMENTS_DOCUMENT,
-                "26 March 2026",
-            ),
-            extract_marker(meeting_notes): _meeting_notes_answer(),
-            extract_marker(requirements): _written_scope_answer(),
-            match_marker(): match_answer_of([1, 2]),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-        )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Re-issued intake portal scope",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                _exported_run(client, project_id)
-                after_first_run = stored_rows(database_url, project_id)
-
-                shutil.copy(
-                    INTAKE_PORTAL / "second-version" / requirements,
-                    source_folder / requirements,
-                )
-                second_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                at_review = wait_for_run_status(
-                    client, second_run, "waiting for review"
-                )
-                approve_every_decision_and_finish_review(client, second_run)
-                wait_for_run_status(client, second_run, "done")
-                after_second_run = stored_rows(database_url, project_id)
-        finally:
-            application.stop()
-
-    raised = [
-        decision
-        for decision in at_review["decisions"]
-        if decision["kind"] == "withdrawal"
-    ]
-    assert [f"#{RECORDS_LIST_ROW}" in decision["question"] for decision in raised] == [
-        True
-    ]
-    assert after_second_run[RECORDS_LIST_ROW].cells[STATUS_CELL] == "Withdrawn"
-    # The meeting note is unchanged, so it was never read again and the three
-    # rows it supplied raised nothing and moved nothing.
-    for untouched in MEETING_NOTE_ROWS:
-        assert after_second_run[untouched] == after_first_run[untouched]
 
 
 def _meeting_notes_answer() -> dict[str, Any]:

@@ -29,7 +29,7 @@ async def collect_batch(
     accepted_extensions: frozenset[str],
     page_limit: int,
 ) -> CollectedBatch:
-    """Take every new or changed file waiting in the project's folder."""
+    """Take every file this project has never read before, by name or content."""
     document_ids: list[UUID] = []
     skipped: list[dict[str, str]] = []
 
@@ -78,17 +78,11 @@ async def collect_batch(
                 continue
 
             content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
-            if await _already_read_unchanged(
+            matched = await _already_read_by_name_or_content(
                 connection, project_id, path.name, content_hash
-            ):
-                skipped.append(
-                    _skipped(
-                        path.name,
-                        "unchanged since an earlier run read it and finished "
-                        "with what it said — an unchanged document is never "
-                        "read or sent to a model again.",
-                    )
-                )
+            )
+            if matched is not None:
+                skipped.append(_skipped(path.name, _already_read_reason(matched)))
                 continue
 
             document_ids.append(
@@ -136,28 +130,72 @@ def _skipped(file_name: str, reason: str) -> dict[str, str]:
     return {"kind": SKIPPED_FILE_KIND, "file": file_name, "reason": reason}
 
 
-async def _already_read_unchanged(
+async def _already_read_by_name_or_content(
     connection: AsyncConnection,
     project_id: UUID,
     source_path: str,
     content_hash: str,
-) -> bool:
-    # A document is finished with when Extract read it and nothing is left to
-    # do with what it said: either that run exported its register, or the
-    # document held nothing the register could ever take. Demanding an export
-    # in the second case would send an unrelated document to the model again,
-    # and pay for it, on every run for as long as the file sits in the folder.
-    # The second half asks what Match asks of the same column.
+) -> str | None:
+    """Which of this file's name or content an earlier, finished read matches.
+
+    A document is finished with when Extract read it and nothing is left to
+    do with what it said: either that run exported its register, or the
+    document held nothing the register could ever take. Demanding an export
+    in the second case would send an unrelated document to the model again,
+    and pay for it, on every run for as long as the file sits in the folder.
+    The second half asks what Match asks of the same column.
+
+    Either the name or the content alone is enough to count as already read —
+    a document that failed extraction has no row here at all (`extraction IS
+    NOT NULL` excludes it), so the next run reads it again regardless of which
+    half would otherwise have matched.
+    """
     result = await connection.execute(
-        "SELECT 1 FROM documents "
+        "SELECT bool_or(documents.source_path = %s) AS name_matched, "
+        "bool_or(documents.content_hash = %s) AS content_matched "
+        "FROM documents "
         "JOIN runs ON runs.id = documents.run_id "
         "WHERE runs.project_id = %s "
         "AND documents.extraction IS NOT NULL "
         "AND (runs.export_json IS NOT NULL "
         "OR documents.extraction ->> 'document_type' = %s "
         "OR jsonb_array_length(documents.extraction -> 'requirements') = 0) "
-        "AND documents.source_path = %s AND documents.content_hash = %s "
-        "LIMIT 1",
-        (project_id, UNRELATED_DOCUMENT, source_path, content_hash),
+        "AND (documents.source_path = %s OR documents.content_hash = %s)",
+        (
+            source_path,
+            content_hash,
+            project_id,
+            UNRELATED_DOCUMENT,
+            source_path,
+            content_hash,
+        ),
     )
-    return await result.fetchone() is not None
+    row = await result.fetchone()
+    name_matched = bool(row and row["name_matched"])
+    content_matched = bool(row and row["content_matched"])
+    if name_matched and content_matched:
+        return "both"
+    if name_matched:
+        return "name"
+    if content_matched:
+        return "content"
+    return None
+
+
+def _already_read_reason(matched: str) -> str:
+    if matched == "both":
+        return (
+            "unchanged since an earlier run read it and finished with what it "
+            "said — an unchanged document is never read or sent to a model "
+            "again."
+        )
+    if matched == "name":
+        return (
+            "this name was already read here, with different words — a "
+            "document is read once by name; save this revision under a new "
+            "name to have it read."
+        )
+    return (
+        "these words were already read here under a different name — "
+        "renaming a file does not make it new."
+    )

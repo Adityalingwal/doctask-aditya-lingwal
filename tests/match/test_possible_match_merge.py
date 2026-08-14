@@ -138,6 +138,113 @@ def test_approved_possible_match_merges_into_the_existing_row(
     ]
 
 
+def test_an_unsure_match_is_still_asked_about_rather_than_merged(
+    tmp_path: Path,
+) -> None:
+    """D09: a confident 'existing row' answer is downgraded to this same gate.
+
+    Rejecting it must leave the two requirements as two separate rows — the
+    system never decides a possible match on its own, and never silently
+    merges what it is unsure about.
+    """
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    first_quote = write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
+    script_path = tmp_path / "script.json"
+    write_script(
+        script_path,
+        {
+            match_marker_for_batch_with(SECOND_FILE): match_answer_existing_row(
+                COMMITTED_ROW_NUMBER
+            ),
+            match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
+            extract_marker(FIRST_FILE): extraction_answer(
+                FIRST_REQUIREMENT, first_quote
+            ),
+            extract_marker(SECOND_FILE): extraction_answer(
+                SECOND_REQUIREMENT,
+                f"The client asked for {SECOND_REQUIREMENT}.",
+            ),
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=tmp_path / "model-calls.jsonl",
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Unsure-match intake portal",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+
+                first_run = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                wait_for_run_status(client, first_run, "waiting for review")
+                approve_every_decision_and_finish_review(client, first_run)
+                wait_for_run_status(client, first_run, "done")
+
+                write_meeting_note(source_folder, SECOND_FILE, SECOND_REQUIREMENT)
+                second_run = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                at_review = wait_for_run_status(
+                    client, second_run, "waiting for review"
+                )
+                match_decision = next(
+                    decision
+                    for decision in at_review["decisions"]
+                    if decision["kind"] == "possible match"
+                )
+                for decision in at_review["decisions"]:
+                    outcome = (
+                        "rejected"
+                        if decision["decision_id"] == match_decision["decision_id"]
+                        else "approved"
+                    )
+                    client.post(
+                        f"/runs/{second_run}/decisions",
+                        json={
+                            "decision_id": decision["decision_id"],
+                            "outcome": outcome,
+                        },
+                    ).raise_for_status()
+                client.post(f"/runs/{second_run}/finish-review").raise_for_status()
+                wait_for_run_status(client, second_run, "done")
+                export = client.get(f"/runs/{second_run}/export").json()
+        finally:
+            application.stop()
+
+        engine = create_engine(database_url)
+        with engine.connect() as connection:
+            proposal = connection.execute(
+                text(
+                    "SELECT is_committed, merged_into_register_row_id FROM "
+                    "register_rows WHERE proposed_by_run_id = :run_id"
+                ),
+                {"run_id": second_run},
+            ).one()
+        engine.dispose()
+
+    assert FIRST_REQUIREMENT in match_decision["question"]
+    # A rejected match stays a row of its own — committed, never merged.
+    assert proposal.is_committed is True
+    assert proposal.merged_into_register_row_id is None
+    assert [row["row_number"] for row in export["rows"]] == [
+        COMMITTED_ROW_NUMBER,
+        PROPOSED_ROW_NUMBER,
+    ]
+
+
 def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
     tmp_path: Path,
 ) -> None:
