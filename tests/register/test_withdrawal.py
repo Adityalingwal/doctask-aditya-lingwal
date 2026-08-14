@@ -295,7 +295,7 @@ def test_a_rejected_withdrawal_leaves_the_row_byte_identical(
     ] == ["rejected"]
 
 
-def test_a_withdrawal_is_answered_through_the_same_six_mcp_tools(
+def test_a_withdrawal_is_answered_through_the_same_seven_mcp_tools(
     tmp_path: Path,
 ) -> None:
     with _register_of_three_rows(
@@ -324,9 +324,10 @@ def test_a_withdrawal_is_answered_through_the_same_six_mcp_tools(
         exported = call_tool(base_url, "get_export", {"run_id": second_run})
         after = stored_rows(database_url, project_id)
 
-    # The tool list stays at six: a withdrawal is another decision the existing
-    # tools carry, not a seventh tool.
-    assert len(tools) == 6
+    # The tool list is unaffected by withdrawal: a withdrawal is another
+    # decision the existing tools carry, not a tool of its own. `list_runs`
+    # (D15) brings the count to seven for a different reason entirely.
+    assert len(tools) == 7
     assert after[DROPPED_ROW].cells[STATUS_CELL] == WITHDRAWN
     assert any(
         row["cells"]["status"] == WITHDRAWN for row in exported.payload["rows"]
