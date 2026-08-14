@@ -277,7 +277,14 @@ export default function serveDemoRuns() {
           return;
         }
         if (request.method === "GET" && parts.length === 1) {
-          reply(response, 200, { runs: Object.values(runs).map(runListEntry) });
+          // Newest first, the order the application itself answers in — a demo
+          // that listed them in any other order would not be showing the screen
+          // what it will really be given.
+          reply(response, 200, {
+            runs: Object.values(runs)
+              .map(runListEntry)
+              .sort((one, other) => other.started_at.localeCompare(one.started_at)),
+          });
           return;
         }
         const demoRun = runs[parts[1]];
@@ -334,6 +341,14 @@ export default function serveDemoRuns() {
           }
           demoRun.run.status = "done";
           demoRun.run.stage = "commit";
+          // A run that finished its review finished Review and Commit with it.
+          // Without these the stage strip reads "never ran" and "not started"
+          // on a run the same reply calls done.
+          demoRun.run.finished_stages = [
+            ...demoRun.run.finished_stages,
+            "review",
+            "commit",
+          ];
           reply(response, 200, { run_id: demoRun.run.run_id, status: "done" });
           return;
         }

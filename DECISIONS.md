@@ -65,8 +65,8 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
 | D13 | Run identity, statuses, lock, and queue | Implemented and verified | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
-| D15 | MCP and React surfaces | MCP implemented and verified; the redesigned screen is implemented, proof pending, and needs `GET /runs` | Storage and interfaces |
-| D16 | Logging; timing and cost dropped | Logging implemented and verified; timing and cost removed from the screen and pending removal from the application | Operations |
+| D15 | MCP and React surfaces | MCP implemented and verified; the redesigned screen is implemented, proof pending against the application | Storage and interfaces |
+| D16 | Logging; timing and cost dropped | Logging implemented and verified; timing and cost removed from the screen and from the application | Operations |
 | D17 | Repository layout, build order, tests, setup, and network bind | Mixed | Delivery plan and proof |
 
 ## Product contract
@@ -720,25 +720,28 @@ slice-1 scope.
   `sample-projects`); background reading stays under `documentation/`.
 - Build thin end-to-end slices, risky runtime properties first, UI last.
 - Slice 1 is complete: `.md` Ingest → Extract → Match → Review → Commit,
-  PostgreSQL, six endpoints, human gate, export, and real-process resume.
+  PostgreSQL, its six endpoints, human gate, export, and real-process resume.
 - The formats and types slice is built: four readers, the page limit, the
   document-type enum and its buckets, per-format citation places, and both
   synthetic corpora.
 - The rules and findings slice is built: Examine, the `findings` table, rules
   frozen per run, D1/D2 in code, and the attachment audit event.
-- The MCP slice is built: six tools mounted in the same process over the same
-  core functions the endpoints call.
+- The MCP slice is built: its six tools mounted in the same process over the
+  same core functions the endpoints call.
 - The incremental update slice is built: the watched folder, the rules-only
   route, requirement withdrawal, and the byte-identical unchanged-row proof on
-  both corpora. The tool list stayed at six; a withdrawal is another decision
-  the existing decision tools carry.
+  both corpora. It added no tool; a withdrawal is another decision the existing
+  decision tools carry.
 - The reliability slice is built, and it is proof rather than construction: the
   concurrency and injection tests were written against the lock, the queue and
   the Extract path exactly as the earlier slices left them, and none of them
   needed a line of that code changed.
-- The operations slice is built: per-stage durations, the token roll-up taken
-  at the model boundary, the estimate from the configured rates, and the same
-  block through both doors and the screen. It is the last planned slice.
+- The operations slice was built and then cut back: its timing and cost are
+  dropped (D16), leaving structured run logging as what it contributed.
+- `GET /runs` and its `list_runs` tool complete the seventh surface on both
+  doors, and `runs.finished_stages` replaced what the dropped timings were
+  being read for. Every planned slice is now built; what remains is the open
+  fresh-clone and image-only verification and the first live-model run.
 
 ### Brief-behaviour acceptance summary
 
@@ -795,11 +798,8 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- Timing and cost are dropped (D16). They are off the screen and still in the
-  application; until they are removed, the stage strip and the run list read
-  which stages finished out of `stage_timings`.
-- The run list reads `GET /runs`, which the application does not serve. Only the
-  dev-only middleware under `ui/demo/` answers it.
+- Timing and cost are dropped (D16). Nothing reports a duration, a token count
+  or a cost; which stages a run finished is read from `runs.finished_stages`.
 - The review screen is built by Node, which the application image does not
   carry, so `ui/dist` must be built before the screen can be served.
 - The watcher holds what it last saw in memory, so a restart re-baselines every
