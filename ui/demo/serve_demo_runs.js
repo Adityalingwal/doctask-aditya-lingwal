@@ -10,7 +10,6 @@
 // `apply: "serve"` keeps every line of this out of `vite build`, so no demo run
 // can reach the bundle FastAPI serves.
 import {
-  costAndTimingReply,
   decisionReply,
   examineReply,
   exportReply,
@@ -65,15 +64,7 @@ function demoRuns() {
             },
           ],
         }),
-        cost_and_timing: costAndTimingReply({
-          stages: [
-            { stage: "ingest", seconds: 0.031 },
-            { stage: "extract", seconds: 4.212 },
-            { stage: "match", seconds: 1.804 },
-            { stage: "examine", seconds: 1.109 },
-          ],
-          total_seconds: 7.156,
-        }),
+        finished_stages: ["ingest", "extract", "match", "examine"],
       }),
     },
 
@@ -86,17 +77,7 @@ function demoRuns() {
         stage: "examine",
         decisions: [],
         examine: null,
-        cost_and_timing: costAndTimingReply({
-          stages: [{ stage: "ingest", seconds: 0.031 }],
-          total_seconds: 0.031,
-          tokens: {
-            prompt: 120,
-            completion: 14,
-            calls_reporting_usage: 1,
-            calls_without_usage: 0,
-          },
-          estimated_cost_usd: "0.000067",
-        }),
+        finished_stages: ["ingest"],
       }),
     },
 
@@ -129,20 +110,7 @@ function demoRuns() {
               + "citation could be written for them",
           },
         ],
-        cost_and_timing: costAndTimingReply({
-          stages: [{ stage: "ingest", seconds: 0.029 }],
-          total_seconds: 0.029,
-          tokens: {
-            prompt: null,
-            completion: null,
-            calls_reporting_usage: 0,
-            calls_without_usage: 2,
-          },
-          estimated_cost_usd: null,
-          cost_unknown_reason:
-            "no model call on this run reported what it spent, so there is "
-            + "nothing to multiply by the configured rates.",
-        }),
+        finished_stages: ["ingest"],
       }),
     },
 
@@ -161,24 +129,14 @@ function demoRuns() {
           }),
         ],
         examine: examineReply({ rows_examined: 4 }),
-        cost_and_timing: costAndTimingReply({
-          stages: [
-            { stage: "ingest", seconds: 0.029 },
-            { stage: "extract", seconds: 4.601 },
-            { stage: "match", seconds: 1.902 },
-            { stage: "examine", seconds: 1.004 },
-            { stage: "review", seconds: 96.4 },
-            { stage: "commit", seconds: 0.211 },
-          ],
-          total_seconds: 104.147,
-          tokens: {
-            prompt: 5600,
-            completion: 750,
-            calls_reporting_usage: 5,
-            calls_without_usage: 0,
-          },
-          estimated_cost_usd: "0.003440",
-        }),
+        finished_stages: [
+          "ingest",
+          "extract",
+          "match",
+          "examine",
+          "review",
+          "commit",
+        ],
       }),
       export: exportedRegister(),
     },
@@ -292,7 +250,7 @@ function exportedRegister() {
 }
 
 /**
- * Vite middleware answering the six endpoints the screen calls, for demo runs
+ * Vite middleware answering the endpoints the screen calls, for demo runs
  * only. An unknown run id is refused the way the application refuses one.
  */
 export default function serveDemoRuns() {
@@ -412,7 +370,7 @@ function runListEntry(demoRun) {
     waiting_decisions: run.decisions.filter(
       (decision) => decision.outcome === null,
     ).length,
-    finished_stages: run.cost_and_timing.stages.map((stage) => stage.stage),
+    finished_stages: run.finished_stages,
   };
 }
 
