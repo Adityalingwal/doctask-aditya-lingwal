@@ -50,7 +50,8 @@ def _examined(tmp_path: Path, answer: dict[str, Any]) -> list[dict[str, Any]]:
             "cited_cells": frozenset({"what_was_asked"}),
         }
     ]
-    return asyncio.run(examine_register(model_client, FROZEN_RULES, rows))
+    found, _usage = asyncio.run(examine_register(model_client, FROZEN_RULES, rows))
+    return found
 
 
 def test_a_finding_takes_its_rule_text_from_the_rules_the_run_froze(

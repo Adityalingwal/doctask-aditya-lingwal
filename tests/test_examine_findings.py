@@ -473,7 +473,7 @@ async def _examine_one_seeded_row(
                 rows = await register_under_examination(
                     connection, project_id, run_id
                 )
-                found = await examine_register(
+                found, _usage = await examine_register(
                     model_client, load_rules(rules_path), rows
                 )
                 await record_findings(connection, run_id, found)

@@ -117,16 +117,15 @@ def test_a_run_whose_model_reported_no_tokens_reports_an_unknown_cost_not_a_zero
 
     reported = status["cost_and_timing"]
 
+    # Neither the cost nor either token count may come back as a zero: a zero
+    # reads as a figure someone measured, and nobody measured this one.
     assert stored is None
     assert reported["estimated_cost_usd"] is None
-    assert "token count" in reported["cost_unknown_reason"].lower()
     assert reported["tokens"]["prompt"] is None
     assert reported["tokens"]["completion"] is None
+    assert "token count" in reported["cost_unknown_reason"].lower()
     assert reported["tokens"]["calls_without_usage"] == 3
     assert reported["tokens"]["calls_reporting_usage"] == 0
-    # The whole block is searched, because a zero anywhere in it reads as a
-    # measured figure rather than as the absence of one.
-    assert 0 not in json.loads(json.dumps(reported)).get("tokens", {}).values()
 
 
 def test_a_stage_that_did_not_run_has_no_duration(tmp_path: Path) -> None:

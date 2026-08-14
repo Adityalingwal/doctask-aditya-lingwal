@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.examine.found_issue import finding_on_row
 from app.extract.answer import json_object_in
+from app.model.call_the_model import ReportedUsage, call_the_model
 
 
 EXAMINE_PROMPT_MARKER = "Examine this register against these rules"
@@ -64,10 +65,10 @@ async def examine_register(
     model_client: BaseChatModel,
     rules: list[dict[str, Any]],
     rows: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], ReportedUsage]:
     """Judge the whole register against the whole rule set in one model call."""
-    reply = await model_client.ainvoke(_examine_prompt(rules, rows))
-    answer = ExamineAnswer.model_validate_json(json_object_in(str(reply.content)))
+    answered = await call_the_model(model_client, _examine_prompt(rules, rows))
+    answer = ExamineAnswer.model_validate_json(json_object_in(answered.text))
 
     rule_text_by_id = {rule["id"]: rule["text"] for rule in rules}
     row_by_number = {row["row_number"]: row for row in rows}
@@ -82,7 +83,7 @@ async def examine_register(
         for found in _refuse_what_was_not_asked_about(
             answer, rule_text_by_id, row_by_number
         )
-    ]
+    ], answered.usage
 
 
 def _refuse_what_was_not_asked_about(
