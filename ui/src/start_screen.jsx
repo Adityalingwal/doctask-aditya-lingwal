@@ -1,6 +1,15 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+// Latin only. The full subset set ships Cyrillic, Greek and Vietnamese too, and
+// everything this system produces is English (TASK.md), so they would be
+// twenty-odd font files nobody ever downloads.
+import "@fontsource/ibm-plex-sans/latin-400.css";
+import "@fontsource/ibm-plex-sans/latin-500.css";
+import "@fontsource/ibm-plex-sans/latin-600.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-600.css";
+
 import ReviewScreen from "./ReviewScreen.jsx";
 import "./screen.css";
 

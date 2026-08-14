@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
+import { openSection } from "./open_section.js";
 import {
   decisionReply,
   runId,
@@ -33,6 +34,7 @@ test("finishing the review is not offered while one decision is still unanswered
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/decisions/i);
   await screen.findByText(unanswered.question);
 
   expect(screen.queryByRole("button", { name: /finish review/i })).toBeNull();
@@ -56,6 +58,7 @@ test("finishing the review is offered once the server reports every decision ans
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/decisions/i);
 
   expect(await screen.findByRole("button", { name: /finish review/i })).toBeTruthy();
 });

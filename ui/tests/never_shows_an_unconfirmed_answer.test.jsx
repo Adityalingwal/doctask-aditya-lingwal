@@ -3,6 +3,7 @@ import { act } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
+import { openSection } from "./open_section.js";
 import {
   decisionReply,
   runId,
@@ -40,6 +41,7 @@ test("a refused answer leaves the decision unanswered on screen and shows the se
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/decisions/i);
   const approve = await screen.findByRole("button", { name: /^approve$/i });
 
   await act(async () => {
@@ -83,6 +85,7 @@ test("an answered decision reads back the outcome the server returned, not the b
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/decisions/i);
   const approve = await screen.findByRole("button", { name: /^approve$/i });
 
   await act(async () => {

@@ -2,35 +2,65 @@
 // read off the decision the server froze, so a possible match, a conflict, a
 // withdrawal, a rule finding and the export gate render through this same code
 // with no branch on which of them it is.
+//
+// The accent is on the left edge of a decision nobody has answered yet, and it
+// is the only accent in the card: Approve and Reject look identical, because a
+// screen that makes one answer louder is answering for the person.
 export default function Question({ decision, reviewing, onAnswer, answering }) {
+  const unanswered = decision.outcome === null;
   return (
-    <li className="question">
-      <p className="question-kind">{decision.kind}</p>
-      <p className="question-text">{decision.question}</p>
-      <p className="question-answer">
-        Answer: {decision.outcome === null ? "unanswered" : decision.outcome}
+    <li
+      className={`border border-line bg-card ${
+        unanswered ? "border-l-4 border-l-signal-edge" : ""
+      }`}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line px-5 py-3">
+        <p className="eyebrow m-0">{decision.kind}</p>
+        <p className="m-0 font-mono text-[11px]">
+          {unanswered ? (
+            <span className="border border-signal-edge bg-signal px-2 py-0.5 font-semibold">
+              unanswered
+            </span>
+          ) : (
+            <span className="text-ink-soft">{decision.outcome}</span>
+          )}
+        </p>
+      </div>
+
+      <p className="m-0 max-w-prose px-5 py-5 text-[17px] leading-relaxed">
+        {decision.question}
       </p>
+
       {reviewing && (
         // An answer may change until finish-review (D02), so a decision the
         // server already recorded keeps both buttons while the run is at
         // review; the screen never closes a window the server leaves open.
-        <p className="question-actions">
-          <button
-            type="button"
-            disabled={answering}
+        <p className="m-0 flex gap-3 border-t border-line px-5 py-4">
+          <AnswerButton
+            label="Approve"
+            answering={answering}
             onClick={() => onAnswer(decision.decision_id, "approved")}
-          >
-            Approve
-          </button>
-          <button
-            type="button"
-            disabled={answering}
+          />
+          <AnswerButton
+            label="Reject"
+            answering={answering}
             onClick={() => onAnswer(decision.decision_id, "rejected")}
-          >
-            Reject
-          </button>
+          />
         </p>
       )}
     </li>
+  );
+}
+
+function AnswerButton({ label, answering, onClick }) {
+  return (
+    <button
+      type="button"
+      disabled={answering}
+      onClick={onClick}
+      className="edge-shadow-sm border border-line-strong bg-card px-5 py-2 font-mono text-sm font-semibold hover:bg-paper disabled:opacity-40"
+    >
+      {label}
+    </button>
   );
 }

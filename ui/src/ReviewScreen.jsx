@@ -1,17 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
+
 import Question from "./Question.jsx";
 import Register, { Examine } from "./Register.jsx";
+import RunList from "./RunList.jsx";
+import Section, { WaitingCount } from "./Section.jsx";
+import Stages from "./Stages.jsx";
 import screenConfig from "../config/screen.json";
 import {
   answerDecision,
   finishReview,
   readExport,
   readRun,
+  readRuns,
 } from "./run_requests.js";
 
 // The one status in which the server accepts an answer or a finished review.
 const WAITING_FOR_REVIEW = "waiting for review";
+
+// The screen's own name. The register it shows keeps the name the decisions and
+// the exports give it; this is only what the person looking at it calls the
+// thing, and it lives in one place so it can be changed in one place.
+const PRODUCT_NAME = "Register";
 
 export default function ReviewScreen({ runId: openedRunId }) {
   const [runId, setRunId] = useState(openedRunId ?? "");
@@ -24,6 +35,26 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const [readRefusal, setReadRefusal] = useState(null);
   const [answerRefusal, setAnswerRefusal] = useState(null);
   const [answering, setAnswering] = useState(false);
+  // The run list is its own read with its own refusal: an application that
+  // cannot list runs can still answer perfectly well for the run being
+  // reviewed, and one refusal standing in for both would hide that.
+  const [runs, setRuns] = useState([]);
+  const [runsRefusal, setRunsRefusal] = useState(null);
+  const [openSection, setOpenSection] = useState("stages");
+  const readingPane = useScrollbarWhileScrolling();
+
+  const readListFromServer = useCallback(async () => {
+    const answered = await readRuns();
+    setRuns(answered.ok ? answered.body.runs : []);
+    setRunsRefusal(answered.ok ? null : answered.refusal);
+  }, []);
+
+  // A link to one run stays a link a reviewer can keep, so opening a run from
+  // the list writes it into the address without adding a history entry.
+  const openRun = useCallback((chosen) => {
+    setRunId(chosen);
+    window.history.replaceState(null, "", `/ui/?run=${encodeURIComponent(chosen)}`);
+  }, []);
 
   const readFromServer = useCallback(async () => {
     if (runId === "") {
@@ -51,9 +82,13 @@ export default function ReviewScreen({ runId: openedRunId }) {
 
   useEffect(() => {
     readFromServer();
-    const polling = setInterval(readFromServer, screenConfig.poll_interval_ms);
+    readListFromServer();
+    const polling = setInterval(() => {
+      readFromServer();
+      readListFromServer();
+    }, screenConfig.poll_interval_ms);
     return () => clearInterval(polling);
-  }, [readFromServer]);
+  }, [readFromServer, readListFromServer]);
 
   // Nothing the person clicked reaches the screen: the answer is sent, and what
   // is shown next is read back from the server that recorded it.
@@ -76,113 +111,220 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setAnswering(false);
   }, [runId, readFromServer]);
 
+  const waiting =
+    run === null
+      ? 0
+      : run.decisions.filter((decision) => decision.outcome === null).length;
+
+  const openProjectName =
+    runs.find((listed) => listed.run_id === runId)?.project_name ?? null;
+
+  // The five sections and their order are fixed; what changes here is that one
+  // is read at a time, so a register of forty rows never buries the timings
+  // under it.
+  const sections =
+    run === null
+      ? []
+      : [
+          {
+            id: "stages",
+            number: "01",
+            name: "Stages",
+            tab: "Stages",
+            body: <Stages run={run} />,
+          },
+          {
+            id: "skipped",
+            number: "02",
+            name: "Skipped",
+            tab: "Skipped",
+            tabCount: run.skipped.length === 0 ? null : String(run.skipped.length),
+            count: `${run.skipped.length} skipped`,
+            body: <Skipped skipped={run.skipped} />,
+          },
+          {
+            id: "decisions",
+            number: "03",
+            name: "Needs your decision",
+            tab: "Decisions",
+            tabCount: waiting === 0 ? null : String(waiting),
+            tabWaiting: waiting > 0,
+            count: <WaitingCount waiting={waiting} />,
+            body: (
+              <Decisions
+                decisions={run.decisions}
+                examine={run.examine}
+                reviewing={run.status === WAITING_FOR_REVIEW}
+                answering={answering}
+                waiting={waiting}
+                onAnswer={answer}
+                onFinish={finish}
+              />
+            ),
+          },
+          {
+            id: "register",
+            number: "04",
+            name: "Register",
+            tab: "Register",
+            tabCount: exported === null ? null : String(exported.rows.length),
+            count:
+              exported === null ? "not exported" : `${exported.rows.length} rows`,
+            body: <RegisterSection exported={exported} />,
+          },
+        ];
+
   return (
-    <main>
-      <h1>Requirements-to-Delivery Register — run review</h1>
-      <OpenRun runId={runId} onOpen={setRunId} />
-      {answerRefusal !== null && (
-        <p className="refusal" role="alert">
-          {answerRefusal}
-        </p>
-      )}
-      {readRefusal !== null && (
-        <p className="refusal" role="alert">
-          {readRefusal}
-        </p>
-      )}
-      {run === null ? (
-        <p>Nothing is shown until the application answers for a run id.</p>
-      ) : (
-        <>
-          <Stages run={run} />
-          <Skipped skipped={run.skipped} />
-          <Decisions
-            decisions={run.decisions}
-            examine={run.examine}
-            reviewing={run.status === WAITING_FOR_REVIEW}
-            answering={answering}
-            onAnswer={answer}
-            onFinish={finish}
-          />
-          <RegisterSection exported={exported} />
-          <CostAndTiming reported={run.cost_and_timing} />
-        </>
-      )}
-    </main>
+    // The whole viewport, once. The bar keeps its height, and the two panes
+    // below it scroll independently — a long register must never push the run
+    // list off the screen.
+    <div className="grid h-screen grid-rows-[3.5rem_1fr] overflow-hidden">
+      <header className="flex items-center gap-3 bg-ink px-5 text-paper">
+        <span className="block h-3 w-3 bg-signal" aria-hidden="true" />
+        <h1 className="m-0 font-mono text-sm font-semibold tracking-tight">
+          {PRODUCT_NAME}
+        </h1>
+      </header>
+
+      <div className="grid min-h-0 grid-cols-1 lg:grid-cols-[20rem_1fr]">
+        <RunList
+          runs={runs}
+          refusal={runsRefusal}
+          openRunId={runId}
+          onOpen={openRun}
+        />
+
+        <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] bg-card">
+          <div className="border-b border-line px-6 pt-7 pb-5 sm:px-10">
+            <p className="eyebrow m-0">project</p>
+            <p className="m-0 mt-1 text-2xl leading-tight font-semibold">
+              {openProjectName ?? "This run"}
+            </p>
+            <SectionTabs
+              sections={sections}
+              openSection={openSection}
+              onOpenSection={setOpenSection}
+              disabled={run === null}
+            />
+          </div>
+
+          <main ref={readingPane} className="pane min-w-0 px-6 pt-8 pb-24 sm:px-10">
+            {answerRefusal !== null && <Refusal text={answerRefusal} />}
+            {readRefusal !== null && <Refusal text={readRefusal} />}
+
+            {run === null ? (
+              <p className="max-w-prose text-ink-soft">
+                Nothing is shown until the application answers for a run. Choose
+                one from the list beside this.
+              </p>
+            ) : (
+              <div className="max-w-5xl">
+                {sections.map(
+                  (section) =>
+                    section.id === openSection && (
+                      <Section
+                        key={section.id}
+                        number={section.number}
+                        name={section.name}
+                        headingId={`${section.id}-heading`}
+                        count={section.count}
+                      >
+                        {section.body}
+                      </Section>
+                    ),
+                )}
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function OpenRun({ runId, onOpen }) {
-  const [typed, setTyped] = useState(runId);
+// Tabs, not buttons: choosing which part of a run to read is navigation, and
+// the only things on this screen that act on a run are Approve, Reject and
+// Finish review.
+function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
+  if (disabled) {
+    return null;
+  }
   return (
-    <form
-      className="open-run"
-      onSubmit={(submitted) => {
-        submitted.preventDefault();
-        onOpen(typed.trim());
-      }}
+    <div
+      role="tablist"
+      aria-label="Sections of this run"
+      className="mt-6 flex flex-wrap items-stretch gap-3"
     >
-      <label htmlFor="run-id">Run id</label>
-      <input
-        id="run-id"
-        name="run-id"
-        value={typed}
-        onChange={(typing) => setTyped(typing.target.value)}
-      />
-      <button type="submit">Show run</button>
-    </form>
+      {sections.map((section) => {
+        const open = section.id === openSection;
+        return (
+          <button
+            key={section.id}
+            role="tab"
+            type="button"
+            aria-selected={open}
+            aria-controls={`${section.id}-heading`}
+            onClick={() => onOpenSection(section.id)}
+            className={`flex items-center gap-2 border px-4 py-2 font-mono text-xs font-semibold tracking-wide whitespace-nowrap ${
+              open
+                ? "edge-shadow-sm border-signal-edge bg-signal text-ink"
+                : "border-line text-ink-soft hover:border-line-strong hover:text-ink"
+            }`}
+          >
+            {section.tab}
+            {section.tabCount !== null && section.tabCount !== undefined && (
+              <span
+                className={`px-1.5 py-0.5 text-[11px] ${
+                  section.tabWaiting
+                    ? "border border-signal-edge bg-signal text-ink"
+                    : "bg-line text-ink"
+                }`}
+              >
+                {section.tabCount}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-function Stages({ run }) {
+function Refusal({ text }) {
   return (
-    <section aria-labelledby="stages-heading">
-      <h2 id="stages-heading">Stages</h2>
-      <dl>
-        <dt>Run</dt>
-        <dd>{run.run_id}</dd>
-        <dt>Project</dt>
-        <dd>{run.project_id}</dd>
-        <dt>Status</dt>
-        <dd>{run.status}</dd>
-        <dt>Stage</dt>
-        <dd>{run.stage === null ? "no stage recorded yet" : run.stage}</dd>
-      </dl>
-      {run.ended_early_reason !== null && (
-        <p>Ended early: {run.ended_early_reason}</p>
-      )}
-      {run.failure_reason !== null && <p>Failure: {run.failure_reason}</p>}
-    </section>
+    <p
+      className="mb-8 border-2 border-danger bg-card px-5 py-4"
+      role="alert"
+    >
+      <span className="eyebrow mb-1 block text-danger">the server refused</span>
+      {text}
+    </p>
   );
 }
 
 function Skipped({ skipped }) {
+  if (skipped.length === 0) {
+    return <p className="m-0 text-ink-soft">This run skipped nothing.</p>;
+  }
   return (
-    <section aria-labelledby="skipped-heading">
-      <h2 id="skipped-heading">Skipped</h2>
-      {skipped.length === 0 ? (
-        <p>This run skipped nothing.</p>
-      ) : (
-        <ul>
-          {skipped.map((entry, place) => (
-            <li key={place}>
-              <dl>
-                {/* A skip states its own fields — a file with its reason, or a
-                    dropped quote with the words that were not found. Rendering
-                    the keys the server sent shows both without inventing a
-                    shape for either. */}
-                {Object.entries(entry).map(([name, value]) => (
-                  <div key={name}>
-                    <dt>{name}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
+      {skipped.map((entry, place) => (
+        <li key={place} className="border border-line bg-card px-4 py-3">
+          <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+            {/* A skip states its own fields — a file with its reason, or a
+                dropped quote with the words that were not found. Rendering the
+                keys the server sent shows both without inventing a shape for
+                either. */}
+            {Object.entries(entry).map(([name, value]) => (
+              <div key={name} className="contents">
+                <dt className="eyebrow">{name}</dt>
+                <dd className="m-0 text-sm">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -191,17 +333,16 @@ function Decisions({
   examine,
   reviewing,
   answering,
+  waiting,
   onAnswer,
   onFinish,
 }) {
-  const unanswered = decisions.filter((decision) => decision.outcome === null);
   return (
-    <section aria-labelledby="decisions-heading">
-      <h2 id="decisions-heading">Needs your decision</h2>
+    <>
       {decisions.length === 0 ? (
-        <p>This run has raised no decision.</p>
+        <p className="m-0 text-ink-soft">This run has raised no decision.</p>
       ) : (
-        <ul className="questions">
+        <ul className="m-0 flex list-none flex-col gap-4 p-0">
           {decisions.map((decision) => (
             <Question
               key={decision.decision_id}
@@ -213,14 +354,18 @@ function Decisions({
           ))}
         </ul>
       )}
-      {examine !== null && <Examine examine={examine} />}
+      {examine !== null && (
+        <div className="mt-8 border-t border-line pt-5">
+          <Examine examine={examine} />
+        </div>
+      )}
       <FinishReview
         reviewing={reviewing}
-        unanswered={unanswered.length}
+        unanswered={waiting}
         answering={answering}
         onFinish={onFinish}
       />
-    </section>
+    </>
   );
 }
 
@@ -229,95 +374,42 @@ function Decisions({
 // where the run the server just described allows it.
 function FinishReview({ reviewing, unanswered, answering, onFinish }) {
   if (!reviewing) {
-    return <p>This run is not at review, so nothing can be answered on it now.</p>;
+    return (
+      <p className="mt-8 text-sm text-ink-soft">
+        This run is not at review, so nothing can be answered on it now.
+      </p>
+    );
   }
   if (unanswered > 0) {
     return (
-      <p>
+      <p className="mt-8 text-sm text-ink-soft">
         {unanswered} decision(s) are unanswered, so the server will refuse to
         finish this review.
       </p>
     );
   }
   return (
-    <button type="button" disabled={answering} onClick={onFinish}>
+    <button
+      type="button"
+      disabled={answering}
+      onClick={onFinish}
+      className="edge-shadow mt-8 border-2 border-signal-edge bg-signal px-6 py-3 font-mono text-sm font-semibold disabled:opacity-40"
+    >
       Finish review
     </button>
   );
 }
 
 function RegisterSection({ exported }) {
-  return (
-    <section aria-labelledby="register-heading">
-      <h2 id="register-heading">Register</h2>
-      {exported === null ? (
-        <p>
-          This run has not exported a register, so there is nothing here to
-          show. The register is exported once the export decision is approved
-          and the run commits.
-        </p>
-      ) : (
-        <Register exported={exported} />
-      )}
-    </section>
-  );
+  if (exported === null) {
+    return (
+      <p className="m-0 max-w-prose text-sm text-ink-soft">
+        This run has not exported a register, so there is nothing here to show.
+        The register is exported once the export decision is approved and the run
+        commits.
+      </p>
+    );
+  }
+  return <Register exported={exported} />;
 }
 
-// Every figure here is the server's: the durations it recorded, the tokens the
-// model reported to it, and the estimate it made from them. Where it has none,
-// the word is "unknown" — never a zero, which would read as a measurement.
-function CostAndTiming({ reported }) {
-  const unknownCost = reported.estimated_cost_usd === null;
-  return (
-    <section aria-labelledby="cost-heading">
-      <h2 id="cost-heading">Cost and timing</h2>
-      {reported.stages.length === 0 ? (
-        <p>No stage of this run has finished, so no duration is recorded yet.</p>
-      ) : (
-        <dl>
-          {reported.stages.map((stage) => (
-            <div key={stage.stage}>
-              <dt>{stage.stage}</dt>
-              <dd>{stage.seconds} seconds</dd>
-            </div>
-          ))}
-          <div>
-            <dt>Every stage together</dt>
-            <dd>{reported.total_seconds} seconds</dd>
-          </div>
-        </dl>
-      )}
-      <dl>
-        <div>
-          <dt>Prompt tokens the model reported</dt>
-          <dd>{reported.tokens.prompt === null ? "unknown" : reported.tokens.prompt}</dd>
-        </div>
-        <div>
-          <dt>Completion tokens the model reported</dt>
-          <dd>
-            {reported.tokens.completion === null
-              ? "unknown"
-              : reported.tokens.completion}
-          </dd>
-        </div>
-        <div>
-          <dt>Calls that reported what they spent</dt>
-          <dd>
-            {reported.tokens.calls_reporting_usage} of{" "}
-            {reported.tokens.calls_reporting_usage +
-              reported.tokens.calls_without_usage}
-          </dd>
-        </div>
-        <div>
-          <dt>Estimated cost, USD</dt>
-          <dd>
-            {unknownCost
-              ? `unknown — ${reported.cost_unknown_reason}`
-              : `${reported.estimated_cost_usd} (estimated)`}
-          </dd>
-        </div>
-      </dl>
-      <p>{reported.estimate_note}</p>
-    </section>
-  );
-}
