@@ -8,18 +8,21 @@
 // fields the server sent.
 const STAGE_ORDER = ["ingest", "extract", "match", "examine", "review", "commit"];
 
-export default function RunList({ runs, refusal, openRunId, onOpen, children }) {
+export default function RunList({ runs, refusal, openRunId, onOpen }) {
   return (
     <nav
       aria-label="Runs"
-      className="flex flex-col border-line-strong bg-paper lg:border-r"
+      className="pane flex min-h-0 flex-col border-line-strong bg-paper lg:border-r"
     >
-      <p className="eyebrow m-0 px-4 py-4">Runs</p>
+      <p className="eyebrow sticky top-0 z-10 m-0 border-b border-line bg-paper px-5 py-4">
+        Runs
+        {runs.length > 0 && <span className="ml-2 text-ink">{runs.length}</span>}
+      </p>
 
       {refusal !== null ? (
-        <p className="m-0 px-4 pb-4 text-xs text-ink-soft">{refusal}</p>
+        <p className="m-0 px-5 py-4 text-sm text-ink-soft">{refusal}</p>
       ) : runs.length === 0 ? (
-        <p className="m-0 px-4 pb-4 text-xs text-ink-soft">
+        <p className="m-0 px-5 py-4 text-sm text-ink-soft">
           The application answered with no runs.
         </p>
       ) : (
@@ -34,8 +37,6 @@ export default function RunList({ runs, refusal, openRunId, onOpen, children }) 
           ))}
         </ul>
       )}
-
-      <div className="mt-auto border-t border-line px-4 py-4">{children}</div>
     </nav>
   );
 }
@@ -51,24 +52,26 @@ function RunCard({ run, open, onOpen }) {
           clicked.preventDefault();
           onOpen(run.run_id);
         }}
-        className={`block border-b border-line px-4 py-3 ${
+        className={`block border-b border-line px-5 py-4 ${
           open
-            ? "-mr-px border-l-4 border-l-ink bg-card pl-3"
+            ? "-mr-px border-l-4 border-l-ink bg-card pl-4"
             : "hover:bg-signal/15"
         }`}
       >
-        <p className="m-0 text-sm font-medium">{run.project_name}</p>
-        <p className="m-0 mt-0.5 font-mono text-[11px] text-ink-soft">
+        <p className="m-0 text-[15px] leading-snug font-semibold">
+          {run.project_name}
+        </p>
+        <p className="m-0 mt-1 font-mono text-xs text-ink-soft">
           {startedOn(run.started_at)}
         </p>
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center justify-between gap-3">
           <StageMarks finished={run.finished_stages} />
           {waiting ? (
-            <span className="border border-signal-edge bg-signal px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+            <span className="border border-signal-edge bg-signal px-2 py-0.5 font-mono text-[11px] font-semibold">
               {run.waiting_decisions} waiting
             </span>
           ) : (
-            <span className="font-mono text-[10px] text-ink-soft">{run.status}</span>
+            <span className="font-mono text-[11px] text-ink-soft">{run.status}</span>
           )}
         </div>
       </a>
@@ -76,7 +79,7 @@ function RunCard({ run, open, onOpen }) {
       {!open && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 right-0 h-px w-2.5 bg-line-strong"
+          className="pointer-events-none absolute top-1/2 right-0 h-px w-3 bg-line-strong"
         />
       )}
     </li>
@@ -89,7 +92,7 @@ function StageMarks({ finished }) {
       {STAGE_ORDER.map((stage) => (
         <span
           key={stage}
-          className={`block h-1.5 w-1.5 border border-line-strong ${
+          className={`block h-2 w-2 border border-line-strong ${
             finished.includes(stage) ? "bg-ink" : "bg-transparent"
           }`}
         />

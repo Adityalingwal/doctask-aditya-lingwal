@@ -24,10 +24,10 @@ export default function Register({ exported }) {
       </p>
 
       <div className="overflow-x-auto border border-line bg-card">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-[15px]">
           <thead>
             <tr className="border-b border-line-strong">
-              <th scope="col" className="eyebrow px-3 py-2 text-left">
+              <th scope="col" className="eyebrow px-4 py-3 text-left">
                 #
               </th>
               {exported.columns.map((column) => (
@@ -42,12 +42,12 @@ export default function Register({ exported }) {
               <tr key={row.row_number} className="border-b border-line last:border-b-0">
                 <th
                   scope="row"
-                  className="px-3 py-3 text-left align-top font-mono text-xs font-normal text-ink-soft"
+                  className="px-4 py-3.5 text-left align-top font-mono text-sm font-normal text-ink-soft"
                 >
                   {row.row_number}
                 </th>
                 {exported.columns.map((column) => (
-                  <td key={column} className="px-3 py-3 align-top">
+                  <td key={column} className="px-4 py-3.5 align-top">
                     {column === STATUS_CELL ? (
                       <StatusChip status={row.cells[column]} />
                     ) : (
@@ -64,7 +64,7 @@ export default function Register({ exported }) {
       <h3 className="eyebrow mt-8 mb-3">Evidence</h3>
       <div className="grid gap-3">
         {exported.rows.map((row) => (
-          <div key={row.row_number} className="border border-line bg-card px-4 py-3">
+          <div key={row.row_number} className="border border-line bg-card px-5 py-4">
             <h4 className="eyebrow m-0 mb-2">Row {row.row_number}</h4>
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {row.citations.map((citation, place) => (
@@ -78,7 +78,7 @@ export default function Register({ exported }) {
                 {row.findings.map((finding) => (
                   <li
                     key={finding.rule_id}
-                    className="border-l-4 border-caution py-1 pl-3 text-sm"
+                    className="border-l-4 border-caution py-1 pl-4"
                   >
                     {findingLine(finding)}
                   </li>
@@ -101,7 +101,7 @@ export function Examine({ examine }) {
       <p className="eyebrow m-0 mb-3">
         rules run against {examine.rows_examined} register row(s)
       </p>
-      <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-xs">
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0 font-mono text-sm">
         {examine.rules.map((rule) => (
           <li key={rule.id}>
             <span className="mr-2 font-semibold">{rule.id}</span>
@@ -111,7 +111,7 @@ export function Examine({ examine }) {
         ))}
       </ul>
       {examine.findings.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-soft">
+        <p className="mt-4 text-ink-soft">
           No findings — no register row broke one of those rules.
         </p>
       ) : (
@@ -119,7 +119,7 @@ export function Examine({ examine }) {
           {examine.findings.map((finding, place) => (
             <li
               key={place}
-              className="border-l-4 border-caution bg-card py-2 pl-3 text-sm"
+              className="border-l-4 border-caution bg-card py-2 pl-4"
             >
               {findingLine(finding)}
             </li>
@@ -136,7 +136,7 @@ function StatusChip({ status }) {
   const needsAttention = screenConfig.attention_statuses.includes(status);
   return (
     <span
-      className={`inline-block border px-2 py-0.5 font-mono text-[11px] whitespace-nowrap ${
+      className={`inline-block border px-2.5 py-1 font-mono text-xs whitespace-nowrap ${
         needsAttention ? "border-caution text-caution" : "border-line text-ink"
       }`}
     >
@@ -158,11 +158,11 @@ function Citation({ citation }) {
         {quoted && citation.place !== null ? ` · ${citation.place}` : ""}
       </p>
       {quoted ? (
-        <p className="m-0 mt-1 border-l-2 border-line-strong pl-3 text-sm">
+        <p className="m-0 mt-1.5 border-l-2 border-line-strong pl-4">
           &ldquo;{citation.source_words}&rdquo;
         </p>
       ) : (
-        <p className="m-0 mt-1 border-l-2 border-line pl-3 text-sm text-ink-soft italic">
+        <p className="m-0 mt-1.5 border-l-2 border-line pl-4 text-ink-soft italic">
           {citation.absence_statement}
         </p>
       )}

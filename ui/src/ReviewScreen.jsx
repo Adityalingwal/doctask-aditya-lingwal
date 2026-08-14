@@ -108,36 +108,37 @@ export default function ReviewScreen({ runId: openedRunId }) {
       : run.decisions.filter((decision) => decision.outcome === null).length;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-12">
-      {/* One sheet with a hard edge, split into the book's edge and its open
-          page. The two live inside the same border so the spine between them
-          is a fold rather than a gap. */}
-      <div className="edge-shadow grid grid-cols-1 border border-line-strong bg-card lg:grid-cols-[17rem_1fr]">
+    // The whole viewport, once. The bar keeps its height, and the two panes
+    // below it scroll independently — a long register must never push the run
+    // list off the screen.
+    <div className="grid h-screen grid-rows-[3.5rem_1fr] overflow-hidden">
+      <header className="flex items-center gap-3 bg-ink px-5 text-paper">
+        <span className="block h-3 w-3 bg-signal" aria-hidden="true" />
+        <h1 className="m-0 font-mono text-sm font-semibold tracking-tight">
+          Requirements-to-Delivery Register
+          <span className="ml-3 font-normal opacity-60">run review</span>
+        </h1>
+      </header>
+
+      <div className="grid min-h-0 grid-cols-1 lg:grid-cols-[20rem_1fr]">
         <RunList
           runs={runs}
           refusal={runsRefusal}
           openRunId={runId}
           onOpen={openRun}
-        >
-          <OpenRun runId={runId} onOpen={openRun} />
-        </RunList>
+        />
 
-        <main className="min-w-0 px-6 pb-16 sm:px-10">
-          <h1 className="m-0 border-b border-line py-5 font-mono text-sm font-semibold tracking-tight">
-            Requirements-to-Delivery Register
-            <span className="ml-3 font-normal text-ink-soft">run review</span>
-          </h1>
-
+        <main className="pane min-w-0 bg-card px-6 pt-8 pb-24 sm:px-10">
           {answerRefusal !== null && <Refusal text={answerRefusal} />}
           {readRefusal !== null && <Refusal text={readRefusal} />}
 
           {run === null ? (
-            <p className="mt-10 text-sm text-ink-soft">
+            <p className="max-w-prose text-ink-soft">
               Nothing is shown until the application answers for a run. Choose one
-              from the list, or open it by id.
+              from the list beside this.
             </p>
           ) : (
-            <div className="mt-10 flex flex-col gap-10">
+            <div className="flex max-w-5xl flex-col gap-12">
             <Section number="01" name="Stages" headingId="stages-heading">
               <Stages run={run} />
             </Section>
@@ -196,48 +197,18 @@ export default function ReviewScreen({ runId: openedRunId }) {
 function Refusal({ text }) {
   return (
     <p
-      className="mt-6 border border-danger bg-card px-4 py-3 text-sm"
+      className="mb-8 border-2 border-danger bg-card px-5 py-4"
       role="alert"
     >
-      <span className="eyebrow block text-danger">the server refused</span>
+      <span className="eyebrow mb-1 block text-danger">the server refused</span>
       {text}
     </p>
   );
 }
 
-function OpenRun({ runId, onOpen }) {
-  const [typed, setTyped] = useState(runId);
-  return (
-    <form
-      className="flex flex-col gap-2"
-      onSubmit={(submitted) => {
-        submitted.preventDefault();
-        onOpen(typed.trim());
-      }}
-    >
-      <label htmlFor="run-id" className="eyebrow">
-        Run id
-      </label>
-      <input
-        id="run-id"
-        name="run-id"
-        value={typed}
-        onChange={(typing) => setTyped(typing.target.value)}
-        className="w-full border border-line-strong bg-card px-2 py-1 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-signal-edge"
-      />
-      <button
-        type="submit"
-        className="edge-shadow-sm self-start border border-line-strong bg-card px-3 py-1 font-mono text-xs font-semibold hover:bg-paper"
-      >
-        Show run
-      </button>
-    </form>
-  );
-}
-
 function Skipped({ skipped }) {
   if (skipped.length === 0) {
-    return <p className="m-0 text-sm text-ink-soft">This run skipped nothing.</p>;
+    return <p className="m-0 text-ink-soft">This run skipped nothing.</p>;
   }
   return (
     <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
@@ -273,7 +244,7 @@ function Decisions({
   return (
     <>
       {decisions.length === 0 ? (
-        <p className="m-0 text-sm text-ink-soft">This run has raised no decision.</p>
+        <p className="m-0 text-ink-soft">This run has raised no decision.</p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-4 p-0">
           {decisions.map((decision) => (
@@ -383,7 +354,7 @@ function CostAndTiming({ reported }) {
           No stage of this run has finished, so no duration is recorded yet.
         </p>
       ) : (
-        <dl className="mt-6 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 font-mono text-xs">
+        <dl className="mt-8 grid grid-cols-[max-content_1fr] gap-x-8 gap-y-1.5 font-mono text-sm">
           {reported.stages.map((stage) => (
             <div key={stage.stage} className="contents">
               <dt className="text-ink-soft">{stage.stage}</dt>
@@ -406,9 +377,9 @@ function Figure({ label, value, note }) {
   return (
     <div className="border border-line bg-card px-4 py-3">
       <p className="eyebrow m-0">{label}</p>
-      <p className="m-0 mt-1 font-mono text-lg">{value}</p>
+      <p className="m-0 mt-2 font-mono text-2xl">{value}</p>
       {note !== undefined && (
-        <p className="m-0 mt-1 text-xs text-ink-soft">{note}</p>
+        <p className="m-0 mt-1.5 text-sm text-ink-soft">{note}</p>
       )}
     </div>
   );

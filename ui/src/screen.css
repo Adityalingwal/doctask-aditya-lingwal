@@ -34,11 +34,28 @@
     color-scheme: light;
   }
 
+  /* Two panes scroll separately, so the document itself never does. */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     background-color: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* A pane's own scrollbar, thin enough not to draw a second border down the
+     middle of the page. */
+  .pane {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
   }
 
   /* Nothing here is rounded. The register is a document, not a dashboard. */
@@ -58,13 +75,34 @@
     box-shadow: 2px 2px 0 0 var(--color-line-strong);
   }
 
-  /* The label above every section: its number, its name, and on the right
-     whatever that section counts. */
+  /* The small mono label used for anything that names a thing rather than
+     saying something: section names, field names, chips. Kept heavy enough to
+     read as a label rather than as faint decoration. */
   .eyebrow {
     font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.2em;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    line-height: 1.4;
     text-transform: uppercase;
+    color: var(--color-ink-soft);
+  }
+
+  /* The name of a section, which should carry as much weight as the numbers
+     under it. */
+  .section-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  .section-number {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
     color: var(--color-ink-soft);
   }
 

@@ -33,7 +33,7 @@ export default function Stages({ run }) {
   const states = stageStates(run.stage, run.status, run.cost_and_timing.stages);
   return (
     <>
-      <dl className="mb-5 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 font-mono text-xs">
+      <dl className="mb-6 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 font-mono text-sm">
         <dt className="text-ink-soft">run</dt>
         <dd className="m-0 break-all">{run.run_id}</dd>
         <dt className="text-ink-soft">project</dt>
@@ -74,9 +74,9 @@ function StageBox({ stage }) {
   }[stage.state];
 
   return (
-    <li className={`border ${box} px-3 py-2`}>
+    <li className={`border ${box} px-4 py-3`}>
       <p className="eyebrow m-0 text-ink">{stage.name}</p>
-      <p className="m-0 mt-1 font-mono text-[11px] text-ink-soft">
+      <p className="m-0 mt-1.5 font-mono text-xs text-ink-soft">
         {stage.seconds === null ? stage.state : `${stage.seconds}s`}
       </p>
       {stage.state === "working" && (
