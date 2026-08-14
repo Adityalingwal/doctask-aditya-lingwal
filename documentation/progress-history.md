@@ -4,7 +4,7 @@ This is the detailed pre-compaction progress record frozen from `PROGRESS.md`
 at commit `2e14c91` on 2026-08-13. Completed dated narrative and resolved
 blockers belong here. Current status, active blockers, assumptions and next
 actions live in root `PROGRESS.md`; the exact byte-for-byte source is
-`documentation/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`.
+`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`.
 
 New completed entries are added newest-first below this header.
 

@@ -4,7 +4,7 @@ This file answers **what is true now and why**. It is intentionally compact.
 Detailed reasoning, rejected alternatives, and the original append-only
 Decision Log live in [`documentation/decision-history.md`](documentation/decision-history.md).
 Exact pre-compaction source is preserved in
-[`documentation/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md`](documentation/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md).
+[`documentation/archive/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md).
 
 The task requirements are interpreted separately in
 `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md`.
@@ -136,6 +136,15 @@ export is always gated.
 - **Known limitation:** A rejected finding does not automatically return when
   later evidence makes it stronger. Evidence that resolves it naturally stops
   the rule firing.
+- **One answer at a time, and no batch — locked 2026-08-14.** Every proposal is
+  answered by its own request; there is no "approve all" and no endpoint that
+  takes several answers together. A batch would need a second API shape, a
+  second MCP tool, and an answer to a question V1 does not otherwise have —
+  what a partly failed batch means when three of seven answers do not apply.
+- **Trade-off, stated plainly:** a run holding many gates costs the Delivery
+  Owner one click and one request each. That is accepted. Reading each proposal
+  before answering it is the point of the gate, and a screen that lets someone
+  approve seven at once quietly invites approving without reading.
 - **Review queue:** One `decisions` row stores the frozen question and answer.
   Its UUID is the API key; question and answer are never stored apart.
 - **A finding's answer lives only here.** `findings` carries the `decision_key`
@@ -632,9 +641,9 @@ slice-1 scope.
   two route cases in `tests/test_review_screen_route.py`, and one whole run
   driven through the screen in a browser: three gates answered one at a time,
   the review finished, and the exported register read back with its citations.
-  Layout and visual treatment remain open, and so does whether answers are
-  later batched at the API layer; the screen answers one decision at a time
-  because that is what `POST /runs/{id}/decisions` accepts.
+  Layout and visual treatment remain open. Answering one decision at a time is
+  no longer open: it is locked in D02, and the screen must not offer any
+  approve-all or batch-submit affordance.
 - Limitation: `GET /runs/{id}` carries no register rows, so the register
   section is empty until the run has exported. Cost and timing do reach that
   response, and the section shows what the run recorded — or says the figure is
@@ -749,10 +758,9 @@ slice-1 scope.
 ## Open decisions
 
 1. Task 2 orchestration: high-level `create_agent` versus raw StateGraph.
-2. Whether review answers stay one-at-a-time or later batch at the API layer.
-3. React visual layout and treatment (content/gates are locked).
-4. Whether real document sizes justify pgvector retrieval or Extract fan-out.
-5. Exact later-slice storage choices where this file explicitly leaves them
+2. React visual layout and treatment (content/gates are locked).
+3. Whether real document sizes justify pgvector retrieval or Extract fan-out.
+4. Exact later-slice storage choices where this file explicitly leaves them
    open; do not invent them before their slice.
 
 ## Known limitations and unverified assumptions
