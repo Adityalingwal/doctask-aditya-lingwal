@@ -20,3 +20,15 @@ MATCH_STAGE = "match"
 EXAMINE_STAGE = "examine"
 REVIEW_STAGE = "review"
 COMMIT_STAGE = "commit"
+
+# The one ordering every reader of `finished_stages` uses — kept here, beside
+# the stage names themselves, so nothing else in the codebase can drift into a
+# second copy of the pipeline's order.
+STAGE_ORDER = (
+    INGEST_STAGE,
+    EXTRACT_STAGE,
+    MATCH_STAGE,
+    EXAMINE_STAGE,
+    REVIEW_STAGE,
+    COMMIT_STAGE,
+)

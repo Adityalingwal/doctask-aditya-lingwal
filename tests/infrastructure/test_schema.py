@@ -40,8 +40,7 @@ EXPECTED_COLUMNS = {
         "current_stage",
         "started_at",
         "finished_at",
-        "stage_timings",
-        "estimated_cost_usd",
+        "finished_stages",
         "skipped",
         "ended_early_reason",
         "failure_reason",
@@ -50,8 +49,6 @@ EXPECTED_COLUMNS = {
         "rules_snapshot",
         "rules_fingerprint",
         "examined_row_count",
-        "token_usage",
-        "cost_unknown_reason",
         "created_at",
     },
     "documents": {
@@ -659,22 +656,6 @@ def test_register_row_refuses_status_outside_the_locked_set(
                 invalid_run_id,
                 status="Delivered",
             )
-
-
-def test_a_new_run_holds_no_cost_until_one_is_estimated(
-    database_connection: Connection,
-) -> None:
-    """A zero cannot be told from a cost nobody could estimate; null can."""
-    project_id = _insert_project(database_connection)
-    run_id = _insert_run(database_connection, project_id)
-
-    estimated_cost, token_usage = database_connection.execute(
-        text("SELECT estimated_cost_usd, token_usage FROM runs WHERE id = :id"),
-        {"id": run_id},
-    ).one()
-
-    assert estimated_cost is None
-    assert token_usage == {}
 
 
 def test_a_downgrade_refuses_to_take_a_withdrawn_row_back_to_a_shape_without_it(
