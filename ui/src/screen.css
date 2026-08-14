@@ -50,12 +50,31 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* A pane's own scrollbar, thin enough not to draw a second border down the
-     middle of the page. */
+  /* A pane scrolls on its own, and its scrollbar is only there while it is
+     being scrolled. The track keeps its width throughout, so the thumb
+     appearing never shifts what is being read. */
   .pane {
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--color-line) transparent;
+    scrollbar-color: transparent transparent;
+  }
+
+  .pane.scrolling {
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+
+  .pane::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .pane::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  .pane.scrolling::-webkit-scrollbar-thumb {
+    background-color: var(--color-line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
 
   /* Nothing here is rounded. The register is a document, not a dashboard. */

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
+
 import Question from "./Question.jsx";
 import Register, { Examine } from "./Register.jsx";
 import RunList from "./RunList.jsx";
@@ -20,7 +22,7 @@ const WAITING_FOR_REVIEW = "waiting for review";
 // The screen's own name. The register it shows keeps the name the decisions and
 // the exports give it; this is only what the person looking at it calls the
 // thing, and it lives in one place so it can be changed in one place.
-const PRODUCT_NAME = "Throughline";
+const PRODUCT_NAME = "Register";
 
 export default function ReviewScreen({ runId: openedRunId }) {
   const [runId, setRunId] = useState(openedRunId ?? "");
@@ -39,6 +41,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const [runs, setRuns] = useState([]);
   const [runsRefusal, setRunsRefusal] = useState(null);
   const [openSection, setOpenSection] = useState("stages");
+  const readingPane = useScrollbarWhileScrolling();
 
   const readListFromServer = useCallback(async () => {
     const answered = await readRuns();
@@ -169,14 +172,6 @@ export default function ReviewScreen({ runId: openedRunId }) {
               exported === null ? "not exported" : `${exported.rows.length} rows`,
             body: <RegisterSection exported={exported} />,
           },
-          {
-            id: "cost",
-            number: "05",
-            name: "Cost and timing",
-            tab: "Cost and timing",
-            count: "estimate, not a bill",
-            body: <CostAndTiming reported={run.cost_and_timing} />,
-          },
         ];
 
   return (
@@ -189,11 +184,6 @@ export default function ReviewScreen({ runId: openedRunId }) {
         <h1 className="m-0 font-mono text-sm font-semibold tracking-tight">
           {PRODUCT_NAME}
         </h1>
-        {openProjectName !== null && (
-          <p className="m-0 truncate font-mono text-sm opacity-60">
-            {openProjectName}
-          </p>
-        )}
       </header>
 
       <div className="grid min-h-0 grid-cols-1 lg:grid-cols-[20rem_1fr]">
@@ -205,14 +195,20 @@ export default function ReviewScreen({ runId: openedRunId }) {
         />
 
         <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] bg-card">
-          <SectionTabs
-            sections={sections}
-            openSection={openSection}
-            onOpenSection={setOpenSection}
-            disabled={run === null}
-          />
+          <div className="border-b border-line px-6 pt-7 pb-5 sm:px-10">
+            <p className="eyebrow m-0">project</p>
+            <p className="m-0 mt-1 text-2xl leading-tight font-semibold">
+              {openProjectName ?? "This run"}
+            </p>
+            <SectionTabs
+              sections={sections}
+              openSection={openSection}
+              onOpenSection={setOpenSection}
+              disabled={run === null}
+            />
+          </div>
 
-          <main className="pane min-w-0 px-6 pt-8 pb-24 sm:px-10">
+          <main ref={readingPane} className="pane min-w-0 px-6 pt-8 pb-24 sm:px-10">
             {answerRefusal !== null && <Refusal text={answerRefusal} />}
             {readRefusal !== null && <Refusal text={readRefusal} />}
 
@@ -251,13 +247,13 @@ export default function ReviewScreen({ runId: openedRunId }) {
 // Finish review.
 function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
   if (disabled) {
-    return <div className="h-12 border-b border-line-strong" />;
+    return null;
   }
   return (
     <div
       role="tablist"
       aria-label="Sections of this run"
-      className="flex flex-wrap items-stretch border-b border-line-strong"
+      className="mt-6 flex flex-wrap items-stretch gap-3"
     >
       {sections.map((section) => {
         const open = section.id === openSection;
@@ -269,10 +265,10 @@ function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
             aria-selected={open}
             aria-controls={`${section.id}-heading`}
             onClick={() => onOpenSection(section.id)}
-            className={`-mb-px flex items-center gap-2 border-r border-line px-5 py-3 font-mono text-xs font-semibold tracking-wide whitespace-nowrap ${
+            className={`flex items-center gap-2 border px-4 py-2 font-mono text-xs font-semibold tracking-wide whitespace-nowrap ${
               open
-                ? "border-b-2 border-b-ink bg-signal"
-                : "text-ink-soft hover:bg-signal/15 hover:text-ink"
+                ? "edge-shadow-sm border-signal-edge bg-signal text-ink"
+                : "border-line text-ink-soft hover:border-line-strong hover:text-ink"
             }`}
           >
             {section.tab}
@@ -417,70 +413,3 @@ function RegisterSection({ exported }) {
   return <Register exported={exported} />;
 }
 
-// Every figure here is the server's: the durations it recorded, the tokens the
-// model reported to it, and the estimate it made from them. Where it has none,
-// the word is "unknown" — never a zero, which would read as a measurement.
-function CostAndTiming({ reported }) {
-  const unknownCost = reported.estimated_cost_usd === null;
-  return (
-    <>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Figure
-          label="Total time"
-          value={
-            reported.stages.length === 0 ? "nothing finished yet" : `${reported.total_seconds}s`
-          }
-        />
-        <Figure
-          label="Tokens reported"
-          value={
-            reported.tokens.prompt === null
-              ? "unknown"
-              : `${reported.tokens.prompt} + ${reported.tokens.completion}`
-          }
-          note={`${reported.tokens.calls_reporting_usage} of ${
-            reported.tokens.calls_reporting_usage + reported.tokens.calls_without_usage
-          } calls reported what they spent`}
-        />
-        <Figure
-          label="Estimated cost, USD"
-          value={unknownCost ? "unknown" : reported.estimated_cost_usd}
-          note={unknownCost ? reported.cost_unknown_reason : "estimated"}
-        />
-      </div>
-
-      {reported.stages.length === 0 ? (
-        <p className="mt-5 text-sm text-ink-soft">
-          No stage of this run has finished, so no duration is recorded yet.
-        </p>
-      ) : (
-        <dl className="mt-8 grid grid-cols-[max-content_1fr] gap-x-8 gap-y-1.5 font-mono text-sm">
-          {reported.stages.map((stage) => (
-            <div key={stage.stage} className="contents">
-              <dt className="text-ink-soft">{stage.stage}</dt>
-              <dd className="m-0">{stage.seconds} seconds</dd>
-            </div>
-          ))}
-          <div className="contents">
-            <dt className="text-ink-soft">Every stage together</dt>
-            <dd className="m-0">{reported.total_seconds} seconds</dd>
-          </div>
-        </dl>
-      )}
-
-      <p className="mt-5 max-w-prose text-sm text-ink-soft">{reported.estimate_note}</p>
-    </>
-  );
-}
-
-function Figure({ label, value, note }) {
-  return (
-    <div className="border border-line bg-card px-4 py-3">
-      <p className="eyebrow m-0">{label}</p>
-      <p className="m-0 mt-2 font-mono text-2xl">{value}</p>
-      {note !== undefined && (
-        <p className="m-0 mt-1.5 text-sm text-ink-soft">{note}</p>
-      )}
-    </div>
-  );
-}

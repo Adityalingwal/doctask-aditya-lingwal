@@ -6,11 +6,15 @@
 // reason this column exists — and nothing on the card is invented: the project
 // name, the status, the moment it started and the stages that finished are all
 // fields the server sent.
+import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
+
 const STAGE_ORDER = ["ingest", "extract", "match", "examine", "review", "commit"];
 
 export default function RunList({ runs, refusal, openRunId, onOpen }) {
+  const listPane = useScrollbarWhileScrolling();
   return (
     <nav
+      ref={listPane}
       aria-label="Runs"
       className="pane flex min-h-0 flex-col border-line-strong bg-paper lg:border-r"
     >

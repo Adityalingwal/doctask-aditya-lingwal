@@ -7,29 +7,30 @@ const FAILED = "failed";
 
 /**
  * What the server has confirmed about each stage — never more than that: a
- * duration means finished, the run's own stage means working, and a stage the
- * run has already moved past without reporting one means it never ran.
+ * reported stage is finished, the run's own stage is working, and a stage the
+ * run has already moved past without reporting means it never ran.
  */
 export function stageStates(stage, status, reportedStages) {
-  const seconds = new Map(
-    reportedStages.map((reported) => [reported.stage, reported.seconds]),
-  );
+  const finished = new Set(reportedStages.map((reported) => reported.stage));
   const reached = STAGE_ORDER.indexOf(stage);
   return STAGE_ORDER.map((name, place) => {
-    if (seconds.has(name)) {
-      return { name, state: "done", seconds: seconds.get(name) };
+    if (finished.has(name)) {
+      return { name, state: "done" };
     }
     if (name === stage) {
-      return { name, state: status === FAILED ? FAILED : "working", seconds: null };
+      return { name, state: status === FAILED ? FAILED : "working" };
     }
     if (reached > -1 && place < reached) {
-      return { name, state: "never ran", seconds: null };
+      return { name, state: "never ran" };
     }
-    return { name, state: "not started", seconds: null };
+    return { name, state: "not started" };
   });
 }
 
 export default function Stages({ run }) {
+  // The only thing still read out of `cost_and_timing` is which stages the
+  // run reported finishing. When that block leaves the API, the run needs
+  // another way to say the same thing.
   const states = stageStates(run.stage, run.status, run.cost_and_timing.stages);
   return (
     <>
@@ -76,9 +77,7 @@ function StageBox({ stage }) {
   return (
     <li className={`border ${box} px-4 py-3`}>
       <p className="eyebrow m-0 text-ink">{stage.name}</p>
-      <p className="m-0 mt-1.5 font-mono text-xs text-ink-soft">
-        {stage.seconds === null ? stage.state : `${stage.seconds}s`}
-      </p>
+      <p className="m-0 mt-1.5 font-mono text-xs text-ink-soft">{stage.state}</p>
       {stage.state === "working" && (
         <span className="signal-slide mt-2 block h-1 w-full border border-signal-edge" />
       )}
