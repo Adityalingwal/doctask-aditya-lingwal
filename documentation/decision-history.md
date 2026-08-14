@@ -3339,3 +3339,22 @@ did, so the column showed the server's refusal against anything but the demo.
 Building it required `finished_stages` to exist first (see the entry above),
 since the list's own `finished_stages` field needed the same source the stage
 strip does.
+
+### The screen gains a way to start a run (2026-08-15, extending D15's screen scope)
+
+Before this, the screen could read runs, answer decisions and finish a
+review, but not start anything: `ui/src/run_requests.js` held five functions
+and none of them called `POST /projects` or `POST /runs`, so a first-time
+user with an empty database had no path forward without `curl`. This adds a
+`StartRun` form — project name, source folder, one `Start run` button —
+rendered in the reading pane in place of "Nothing is shown until the
+application answers for a run", but only once `GET /runs` has actually
+answered and come back with zero runs; a refusal there keeps the existing
+paragraph, never the form. The form validates nothing itself: every refusal
+shown is `create_project`'s or `start_run`'s own sentence, unchanged. The
+component holds the `project_id` `POST /projects` returns in its own state,
+so a retry after a failed `POST /runs` skips the create and retries only
+`POST /runs` — `projects.name` carries no unique constraint, so retrying the
+create would leave a second project over the same folder and the watcher
+polling it twice. After a successful start the screen re-reads the run list
+and opens the id the server returned, never the values that were submitted.

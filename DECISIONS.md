@@ -65,7 +65,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
 | D13 | Run identity, statuses, lock, and queue | Implemented and verified | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
-| D15 | MCP and React surfaces | MCP implemented and verified; the redesigned screen is implemented, proof pending against the application | Storage and interfaces |
+| D15 | MCP and React surfaces | MCP implemented and verified; the redesigned screen's start-a-run form is verified against the application, the rest is proof pending | Storage and interfaces |
 | D16 | Logging; timing and cost dropped | Logging implemented and verified; timing and cost removed from the screen and from the application | Operations |
 | D17 | Repository layout, build order, tests, setup, and network bind | Mixed | Delivery plan and proof |
 
@@ -640,6 +640,28 @@ slice-1 scope.
   "finished" before the batch is done; the run's current stage overrides that
   reading while the run is still working, but a `done`, `failed`, or otherwise
   terminal run shows its last stage as `done`, not stuck "working" forever.
+- **The screen gained one way in, not a dashboard (2026-08-15):** a
+  `StartRun` form — project name, source folder, one `Start run` button —
+  renders in the reading pane in place of "Nothing is shown until the
+  application answers for a run", but only once `GET /runs` has actually
+  answered and returned zero runs; a run-list refusal keeps that paragraph
+  instead, never a form over an application that could not be reached. It
+  validates nothing itself — every refusal shown is `create_project`'s or
+  `start_run`'s own sentence, because core owns what is usable, not this
+  door. The component holds the `project_id` `POST /projects` returns in its
+  own state, so a retry after a failed `POST /runs` skips the create and
+  retries only `POST /runs`. This matters because `projects.name` carries no
+  unique constraint — `migrations/versions/20260812_0001_create_slice_1_tables.py`
+  declares only a primary key on `id` — so retrying the create would leave a
+  second project over the same folder and the watcher polling it twice. For
+  the same reason the button stays disabled through the parent's re-read
+  rather than being re-enabled when `POST /runs` answers: the form is still on
+  screen for that round trip, and a second click there starts another run,
+  which the server does not refuse — it queues one behind the first.
+  D15's "no dashboard, no settings" lock still stands: this form is the one
+  exception already named as a gap, not an invitation to add more — no
+  folder picker, no project dropdown, and no "New project" affordance once a
+  run exists (see the limitation below).
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
 - The screen reads `GET /runs/{id}` on a poll whose interval is
@@ -660,13 +682,22 @@ slice-1 scope.
   bare `404`.
 - **Status:** MCP **implemented and verified** — `tests/interfaces/test_mcp_tools.py`
   and `tests/interfaces/test_mcp_flow.py`, plus one run driven through the tools by hand.
-  React is **implemented, proof pending** for the redesigned screen: twenty
-  Vitest cases in `ui/tests/` and the two route cases in
-  `tests/interfaces/test_review_screen_route.py` pass, but the screen has only been driven
-  against `ui/demo/`, never against the application since the redesign. Layout
-  and visual treatment are no longer open. Answering one decision at a time is
-  locked in D02, and the screen must not offer any approve-all or batch-submit
-  affordance.
+  React is **implemented**; 25 Vitest cases in `ui/tests/` and the two route
+  cases in `tests/interfaces/test_review_screen_route.py` pass. The
+  start-a-run form is **verified against the application** (2026-08-15,
+  hand-driven in a browser): an empty database showed the form; a folder
+  that does not exist and a blank name were each refused with `create_project`'s
+  own sentence; `POST /projects` succeeded for a real folder while the
+  environment's missing `OPENROUTER_API_KEY` refused `POST /runs`, and a
+  second click retried only `POST /runs` — the `projects` table held one row
+  for that project throughout, proving the L4 retry live, not only in a test.
+  A run could not be watched through to review this way, because this
+  environment has no live model key. The rest of the redesigned screen —
+  decisions, answer, finish, register — remains **proof pending**, driven
+  only against `ui/demo/`, never against the application since the redesign.
+  Layout and visual treatment are no longer open. Answering one decision at a
+  time is locked in D02, and the screen must not offer any approve-all or
+  batch-submit affordance.
 - `GET /runs` and `list_runs` are built, both calling `app/runs/list_runs.py`'s
   one core function: every run, newest first, no cap, each carrying its
   project name, status, `started_at` (`null` for a run that has not started
@@ -678,6 +709,18 @@ slice-1 scope.
   the SDK's own host check answers `421` to a request whose `Host` is neither
   `localhost` nor `127.0.0.1`, so a client on another machine needs transport
   work that is not designed yet.
+- Limitation: the source folder a project names is read inside the
+  application's container, whose only mount is `.:/workspace`, so only a path
+  inside the repository exists as far as it is concerned; a path like
+  `/Users/name/Downloads/client-docs` is refused, correctly, by
+  `create_project`. Deliberately not fixed by widening the mount — that would
+  grow the already-too-broad development mount `PROGRESS.md` lists as an
+  active blocker, and put an unauthenticated screen in front of the host
+  filesystem.
+- Limitation: the start form disappears once the first run exists — L1's
+  condition is a run list of exactly zero. A second project needs
+  `POST /projects` by hand or the `create_project` MCP tool; there is no
+  "New project" affordance to cover this.
 
 ## Operations
 
@@ -783,6 +826,14 @@ slice-1 scope.
 3. Whether real document sizes justify pgvector retrieval or Extract fan-out.
 4. Exact later-slice storage choices where this file explicitly leaves them
    open; do not invent them before their slice.
+5. **How the run list is organised once runs accumulate (2026-08-15).** It is
+   a flat list of every run across every project today, newest first, which
+   is right while there are a handful. Runs never stop being created, so one
+   project's history will eventually crowd out another's. The likely answer
+   is grouping the cards under a project heading rather than a two-level
+   navigation, because a project asks for no work of its own and a second
+   click would hide what is waiting. Left open; settling it is not part of
+   this work.
 
 ## Known limitations and unverified assumptions
 

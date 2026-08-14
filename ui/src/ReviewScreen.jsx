@@ -3,10 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 
 import Question from "./Question.jsx";
+import Refusal from "./Refusal.jsx";
 import Register, { Examine } from "./Register.jsx";
 import RunList from "./RunList.jsx";
 import Section, { WaitingCount } from "./Section.jsx";
 import Stages from "./Stages.jsx";
+import StartRun from "./StartRun.jsx";
 import screenConfig from "../config/screen.json";
 import {
   answerDecision,
@@ -40,6 +42,11 @@ export default function ReviewScreen({ runId: openedRunId }) {
   // reviewed, and one refusal standing in for both would hide that.
   const [runs, setRuns] = useState([]);
   const [runsRefusal, setRunsRefusal] = useState(null);
+  // Before the first read comes back, "the application answered with no runs"
+  // and "the application has not been asked yet" hold the same two values — an
+  // empty list and no refusal. Only this tells them apart, and without it the
+  // start form is offered over an application that has said nothing.
+  const [runsAnswered, setRunsAnswered] = useState(false);
   const [openSection, setOpenSection] = useState("stages");
   const readingPane = useScrollbarWhileScrolling();
 
@@ -47,6 +54,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
     const answered = await readRuns();
     setRuns(answered.ok ? answered.body.runs : []);
     setRunsRefusal(answered.ok ? null : answered.refusal);
+    setRunsAnswered(true);
   }, []);
 
   // A link to one run stays a link a reviewer can keep, so opening a run from
@@ -110,6 +118,17 @@ export default function ReviewScreen({ runId: openedRunId }) {
     await readFromServer();
     setAnswering(false);
   }, [runId, readFromServer]);
+
+  // L5: nothing the person typed into the start form reaches the screen. The
+  // list is re-read and the run the server actually created is what gets
+  // opened — never the id or the fields that were submitted.
+  const startedRun = useCallback(
+    async (startedRunId) => {
+      await readListFromServer();
+      openRun(startedRunId);
+    },
+    [readListFromServer, openRun],
+  );
 
   const waiting =
     run === null
@@ -213,10 +232,19 @@ export default function ReviewScreen({ runId: openedRunId }) {
             {readRefusal !== null && <Refusal text={readRefusal} />}
 
             {run === null ? (
-              <p className="max-w-prose text-ink-soft">
-                Nothing is shown until the application answers for a run. Choose
-                one from the list beside this.
-              </p>
+              // L1: the form stands in for this paragraph only once the list
+              // read has actually answered and come back with zero runs — a
+              // refusal (runsRefusal !== null) keeps the paragraph, because a
+              // form here would say "start one" over an application that could
+              // not be reached, and so does a read that has not answered yet.
+              runsAnswered && runs.length === 0 && runsRefusal === null ? (
+                <StartRun onStarted={startedRun} />
+              ) : (
+                <p className="max-w-prose text-ink-soft">
+                  Nothing is shown until the application answers for a run.
+                  Choose one from the list beside this.
+                </p>
+              )
             ) : (
               <div className="max-w-5xl">
                 {sections.map(
@@ -287,18 +315,6 @@ function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
         );
       })}
     </div>
-  );
-}
-
-function Refusal({ text }) {
-  return (
-    <p
-      className="mb-8 border-2 border-danger bg-card px-5 py-4"
-      role="alert"
-    >
-      <span className="eyebrow mb-1 block text-danger">the server refused</span>
-      {text}
-    </p>
   );
 }
 
