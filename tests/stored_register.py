@@ -113,6 +113,55 @@ def runs_of_project(database_url: str, project_id: str) -> list[tuple[Any, ...]]
         engine.dispose()
 
 
+def findings_of_run(database_url: str, run_id: str) -> list[tuple[Any, ...]]:
+    """Every finding one run raised, with the project and row each one names."""
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            return [
+                (
+                    finding["rule_id"],
+                    finding["issue"],
+                    finding["question"],
+                    str(finding["project_id"]),
+                    finding["row_number"],
+                )
+                for finding in connection.execute(
+                    text(
+                        "SELECT findings.rule_id, findings.issue, "
+                        "findings.question, register_rows.project_id, "
+                        "register_rows.row_number FROM findings "
+                        "JOIN register_rows ON register_rows.id = "
+                        "findings.register_row_id WHERE findings.run_id = "
+                        ":run_id ORDER BY findings.rule_id"
+                    ),
+                    {"run_id": run_id},
+                ).mappings().all()
+            ]
+    finally:
+        engine.dispose()
+
+
+def extraction_of_document(
+    database_url: str,
+    run_id: str,
+    source_path: str,
+) -> dict[str, Any]:
+    """What Extract stored for one document of one run, as PostgreSQL holds it."""
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            return connection.execute(
+                text(
+                    "SELECT extraction FROM documents WHERE run_id = :run_id "
+                    "AND source_path = :source_path"
+                ),
+                {"run_id": run_id, "source_path": source_path},
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+
 def documents_of_run(database_url: str, run_id: str) -> list[str]:
     engine = create_engine(database_url)
     try:

@@ -16,6 +16,9 @@ EXTRACT_MARKER = "File name: {source_file}"
 # Only Match is sent the requirements as JSON, so this marker picks out the
 # Match call of the run whose batch holds one named document.
 MATCH_BATCH_MARKER = '"source_file": "{source_file}"'
+# A first run's Match sees an empty register, so on a first run this row text
+# reaches the model only in the Examine call of the project that holds the row.
+EXAMINE_ROW_MARKER = '"what_was_asked": "{what_was_asked}"'
 # The register Match is shown is empty only before any row is committed, which
 # is what tells a first run's Match call apart from a later run's.
 EMPTY_REGISTER_MARKER = "Register rows:\n[]"
@@ -248,6 +251,11 @@ def match_marker_against_an_empty_register() -> str:
 
 def examine_marker() -> str:
     return EXAMINE_PROMPT_MARKER
+
+
+def examine_marker_for_register_holding(what_was_asked: str) -> str:
+    """The first run's Examine call for the project whose register holds this row."""
+    return EXAMINE_ROW_MARKER.format(what_was_asked=what_was_asked)
 
 
 def no_findings_answer() -> dict[str, Any]:

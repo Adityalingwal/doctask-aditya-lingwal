@@ -9,8 +9,9 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, IO
 from uuid import uuid4
 
 import httpx
@@ -26,6 +27,7 @@ from app.model.scripted_client import (
     ERROR_STATUS_CODE_KEY,
     PROMPT_MARKER_KEY,
 )
+from app.run_logging import RUN_LOGGER_NAME
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +39,7 @@ POSTGRES_MAINTENANCE_DATABASE = "postgres"
 TEST_DATABASE_PREFIX = "register_test_"
 HEALTH_TIMEOUT_SECONDS = 60.0
 POLL_SECONDS = 0.2
+LOG_CONFIG_FILE_SUFFIX = ".log-config.json"
 
 
 @contextmanager
@@ -78,8 +81,10 @@ class ApplicationProcess:
     delay_seconds: float = 0.0
     rules_config_path: Path | None = None
     watcher_config_path: Path | None = None
+    log_path: Path | None = None
     port: int = field(default_factory=lambda: _free_port())
     _process: subprocess.Popen | None = None
+    _log_file: IO[str] | None = None
 
     @property
     def base_url(self) -> str:
@@ -102,17 +107,23 @@ class ApplicationProcess:
             environment[WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE] = str(
                 self.watcher_config_path
             )
+        command = [
+            "uvicorn",
+            "app.main:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(self.port),
+        ]
+        if self.log_path is not None:
+            command += ["--log-config", str(_run_event_log_config(self.log_path))]
+            self._log_file = self.log_path.open("a", encoding="utf-8")
         self._process = subprocess.Popen(
-            [
-                "uvicorn",
-                "app.main:app",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(self.port),
-            ],
+            command,
             cwd=str(PROJECT_ROOT),
             env=environment,
+            stdout=self._log_file,
+            stderr=subprocess.STDOUT if self._log_file is not None else None,
         )
         self._wait_until_healthy()
 
@@ -121,6 +132,7 @@ class ApplicationProcess:
         os.kill(self._process.pid, signal.SIGKILL)
         self._process.wait(timeout=30)
         self._process = None
+        self._close_log_file()
 
     def stop(self) -> None:
         if self._process is None:
@@ -128,6 +140,12 @@ class ApplicationProcess:
         self._process.terminate()
         self._process.wait(timeout=30)
         self._process = None
+        self._close_log_file()
+
+    def _close_log_file(self) -> None:
+        if self._log_file is not None:
+            self._log_file.close()
+            self._log_file = None
 
     def client(self) -> httpx.Client:
         return httpx.Client(base_url=self.base_url, timeout=30)
@@ -166,15 +184,86 @@ def model_call_failure(message: str, status_code: int | None = None) -> dict[str
 
 
 def recorded_markers(call_log_path: Path) -> list[str]:
+    return [call["marker"] for call in recorded_calls(call_log_path)]
+
+
+def recorded_calls(call_log_path: Path) -> list[dict[str, Any]]:
+    """Every scripted model call, with the moment the call started.
+
+    The moment matters to a concurrency test: a call occupies the scripted
+    client for its configured delay, so two calls whose windows overlap were
+    genuinely in flight together rather than one after the other.
+    """
     if not call_log_path.exists():
         return []
-    markers = []
+    calls = []
     for line in call_log_path.read_text(encoding="utf-8").splitlines():
         try:
-            markers.append(json.loads(line)["marker"])
+            recorded = json.loads(line)
         except json.JSONDecodeError:
             continue
-    return markers
+        calls.append(
+            {
+                "marker": recorded["marker"],
+                "asked_at": datetime.fromisoformat(recorded["asked_at"]),
+            }
+        )
+    return calls
+
+
+def logged_run_events(log_path: Path) -> list[dict[str, Any]]:
+    """Every structured run event the application process wrote to stdout."""
+    if not log_path.exists():
+        return []
+    events = []
+    for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("{"):
+            continue
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict) and "event" in payload:
+            events.append(payload)
+    return events
+
+
+def _run_event_log_config(log_path: Path) -> Path:
+    """Write the logging configuration that puts run events on stdout.
+
+    uvicorn's shipped configuration leaves the run logger without a handler, so
+    an INFO run event reaches nothing at all and a test cannot read one back.
+    The application is started with this file instead, which changes where the
+    records go and nothing about the records themselves.
+    """
+    config_path = log_path.with_suffix(LOG_CONFIG_FILE_SUFFIX)
+    config_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {"one_line": {"format": "%(message)s"}},
+                "handlers": {
+                    "stdout": {
+                        "class": "logging.StreamHandler",
+                        "formatter": "one_line",
+                        "stream": "ext://sys.stdout",
+                    }
+                },
+                "loggers": {
+                    RUN_LOGGER_NAME: {
+                        "handlers": ["stdout"],
+                        "level": "INFO",
+                        "propagate": False,
+                    }
+                },
+                "root": {"handlers": ["stdout"], "level": "WARNING"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return config_path
 
 
 def wait_for_run_status(
