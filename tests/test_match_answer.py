@@ -14,13 +14,13 @@ from app.model.client import (
     build_model_client,
 )
 from app.model.scripted_client import SCRIPT_PATH_ENVIRONMENT_VARIABLE
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
     wait_for_run_status,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     extract_marker,
     extraction_answer,
     match_marker,

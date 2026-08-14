@@ -21,14 +21,14 @@ from app.examine.record_findings import record_findings
 from app.examine.register_under_examination import register_under_examination
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
 from app.runs.statuses import RUNNING
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
     wait_until,
     write_script,
 )
-from examine_answers import R1_ISSUE, examine_answer, one_finding
-from register_documents import (
+from tests.examine.answers import R1_ISSUE, examine_answer, one_finding
+from tests.documents.register_documents import (
     extract_marker,
     extraction_answer,
     match_answer,

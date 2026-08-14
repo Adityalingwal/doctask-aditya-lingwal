@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     logged_run_events,
@@ -16,7 +16,7 @@ from conftest import (
     wait_until,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     examine_marker_for_register_holding,
     extract_marker,
     extraction_answer,
@@ -24,7 +24,7 @@ from register_documents import (
     match_marker_for_batch_with,
     write_meeting_note,
 )
-from stored_register import documents_of_run, findings_of_run, stored_rows
+from tests.register.stored_register import documents_of_run, findings_of_run, stored_rows
 
 
 ALPHA_FILE = "alpha-notes.md"

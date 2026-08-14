@@ -6,15 +6,15 @@ from pathlib import Path
 
 import httpx
 
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
     wait_for_run_status,
     write_script,
 )
-from mcp_client import call_tool, tool_names
-from register_documents import (
+from tests.interfaces.mcp_client import call_tool, tool_names
+from tests.documents.register_documents import (
     dated_extraction_answer,
     examine_marker,
     extract_marker,
@@ -27,7 +27,7 @@ from register_documents import (
     write_client_requirements,
     write_meeting_note,
 )
-from stored_register import audit_of_row, stored_rows
+from tests.register.stored_register import audit_of_row, stored_rows
 
 from app.extract.answer import (
     CLIENT_REQUIREMENTS_DOCUMENT,

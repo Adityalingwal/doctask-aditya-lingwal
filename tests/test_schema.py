@@ -12,7 +12,7 @@ from sqlalchemy import Connection, Engine, create_engine, inspect, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import IntegrityError
 
-from conftest import temporary_database
+from tests.runs.application import temporary_database
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

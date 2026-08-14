@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
     wait_for_run_status,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,

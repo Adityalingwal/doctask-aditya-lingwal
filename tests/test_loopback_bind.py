@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from conftest import PROJECT_ROOT
+from tests.runs.application import PROJECT_ROOT
 
 
 def test_dockerfile_bind_host_defaults_to_loopback_via_app_host() -> None:

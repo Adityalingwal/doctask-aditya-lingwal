@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from conftest import (
+from tests.runs.application import (
     PROJECT_ROOT,
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -14,7 +14,7 @@ from conftest import (
     wait_for_run_status,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     dated_extraction_answer,
     examine_marker,
     extract_marker,
@@ -22,7 +22,7 @@ from register_documents import (
     match_marker,
     no_findings_answer,
 )
-from stored_register import documents_of_run, extraction_of_document, stored_rows
+from tests.register.stored_register import documents_of_run, extraction_of_document, stored_rows
 
 from app.extract.answer import MEETING_NOTES
 

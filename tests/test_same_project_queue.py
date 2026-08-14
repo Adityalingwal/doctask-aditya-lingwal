@@ -4,7 +4,7 @@ from pathlib import Path
 
 import httpx
 
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     logged_run_events,
@@ -15,7 +15,7 @@ from conftest import (
     wait_until,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,
@@ -24,7 +24,7 @@ from register_documents import (
     no_findings_answer,
     write_meeting_note,
 )
-from stored_register import documents_of_run, runs_of_project, stored_rows
+from tests.register.stored_register import documents_of_run, runs_of_project, stored_rows
 
 
 FIRST_FILE = "first-notes.md"

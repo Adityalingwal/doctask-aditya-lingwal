@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from app.ingest.read_docx import read_docx
 from app.ingest.read_source_document import read_source_document
 from app.ingest.unreadable_document import DocumentUnreadable
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     recorded_markers,
@@ -16,7 +16,7 @@ from conftest import (
     wait_for_run_status,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     match_answer,

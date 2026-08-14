@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
     wait_until,
     write_script,
 )
-from mcp_client import call_tool
-from register_documents import (
+from tests.interfaces.mcp_client import call_tool
+from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,

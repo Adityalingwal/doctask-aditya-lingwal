@@ -17,7 +17,7 @@ from app.examine.frozen_rules import (
     load_rules,
 )
 from app.runs.statuses import RUNNING
-from conftest import temporary_database
+from tests.runs.application import temporary_database
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

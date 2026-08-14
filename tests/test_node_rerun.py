@@ -14,8 +14,8 @@ from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH
 from app.register.propose_rows import propose_rows
 from app.runs.statuses import RUNNING
-from conftest import temporary_database
-from register_documents import write_meeting_note
+from tests.runs.application import temporary_database
+from tests.documents.register_documents import write_meeting_note
 
 
 MARKDOWN_ONLY = frozenset({".md"})

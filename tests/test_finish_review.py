@@ -19,7 +19,7 @@ from app.model.scripted_client import build_scripted_client
 from app.review.review_queue import APPROVED, answer_decision, decisions_of_run
 from app.runs.run_records import claim_review_finished, read_run
 from app.runs.statuses import DONE, RUNNING, WAITING_FOR_REVIEW
-from conftest import (
+from tests.runs.application import (
     PROJECT_ROOT,
     ApplicationProcess,
     approve_every_decision,
@@ -27,7 +27,7 @@ from conftest import (
     wait_for_run_status,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,

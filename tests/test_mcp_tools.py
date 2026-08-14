@@ -7,14 +7,14 @@ from uuid import uuid4
 
 from sqlalchemy import create_engine, text
 
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
     wait_until,
     write_script,
 )
-from mcp_client import call_tool, tool_names
-from register_documents import (
+from tests.interfaces.mcp_client import call_tool, tool_names
+from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,

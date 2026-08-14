@@ -30,7 +30,7 @@ from app.model.scripted_client import (
 from app.run_logging import RUN_LOGGER_NAME
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
 RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE = "RULES_CONFIG_PATH"
 WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE = "WATCHER_CONFIG_PATH"

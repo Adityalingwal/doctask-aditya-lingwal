@@ -11,7 +11,7 @@ from app.examine.deliverable_checks import deliverable_findings
 from app.examine.register_under_examination import register_under_examination
 from app.register.cells import WHAT_TESTING_FOUND, WHAT_WAS_ASKED
 from app.runs.statuses import RUNNING
-from conftest import temporary_database
+from tests.runs.application import temporary_database
 
 
 REQUIREMENT = "Send an email to the operations team on intake form submit."

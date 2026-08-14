@@ -4,14 +4,14 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text
 
-from conftest import (
+from tests.runs.application import (
     ApplicationProcess,
     recorded_markers,
     temporary_database,
     wait_until,
     write_script,
 )
-from register_documents import (
+from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,
