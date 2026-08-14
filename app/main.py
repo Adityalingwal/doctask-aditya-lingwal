@@ -18,6 +18,7 @@ from app.ingest.read_source_document import READER_EXTENSIONS
 from app.mcp_server.tools import MCP_PATH, build_mcp_server
 from app.model.client import build_model_client
 from app.projects.create_project import ensure_demo_project
+from app.review_screen.serve_screen import serve_review_screen
 from app.run_logging import log_run_event
 from app.runs.run_lifecycle import RunEngine, resume_unfinished_runs
 from app.runs.watch_source_folders import load_watcher_settings, watch_source_folders
@@ -36,6 +37,8 @@ RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE = "RULES_CONFIG_PATH"
 DEFAULT_RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
 WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE = "WATCHER_CONFIG_PATH"
 DEFAULT_WATCHER_CONFIG_PATH = PROJECT_ROOT / "config" / "watcher.yaml"
+REVIEW_SCREEN_PATH = "/ui"
+BUILT_REVIEW_SCREEN = PROJECT_ROOT / "ui" / "dist"
 
 
 def database_url_from_environment() -> str:
@@ -160,6 +163,7 @@ app.include_router(router)
 add_refusal_responses(app)
 app.state.mcp_server = build_mcp_server(app)
 app.mount(MCP_PATH, app.state.mcp_server.streamable_http_app())
+serve_review_screen(app, BUILT_REVIEW_SCREEN, REVIEW_SCREEN_PATH)
 
 
 @app.get("/health")
