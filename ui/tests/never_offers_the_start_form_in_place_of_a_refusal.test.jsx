@@ -30,6 +30,20 @@ test("never_offers_the_start_form_in_place_of_a_refusal", async () => {
   expect(screen.queryByRole("button", { name: /start run/i })).toBeNull();
 });
 
+// The same rule at the one moment it is easiest to break: before the first
+// read has come back, "no runs" and "not asked yet" look identical in state —
+// an empty list and no refusal. The form must wait for an actual answer, or a
+// reviewer whose application is slow or down can type into it and submit.
+test("never_offers_the_start_form_before_the_run_list_has_answered", async () => {
+  vi.stubGlobal("fetch", () => new Promise(() => {}));
+
+  render(<ReviewScreen />);
+
+  expect(screen.queryByLabelText(/project name/i)).toBeNull();
+  expect(screen.queryByLabelText(/folder/i)).toBeNull();
+  expect(screen.queryByRole("button", { name: /start run/i })).toBeNull();
+});
+
 // Confirms the passing case really is the empty-and-answered one, so the
 // refusal test above is not passing only because the form is never rendered
 // at all.

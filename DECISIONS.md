@@ -653,7 +653,11 @@ slice-1 scope.
   retries only `POST /runs`. This matters because `projects.name` carries no
   unique constraint — `migrations/versions/20260812_0001_create_slice_1_tables.py`
   declares only a primary key on `id` — so retrying the create would leave a
-  second project over the same folder and the watcher polling it twice.
+  second project over the same folder and the watcher polling it twice. For
+  the same reason the button stays disabled through the parent's re-read
+  rather than being re-enabled when `POST /runs` answers: the form is still on
+  screen for that round trip, and a second click there starts another run,
+  which the server does not refuse — it queues one behind the first.
   D15's "no dashboard, no settings" lock still stands: this form is the one
   exception already named as a gap, not an invitation to add more — no
   folder picker, no project dropdown, and no "New project" affordance once a

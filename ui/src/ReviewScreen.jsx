@@ -42,6 +42,11 @@ export default function ReviewScreen({ runId: openedRunId }) {
   // reviewed, and one refusal standing in for both would hide that.
   const [runs, setRuns] = useState([]);
   const [runsRefusal, setRunsRefusal] = useState(null);
+  // Before the first read comes back, "the application answered with no runs"
+  // and "the application has not been asked yet" hold the same two values — an
+  // empty list and no refusal. Only this tells them apart, and without it the
+  // start form is offered over an application that has said nothing.
+  const [runsAnswered, setRunsAnswered] = useState(false);
   const [openSection, setOpenSection] = useState("stages");
   const readingPane = useScrollbarWhileScrolling();
 
@@ -49,6 +54,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
     const answered = await readRuns();
     setRuns(answered.ok ? answered.body.runs : []);
     setRunsRefusal(answered.ok ? null : answered.refusal);
+    setRunsAnswered(true);
   }, []);
 
   // A link to one run stays a link a reviewer can keep, so opening a run from
@@ -230,8 +236,8 @@ export default function ReviewScreen({ runId: openedRunId }) {
               // read has actually answered and come back with zero runs — a
               // refusal (runsRefusal !== null) keeps the paragraph, because a
               // form here would say "start one" over an application that could
-              // not be reached.
-              runs.length === 0 && runsRefusal === null ? (
+              // not be reached, and so does a read that has not answered yet.
+              runsAnswered && runs.length === 0 && runsRefusal === null ? (
                 <StartRun onStarted={startedRun} />
               ) : (
                 <p className="max-w-prose text-ink-soft">

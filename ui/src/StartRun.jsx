@@ -40,12 +40,16 @@ export default function StartRun({ onStarted }) {
     }
 
     const started = await startRun(usableProjectId);
-    setStarting(false);
     if (!started.ok) {
       setRefusal(started.refusal);
+      setStarting(false);
       return;
     }
-    onStarted(started.body.run_id);
+    // `starting` is deliberately left set. The parent's re-read is a round
+    // trip, and this form stays mounted through it; a live button there takes
+    // a second click and starts another run, which the server does not refuse
+    // — it queues one behind the first.
+    await onStarted(started.body.run_id);
   };
 
   return (
