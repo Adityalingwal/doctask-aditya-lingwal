@@ -97,6 +97,7 @@ EXPECTED_COLUMNS = {
         "question",
         "proposed_register_row_id",
         "candidate_register_row_id",
+        "source_document_id",
         "outcome",
         "decided_at",
     },

@@ -84,6 +84,10 @@ row. Another document's silence proposes nothing, because a document that never
 asked for something cannot stop asking for it. Deleting a file from the folder
 deletes nothing either — the rows its earlier content produced stay.
 
+A withdrawal does not come back. If a later document asks for the requirement
+again, its evidence merges onto the row the way any evidence does, and the row
+still reads `Withdrawn`.
+
 ## Rules that changed and documents that did not
 
 When no document has changed but the rules in `config/rules.yaml` have, the run
@@ -199,7 +203,7 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `incremental-update` branch: **116 passed**, real
+Last verified on the `incremental-update` branch: **117 passed**, real
 PostgreSQL, no live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
@@ -237,6 +241,8 @@ the next run and never to one already under way or already finished. Point
 - A row two documents both asked for raises a withdrawal proposal when either
   of them drops it. The proposal is a question, never a change, and the
   Delivery Owner answers it.
+- A withdrawn row stays `Withdrawn` even if a later document asks for the
+  requirement again.
 - React and cost/timing reporting are later slices.
 - Neither the endpoints nor the MCP tools authenticate a caller, and the MCP
   endpoint answers `421 Misdirected Request` to a request whose `Host` is

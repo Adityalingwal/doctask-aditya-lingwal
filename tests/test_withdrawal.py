@@ -29,7 +29,11 @@ from register_documents import (
 )
 from stored_register import audit_of_row, stored_rows
 
-from app.extract.answer import CLIENT_REQUIREMENTS_DOCUMENT, MEETING_NOTES
+from app.extract.answer import (
+    CLIENT_REQUIREMENTS_DOCUMENT,
+    MEETING_NOTES,
+    RELATED_ADDITIONAL_DOCUMENT,
+)
 
 REQUIREMENTS_FILE = "client-requirements.md"
 MEETING_FILE = "meeting-notes.md"
@@ -38,13 +42,33 @@ DROPPED = "a records list page showing every intake record"
 DISCUSSED = "a search over old intake records"
 FIRST_VERSION_DATE = "12 March 2026"
 SECOND_VERSION_DATE = "26 March 2026"
+# Not 10 March: the Extract instructions carry that date in their example, so
+# it is in every extraction prompt and cannot tell one document from another.
+FIRST_MEETING_DATE = "11 March 2026"
 SECOND_MEETING_DATE = "24 March 2026"
+THIRD_MEETING_DATE = "30 March 2026"
 KEPT_ROW = 1
 DROPPED_ROW = 2
 DISCUSSED_ROW = 3
 STATUS_CELL = 3
 DATE_MARKER = "**Date:** {date}"
 WITHDRAWN = "Withdrawn"
+
+
+def _meeting_note_asking_for(
+    folder: Path,
+    date: str,
+    requirements: list[str],
+) -> list[str]:
+    """The meeting note re-issued: its own date, and what it still asks for."""
+    quotes = [f"The client asked for {requirement}." for requirement in requirements]
+    (folder / MEETING_FILE).write_text(
+        "# Intake portal meeting notes\n\n"
+        f"{DATE_MARKER.format(date=date)}\n\n"
+        "## Discussion\n\n" + "\n\n".join(quotes) + "\n",
+        encoding="utf-8",
+    )
+    return quotes
 
 
 def _write_second_meeting_note(folder: Path) -> str:
@@ -307,3 +331,124 @@ def test_a_withdrawal_is_answered_through_the_same_six_mcp_tools(
     assert any(
         row["cells"]["status"] == WITHDRAWN for row in exported.payload["rows"]
     )
+
+
+def test_the_absence_is_cited_to_the_document_that_actually_stopped_asking(
+    tmp_path: Path,
+) -> None:
+    # Row 2 ends up cited to both documents. Only the meeting note drops it, so
+    # the absence must be written against the meeting note — not against the
+    # requirements document, which is merely the first of the two by name.
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    kept_quote, dropped_quote = write_client_requirements(
+        source_folder, REQUIREMENTS_FILE, [KEPT, DROPPED], FIRST_VERSION_DATE
+    )
+    first_meeting_quotes = _meeting_note_asking_for(
+        source_folder, FIRST_MEETING_DATE, [DISCUSSED]
+    )
+    second_meeting_quotes = [
+        f"The client asked for {requirement}." for requirement in (DISCUSSED, DROPPED)
+    ]
+    third_meeting_quotes = [f"The client asked for {DISCUSSED}."]
+
+    script_path = tmp_path / "script.json"
+    write_script(
+        script_path,
+        {
+            match_marker_against_an_empty_register(): match_answer(3),
+            DATE_MARKER.format(date=THIRD_MEETING_DATE): dated_extraction_answer(
+                [(DISCUSSED, third_meeting_quotes[0])],
+                MEETING_NOTES,
+                THIRD_MEETING_DATE,
+            ),
+            DATE_MARKER.format(date=SECOND_MEETING_DATE): dated_extraction_answer(
+                [
+                    (DISCUSSED, second_meeting_quotes[0]),
+                    (DROPPED, second_meeting_quotes[1]),
+                ],
+                MEETING_NOTES,
+                SECOND_MEETING_DATE,
+            ),
+            DATE_MARKER.format(date=FIRST_MEETING_DATE): dated_extraction_answer(
+                [(DISCUSSED, first_meeting_quotes[0])],
+                MEETING_NOTES,
+                FIRST_MEETING_DATE,
+            ),
+            # Re-read and judged a different type this time, so it reaches
+            # neither Match nor a withdrawal — and still carries row 2's
+            # earlier citation.
+            DATE_MARKER.format(date=SECOND_VERSION_DATE): dated_extraction_answer(
+                [], RELATED_ADDITIONAL_DOCUMENT, SECOND_VERSION_DATE
+            ),
+            DATE_MARKER.format(date=FIRST_VERSION_DATE): dated_extraction_answer(
+                [(KEPT, kept_quote), (DROPPED, dropped_quote)],
+                CLIENT_REQUIREMENTS_DOCUMENT,
+                FIRST_VERSION_DATE,
+            ),
+            # Only the second meeting note's Match call carries this quote.
+            second_meeting_quotes[1]: match_answer_of([DISCUSSED_ROW, DROPPED_ROW]),
+            match_marker(): match_answer_of([DISCUSSED_ROW]),
+            examine_marker(): no_findings_answer(),
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=Path("/workspace/debug-model-calls.jsonl"),
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Two documents, one dropped it",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                first_run = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                wait_for_run_status(client, first_run, "waiting for review")
+                approve_every_decision_and_finish_review(client, first_run)
+                wait_for_run_status(client, first_run, "done")
+
+                # The meeting note asks for the dropped requirement too, and
+                # approving that match puts its citation on row 2.
+                _meeting_note_asking_for(
+                    source_folder, SECOND_MEETING_DATE, [DISCUSSED, DROPPED]
+                )
+                second_run, _ = _run_to_review(client, project_id)
+                approve_every_decision_and_finish_review(client, second_run)
+                wait_for_run_status(client, second_run, "done")
+
+                write_client_requirements(
+                    source_folder, REQUIREMENTS_FILE, [KEPT, DROPPED], SECOND_VERSION_DATE
+                )
+                _meeting_note_asking_for(
+                    source_folder, THIRD_MEETING_DATE, [DISCUSSED]
+                )
+                third_run, at_review = _run_to_review(client, project_id)
+                raised = _withdrawals(at_review)
+                approve_every_decision_and_finish_review(client, third_run)
+                wait_for_run_status(client, third_run, "done")
+                after = stored_rows(database_url, project_id)
+        finally:
+            application.stop()
+
+    assert len(raised) == 1
+    assert MEETING_FILE in raised[0]["question"]
+
+    withdrawn = after[DROPPED_ROW]
+    cited_files = {citation[1] for citation in withdrawn.citations}
+    assert {REQUIREMENTS_FILE, MEETING_FILE} <= cited_files
+    absence = [citation for citation in withdrawn.citations if citation[4] is not None]
+    assert len(absence) == 1
+    # The question named the meeting note; the record must name it too.
+    assert absence[0][1] == MEETING_FILE
+    assert MEETING_FILE in absence[0][4]
+    assert withdrawn.cells[STATUS_CELL] == WITHDRAWN
+    assert withdrawn.cells[6] == THIRD_MEETING_DATE

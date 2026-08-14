@@ -97,6 +97,7 @@ async def propose_withdrawals(
                     run_id,
                     _withdrawal_question(row, source_file),
                     row["id"],
+                    document["id"],
                 )
                 already_being_asked_about.add(row["id"])
                 proposed_row_numbers.append(row["row_number"])
@@ -120,9 +121,11 @@ async def apply_approved_withdrawals(
             continue
         if decision["outcome"] != APPROVED:
             continue
-        row_id = decision["candidate_register_row_id"]
-        row = await _committed_row(connection, row_id)
-        document = await _document_that_stopped_asking(connection, run_id, row_id)
+        row = await _committed_row(connection, decision["candidate_register_row_id"])
+        # The document the question named, not one worked out again afterwards:
+        # a row cited to two documents would otherwise have its absence written
+        # against whichever came first, including one still asking for it.
+        document = await _document_read(connection, decision["source_document_id"])
         withdrawn_row_numbers.append(
             await _withdraw_one_row(connection, run_id, row, document)
         )
@@ -261,19 +264,13 @@ async def _committed_row(
     return await result.fetchone()
 
 
-async def _document_that_stopped_asking(
+async def _document_read(
     connection: AsyncConnection,
-    run_id: UUID,
-    register_row_id: UUID,
+    document_id: UUID,
 ) -> dict[str, Any]:
     result = await connection.execute(
-        "SELECT documents.id, documents.source_path, documents.extraction "
-        "FROM documents JOIN citations ON citations.source_file = "
-        "documents.source_path WHERE documents.run_id = %s "
-        "AND documents.extraction IS NOT NULL "
-        "AND citations.register_row_id = %s AND citations.cell_name = %s "
-        "ORDER BY documents.source_path LIMIT 1",
-        (run_id, register_row_id, WHAT_WAS_ASKED),
+        "SELECT id, source_path, extraction FROM documents WHERE id = %s",
+        (document_id,),
     )
     return await result.fetchone()
 

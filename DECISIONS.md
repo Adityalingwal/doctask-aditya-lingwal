@@ -203,8 +203,17 @@ export is always gated.
 - **Must preserve:** an approved withdrawal is a `Status` cell change, so it
   writes cell audit and moves only that row's fingerprint; a rejected one is
   retained in the run record and is not raised again until that document
-  changes again; a requirement that reappears later moves the row off
-  `Withdrawn` through the ordinary gate, with no second mechanism.
+  changes again; the absence is cited to the document the question named,
+  which the decision stores, never to one worked out again afterwards.
+- **A withdrawal is final in V1.** If a later document asks for the
+  requirement again, its evidence merges onto the row as any evidence does,
+  and the row still reads `Withdrawn`. Nothing in this system updates a
+  committed row's cells from later evidence — an approved match moves
+  citations only — so there is no ordinary gate to carry it back, and no
+  honest status to carry it to: `No evidence yet` would deny testing evidence
+  the row may already hold, and the status it had before the withdrawal
+  described a world that has since changed. Deciding what a returning
+  requirement should read as is deferred, not refused.
 - **Limitation:** `Withdrawn` describes the requirement, while the other six
   statuses describe delivery. One `Status` cell carries both, because it is
   the one cell every export, gate, and reader already consults.
@@ -640,7 +649,7 @@ slice-1 scope.
 | 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 116 tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 117 tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
@@ -692,6 +701,8 @@ slice-1 scope.
   of its own.
 - A row two documents both supplied raises a withdrawal proposal when either of
   them drops it; the proposal is a question, never a change.
+- A withdrawal is final: a requirement asked for again merges its evidence onto
+  the row, which still reads `Withdrawn`.
 - Neither door authenticates a caller, and the MCP endpoint answers `421` to a
   `Host` header other than `localhost` or `127.0.0.1`.
 - A finding raised against a register row is never re-examined by a later run;
