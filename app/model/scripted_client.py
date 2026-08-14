@@ -9,7 +9,6 @@ from typing import Any
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.messages.ai import UsageMetadata
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 
@@ -18,9 +17,6 @@ CALL_LOG_PATH_ENVIRONMENT_VARIABLE = "SCRIPTED_MODEL_CALL_LOG"
 DELAY_ENVIRONMENT_VARIABLE = "SCRIPTED_MODEL_DELAY_SECONDS"
 PROMPT_MARKER_KEY = "when_prompt_contains"
 ANSWER_KEY = "answer"
-USAGE_KEY = "usage"
-PROMPT_TOKENS_KEY = "prompt_tokens"
-COMPLETION_TOKENS_KEY = "completion_tokens"
 ERROR_KEY = "error"
 ERROR_MESSAGE_KEY = "message"
 ERROR_STATUS_CODE_KEY = "status_code"
@@ -72,12 +68,7 @@ class ScriptedChatModel(GenericFakeChatModel):
             )
         return ChatResult(
             generations=[
-                ChatGeneration(
-                    message=AIMessage(
-                        content=scripted[ANSWER_KEY],
-                        usage_metadata=_scripted_usage(scripted),
-                    )
-                )
+                ChatGeneration(message=AIMessage(content=scripted[ANSWER_KEY]))
             ]
         )
 
@@ -106,24 +97,6 @@ class ScriptedChatModel(GenericFakeChatModel):
         # nothing a chance to flush.
         with self.call_log_path.open("a", encoding="utf-8") as call_log:
             call_log.write(f"{line}\n")
-
-
-def _scripted_usage(scripted: dict[str, Any]) -> UsageMetadata | None:
-    """What this scripted call reports having spent, where the script says.
-
-    A script that says nothing reports nothing, which is the shape a provider
-    that returns no usage block has: the run must call that unknown, not zero.
-    """
-    reported = scripted.get(USAGE_KEY)
-    if reported is None:
-        return None
-    prompt_tokens = int(reported[PROMPT_TOKENS_KEY])
-    completion_tokens = int(reported[COMPLETION_TOKENS_KEY])
-    return UsageMetadata(
-        input_tokens=prompt_tokens,
-        output_tokens=completion_tokens,
-        total_tokens=prompt_tokens + completion_tokens,
-    )
 
 
 def build_scripted_client(

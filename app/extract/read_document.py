@@ -8,7 +8,7 @@ from app.extract.answer import ExtractionAnswer, parse_extraction_answer
 from app.extract.prompt import extraction_prompt
 from app.ingest.locate_quote import locate_quote
 from app.ingest.place_in_document import place_finder_for
-from app.model.call_the_model import ReportedUsage, call_the_model
+from app.model.call_the_model import call_the_model
 from app.register.cells import shorten_quote
 
 
@@ -28,11 +28,11 @@ async def read_one_document(
     model_client: BaseChatModel,
     source_file: str,
     document_text: str,
-) -> tuple[ExtractionAnswer, ReportedUsage]:
+) -> ExtractionAnswer:
     answered = await call_the_model(
         model_client, extraction_prompt(source_file, document_text)
     )
-    return parse_extraction_answer(answered.text), answered.usage
+    return parse_extraction_answer(answered)
 
 
 def locate_extraction(

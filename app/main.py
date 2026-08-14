@@ -16,7 +16,7 @@ from app.database import build_connection_pool
 from app.graph.register_graph import build_register_graph
 from app.ingest.read_source_document import READER_EXTENSIONS
 from app.mcp_server.tools import MCP_PATH, build_mcp_server
-from app.model.client import build_model_client, read_cost_rates
+from app.model.client import build_model_client
 from app.projects.create_project import ensure_demo_project
 from app.review_screen.serve_screen import serve_review_screen
 from app.run_logging import log_run_event
@@ -137,7 +137,6 @@ def _build_run_engine(
     """
     try:
         model_client = build_model_client(MODEL_CONFIG_PATH, os.environ)
-        cost_rates = read_cost_rates(MODEL_CONFIG_PATH)
     except RuntimeError as unavailable:
         log_run_event(
             logging.WARNING,
@@ -155,7 +154,6 @@ def _build_run_engine(
         accepted_extensions,
         page_limit,
         rules_config_path,
-        cost_rates,
     )
     return RunEngine(graph=graph, pool=pool, checkpointer=checkpointer), None
 
