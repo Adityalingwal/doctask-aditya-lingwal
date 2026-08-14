@@ -91,8 +91,14 @@ never exercised.
 - **Sub-folders are not read.** Only files directly in the project's folder
   are.
 
-Every one of these already appears on the run's `Skipped` section with its own
-reason, so none of it is silent.
+A file that is still in the folder and gets passed over says so: the run's
+`Skipped` section names it and gives the reason, so an edited, renamed or
+replaced document is never quietly ignored.
+
+Two of these are silent, and cannot be otherwise. A deleted document is no
+longer a path for Ingest to enumerate, and a sub-folder is not a file, so
+neither reaches the point where a skip is recorded. Nothing names them; a run
+that finds no new document says only that.
 
 ## Rules that changed and documents that did not
 
