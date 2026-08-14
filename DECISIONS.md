@@ -65,8 +65,8 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
 | D13 | Run identity, statuses, lock, and queue | Implemented and verified | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
-| D15 | MCP and React surfaces | Both implemented and verified; React layout and visual treatment still open | Storage and interfaces |
-| D16 | Logging, timing, and cost | Implemented and verified with the scripted model | Operations |
+| D15 | MCP and React surfaces | MCP implemented and verified; the redesigned screen is implemented, proof pending, and needs `GET /runs` | Storage and interfaces |
+| D16 | Logging; timing and cost dropped | Logging implemented and verified; timing and cost removed from the screen and pending removal from the application | Operations |
 | D17 | Repository layout, build order, tests, setup, and network bind | Mixed | Delivery plan and proof |
 
 ## Product contract
@@ -619,8 +619,15 @@ slice-1 scope.
 - The dependency is the official `mcp` SDK pinned at `1.29.0`. Its 2.x line was
   days old and changes the HTTP stack it depends on; `fastmcp` would put a
   second server framework beside FastAPI.
-- React is one page with five sections: stages, skipped, needs your decision,
-  register, cost/timing. One generic question component serves all gates.
+- React is one screen filling the viewport: a run list down the left, and to its
+  right one run's sections read one at a time behind tabs — stages, skipped,
+  needs your decision, register. One generic question component serves all
+  gates, with no branch on gate kind. The two columns scroll independently.
+- The run list replaces pasting a run id: a card carries the project name, when
+  the run started, which stages finished and what is waiting, and never a UUID.
+  Section tabs carry `role="tab"`, not the button role, because choosing what to
+  read is navigation — the only actions on a run stay Approve, Reject and
+  Finish review.
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
 - The screen reads `GET /runs/{id}` on a poll whose interval is
@@ -628,26 +635,33 @@ slice-1 scope.
   status says the run exported. Nothing a person clicked is shown: an answer is
   posted and the screen then re-reads the run it was recorded against.
 - The screen's own toolchain is Vite and Vitest with jsdom and
-  `@testing-library/react`, all pinned exactly. React and `react-dom` are the
-  only runtime dependencies; no state library, CSS framework, component library
-  or icon set is installed.
+  `@testing-library/react`, all pinned exactly. React and `react-dom` remain the
+  only runtime dependencies. **Tailwind CSS 4.3.3 is installed** as a build-time
+  dependency, with the palette, the two fonts and the spacing held as `@theme`
+  tokens in `ui/src/screen.css`; IBM Plex Sans and IBM Plex Mono are served from
+  the repository through `@fontsource`, latin subset only, so the screen fetches
+  no font at runtime. No state library, component library or icon set is
+  installed, and there is still no design system.
 - FastAPI serves the built screen at `/ui` from `ui/dist`
   (`app/review_screen/serve_screen.py`). Node is not in the image, so an
   unbuilt checkout is answered `503` naming the build command rather than a
   bare `404`.
 - **Status:** MCP **implemented and verified** — `tests/test_mcp_tools.py` and
   `tests/test_mcp_flow.py`, plus one run driven through the tools by hand.
-  React is **implemented and verified** — thirteen Vitest cases in `ui/tests/`, the
-  two route cases in `tests/test_review_screen_route.py`, and one whole run
-  driven through the screen in a browser: three gates answered one at a time,
-  the review finished, and the exported register read back with its citations.
-  Layout and visual treatment remain open. Answering one decision at a time is
-  no longer open: it is locked in D02, and the screen must not offer any
-  approve-all or batch-submit affordance.
+  React is **implemented, proof pending** for the redesigned screen: eleven
+  Vitest cases in `ui/tests/` and the two route cases in
+  `tests/test_review_screen_route.py` pass, but the screen has only been driven
+  against `ui/demo/`, never against the application since the redesign. Layout
+  and visual treatment are no longer open. Answering one decision at a time is
+  locked in D02, and the screen must not offer any approve-all or batch-submit
+  affordance.
+- **Limitation, and the next piece of work:** the run list reads `GET /runs`,
+  **which the application does not serve.** Only the dev-only middleware in
+  `ui/demo/` answers it, and against the real application the column shows the
+  server's refusal rather than an invented or empty list. Building that endpoint
+  and its MCP tool is pending.
 - Limitation: `GET /runs/{id}` carries no register rows, so the register
-  section is empty until the run has exported. Cost and timing do reach that
-  response, and the section shows what the run recorded — or says the figure is
-  unknown and why, never a zero.
+  section is empty until the run has exported.
 - Limitation: the tools inherit the HTTP surface's lack of authentication, and
   the SDK's own host check answers `421` to a request whose `Host` is neither
   `localhost` nor `127.0.0.1`, so a client on another machine needs transport
@@ -655,7 +669,7 @@ slice-1 scope.
 
 ## Operations
 
-### D16 — logging, timing, and cost
+### D16 — logging, and the dropped timing and cost
 
 - JSON-line stdout logs; every run event carries `run_id`. Log stage start/end,
   path-changing decisions, retries, and failures. Never log secrets or full
@@ -683,17 +697,29 @@ slice-1 scope.
 - **Rates are read at startup with the rest of `config/model.yaml`**, so a rate
   edit applies to runs started after a restart; a missing or unusable rate
   makes the estimate unknown and names the file, rather than stopping the run.
-- **Status:** **Implemented and verified** — 2026-08-14, by
-  `tests/test_timing_and_cost.py`: the estimate is labelled and never a bill,
-  an absent token count reports unknown rather than zero, a stage that did not
-  run has no duration, a killed and resumed run reports each stage once without
-  doubling its tokens, the new log fields carry no key or document text, and
-  the MCP `get_run_status` tool returns the same block as `GET /runs/{id}`
-  because both read it from `read_run_status`.
-- **Limitation:** a call whose answer could not be parsed or used records no
-  token count, so an estimate over a run with skipped documents is a lower
-  bound. Every figure so far comes from the scripted client, so the cost is
-  arithmetic over scripted usage and says nothing about a real provider.
+- **Dropped, 2026-08-14 — timing and cost are being removed, not kept.** The
+  behaviour costs a column set, a migration, a module, a test file and a section
+  of screen, and returns a figure that was never a provider charge. This phase
+  cuts scope rather than adds, so it goes. Logging stays; only the `seconds` and
+  token fields on those lines go with it.
+- **Removed so far:** the whole Cost and timing section of the review screen,
+  its tab, the per-stage durations in the stage strip, and
+  `ui/tests/never_shows_a_cost_that_is_not_an_estimate.test.jsx`. The screen
+  makes no claim about time or money.
+- **Still to remove, as one piece of work:** `app/runs/cost_and_timing.py`,
+  `tests/runs/test_timing_and_cost.py`, the `runs.stage_timings`,
+  `runs.token_usage`, `runs.estimated_cost_usd` and `runs.cost_unknown_reason`
+  columns with a migration that drops them, the `usage_metadata` read in
+  `app/model/call_the_model.py`, the `seconds=` fields on the graph's log lines,
+  `rates_usd_per_token` in `config/model.yaml`, and this section.
+- **The one dependency to settle first.** Which stages a run finished is read
+  out of `stage_timings` today — by the stage strip and by the run list. The run
+  needs its own `finished_stages`, written where the duration is written now and
+  keyed the same way, so a node that re-enters after a kill (D12) overwrites its
+  own key instead of adding a second one. Deriving it from `runs.stage` instead
+  would be wrong: on the rules-only route Extract and Match never run, and the
+  screen would call them finished.
+- **Status:** **Removed from the screen; still present in the application.**
 
 ## Delivery plan and proof
 
@@ -758,7 +784,8 @@ slice-1 scope.
 ## Open decisions
 
 1. Task 2 orchestration: high-level `create_agent` versus raw StateGraph.
-2. React visual layout and treatment (content/gates are locked).
+2. Nothing open here: the screen's layout and visual treatment were settled
+   on 2026-08-14 with the run list, the section tabs and the Tailwind tokens.
 3. Whether real document sizes justify pgvector retrieval or Extract fan-out.
 4. Exact later-slice storage choices where this file explicitly leaves them
    open; do not invent them before their slice.
@@ -777,10 +804,11 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- Every timing and token figure so far comes from the scripted client, so the
-  estimated cost is arithmetic over scripted usage, not a measured provider
-  charge. A call whose answer could not be used records no token count, so an
-  estimate over a run with skipped documents is a lower bound.
+- Timing and cost are dropped (D16). They are off the screen and still in the
+  application; until they are removed, the stage strip and the run list read
+  which stages finished out of `stage_timings`.
+- The run list reads `GET /runs`, which the application does not serve. Only the
+  dev-only middleware under `ui/demo/` answers it.
 - The review screen is built by Node, which the application image does not
   carry, so `ui/dist` must be built before the screen can be served.
 - The watcher holds what it last saw in memory, so a restart re-baselines every

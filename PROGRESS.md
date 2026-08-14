@@ -11,8 +11,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - Slice 1, the formats and types slice, the rules and findings slice, the MCP
   slice, the incremental update slice, the reliability slice and the React
   slice are merged into `main`.
-- The operations slice is built on `operations-timing-cost`, not yet merged.
-- 130 Python tests and 13 front-end tests pass without a live API key.
+- The operations slice is merged, and its timing and cost behaviour is now
+  dropped (D16): off the screen, still in the application.
+- 130 Python tests and 11 front-end tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
@@ -37,15 +38,12 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   flight.
 - A document read again that stopped asking for something raises one withdrawal
   proposal for the row it supplied, and only for that row.
-- One review screen is served at `/ui`: five sections over the endpoints that
-  already exist, one question component for every gate, one answer at a time,
-  and nothing shown that the server did not send back.
-- Every run records how long each stage took and what each model call reported
-  spending; `GET /runs/{id}` and the MCP `get_run_status` tool report the same
-  breakdown, token counts and estimated cost, and the screen shows them.
-- The estimate is tokens the model reported multiplied by the rates in
-  `config/model.yaml`. Every figure recorded so far came from the scripted
-  client, so it is arithmetic over scripted usage and not a provider charge.
+- The review screen was rebuilt on `review-screen-redesign`: the viewport is
+  split into a run list and one run's sections, read one at a time behind tabs,
+  on Tailwind tokens with IBM Plex served from the repository. Nobody types a
+  run id any more. Still nothing is shown that the server did not send back.
+- Timing and cost are gone from that screen, with the rest of their removal
+  written down in D16 and not yet done.
 
 ## Completed
 
@@ -124,7 +122,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] Five never-do tests written and run before any implementation; all five
       failed at the baseline on the screen module not existing.
 - [x] One page, five sections in the locked order, each showing only fields
-      `GET /runs/{id}` and `GET /runs/{id}/export` return.
+      `GET /runs/{id}` and `GET /runs/{id}/export` return. Superseded by the
+      2026-08-14 redesign: a run list, four sections behind tabs, and no cost
+      and timing.
 - [x] One `Question` component for every gate kind, with no branch on kind.
 - [x] An answer is posted and then read back: no click reaches the screen, and
       a refused answer leaves the decision unanswered with the server's reason.
@@ -188,12 +188,13 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## In progress / next slices
 
-| Order | Slice | Scope | Current state |
+| Order | Work | Scope | Current state |
 |---|---|---|---|
-| 1 | Operations | Stage timings, token/cost roll-up, reported evidence | Built on `operations-timing-cost`; awaiting review and merge |
+| 1 | Review screen redesign | Run list, section tabs, Tailwind tokens, demo server | Built on `review-screen-redesign`; documentation updated, awaiting merge |
+| 2 | `GET /runs` and the timing/cost removal | List endpoint plus MCP tool, `finished_stages`, and cutting D16's machinery | Not started; one brief, because the endpoint must not be built on a column that is about to be dropped |
 
-This was the last planned slice. What remains is the open fresh-clone and
-image-only verification, and the two open React questions.
+Every planned slice is built. What remains is the work above, the open
+fresh-clone and image-only verification, and the first live-model run.
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -256,17 +257,14 @@ working claim only after its own implementation and proof land.
   its evidence onto the row, and the row still reads `Withdrawn`. Nothing in
   this system updates a committed row's cells from later evidence, so there is
   no gate to carry it back and no honest status to carry it to.
-- Every stage duration is measured, but every token count and therefore every
-  estimated cost so far comes from the scripted client. The estimate is
-  arithmetic over scripted usage and says nothing about a real provider's
-  charge or latency.
-- A model call whose answer could not be parsed or used records no token count,
-  so a run that skipped a document reports an estimate that is a lower bound.
-- The stored estimate has six decimal places, so an estimate below
-  0.000001 USD would round to zero; at the configured rates that needs a run of
-  one or two tokens.
-- Review's duration measures how long a person took to answer, not how long the
-  system worked; it is computed from the run's two durable timestamps.
+- Timing and cost are dropped (D16) but only removed from the screen so far, so
+  the application still records and reports them.
+- The run list reads `GET /runs`, which the application does not serve; only the
+  dev-only middleware under `ui/demo/` answers it, and against the application
+  the list shows the server's refusal.
+- The stage strip and the run list learn which stages a run finished from
+  `stage_timings`, the column D16 removes. That has to be settled before the
+  removal.
 - `GET /runs/{id}` returns no register rows, so the screen's register section
   is empty until that run has exported; a run closed without export never shows
   a register at all.
@@ -293,13 +291,13 @@ working claim only after its own implementation and proof land.
 
 ## Next actions
 
-1. Decide whether one bounded live-model run is worth making, which is the only
-   thing that would turn the estimate into evidence about a real provider.
-2. Answer the one React decision still open: layout and visual treatment.
-   Answering one decision at a time is now locked (D02) and not open.
-3. Decide whether the run logger should be given its own stdout handler, so the
+1. Merge `review-screen-redesign`.
+2. Write and run the brief for `GET /runs` plus the timing and cost removal,
+   settling `finished_stages` first (D16).
+3. Decide whether one bounded live-model run is worth making.
+4. Decide whether the run logger should be given its own stdout handler, so the
    INFO run events D16 describes reach a reader outside a test.
-4. Decide whether the already-read rule should settle a related additional
+5. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
 ## Verification evidence
@@ -307,7 +305,7 @@ working claim only after its own implementation and proof land.
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
 | `docker compose -p operations-suite run --rm app pytest` | 2026-08-14, `operations-timing-cost` branch | 130 passed, no live key |
-| `npm --prefix ui test` | 2026-08-14, `operations-timing-cost` branch | 13 passed, 7 files, no live key |
+| `npm --prefix ui test` | 2026-08-14, `review-screen-redesign` branch | 11 passed, 6 files, no live key. Two changed to open a section by its tab, and the cost file was deleted with the behaviour it covered |
 | Review screen run | 2026-08-14, `react-review-screen` branch | One run driven through `/ui` in a browser: three gates answered one at a time, one finding approved and one rejected, the review finished, and the exported register read back with its citations and the approved finding only |
 | Review screen polling | 2026-08-14, `react-review-screen` branch | A second run watched from `running`/`match` through to its recorded failure without a reload; Finish review was never offered and no register was shown |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
@@ -326,6 +324,7 @@ working claim only after its own implementation and proof land.
 | Intake portal timing and cost | 2026-08-14, `operations-timing-cost` branch | Two documents through export: ingest 0.005s, extract 0.005s, match 0.006s, examine 0.003s, review 0.206s, commit 0.011s, total 0.236s; 4 calls reported 4,400 prompt and 570 completion tokens, estimated 0.002672 USD. Scripted-client usage, so the cost is arithmetic, not a provider charge |
 | Northside Dental timing and cost | 2026-08-14, `operations-timing-cost` branch | Three documents (`.md`, `.docx`, `.pdf`) through export: ingest 0.029s, extract 0.011s, match 0.008s, examine 0.004s, review 0.152s, commit 0.013s, total 0.217s; 5 calls reported 5,600 prompt and 750 completion tokens, estimated 0.003440 USD. Scripted-client usage, as above |
 | Kill and resume, not doubled | 2026-08-14, `operations-timing-cost` branch | Killed inside Extract with the third document's call in flight; the resumed run asked about that document twice and still reported one `extract` entry, 5 calls reporting usage and 550 prompt tokens, not 650 |
+| Redesigned screen | 2026-08-14, `review-screen-redesign` branch | Four demo runs driven through it in a browser — at review, working, failed, exported — with gates answered and the accent clearing as they were. Against `ui/demo/` only; the screen has not been driven against the application since the redesign |
 | Live model | Never | Unverified |
 | Fresh clone/image-only | Not run yet | Open release gate |
 
