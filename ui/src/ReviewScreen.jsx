@@ -105,7 +105,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
             onFinish={finish}
           />
           <RegisterSection exported={exported} />
-          <CostAndTiming />
+          <CostAndTiming reported={run.cost_and_timing} />
         </>
       )}
     </main>
@@ -263,15 +263,61 @@ function RegisterSection({ exported }) {
   );
 }
 
-function CostAndTiming() {
+// Every figure here is the server's: the durations it recorded, the tokens the
+// model reported to it, and the estimate it made from them. Where it has none,
+// the word is "unknown" — never a zero, which would read as a measurement.
+function CostAndTiming({ reported }) {
+  const unknownCost = reported.estimated_cost_usd === null;
   return (
     <section aria-labelledby="cost-heading">
       <h2 id="cost-heading">Cost and timing</h2>
-      <p>
-        The API reports no cost or timing for a run yet, so nothing is shown
-        here rather than a number nobody measured. The operations slice adds
-        stage durations and the token roll-up.
-      </p>
+      {reported.stages.length === 0 ? (
+        <p>No stage of this run has finished, so no duration is recorded yet.</p>
+      ) : (
+        <dl>
+          {reported.stages.map((stage) => (
+            <div key={stage.stage}>
+              <dt>{stage.stage}</dt>
+              <dd>{stage.seconds} seconds</dd>
+            </div>
+          ))}
+          <div>
+            <dt>Every stage together</dt>
+            <dd>{reported.total_seconds} seconds</dd>
+          </div>
+        </dl>
+      )}
+      <dl>
+        <div>
+          <dt>Prompt tokens the model reported</dt>
+          <dd>{reported.tokens.prompt === null ? "unknown" : reported.tokens.prompt}</dd>
+        </div>
+        <div>
+          <dt>Completion tokens the model reported</dt>
+          <dd>
+            {reported.tokens.completion === null
+              ? "unknown"
+              : reported.tokens.completion}
+          </dd>
+        </div>
+        <div>
+          <dt>Calls that reported what they spent</dt>
+          <dd>
+            {reported.tokens.calls_reporting_usage} of{" "}
+            {reported.tokens.calls_reporting_usage +
+              reported.tokens.calls_without_usage}
+          </dd>
+        </div>
+        <div>
+          <dt>Estimated cost, USD</dt>
+          <dd>
+            {unknownCost
+              ? `unknown — ${reported.cost_unknown_reason}`
+              : `${reported.estimated_cost_usd} (estimated)`}
+          </dd>
+        </div>
+      </dl>
+      <p>{reported.estimate_note}</p>
     </section>
   );
 }
