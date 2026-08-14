@@ -4,7 +4,7 @@ This is the detailed pre-compaction decision record frozen from `DECISIONS.md`
 at commit `2e14c91` on 2026-08-13. Its Decision Log is append-only and remains
 in original order. Current canonical truth lives in root `DECISIONS.md`; exact
 byte-for-byte source preservation lives in
-`documentation/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md`.
+`documentation/archive/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md`.
 
 Future supersessions append here before root current truth is changed.
 
@@ -3244,3 +3244,35 @@ which is the only shape the older column can hold.
 `token_usage`. It would have been correct for the no-usage case and guesswork for
 the missing-rate case, which the writer knows and a reader would have had to
 infer.
+
+## One answer at a time, and no batch (LOCKED 2026-08-14)
+
+**Superseded:** the open decision recorded as "whether review answers stay
+one-at-a-time or later batch at the API layer", open since the review-interface
+design and carried through the React slice, whose brief forbade closing it.
+
+**Decision:** every gated proposal is answered by its own request. There is no
+approve-all, no batch-submit endpoint, and no screen affordance implying one.
+
+**Why now:** the screen exists and has been driven through a real run, which is
+the evidence the decision was waiting for. Nothing about answering one at a
+time was uncomfortable in use.
+
+**What a batch would have cost, concretely:** a second API shape alongside
+`POST /runs/{id}/decisions`, a second MCP tool beside the six that are locked,
+and an answer to a question this system does not otherwise have — what a partly
+applied batch means when three of seven answers are refused. The refusal path
+today is one answer, one reason. A batch turns that into a list of outcomes the
+screen must then reconcile against what the server actually recorded, which is
+exactly the kind of divided truth `TASK.md` exists to prevent.
+
+**Trade-off, accepted openly:** a run holding many gates costs the Delivery
+Owner one click and one request each. For a register of around fifteen rows
+that is small, and it is not free — a run with seven findings is seven separate
+answers. It is accepted because reading each proposal before answering it is
+the entire point of the gate, and a control that approves seven at once quietly
+invites approving without reading, which is the failure the human gate exists
+to prevent.
+
+**Not refused for ever:** if real use shows the click cost is genuinely painful,
+this is reopened with that evidence — a concrete scenario, not a preference.

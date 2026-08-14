@@ -3,7 +3,7 @@
 Current status only. Detailed dated narrative is archived in
 [`documentation/progress-history.md`](documentation/progress-history.md); the
 exact pre-compaction source is
-[`documentation/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
+[`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## Snapshot — 2026-08-14
@@ -293,14 +293,13 @@ working claim only after its own implementation and proof land.
 
 ## Next actions
 
-1. Review and merge the operations branch.
-2. Decide whether one bounded live-model run is worth making, which is the only
+1. Decide whether one bounded live-model run is worth making, which is the only
    thing that would turn the estimate into evidence about a real provider.
-3. Answer the two open React decisions: layout and visual treatment, and
-   whether review answers are ever batched at the API layer.
-4. Decide whether the run logger should be given its own stdout handler, so the
+2. Answer the one React decision still open: layout and visual treatment.
+   Answering one decision at a time is now locked (D02) and not open.
+3. Decide whether the run logger should be given its own stdout handler, so the
    INFO run events D16 describes reach a reader outside a test.
-5. Decide whether the already-read rule should settle a related additional
+4. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
 ## Verification evidence
@@ -338,4 +337,4 @@ working claim only after its own implementation and proof land.
 - When a blocker resolves, move its resolution and evidence to history and
   remove it from the active list.
 - Exact pre-compaction hashes and inventory mapping live in the compaction
-  manifest under `documentation/history/`.
+  manifest under `documentation/archive/history/`.
