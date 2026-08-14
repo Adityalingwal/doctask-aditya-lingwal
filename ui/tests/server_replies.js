@@ -18,7 +18,32 @@ export function runReply(overrides = {}) {
     failure_reason: null,
     decisions: [],
     examine: null,
+    cost_and_timing: costAndTimingReply(),
     exported: false,
+    ...overrides,
+  };
+}
+
+export function costAndTimingReply(overrides = {}) {
+  return {
+    stages: [
+      { stage: "ingest", seconds: 0.031 },
+      { stage: "extract", seconds: 4.212 },
+      { stage: "match", seconds: 1.804 },
+      { stage: "examine", seconds: 1.109 },
+    ],
+    total_seconds: 7.156,
+    tokens: {
+      prompt: 350,
+      completion: 35,
+      calls_reporting_usage: 3,
+      calls_without_usage: 0,
+    },
+    estimated_cost_usd: "0.000196",
+    estimate_note:
+      "An estimate: the tokens the model reported, multiplied by the rates in "
+      + "config/model.yaml. It is not a bill.",
+    cost_unknown_reason: null,
     ...overrides,
   };
 }
