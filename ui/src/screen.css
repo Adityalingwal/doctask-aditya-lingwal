@@ -1,91 +1,101 @@
-body {
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
-  margin: 0;
+@import "tailwindcss";
+
+/* One accent, one meaning: signal marks work that is still waiting for the
+   Delivery Owner. Approve and Reject are deliberately not coloured — a screen
+   that makes one answer louder than the other is answering for the person.
+
+   Both fonts come from one superfamily so labels and prose sit together
+   without a second typeface fighting the first: mono carries identifiers,
+   durations and status chips, sans carries everything a person reads. */
+@theme {
+  --color-paper: #f6f5f1;
+  --color-card: #ffffff;
+  --color-ink: #0f0f0e;
+  --color-ink-soft: #6b6b63;
+  --color-line: #dedcd3;
+  --color-line-strong: #0f0f0e;
+
+  --color-signal: #cbf74a;
+  --color-signal-edge: #4a6b00;
+  --color-danger: #b4241c;
+  --color-caution: #9a5b00;
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-none: 0;
 }
 
-main {
-  margin: 0 auto;
-  max-width: 60rem;
-  padding: 1.5rem;
+/* The screen is light by design, like the register it shows. Saying so stops a
+   browser in dark mode from painting its own background behind text that was
+   never given a colour. */
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Nothing here is rounded. The register is a document, not a dashboard. */
+  * {
+    border-radius: 0;
+  }
 }
 
-section {
-  border-top: 1px solid #ccc;
-  margin-top: 2rem;
-  padding-top: 0.5rem;
+@layer components {
+  /* A hard offset shadow, no blur — the one piece of ornament this screen has,
+     kept for the elements a person acts on. */
+  .edge-shadow {
+    box-shadow: 4px 4px 0 0 var(--color-line-strong);
+  }
+
+  .edge-shadow-sm {
+    box-shadow: 2px 2px 0 0 var(--color-line-strong);
+  }
+
+  /* The label above every section: its number, its name, and on the right
+     whatever that section counts. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-ink-soft);
+  }
+
+  .signal-slide {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--color-signal) 45%,
+      var(--color-signal) 55%,
+      transparent 100%
+    );
+    background-size: 220% 100%;
+    animation: signal-slide 1.4s linear infinite;
+  }
 }
 
-.open-run {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: baseline;
+@keyframes signal-slide {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
 }
 
-.open-run input {
-  flex: 1 1 24rem;
-  padding: 0.25rem;
-}
-
-.refusal {
-  border-left: 4px solid #999;
-  padding-left: 0.75rem;
-}
-
-dl {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.25rem 1rem;
-  margin: 0;
-}
-
-dt {
-  font-weight: 600;
-}
-
-dd {
-  margin: 0;
-}
-
-.questions {
-  list-style: none;
-  padding: 0;
-}
-
-.question {
-  border: 1px solid #ccc;
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-}
-
-.question-kind {
-  font-weight: 600;
-  margin: 0;
-}
-
-.question-actions button,
-button {
-  font: inherit;
-  margin-right: 0.5rem;
-  padding: 0.25rem 0.75rem;
-}
-
-table {
-  border-collapse: collapse;
-  display: block;
-  overflow-x: auto;
-  width: 100%;
-}
-
-th,
-td {
-  border: 1px solid #ccc;
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-  vertical-align: top;
-}
-
-.row-evidence ul {
-  margin-top: 0.25rem;
+/* A run that is working should not keep moving for someone who asked the
+   system to stop moving things. */
+@media (prefers-reduced-motion: reduce) {
+  .signal-slide {
+    animation: none;
+    background-image: none;
+    background-color: var(--color-signal);
+  }
 }

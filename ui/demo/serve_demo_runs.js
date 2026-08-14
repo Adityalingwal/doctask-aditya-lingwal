@@ -1,0 +1,419 @@
+// The screen is designed against states, not one screenshot: a run mid-extract,
+// a failed run, a review with gates waiting, an exported register, and the
+// rules-only route that never runs Extract or Match. None of them can be seen
+// without the application, so the Vite dev server answers them here.
+//
+// The shapes come from `../tests/server_replies.js`, which follows the API
+// itself. Inventing a second set of fake bodies here would let the screen drift
+// from what the application actually returns.
+//
+// `apply: "serve"` keeps every line of this out of `vite build`, so no demo run
+// can reach the bundle FastAPI serves.
+import {
+  costAndTimingReply,
+  decisionReply,
+  examineReply,
+  exportReply,
+  runReply,
+} from "../tests/server_replies.js";
+
+const JSON_HEADER = { "Content-Type": "application/json" };
+
+function demoRuns() {
+  return {
+    "demo-review": {
+      run: runReply({
+        run_id: "demo-review",
+        status: "waiting for review",
+        stage: "review",
+        decisions: [
+          decisionReply({
+            decision_id: "demo-decision-1",
+            kind: "possible match",
+            question:
+              "Is 'Applicants upload documents' the same requirement as row 2, "
+              + "'Applicant document upload'?",
+          }),
+          decisionReply({
+            decision_id: "demo-decision-2",
+            kind: "rule finding",
+            question:
+              "R1 — row 4 'SMS reminders before an appointment' has no written "
+              + "scope entry. Attach this finding to that row?",
+          }),
+          decisionReply({
+            decision_id: "demo-decision-3",
+            kind: "withdrawal",
+            question:
+              "The 26 March scope was read in full and no longer asks for "
+              + "supporting document upload. Withdraw row 1?",
+          }),
+          decisionReply({
+            decision_id: "demo-decision-4",
+            kind: "export",
+            question: "Export this register with 7 rows and 1 approved finding?",
+          }),
+        ],
+        examine: examineReply({
+          rows_examined: 7,
+          findings: [
+            {
+              row_number: 4,
+              rule_id: "R1",
+              issue: "no written scope entry supports this requirement",
+              evidence: "meeting-notes-20-mar.md is the only source",
+            },
+          ],
+        }),
+        cost_and_timing: costAndTimingReply({
+          stages: [
+            { stage: "ingest", seconds: 0.031 },
+            { stage: "extract", seconds: 4.212 },
+            { stage: "match", seconds: 1.804 },
+            { stage: "examine", seconds: 1.109 },
+          ],
+          total_seconds: 7.156,
+        }),
+      }),
+    },
+
+    "demo-running": {
+      run: runReply({
+        run_id: "demo-running",
+        status: "running",
+        stage: "extract",
+        decisions: [],
+        examine: null,
+        cost_and_timing: costAndTimingReply({
+          stages: [{ stage: "ingest", seconds: 0.031 }],
+          total_seconds: 0.031,
+          tokens: {
+            prompt: 120,
+            completion: 14,
+            calls_reporting_usage: 1,
+            calls_without_usage: 0,
+          },
+          estimated_cost_usd: "0.000067",
+        }),
+      }),
+    },
+
+    "demo-failed": {
+      run: runReply({
+        run_id: "demo-failed",
+        status: "failed",
+        stage: "extract",
+        decisions: [],
+        examine: null,
+        failure_reason:
+          "OPENROUTER_API_KEY is empty — copy .env.example to .env and put an "
+          + "OpenRouter API key in it, then start the run again.",
+        skipped: [
+          {
+            source_file: "northside-dental-brochure.pdf",
+            reason: "read as an unrelated document, so it produced no requirement",
+          },
+        ],
+        cost_and_timing: costAndTimingReply({
+          stages: [{ stage: "ingest", seconds: 0.029 }],
+          total_seconds: 0.029,
+          tokens: {
+            prompt: null,
+            completion: null,
+            calls_reporting_usage: 0,
+            calls_without_usage: 2,
+          },
+          estimated_cost_usd: null,
+          cost_unknown_reason:
+            "no model call on this run reported what it spent, so there is "
+            + "nothing to multiply by the configured rates.",
+        }),
+      }),
+    },
+
+    // Only the rules changed, so Ingest routed straight to Examine (D03/D07).
+    // Extract and Match never ran and never will on this run.
+    "demo-rules-only": {
+      run: runReply({
+        run_id: "demo-rules-only",
+        status: "waiting for review",
+        stage: "review",
+        decisions: [
+          decisionReply({
+            decision_id: "demo-rules-decision-1",
+            kind: "rule finding",
+            question:
+              "R3 — row 6 'Appointment reminders' has not moved for 31 days, "
+              + "beyond max_days 30. Attach this finding to that row?",
+          }),
+        ],
+        examine: examineReply({
+          rows_examined: 7,
+          rules: [
+            { id: "R1", text: "Every requirement must have a written scope entry." },
+            {
+              id: "R3",
+              text: "No requirement may sit beyond max_days without movement.",
+              params: { max_days: 30 },
+            },
+          ],
+          findings: [
+            {
+              row_number: 6,
+              rule_id: "R3",
+              issue: "the row has not moved for 31 days",
+              evidence: "last moved 2026-03-14, examined 2026-04-14",
+            },
+          ],
+        }),
+        cost_and_timing: costAndTimingReply({
+          stages: [
+            { stage: "ingest", seconds: 0.012 },
+            { stage: "examine", seconds: 0.987 },
+          ],
+          total_seconds: 0.999,
+        }),
+      }),
+    },
+
+    "demo-exported": {
+      run: runReply({
+        run_id: "demo-exported",
+        status: "done",
+        stage: "commit",
+        exported: true,
+        decisions: [
+          decisionReply({
+            decision_id: "demo-exported-decision-1",
+            kind: "export",
+            question: "Export this register with 4 rows and 1 approved finding?",
+            outcome: "approved",
+          }),
+        ],
+        examine: examineReply({ rows_examined: 4 }),
+        cost_and_timing: costAndTimingReply({
+          stages: [
+            { stage: "ingest", seconds: 0.029 },
+            { stage: "extract", seconds: 4.601 },
+            { stage: "match", seconds: 1.902 },
+            { stage: "examine", seconds: 1.004 },
+            { stage: "review", seconds: 96.4 },
+            { stage: "commit", seconds: 0.211 },
+          ],
+          total_seconds: 104.147,
+          tokens: {
+            prompt: 5600,
+            completion: 750,
+            calls_reporting_usage: 5,
+            calls_without_usage: 0,
+          },
+          estimated_cost_usd: "0.003440",
+        }),
+      }),
+      export: exportedRegister(),
+    },
+  };
+}
+
+function exportedRegister() {
+  const base = exportReply();
+  return {
+    ...base,
+    run_id: "demo-exported",
+    project: { id: base.project.id, name: "Northside Dental" },
+    rows: [
+      base.rows[0],
+      {
+        row_number: 2,
+        fingerprint: "b2c3d4e5f6071829",
+        cells: {
+          what_was_asked: "Patients book an appointment online.",
+          in_writing: "Yes — 12 March scope, section 1.",
+          what_testing_found: "Booking works on desktop and mobile.",
+          status: "Done",
+          blocked_on: "Nothing recorded.",
+          first_seen: "2026-03-12",
+          last_moved: "2026-03-24",
+        },
+        citations: [
+          {
+            cell: "what_was_asked",
+            source_file: "12-march-scope.docx",
+            place: "line 14",
+            source_words: "patients should be able to book an appointment online",
+            absence_statement: null,
+          },
+          {
+            cell: "what_testing_found",
+            source_file: "testing-feedback-24-mar.pdf",
+            place: "page 2",
+            source_words: "booking confirmed on both desktop and mobile",
+            absence_statement: null,
+          },
+        ],
+        findings: [],
+      },
+      {
+        row_number: 3,
+        fingerprint: "c3d4e5f607182930",
+        cells: {
+          what_was_asked: "Staff see the day's appointments on one screen.",
+          in_writing: "Yes — 12 March scope, section 3.",
+          what_testing_found: "No evidence yet.",
+          status: "Blocked",
+          blocked_on: "The practice has not supplied its staff rota format.",
+          first_seen: "2026-03-12",
+          last_moved: "2026-03-20",
+        },
+        citations: [
+          {
+            cell: "blocked_on",
+            source_file: "meeting-notes-20-mar.md",
+            place: "Blockers",
+            source_words: "we still do not have the rota format from the practice",
+            absence_statement: null,
+          },
+        ],
+        findings: [],
+      },
+      {
+        row_number: 4,
+        fingerprint: "d4e5f60718293041",
+        cells: {
+          what_was_asked: "Patients get an SMS reminder before an appointment.",
+          in_writing: "No written scope entry.",
+          what_testing_found: "No evidence yet.",
+          status: "No evidence yet",
+          blocked_on: "Nothing recorded.",
+          first_seen: "2026-03-20",
+          last_moved: "2026-03-20",
+        },
+        citations: [
+          {
+            cell: "what_was_asked",
+            source_file: "meeting-notes-20-mar.md",
+            place: "Asks",
+            source_words: "they also want a text message before the appointment",
+            absence_statement: null,
+          },
+        ],
+        findings: [
+          {
+            row_number: 4,
+            rule_id: "R1",
+            issue: "no written scope entry supports this requirement",
+            evidence: "meeting-notes-20-mar.md is the only source",
+          },
+        ],
+      },
+    ],
+    examine: examineReply({
+      rows_examined: 4,
+      findings: [
+        {
+          row_number: 4,
+          rule_id: "R1",
+          issue: "no written scope entry supports this requirement",
+          evidence: "meeting-notes-20-mar.md is the only source",
+        },
+      ],
+    }),
+  };
+}
+
+/**
+ * Vite middleware answering the six endpoints the screen calls, for demo runs
+ * only. An unknown run id is refused the way the application refuses one.
+ */
+export default function serveDemoRuns() {
+  // Held per dev-server start, so an answered gate stays answered while the
+  // screen polls, and a restart puts every demo run back where it began.
+  const runs = demoRuns();
+
+  return {
+    name: "serve-demo-runs",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use(async (request, response, next) => {
+        const url = new URL(request.url, "http://localhost");
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (parts[0] !== "runs") {
+          next();
+          return;
+        }
+        const demoRun = runs[parts[1]];
+        if (demoRun === undefined) {
+          reply(response, 404, {
+            detail:
+              `No run ${parts[1]} exists. The dev server answers only the demo `
+              + `runs: ${Object.keys(runs).join(", ")}.`,
+          });
+          return;
+        }
+        if (request.method === "GET" && parts.length === 2) {
+          reply(response, 200, demoRun.run);
+          return;
+        }
+        if (request.method === "GET" && parts[2] === "export") {
+          if (demoRun.export === undefined) {
+            reply(response, 409, {
+              detail:
+                "This run has not exported a register. Approve its export "
+                + "decision and finish the review first.",
+            });
+            return;
+          }
+          reply(response, 200, demoRun.export);
+          return;
+        }
+        if (request.method === "POST" && parts[2] === "decisions") {
+          const sent = JSON.parse(await bodyOf(request));
+          const decision = demoRun.run.decisions.find(
+            (candidate) => candidate.decision_id === sent.decision_id,
+          );
+          if (decision === undefined) {
+            reply(response, 404, {
+              detail: `No decision ${sent.decision_id} belongs to this run.`,
+            });
+            return;
+          }
+          decision.outcome = sent.outcome;
+          reply(response, 200, { decision_id: sent.decision_id, outcome: sent.outcome });
+          return;
+        }
+        if (request.method === "POST" && parts[2] === "finish-review") {
+          const unanswered = demoRun.run.decisions.filter(
+            (candidate) => candidate.outcome === null,
+          );
+          if (unanswered.length > 0) {
+            reply(response, 409, {
+              detail:
+                `${unanswered.length} decision(s) on this run are unanswered. `
+                + "Answer every one of them, then finish the review again.",
+            });
+            return;
+          }
+          demoRun.run.status = "done";
+          demoRun.run.stage = "commit";
+          reply(response, 200, { run_id: demoRun.run.run_id, status: "done" });
+          return;
+        }
+        next();
+      });
+    },
+  };
+}
+
+function reply(response, status, body) {
+  response.statusCode = status;
+  response.setHeader("Content-Type", JSON_HEADER["Content-Type"]);
+  response.end(JSON.stringify(body));
+}
+
+async function bodyOf(request) {
+  const chunks = [];
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks).toString("utf-8");
+}

@@ -1,3 +1,4 @@
 {
-  "poll_interval_ms": 3000
+  "poll_interval_ms": 3000,
+  "attention_statuses": ["Blocked", "No evidence yet"]
 }
