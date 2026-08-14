@@ -63,7 +63,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D10 | Rules, Examine, findings, and no-findings | Implemented and verified with the scripted model | Examine and findings |
 | D11 | Model provider, retry, failure classification | Mixed | Model boundary and failure handling |
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
-| D13 | Run identity, statuses, lock, and queue | Mixed | Reliability and concurrency |
+| D13 | Run identity, statuses, lock, and queue | Implemented and verified | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
 | D15 | MCP and React surfaces | MCP implemented and verified; React locked, not implemented | Storage and interfaces |
 | D16 | Logging, timing, and cost | Mixed | Operations |
@@ -408,9 +408,17 @@ there is nothing to match.
 - **Injection:** Document text is data, never system authority. It has no code
   path to approve, commit, or export. The model may report suspicious text;
   detection is not guaranteed and no brittle phrase list is built.
-- **Required proof:** Later behaviour-8 test must show hostile document text
-  cannot record approval, commit, or export. A demo document also carries one
-  buried hostile line; the second-run corpus does not.
+- **Implemented and verified** — 2026-08-14, by
+  `tests/test_document_instruction_is_reported.py`, which drives the demo
+  document that buries the hostile line through a real run: the line is stored
+  as an embedded instruction placed in that document and logged against the
+  run, and it creates no row, changes no cell, reaches the Delivery Owner as no
+  proposed action, and appears nowhere in the export. The export was still
+  refused until a person approved it.
+- **What that proof does not cover:** the model is scripted, so this shows the
+  pipeline has no path from document text to an approval, a commit or an
+  export. Whether a live model spots the line is the detection the decision
+  above already declines to guarantee.
 - **Known limitation:** If killed after a model answer is stored but before its
   checkpoint, one call may repeat. Rows and finished earlier calls do not.
 
@@ -547,9 +555,21 @@ false-success `done` run.
 - `done` means export exists. `closed without export` means export was rejected.
   `failed` is deliberate unrecoverable stop. Early exits use `ended without
   changes` plus a reason.
-- **Implemented, proof pending:** Lock and queue exist; kill/resume exercises
-  the lock indirectly. Dedicated same-project queue and two-project isolation
-  tests belong to the concurrency slice. Do not call concurrency proven yet.
+- **Implemented and verified** — 2026-08-14, by
+  `tests/test_two_projects_at_once.py` and `tests/test_same_project_queue.py`,
+  against real PostgreSQL and the scripted client:
+  - Two projects run at once and neither reaches into the other — row,
+    citation, decision, finding and log line each belong to the run that
+    produced them. The two runs are shown to have been live together twice
+    over: both reported `running` with a stage set at one polled moment, and
+    two of their model calls started less than the scripted call delay apart,
+    so those calls were in flight together.
+  - A second run on one project is `waiting`, however often it is asked for,
+    while the first holds the lock in either active status.
+  - A waiting run's batch is formed when it starts: a file that arrived while
+    it waited belongs to it, and to the run ahead of it never.
+  - The run behind is not lost when the one ahead ends, whether that ending is
+    `done` or `failed`.
 - **Known limitation:** A run at Review holds the project lock as long as the
   Delivery Owner takes; later work waits.
 
@@ -636,8 +656,12 @@ slice-1 scope.
   route, requirement withdrawal, and the byte-identical unchanged-row proof on
   both corpora. The tool list stayed at six; a withdrawal is another decision
   the existing decision tools carry.
-- Later slices: concurrency/injection → React → cost/timing. Exact scheduling
-  may combine safe adjacent work, but proof claims stay separate.
+- The reliability slice is built, and it is proof rather than construction: the
+  concurrency and injection tests were written against the lock, the queue and
+  the Extract path exactly as the earlier slices left them, and none of them
+  needed a line of that code changed.
+- Later slices: React → cost/timing. Exact scheduling may combine safe adjacent
+  work, but proof claims stay separate.
 
 ### Brief-behaviour acceptance summary
 
@@ -649,9 +673,9 @@ slice-1 scope.
 | 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 117 tests verified; later minima remain |
-| 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
-| 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
+| 7 | Automated proof | Key-free full suite with real paths | 122 tests verified; later minima remain |
+| 8 | No document authority | Hostile document cannot approve/commit/export | Verified on the demo document that buries the line |
+| 9 | Concurrent isolation | Two projects parallel; same project queues | Verified for both halves |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
 
 ### Slice-1 test and setup contracts
@@ -689,7 +713,6 @@ slice-1 scope.
 - The page limit binds `.pdf` only; no other declared format reports pages.
 - A related additional document that lists requirements, in a run that never
   exports, is read again by the next run.
-- Concurrency mechanism is built but dedicated proof is pending.
 - One Extract call can repeat in the answer-to-checkpoint kill window.
 - Rejected findings stay suppressed even if later evidence strengthens them.
 - Files arriving during Review wait; the project lock may be held a long time.

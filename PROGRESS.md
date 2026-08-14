@@ -8,10 +8,12 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## Snapshot — 2026-08-14
 
-- Slice 1, the formats and types slice, the rules and findings slice, and the
-  MCP slice are merged into `main`.
-- The incremental update slice is built on `incremental-update`, not yet merged.
-- 117 tests pass without a live API key.
+- Slice 1, the formats and types slice, the rules and findings slice, the MCP
+  slice and the incremental update slice are merged into `main`.
+- The reliability slice is built on `reliability-proof`, not yet merged. It
+  changed no production code: every test in it passed against `main` the first
+  time it ran.
+- 122 tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
@@ -20,8 +22,11 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   queue including finding gates, JSON/Markdown export.
 - Verified reliability: real-process `SIGKILL` resume, no repeated completed
   extraction, Ingest/Match re-entry safety, honest terminal statuses.
-- Durable per-project lock and one waiting-run queue are built; dedicated
-  concurrency proof is pending.
+- Two projects run at once without either appearing in the other's rows,
+  citations, decisions, findings or log lines, and a second run on one project
+  waits until the first releases the lock.
+- The demo document's buried instruction is reported as a fact about that
+  document and never acted on.
 - Both synthetic corpora are written: four intake-portal documents and the six
   Northside Dental documents in `.md`, `.docx` and `.pdf`.
 - Rules are frozen per run, findings are gated one by one, and an approved
@@ -90,6 +95,22 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       absence written against the one the question named.
 - [x] Both corpora driven through a first and a second run inside the suite.
 
+### Reliability slice (branch `reliability-proof`)
+
+- [x] Five never-do tests written and run at the baseline commit `bb24476`
+      before any other work; all five passed there, so the slice is proof and
+      the production code is unchanged.
+- [x] Two projects run at once over one database, shown live together by both a
+      polled status and the model-call timestamps, with a negative control
+      confirming the timestamp check reports no overlap when the same two
+      projects run one after the other.
+- [x] Same-project queue: one waiting run however often a run is asked for, its
+      batch formed when it starts, and picked up whether the run ahead ended
+      `done` or `failed`.
+- [x] The demo document's buried instruction driven through a real run and
+      proven to create no row, change no cell, raise no gated proposal and
+      reach no export.
+
 ### MCP slice (branch `mcp-tools`)
 
 - [x] Every existence check, refusal and reported shape moved out of the routes
@@ -120,10 +141,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 | Order | Slice | Scope | Current state |
 |---|---|---|---|
-| 1 | Incremental proof | Watched folder, rules-only route, withdrawal, byte-identical unchanged-row proof | Built on `incremental-update`; awaiting review and merge |
-| 2 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
-| 3 | React | One-page five-section review surface | Designed |
-| 4 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
+| 1 | Reliability proof | Two-project concurrency, same-project queue, injection test | Built on `reliability-proof`; awaiting review and merge |
+| 2 | React | One-page five-section review surface | Designed |
+| 3 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -143,7 +163,6 @@ working claim only after its own implementation and proof land.
 | Source documents are usually 5–10 pages | Small-team domain expectation | Measure actual corpora; revisit pgvector/chunking only if needed |
 | Real SDK exception classification matches tests | Typed `status_code`; only scripted/401 path observed | Live provider failure evidence |
 | SDK retry is close enough to locked policy | Two attempts/120s configured; SDK owns wait | Live timing and explicit retry evidence |
-| Lock/queue isolate concurrent work | Schema + indirect resume exercise | Dedicated two-project and same-project tests |
 | Default OpenRouter model is suitable | Configured but never called | Bounded live-model run |
 
 ## Known limitations
@@ -185,6 +204,17 @@ working claim only after its own implementation and proof land.
   its evidence onto the row, and the row still reads `Withdrawn`. Nothing in
   this system updates a committed row's cells from later evidence, so there is
   no gate to carry it back and no honest status to carry it to.
+- A reported embedded instruction reaches a person only through the run's log
+  line: `GET /runs/{id}` does not carry it, and neither does the export. D02
+  scenario 9 makes it information rather than a gate, and there is currently no
+  surface that shows that information.
+- Run events below `WARNING` reach nothing when the application is started the
+  way the Dockerfile starts it. uvicorn's shipped logging configuration leaves
+  the `register.run` logger without a handler, so `log_run_event` at INFO is
+  dropped by the root logger's last-resort handler and only WARNING and ERROR
+  events reach stderr. The records themselves are correct and each carries its
+  `run_id`; what is missing is the sink D16 describes. The reliability tests
+  supply their own logging configuration to read them.
 - No React or cost/timing reporting yet.
 - Neither door authenticates a caller; the MCP endpoint additionally answers
   `421` to a `Host` header other than `localhost` or `127.0.0.1`, so a client
@@ -193,9 +223,9 @@ working claim only after its own implementation and proof land.
 
 ## Next three actions
 
-1. Review and merge the incremental-update branch.
-2. Start the reliability slice: two-project concurrency, same-project queue, and
-   the prompt-injection proof.
+1. Review and merge the reliability-proof branch.
+2. Decide whether the run logger should be given its own stdout handler, so the
+   INFO run events D16 describes reach a reader outside a test.
 3. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
@@ -203,7 +233,7 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-14, `incremental-update` branch | 117 passed, no live key |
+| `docker compose run --rm app pytest` | 2026-08-14, `reliability-proof` branch | 122 passed, no live key |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
 | API flow | Slice 1 | One run driven by hand through review/export |
 | Northside Dental corpus run | 2026-08-13, `formats-and-types` branch | 6 documents read across `.md`/`.docx`/`.pdf`; unrelated skipped, related additional labelled without a row; 7 rows exported |
@@ -213,8 +243,11 @@ working claim only after its own implementation and proof land.
 | Northside Dental second run | 2026-08-14, `incremental-update` branch | Meeting notes read first, then `.docx` scope and `.pdf` testing feedback; the SMS row byte-identical, rows 1 and 3 unmoved through their merges, rows 5 and 7 new |
 | Withdrawal on the corpus | 2026-08-14, `incremental-update` branch | The re-issued 26 March scope raised exactly one proposal, on the records-list row it dropped; approving it wrote `Withdrawn`, its cell audit and the absence citation, and the three meeting-note rows were byte-identical |
 | Watched folder | 2026-08-14, `incremental-update` branch | An arriving file started a run by itself; a second file arriving during that run's review started nothing until the review finished |
+| Two projects at once | 2026-08-14, `reliability-proof` branch | Both runs live together — polled as `running` with a stage set, and two model calls started less than the 2-second call delay apart; rows, citations, decisions, findings and log lines each stayed with the run that produced them |
+| Same-project queue | 2026-08-14, `reliability-proof` branch | One waiting run across four requests; its batch held only the file that arrived after it was queued; it started by itself after a `done` run and after a `failed` one |
+| Buried instruction | 2026-08-14, `reliability-proof` branch | `meeting-notes-20-mar.md` read in a real run: the line stored and logged as an embedded instruction, one register row from the other document, the export gate the only question asked, and the export refused until it was approved |
+| New tests repeated | 2026-08-14, `reliability-proof` branch | Five runs in a row, five passes; no sleep added anywhere |
 | Live model | Never | Unverified |
-| Concurrency suite | Not run/built yet | Mechanism exists; proof pending |
 | Fresh clone/image-only | Not run yet | Open release gate |
 
 ## Documentation history policy
