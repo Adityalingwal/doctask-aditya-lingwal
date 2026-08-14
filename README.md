@@ -239,7 +239,8 @@ async with streamable_http_client("http://localhost:8000/mcp/") as (read, write,
         await session.call_tool("get_run_status", {"run_id": run_id})
 ```
 
-The test suite drives the tools exactly this way; see `tests/mcp_client.py`.
+The test suite drives the tools exactly this way; see
+`tests/interfaces/mcp_client.py`.
 
 The application currently reads project folders from inside the repository.
 The included demo folder is `sample-projects/intake-portal`; a second synthetic

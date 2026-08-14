@@ -72,7 +72,8 @@ and comes back.
 **Formats are deliberately mixed.** `intake-portal` is entirely `.md`. This
 corpus uses `.md`, `.docx` and `.pdf`, so a second run reads three of the four
 declared formats rather than only the one the demo used. No corpus carries a
-`.txt` document; that reader is covered by `tests/test_document_readers.py`.
+`.txt` document; that reader is covered by
+`tests/documents/test_document_readers.py`.
 
 **The related additional and unrelated documents are both present on
 purpose.** The locked document-type handling requires the second-run test to

@@ -1,0 +1,394 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from sqlalchemy import create_engine, text
+
+from app.ingest.read_docx import read_docx
+from app.ingest.read_source_document import read_source_document
+from app.ingest.unreadable_document import DocumentUnreadable
+from tests.runs.application import (
+    ApplicationProcess,
+    approve_every_decision_and_finish_review,
+    recorded_markers,
+    temporary_database,
+    wait_for_run_status,
+    write_script,
+)
+from tests.documents.register_documents import (
+    examine_marker,
+    extract_marker,
+    match_answer,
+    match_marker,
+    no_findings_answer,
+    requirement_extraction_answer,
+    write_corrupt_docx,
+    write_corrupt_pdf,
+    write_docx,
+    write_encrypted_pdf,
+    write_meeting_note,
+    write_pdf,
+    write_pdf_without_a_text_layer,
+    write_text_file,
+)
+
+
+OVERSIZED_PDF = "requirements-bundle.pdf"
+ENCRYPTED_PDF = "signed-scope.pdf"
+SCANNED_PDF = "testing-feedback-scan.pdf"
+MARKDOWN_FILE = "meeting-note.md"
+DOCX_FILE = "client-requirements.docx"
+TEXT_FILE = "call-note.txt"
+PDF_FILE = "testing-feedback.pdf"
+SPREADSHEET_FILE = "budget.xlsx"
+PAGE_LIMIT = 20
+
+MARKDOWN_REQUIREMENT = "an email to the operations team on intake form submit"
+DOCX_REQUIREMENT = "a records list page with a search box"
+TEXT_REQUIREMENT = "a weekly digest of new intake records"
+PDF_REQUIREMENT = "the same notification sent over WhatsApp"
+
+DOCX_QUOTE = "The portal must offer a records list page with a search box."
+TEXT_QUOTE = "The client asked for a weekly digest of new intake records."
+PDF_QUOTE = "The client asked for the same notification sent over WhatsApp."
+
+
+def test_a_pdf_longer_than_the_page_limit_is_never_read(tmp_path: Path) -> None:
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    write_pdf(
+        source_folder / OVERSIZED_PDF,
+        [[f"Page {number} of the bundled requirements."] for number in range(1, 22)],
+    )
+    script_path = tmp_path / "script.json"
+    write_script(script_path, {})
+    call_log_path = tmp_path / "model-calls.jsonl"
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=call_log_path,
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Intake portal with an oversized bundle",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                ended = wait_for_run_status(client, run_id, "ended without changes")
+        finally:
+            application.stop()
+
+    skipped = _skipped_entry(ended, OVERSIZED_PDF)
+    assert "21 pages" in skipped["reason"]
+    assert "20" in skipped["reason"]
+    assert "config/formats.yaml" in skipped["reason"]
+    # Never read means never extracted and never paid for.
+    assert recorded_markers(call_log_path) == []
+
+
+def test_an_encrypted_pdf_is_skipped_with_the_reason_and_the_batch_continues(
+    tmp_path: Path,
+) -> None:
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    quote = write_meeting_note(source_folder, MARKDOWN_FILE, MARKDOWN_REQUIREMENT)
+    write_encrypted_pdf(
+        source_folder / ENCRYPTED_PDF,
+        [["The signed scope of work for the intake portal."]],
+    )
+    script_path = tmp_path / "script.json"
+    write_script(
+        script_path,
+        {
+            extract_marker(MARKDOWN_FILE): requirement_extraction_answer(
+                MARKDOWN_REQUIREMENT, quote
+            ),
+            match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=tmp_path / "model-calls.jsonl",
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Intake portal with a locked scope",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                wait_for_run_status(client, run_id, "waiting for review")
+                approve_every_decision_and_finish_review(client, run_id)
+                finished = wait_for_run_status(client, run_id, "done")
+                export = client.get(f"/runs/{run_id}/export").json()
+        finally:
+            application.stop()
+
+        read_files = _documents_in(database_url)
+
+    skipped = _skipped_entry(finished, ENCRYPTED_PDF)
+    assert "encrypted" in skipped["reason"]
+    assert "password" in skipped["reason"]
+    # Not an empty document row that later stages would read as "said nothing".
+    assert read_files == [MARKDOWN_FILE]
+    assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
+        MARKDOWN_REQUIREMENT
+    ]
+
+
+def test_a_scanned_pdf_is_skipped_with_its_own_reason_rather_than_read_as_empty(
+    tmp_path: Path,
+) -> None:
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    write_pdf_without_a_text_layer(source_folder / SCANNED_PDF)
+    script_path = tmp_path / "script.json"
+    write_script(script_path, {})
+    call_log_path = tmp_path / "model-calls.jsonl"
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=call_log_path,
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Intake portal with a scanned feedback sheet",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                ended = wait_for_run_status(client, run_id, "ended without changes")
+        finally:
+            application.stop()
+
+        read_files = _documents_in(database_url)
+
+    skipped = _skipped_entry(ended, SCANNED_PDF)
+    assert "no text layer" in skipped["reason"]
+    assert "scanned" in skipped["reason"]
+    assert read_files == []
+    assert recorded_markers(call_log_path) == []
+
+
+def test_only_the_extensions_the_config_accepts_reach_a_reader(
+    tmp_path: Path,
+) -> None:
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    markdown_quote = write_meeting_note(
+        source_folder, MARKDOWN_FILE, MARKDOWN_REQUIREMENT
+    )
+    write_docx(
+        source_folder / DOCX_FILE,
+        [("Scope", ["The provider will build the intake portal."])],
+        table_rows=[["Requirement", "Detail"], ["Records list", DOCX_QUOTE]],
+    )
+    write_text_file(
+        source_folder / TEXT_FILE,
+        ["Call with the operations lead.", "", TEXT_QUOTE],
+    )
+    write_pdf(source_folder / PDF_FILE, [["Testing feedback", PDF_QUOTE]])
+    # A real PDF wearing an extension the config does not accept: the gate is
+    # the configured list, not what the bytes turn out to be.
+    write_pdf(source_folder / SPREADSHEET_FILE, [["Budget for the intake portal."]])
+
+    script_path = tmp_path / "script.json"
+    call_log_path = tmp_path / "model-calls.jsonl"
+    write_script(
+        script_path,
+        {
+            extract_marker(MARKDOWN_FILE): requirement_extraction_answer(
+                MARKDOWN_REQUIREMENT, markdown_quote
+            ),
+            extract_marker(DOCX_FILE): requirement_extraction_answer(
+                DOCX_REQUIREMENT,
+                DOCX_QUOTE,
+                document_type="client requirements document",
+            ),
+            extract_marker(TEXT_FILE): requirement_extraction_answer(
+                TEXT_REQUIREMENT, TEXT_QUOTE
+            ),
+            extract_marker(PDF_FILE): requirement_extraction_answer(
+                PDF_REQUIREMENT, PDF_QUOTE
+            ),
+            match_marker(): match_answer(4),
+            examine_marker(): no_findings_answer(),
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=call_log_path,
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Intake portal in four formats",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                wait_for_run_status(client, run_id, "waiting for review")
+                approve_every_decision_and_finish_review(client, run_id)
+                finished = wait_for_run_status(client, run_id, "done")
+                export = client.get(f"/runs/{run_id}/export").json()
+        finally:
+            application.stop()
+
+        read_files = _documents_in(database_url)
+
+    assert read_files == sorted([MARKDOWN_FILE, DOCX_FILE, TEXT_FILE, PDF_FILE])
+    assert extract_marker(SPREADSHEET_FILE) not in recorded_markers(call_log_path)
+    skipped = _skipped_entry(finished, SPREADSHEET_FILE)
+    assert "unsupported format" in skipped["reason"]
+    assert "config/formats.yaml" in skipped["reason"]
+    assert sorted(row["cells"]["what_was_asked"] for row in export["rows"]) == sorted(
+        [MARKDOWN_REQUIREMENT, DOCX_REQUIREMENT, TEXT_REQUIREMENT, PDF_REQUIREMENT]
+    )
+
+
+def test_a_docx_reader_never_adds_words_the_document_does_not_contain(
+    tmp_path: Path,
+) -> None:
+    """Whatever the reader hands over becomes both the model's evidence and the
+    words a citation quotes back, so it may hold only the document's own text."""
+    path = tmp_path / DOCX_FILE
+    heading = "Out of scope"
+    paragraph = "The provider will build the intake portal."
+    table_rows = [["Requirement", "Detail"], ["Records list", DOCX_QUOTE]]
+    write_docx(path, [(heading, [paragraph])], table_rows=table_rows)
+
+    document_text = read_docx(path)
+
+    written = {heading, paragraph, *(cell for row in table_rows for cell in row)}
+    assert [line for line in document_text.splitlines() if line.strip()] != []
+    for line in document_text.splitlines():
+        assert line in written or not line.strip(), (
+            f"the reader produced {line!r}, which is not in the document"
+        )
+
+
+def test_a_corrupt_docx_is_skipped_with_a_reason_naming_the_cause_and_the_fix(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / DOCX_FILE
+    write_corrupt_docx(path)
+
+    with pytest.raises(DocumentUnreadable) as unreadable:
+        read_source_document(path, PAGE_LIMIT)
+
+    reason = str(unreadable.value)
+    assert DOCX_FILE in reason
+    assert "Word" in reason
+    assert "run" in reason
+
+
+def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
+    tmp_path: Path,
+) -> None:
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    quote = write_meeting_note(source_folder, MARKDOWN_FILE, MARKDOWN_REQUIREMENT)
+    write_corrupt_pdf(source_folder / PDF_FILE)
+    script_path = tmp_path / "script.json"
+    write_script(
+        script_path,
+        {
+            extract_marker(MARKDOWN_FILE): requirement_extraction_answer(
+                MARKDOWN_REQUIREMENT, quote
+            ),
+            match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=tmp_path / "model-calls.jsonl",
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Intake portal with a truncated PDF",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                wait_for_run_status(client, run_id, "waiting for review")
+                approve_every_decision_and_finish_review(client, run_id)
+                finished = wait_for_run_status(client, run_id, "done")
+                export = client.get(f"/runs/{run_id}/export").json()
+        finally:
+            application.stop()
+
+        read_files = _documents_in(database_url)
+
+    skipped = _skipped_entry(finished, PDF_FILE)
+    assert "PDF" in skipped["reason"]
+    # One damaged file loses its own document, never the rest of the batch.
+    assert read_files == [MARKDOWN_FILE]
+    assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
+        MARKDOWN_REQUIREMENT
+    ]
+
+
+def _skipped_entry(run: dict, source_file: str) -> dict:
+    entries = [entry for entry in run["skipped"] if entry.get("file") == source_file]
+    assert len(entries) == 1, f"expected one skip for {source_file}, got {entries}"
+    return entries[0]
+
+
+def _documents_in(database_url: str) -> list[str]:
+    engine = create_engine(database_url)
+    with engine.connect() as connection:
+        read_files = (
+            connection.execute(
+                text("SELECT source_path FROM documents ORDER BY source_path")
+            )
+            .scalars()
+            .all()
+        )
+    engine.dispose()
+    return list(read_files)
