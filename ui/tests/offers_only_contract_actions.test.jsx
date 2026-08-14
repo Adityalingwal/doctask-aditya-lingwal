@@ -16,27 +16,25 @@ afterEach(() => {
 
 const ALLOWED_BUTTONS = ["show run", "approve", "reject", "finish review"];
 
-test("the screen offers approve, reject and finish review and no other action over a run", async () => {
-  const decisions = [
-    decisionReply({ outcome: "approved" }),
-    decisionReply({
-      decision_id: "3d5f7b91-2222-4c33-9444-555566667777",
-      kind: "export",
-      question: "Export the register for this run?",
-      outcome: "approved",
-    }),
-  ];
+const decisions = [
+  decisionReply({ outcome: "approved" }),
+  decisionReply({
+    decision_id: "3d5f7b91-2222-4c33-9444-555566667777",
+    kind: "export",
+    question: "Export the register for this run?",
+    outcome: "approved",
+  }),
+];
+
+test("a run at review offers approve, reject and finish review and no other action", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
       {
         method: "GET",
         path: `/runs/${runId}`,
-        reply: {
-          body: runReply({ status: "done", stage: "commit", decisions, exported: true }),
-        },
+        reply: { body: runReply({ decisions }) },
       },
-      { method: "GET", path: `/runs/${runId}/export`, reply: { body: exportReply() } },
     ]),
   );
 
@@ -47,26 +45,30 @@ test("the screen offers approve, reject and finish review and no other action ov
     .getAllByRole("button")
     .map((button) => button.textContent.trim().toLowerCase());
   expect(offered.every((label) => ALLOWED_BUTTONS.includes(label))).toBe(true);
-  expect(offered.filter((label) => label === "approve").length).toBe(decisions.length);
-  expect(offered.filter((label) => label === "reject").length).toBe(decisions.length);
+  expect(offered.filter((label) => label === "approve")).toHaveLength(decisions.length);
+  expect(offered.filter((label) => label === "reject")).toHaveLength(decisions.length);
+  expect(
+    screen.queryByRole("button", {
+      name: /approve all|reject all|approve everything|submit all/i,
+    }),
+  ).toBeNull();
 });
 
-test("no control answers more than one decision at a time and no register cell can be edited by hand", async () => {
-  const decisions = [
-    decisionReply(),
-    decisionReply({
-      decision_id: "4e6a8c02-3333-4d44-8555-666677778888",
-      kind: "finding",
-      question: "Row 3 cites no source. Attach this finding to it?",
-    }),
-  ];
+test("an exported register offers no control at all and no cell that can be edited by hand", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
       {
         method: "GET",
         path: `/runs/${runId}`,
-        reply: { body: runReply({ decisions, exported: true }) },
+        reply: {
+          body: runReply({
+            status: "done",
+            stage: "commit",
+            decisions,
+            exported: true,
+          }),
+        },
       },
       { method: "GET", path: `/runs/${runId}/export`, reply: { body: exportReply() } },
     ]),
@@ -78,8 +80,8 @@ test("no control answers more than one decision at a time and no register cell c
   expect(within(register).queryAllByRole("textbox")).toHaveLength(0);
   expect(within(register).queryAllByRole("button")).toHaveLength(0);
   expect(register.querySelectorAll("[contenteditable]")).toHaveLength(0);
-  expect(
-    screen.queryByRole("button", { name: /approve all|reject all|approve everything|submit all/i }),
-  ).toBeNull();
   expect(screen.queryByRole("button", { name: /export|commit|start run/i })).toBeNull();
+  // The run has left review, so the server refuses an answer to any of its
+  // decisions; the screen offers none.
+  expect(screen.queryByRole("button", { name: /^approve$|^reject$/i })).toBeNull();
 });

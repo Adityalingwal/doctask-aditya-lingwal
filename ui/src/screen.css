@@ -1,0 +1,91 @@
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  margin: 0;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 60rem;
+  padding: 1.5rem;
+}
+
+section {
+  border-top: 1px solid #ccc;
+  margin-top: 2rem;
+  padding-top: 0.5rem;
+}
+
+.open-run {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.open-run input {
+  flex: 1 1 24rem;
+  padding: 0.25rem;
+}
+
+.refusal {
+  border-left: 4px solid #999;
+  padding-left: 0.75rem;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+dt {
+  font-weight: 600;
+}
+
+dd {
+  margin: 0;
+}
+
+.questions {
+  list-style: none;
+  padding: 0;
+}
+
+.question {
+  border: 1px solid #ccc;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+}
+
+.question-kind {
+  font-weight: 600;
+  margin: 0;
+}
+
+.question-actions button,
+button {
+  font: inherit;
+  margin-right: 0.5rem;
+  padding: 0.25rem 0.75rem;
+}
+
+table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+}
+
+th,
+td {
+  border: 1px solid #ccc;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.row-evidence ul {
+  margin-top: 0.25rem;
+}
