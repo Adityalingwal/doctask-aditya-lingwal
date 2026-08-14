@@ -77,11 +77,13 @@ function demoRuns() {
       }),
     },
 
+    // Only the rules changed, so Ingest routed straight to Examine (D03/D07):
+    // Extract and Match never ran on this one and never will.
     "demo-running": {
       run: runReply({
         run_id: "demo-running",
         status: "running",
-        stage: "extract",
+        stage: "examine",
         decisions: [],
         examine: null,
         cost_and_timing: costAndTimingReply({
@@ -113,75 +115,6 @@ function demoRuns() {
             source_file: "northside-dental-brochure.pdf",
             reason: "read as an unrelated document, so it produced no requirement",
           },
-        ],
-        cost_and_timing: costAndTimingReply({
-          stages: [{ stage: "ingest", seconds: 0.029 }],
-          total_seconds: 0.029,
-          tokens: {
-            prompt: null,
-            completion: null,
-            calls_reporting_usage: 0,
-            calls_without_usage: 2,
-          },
-          estimated_cost_usd: null,
-          cost_unknown_reason:
-            "no model call on this run reported what it spent, so there is "
-            + "nothing to multiply by the configured rates.",
-        }),
-      }),
-    },
-
-    // Every gate answered but the review not finished: approved, rejected and
-    // one still waiting, so all three card states sit side by side.
-    "demo-answered": {
-      run: runReply({
-        run_id: "demo-answered",
-        status: "waiting for review",
-        stage: "review",
-        decisions: [
-          decisionReply({
-            decision_id: "demo-answered-1",
-            kind: "possible match",
-            question:
-              "Is 'Patients book online' the same requirement as row 2, "
-              + "'Online appointment booking'?",
-            outcome: "approved",
-          }),
-          decisionReply({
-            decision_id: "demo-answered-2",
-            kind: "rule finding",
-            question:
-              "R3 — row 3 'Staff day view' has not moved for 21 days, beyond "
-              + "max_days 14. Attach this finding to that row?",
-            outcome: "rejected",
-          }),
-          decisionReply({
-            decision_id: "demo-answered-3",
-            kind: "export",
-            question: "Export this register with 7 rows?",
-          }),
-        ],
-        examine: examineReply({ rows_examined: 7 }),
-      }),
-    },
-
-    // Documents read, none of them usable. This is the state a person most
-    // often has to make sense of without opening the folder themselves.
-    "demo-skipped": {
-      run: runReply({
-        run_id: "demo-skipped",
-        status: "ended without changes",
-        stage: "match",
-        ended_early_reason:
-          "every document in this batch was read and none of them asked for "
-          + "anything new, so no register row moved.",
-        decisions: [],
-        examine: null,
-        skipped: [
-          {
-            source_file: "northside-dental-brochure.pdf",
-            reason: "read as an unrelated document, so it produced no requirement",
-          },
           {
             source_file: "old-contract-scan.pdf",
             reason:
@@ -197,64 +130,18 @@ function demoRuns() {
           },
         ],
         cost_and_timing: costAndTimingReply({
-          stages: [
-            { stage: "ingest", seconds: 0.044 },
-            { stage: "extract", seconds: 3.117 },
-            { stage: "match", seconds: 0.902 },
-          ],
-          total_seconds: 4.063,
+          stages: [{ stage: "ingest", seconds: 0.029 }],
+          total_seconds: 0.029,
           tokens: {
-            prompt: 2100,
-            completion: 180,
-            calls_reporting_usage: 2,
-            calls_without_usage: 1,
+            prompt: null,
+            completion: null,
+            calls_reporting_usage: 0,
+            calls_without_usage: 2,
           },
-          estimated_cost_usd: "0.001164",
-        }),
-      }),
-    },
-
-    // Only the rules changed, so Ingest routed straight to Examine (D03/D07).
-    // Extract and Match never ran and never will on this run.
-    "demo-rules-only": {
-      run: runReply({
-        run_id: "demo-rules-only",
-        status: "waiting for review",
-        stage: "review",
-        decisions: [
-          decisionReply({
-            decision_id: "demo-rules-decision-1",
-            kind: "rule finding",
-            question:
-              "R3 — row 6 'Appointment reminders' has not moved for 31 days, "
-              + "beyond max_days 30. Attach this finding to that row?",
-          }),
-        ],
-        examine: examineReply({
-          rows_examined: 7,
-          rules: [
-            { id: "R1", text: "Every requirement must have a written scope entry." },
-            {
-              id: "R3",
-              text: "No requirement may sit beyond max_days without movement.",
-              params: { max_days: 30 },
-            },
-          ],
-          findings: [
-            {
-              row_number: 6,
-              rule_id: "R3",
-              issue: "the row has not moved for 31 days",
-              evidence: "last moved 2026-03-14, examined 2026-04-14",
-            },
-          ],
-        }),
-        cost_and_timing: costAndTimingReply({
-          stages: [
-            { stage: "ingest", seconds: 0.012 },
-            { stage: "examine", seconds: 0.987 },
-          ],
-          total_seconds: 0.999,
+          estimated_cost_usd: null,
+          cost_unknown_reason:
+            "no model call on this run reported what it spent, so there is "
+            + "nothing to multiply by the configured rates.",
         }),
       }),
     },
@@ -503,21 +390,15 @@ export default function serveDemoRuns() {
 // answer with once `GET /runs` exists.
 const DEMO_PROJECT_NAMES = {
   "demo-review": "Acme intake portal",
-  "demo-answered": "Acme intake portal",
   "demo-running": "Northside Dental",
   "demo-failed": "Northside Dental",
-  "demo-skipped": "Northside Dental",
-  "demo-rules-only": "Acme intake portal",
   "demo-exported": "Northside Dental",
 };
 
 const DEMO_START_TIMES = {
   "demo-review": "2026-08-14T20:41:00+00:00",
-  "demo-answered": "2026-08-14T19:12:00+00:00",
   "demo-running": "2026-08-14T20:58:00+00:00",
   "demo-failed": "2026-08-14T18:03:00+00:00",
-  "demo-skipped": "2026-08-13T16:20:00+00:00",
-  "demo-rules-only": "2026-08-13T11:47:00+00:00",
   "demo-exported": "2026-08-12T09:30:00+00:00",
 };
 
@@ -537,11 +418,8 @@ function runListEntry(demoRun) {
 
 const RUN_DESCRIPTIONS = {
   "demo-review": "At review with four gates waiting — the accent, the counter and Finish review",
-  "demo-answered": "Approved, rejected and waiting gates side by side",
-  "demo-running": "Mid-extract: three stages ahead of it have not started",
-  "demo-failed": "Failed inside Extract, with the reason against that stage",
-  "demo-skipped": "Ended without changes; three documents skipped for three different reasons",
-  "demo-rules-only": "Rules-only route — Extract and Match never ran",
+  "demo-running": "Working, on the rules-only route: Extract and Match never ran",
+  "demo-failed": "Failed inside Extract, with three documents skipped for three different reasons",
   "demo-exported": "Done and exported: the full register, its evidence and one finding",
 };
 
