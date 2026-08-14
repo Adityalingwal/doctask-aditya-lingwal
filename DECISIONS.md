@@ -161,7 +161,7 @@ export is always gated.
   Review node and `submit_decision` both gate on it, not on status alone.
   Proven by `test_finished_review_does_not_reopen_on_resume` and
   `test_decision_refused_after_review_finished_even_if_status_regresses` in
-  `tests/test_finish_review.py`.
+  `tests/register/test_finish_review.py`.
 - **Evidence:** Possible-match and export decisions, incomplete-review refusal,
   atomic finish claim, merge/reject, export paths, and the post-finish
   crash-replay window are tested.
@@ -177,7 +177,7 @@ export is always gated.
   provided the project has no run running, at review, or queued. Manual
   `POST /runs` remains. Files arriving during Review wait for the next run.
   Both numbers are `config/watcher.yaml`, read through `WATCHER_CONFIG_PATH`.
-  **Implemented and verified** by `tests/test_watched_folder.py`.
+  **Implemented and verified** by `tests/runs/test_watched_folder.py`.
 - **Baseline, not backlog:** whatever the watcher first sees in a folder is not
   an arrival, so a project created over a folder of documents starts nothing by
   itself and never surprises a fresh `docker compose up` with a paid run. The
@@ -189,8 +189,9 @@ export is always gated.
   `test_a_changed_rules_file_re_examines_the_register_without_reading_a_document`.
 - **Unchanged-row proof:** a second run leaves every row its documents did not
   affect byte-identical — cells, citations and fingerprint. **Implemented and
-  verified** on both synthetic corpora by `tests/test_second_run_on_corpora.py`
-  and `tests/test_incremental_updates.py`.
+  verified** on both synthetic corpora by
+  `tests/incremental/test_second_run_on_corpora.py` and
+  `tests/incremental/test_incremental_updates.py`.
 
 ### Withdrawal — when a changed document drops a requirement
 
@@ -236,7 +237,7 @@ export is always gated.
   second piece of state remembers the rejection.
 - **Status:** **Implemented and verified** — 2026-08-14. Ours, not the brief's;
   the task PDF says nothing about removed requirements. Proven by
-  `tests/test_withdrawal.py` and
+  `tests/register/test_withdrawal.py` and
   `test_the_re_issued_corpus_requirements_document_withdraws_the_row_it_dropped`,
   including the answer submitted through the MCP `submit_decision` tool.
 - **History:** [`decision-history.md`](documentation/decision-history.md),
@@ -293,9 +294,9 @@ and its buckets are:
   format can report a page count. Markdown, plain text and Word have none and
   none is invented for them; the shared gate in the dispatch limits any
   paginated reader added later.
-- **Evidence:** `tests/test_document_readers.py`,
-  `tests/test_document_type_buckets.py`, and one run over the six-document
-  Northside Dental corpus.
+- **Evidence:** `tests/documents/test_document_readers.py`,
+  `tests/documents/test_document_type_buckets.py`, and one run over the
+  six-document Northside Dental corpus.
 
 ## Register and evidence
 
@@ -340,8 +341,8 @@ Statuses are fixed in code and in a database check constraint:
 - **Evidence/status:** Markdown quote location, multi-line normalization,
   invented quote rejection, first occurrence, and Latin-1 read are verified.
   The PDF page, DOCX line, and TXT line locators are implemented and verified
-  by `tests/test_citation_places.py`; each citation may only name a place its
-  own reader produced.
+  by `tests/documents/test_citation_places.py`; each citation may only name a
+  place its own reader produced.
 - **Limitation:** a DOCX line number counts lines of the text this system
   extracted, not lines Word displays, so a reader cannot open the file and
   jump to it — the quoted words remain the reliable way to find the passage.
@@ -364,7 +365,7 @@ Statuses are fixed in code and in a database check constraint:
   and there is no honest cell name to write. Migration `20260813_0005`
   backfills every existing row as a cell change; its downgrade drops
   attachment rows, which the older shape cannot represent. Proven by
-  `tests/test_schema.py`.
+  `tests/infrastructure/test_schema.py`.
 - **Implemented and verified:** a second run's unaffected rows come back with
   the same cells, the same citations and the same fingerprint, compared as
   stored rather than as rendered. An approved merge moves citations onto the
@@ -418,12 +419,12 @@ there is nothing to match.
   path to approve, commit, or export. The model may report suspicious text;
   detection is not guaranteed and no brittle phrase list is built.
 - **Implemented and verified** — 2026-08-14, by
-  `tests/test_document_instruction_is_reported.py`, which drives the demo
-  document that buries the hostile line through a real run: the line is stored
-  as an embedded instruction placed in that document and logged against the
-  run, and it creates no row, changes no cell, reaches the Delivery Owner as no
-  proposed action, and appears nowhere in the export. The export was still
-  refused until a person approved it.
+  `tests/documents/test_document_instruction_is_reported.py`, which drives the
+  demo document that buries the hostile line through a real run: the line is
+  stored as an embedded instruction placed in that document and logged against
+  the run, and it creates no row, changes no cell, reaches the Delivery Owner
+  as no proposed action, and appears nowhere in the export. The export was
+  still refused until a person approved it.
 - **What that proof does not cover:** the model is scripted, so this shows the
   pipeline has no path from document text to an approval, a commit or an
   export. Whether a live model spots the line is the detection the decision
@@ -489,8 +490,10 @@ there is nothing to match.
   the human gate through the existing review queue, a rejected finding stays in
   the run record and never reaches the export, and Examine re-entry after a
   crash replaces this run's unanswered findings rather than adding to them.
-  Proven by `tests/test_examine_findings.py`, `tests/test_examine_answer.py`,
-  `tests/test_frozen_rules.py`, `tests/test_deliverable_checks.py`, and
+  Proven by `tests/examine/test_examine_findings.py`,
+  `tests/examine/test_examine_answer.py`,
+  `tests/examine/test_frozen_rules.py`,
+  `tests/examine/test_deliverable_checks.py`, and
   `test_examine_rerun_does_not_duplicate_findings_for_the_same_run`.
 
 ## Model boundary and failure handling
@@ -565,7 +568,8 @@ false-success `done` run.
   `failed` is deliberate unrecoverable stop. Early exits use `ended without
   changes` plus a reason.
 - **Implemented and verified** — 2026-08-14, by
-  `tests/test_two_projects_at_once.py` and `tests/test_same_project_queue.py`,
+  `tests/runs/test_two_projects_at_once.py` and
+  `tests/runs/test_same_project_queue.py`,
   against real PostgreSQL and the scripted client:
   - Two projects run at once and neither reaches into the other — row,
     citation, decision, finding and log line each belong to the run that
@@ -635,14 +639,16 @@ slice-1 scope.
   (`app/review_screen/serve_screen.py`). Node is not in the image, so an
   unbuilt checkout is answered `503` naming the build command rather than a
   bare `404`.
-- **Status:** MCP **implemented and verified** — `tests/test_mcp_tools.py` and
-  `tests/test_mcp_flow.py`, plus one run driven through the tools by hand.
-  React is **implemented and verified** — thirteen Vitest cases in `ui/tests/`, the
-  two route cases in `tests/test_review_screen_route.py`, and one whole run
-  driven through the screen in a browser: three gates answered one at a time,
-  the review finished, and the exported register read back with its citations.
-  Layout and visual treatment remain open. Answering one decision at a time is
-  no longer open: it is locked in D02, and the screen must not offer any
+- **Status:** MCP **implemented and verified** —
+  `tests/interfaces/test_mcp_tools.py` and
+  `tests/interfaces/test_mcp_flow.py`, plus one run driven through the tools by
+  hand. React is **implemented and verified** — thirteen Vitest cases in
+  `ui/tests/`, the two route cases in
+  `tests/interfaces/test_review_screen_route.py`, and one whole run driven
+  through the screen in a browser: three gates answered one at a time, the
+  review finished, and the exported register read back with its citations.
+  Layout and visual treatment remain open. Answering one decision at a time
+  is no longer open: it is locked in D02, and the screen must not offer any
   approve-all or batch-submit affordance.
 - Limitation: `GET /runs/{id}` carries no register rows, so the register
   section is empty until the run has exported. Cost and timing do reach that
@@ -684,7 +690,7 @@ slice-1 scope.
   edit applies to runs started after a restart; a missing or unusable rate
   makes the estimate unknown and names the file, rather than stopping the run.
 - **Status:** **Implemented and verified** — 2026-08-14, by
-  `tests/test_timing_and_cost.py`: the estimate is labelled and never a bill,
+  `tests/runs/test_timing_and_cost.py`: the estimate is labelled and never a bill,
   an absent token count reports unknown rather than zero, a stage that did not
   run has no duration, a killed and resumed run reports each stage once without
   doubling its tokens, the new log fields carry no key or document text, and
@@ -750,7 +756,7 @@ slice-1 scope.
   Dockerfile's `uvicorn` reads `APP_HOST`, defaulting to `127.0.0.1`; Compose
   sets `APP_HOST=0.0.0.0` for the app service (required inside the container)
   and publishes `127.0.0.1:8000:8000`, matching `db`. Proven by
-  `tests/test_loopback_bind.py`.
+  `tests/infrastructure/test_loopback_bind.py`.
 - **Known development limitation:** Broad `.:/workspace` bind mount is retained
   for iteration. Remove/narrow it and clear stale dev DB before final
   image-only verification.
