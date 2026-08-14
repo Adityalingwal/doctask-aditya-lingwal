@@ -14,11 +14,6 @@ export default function RunList({ runs, refusal, openRunId, onOpen }) {
       aria-label="Runs"
       className="pane flex min-h-0 flex-col border-line-strong bg-paper lg:border-r"
     >
-      <p className="eyebrow sticky top-0 z-10 m-0 border-b border-line bg-paper px-5 py-4">
-        Runs
-        {runs.length > 0 && <span className="ml-2 text-ink">{runs.length}</span>}
-      </p>
-
       {refusal !== null ? (
         <p className="m-0 px-5 py-4 text-sm text-ink-soft">{refusal}</p>
       ) : runs.length === 0 ? (

@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
+import { openSection } from "./open_section.js";
 import { exportReply, runId, runReply, serverAnswering } from "./server_replies.js";
 
 afterEach(() => {
@@ -41,6 +42,7 @@ test("the register section says the register is not exported rather than showing
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/register/i);
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(within(register).queryByRole("table")).toBeNull();

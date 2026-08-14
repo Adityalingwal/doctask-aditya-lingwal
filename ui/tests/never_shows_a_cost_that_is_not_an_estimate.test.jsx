@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
+import { openSection } from "./open_section.js";
 import {
   costAndTimingReply,
   runId,
@@ -13,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function screenShowing(costAndTiming) {
+async function screenShowing(costAndTiming) {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
@@ -25,6 +26,7 @@ function screenShowing(costAndTiming) {
     ]),
   );
   render(<ReviewScreen runId={runId} />);
+  await openSection(/cost and timing/i);
   return screen.findByRole("region", { name: /cost and timing/i });
 }
 

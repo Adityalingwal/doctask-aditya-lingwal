@@ -17,6 +17,11 @@ import {
 // The one status in which the server accepts an answer or a finished review.
 const WAITING_FOR_REVIEW = "waiting for review";
 
+// The screen's own name. The register it shows keeps the name the decisions and
+// the exports give it; this is only what the person looking at it calls the
+// thing, and it lives in one place so it can be changed in one place.
+const PRODUCT_NAME = "Throughline";
+
 export default function ReviewScreen({ runId: openedRunId }) {
   const [runId, setRunId] = useState(openedRunId ?? "");
   const [run, setRun] = useState(null);
@@ -33,6 +38,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
   // reviewed, and one refusal standing in for both would hide that.
   const [runs, setRuns] = useState([]);
   const [runsRefusal, setRunsRefusal] = useState(null);
+  const [openSection, setOpenSection] = useState("stages");
 
   const readListFromServer = useCallback(async () => {
     const answered = await readRuns();
@@ -107,6 +113,72 @@ export default function ReviewScreen({ runId: openedRunId }) {
       ? 0
       : run.decisions.filter((decision) => decision.outcome === null).length;
 
+  const openProjectName =
+    runs.find((listed) => listed.run_id === runId)?.project_name ?? null;
+
+  // The five sections and their order are fixed; what changes here is that one
+  // is read at a time, so a register of forty rows never buries the timings
+  // under it.
+  const sections =
+    run === null
+      ? []
+      : [
+          {
+            id: "stages",
+            number: "01",
+            name: "Stages",
+            tab: "Stages",
+            body: <Stages run={run} />,
+          },
+          {
+            id: "skipped",
+            number: "02",
+            name: "Skipped",
+            tab: "Skipped",
+            tabCount: run.skipped.length === 0 ? null : String(run.skipped.length),
+            count: `${run.skipped.length} skipped`,
+            body: <Skipped skipped={run.skipped} />,
+          },
+          {
+            id: "decisions",
+            number: "03",
+            name: "Needs your decision",
+            tab: "Decisions",
+            tabCount: waiting === 0 ? null : String(waiting),
+            tabWaiting: waiting > 0,
+            count: <WaitingCount waiting={waiting} />,
+            body: (
+              <Decisions
+                decisions={run.decisions}
+                examine={run.examine}
+                reviewing={run.status === WAITING_FOR_REVIEW}
+                answering={answering}
+                waiting={waiting}
+                onAnswer={answer}
+                onFinish={finish}
+              />
+            ),
+          },
+          {
+            id: "register",
+            number: "04",
+            name: "Register",
+            tab: "Register",
+            tabCount: exported === null ? null : String(exported.rows.length),
+            count:
+              exported === null ? "not exported" : `${exported.rows.length} rows`,
+            body: <RegisterSection exported={exported} />,
+          },
+          {
+            id: "cost",
+            number: "05",
+            name: "Cost and timing",
+            tab: "Cost and timing",
+            count: "estimate, not a bill",
+            body: <CostAndTiming reported={run.cost_and_timing} />,
+          },
+        ];
+
   return (
     // The whole viewport, once. The bar keeps its height, and the two panes
     // below it scroll independently — a long register must never push the run
@@ -115,9 +187,13 @@ export default function ReviewScreen({ runId: openedRunId }) {
       <header className="flex items-center gap-3 bg-ink px-5 text-paper">
         <span className="block h-3 w-3 bg-signal" aria-hidden="true" />
         <h1 className="m-0 font-mono text-sm font-semibold tracking-tight">
-          Requirements-to-Delivery Register
-          <span className="ml-3 font-normal opacity-60">run review</span>
+          {PRODUCT_NAME}
         </h1>
+        {openProjectName !== null && (
+          <p className="m-0 truncate font-mono text-sm opacity-60">
+            {openProjectName}
+          </p>
+        )}
       </header>
 
       <div className="grid min-h-0 grid-cols-1 lg:grid-cols-[20rem_1fr]">
@@ -128,68 +204,92 @@ export default function ReviewScreen({ runId: openedRunId }) {
           onOpen={openRun}
         />
 
-        <main className="pane min-w-0 bg-card px-6 pt-8 pb-24 sm:px-10">
-          {answerRefusal !== null && <Refusal text={answerRefusal} />}
-          {readRefusal !== null && <Refusal text={readRefusal} />}
+        <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] bg-card">
+          <SectionTabs
+            sections={sections}
+            openSection={openSection}
+            onOpenSection={setOpenSection}
+            disabled={run === null}
+          />
 
-          {run === null ? (
-            <p className="max-w-prose text-ink-soft">
-              Nothing is shown until the application answers for a run. Choose one
-              from the list beside this.
-            </p>
-          ) : (
-            <div className="flex max-w-5xl flex-col gap-12">
-            <Section number="01" name="Stages" headingId="stages-heading">
-              <Stages run={run} />
-            </Section>
+          <main className="pane min-w-0 px-6 pt-8 pb-24 sm:px-10">
+            {answerRefusal !== null && <Refusal text={answerRefusal} />}
+            {readRefusal !== null && <Refusal text={readRefusal} />}
 
-            <Section
-              number="02"
-              name="Skipped"
-              headingId="skipped-heading"
-              count={`${run.skipped.length} skipped`}
-            >
-              <Skipped skipped={run.skipped} />
-            </Section>
-
-            <Section
-              number="03"
-              name="Needs your decision"
-              headingId="decisions-heading"
-              count={<WaitingCount waiting={waiting} />}
-            >
-              <Decisions
-                decisions={run.decisions}
-                examine={run.examine}
-                reviewing={run.status === WAITING_FOR_REVIEW}
-                answering={answering}
-                waiting={waiting}
-                onAnswer={answer}
-                onFinish={finish}
-              />
-            </Section>
-
-            <Section
-              number="04"
-              name="Register"
-              headingId="register-heading"
-              count={exported === null ? "not exported" : `${exported.rows.length} rows`}
-            >
-              <RegisterSection exported={exported} />
-            </Section>
-
-            <Section
-              number="05"
-              name="Cost and timing"
-              headingId="cost-heading"
-              count="estimate, not a bill"
-            >
-              <CostAndTiming reported={run.cost_and_timing} />
-            </Section>
-            </div>
-          )}
-        </main>
+            {run === null ? (
+              <p className="max-w-prose text-ink-soft">
+                Nothing is shown until the application answers for a run. Choose
+                one from the list beside this.
+              </p>
+            ) : (
+              <div className="max-w-5xl">
+                {sections.map(
+                  (section) =>
+                    section.id === openSection && (
+                      <Section
+                        key={section.id}
+                        number={section.number}
+                        name={section.name}
+                        headingId={`${section.id}-heading`}
+                        count={section.count}
+                      >
+                        {section.body}
+                      </Section>
+                    ),
+                )}
+              </div>
+            )}
+          </main>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// Tabs, not buttons: choosing which part of a run to read is navigation, and
+// the only things on this screen that act on a run are Approve, Reject and
+// Finish review.
+function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
+  if (disabled) {
+    return <div className="h-12 border-b border-line-strong" />;
+  }
+  return (
+    <div
+      role="tablist"
+      aria-label="Sections of this run"
+      className="flex flex-wrap items-stretch border-b border-line-strong"
+    >
+      {sections.map((section) => {
+        const open = section.id === openSection;
+        return (
+          <button
+            key={section.id}
+            role="tab"
+            type="button"
+            aria-selected={open}
+            aria-controls={`${section.id}-heading`}
+            onClick={() => onOpenSection(section.id)}
+            className={`-mb-px flex items-center gap-2 border-r border-line px-5 py-3 font-mono text-xs font-semibold tracking-wide whitespace-nowrap ${
+              open
+                ? "border-b-2 border-b-ink bg-signal"
+                : "text-ink-soft hover:bg-signal/15 hover:text-ink"
+            }`}
+          >
+            {section.tab}
+            {section.tabCount !== null && section.tabCount !== undefined && (
+              <span
+                className={`px-1.5 py-0.5 text-[11px] ${
+                  section.tabWaiting
+                    ? "border border-signal-edge bg-signal text-ink"
+                    : "bg-line text-ink"
+                }`}
+              >
+                {section.tabCount}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

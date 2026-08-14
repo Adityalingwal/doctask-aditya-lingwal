@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
+import { openSection } from "./open_section.js";
 import { exportReply, runId, runReply, serverAnswering } from "./server_replies.js";
 
 afterEach(() => {
@@ -23,6 +24,7 @@ test("every citation names the source file and the place the server gave it", as
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/register/i);
   const register = await screen.findByRole("region", { name: /register/i });
 
   const [present, absence] = exported.rows[0].citations;
@@ -64,6 +66,7 @@ test("a citation whose quoted words the server did not send is never shown as a 
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/register/i);
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(register.textContent).toContain("12-march-scope.md");

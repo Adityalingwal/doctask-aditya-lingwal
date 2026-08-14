@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
+import { openSection } from "./open_section.js";
 import {
   decisionReply,
   exportReply,
@@ -39,6 +40,7 @@ test("a run at review offers approve, reject and finish review and no other acti
   );
 
   render(<ReviewScreen runId={runId} />);
+  await openSection(/decisions/i);
   await screen.findByRole("button", { name: /finish review/i });
 
   const offered = screen
@@ -75,13 +77,17 @@ test("an exported register offers no control at all and no cell that can be edit
   );
 
   render(<ReviewScreen runId={runId} />);
+
+  // The run has left review, so the server refuses an answer to any of its
+  // decisions; the section that would carry them offers none.
+  await openSection(/decisions/i);
+  expect(screen.queryByRole("button", { name: /^approve$|^reject$/i })).toBeNull();
+
+  await openSection(/register/i);
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(within(register).queryAllByRole("textbox")).toHaveLength(0);
   expect(within(register).queryAllByRole("button")).toHaveLength(0);
   expect(register.querySelectorAll("[contenteditable]")).toHaveLength(0);
   expect(screen.queryByRole("button", { name: /export|commit|start run/i })).toBeNull();
-  // The run has left review, so the server refuses an answer to any of its
-  // decisions; the screen offers none.
-  expect(screen.queryByRole("button", { name: /^approve$|^reject$/i })).toBeNull();
 });
