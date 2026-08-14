@@ -15,6 +15,7 @@ from app.register.read_export import read_export
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
+from app.runs.list_runs import read_run_list
 from app.runs.run_lifecycle import RunEngine, require_run_engine, start_run
 from app.runs.run_status import read_run_status
 
@@ -71,6 +72,12 @@ async def create_one_project(
 @router.post("/runs", status_code=status.HTTP_202_ACCEPTED)
 async def start_one_run(request: Request, payload: StartRun) -> dict[str, str]:
     return await start_run(_run_engine(request), payload.project_id)
+
+
+@router.get("/runs")
+async def read_all_runs(request: Request) -> dict[str, Any]:
+    async with request.app.state.pool.connection() as connection:
+        return await read_run_list(connection)
 
 
 @router.get("/runs/{run_id}")

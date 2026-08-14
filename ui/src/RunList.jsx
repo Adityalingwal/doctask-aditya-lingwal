@@ -100,9 +100,15 @@ function StageMarks({ finished }) {
   );
 }
 
-// The server sends a timestamp; a person reads a day and a time. Nothing is
-// added to it — an unreadable value is shown exactly as it arrived.
+// The server sends a timestamp, or null for a run that has not started yet.
+// Nothing is added to either one — an unreadable value is shown exactly as it
+// arrived, and a run with no started_at says so in words rather than falling
+// through to `new Date(null)`, which JavaScript reads as the 1970 epoch
+// rather than an invalid date.
 function startedOn(startedAt) {
+  if (startedAt === null) {
+    return "waiting to start";
+  }
   const moment = new Date(startedAt);
   if (Number.isNaN(moment.getTime())) {
     return startedAt;

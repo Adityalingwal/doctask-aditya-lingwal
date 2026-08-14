@@ -11,14 +11,19 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - Slice 1, the formats and types slice, the rules and findings slice, the MCP
   slice, the incremental update slice, the reliability slice and the React
   slice are merged into `main`.
-- The operations slice is merged, and its timing and cost behaviour is now
-  dropped (D16): off the screen, still in the application.
-- 130 Python tests and 11 front-end tests pass without a live API key.
+- The operations slice is merged into `main` with its original timing and cost
+  behaviour dropped from the screen only.
+- On branch `finished-stages-and-list-runs`, not yet merged: `runs.finished_stages`
+  is built, timing and cost are removed from the application in full (D16),
+  and `GET /runs` plus its MCP tool `list_runs` are built (D14/D15) — the run
+  list on the review screen now has a real endpoint to read instead of
+  `ui/demo/`'s dev-only middleware. 129 Python tests and 20 front-end tests
+  pass on this branch without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
-- Implemented interface: six FastAPI endpoints and the same six operations as
-  MCP tools mounted in the same process, startup demo-project seed, review
+- Implemented interface: seven FastAPI endpoints and the same seven operations
+  as MCP tools mounted in the same process, startup demo-project seed, review
   queue including finding gates, JSON/Markdown export.
 - Verified reliability: real-process `SIGKILL` resume, no repeated completed
   extraction, Ingest/Match re-entry safety, honest terminal statuses.
@@ -42,8 +47,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   split into a run list and one run's sections, read one at a time behind tabs,
   on Tailwind tokens with IBM Plex served from the repository. Nobody types a
   run id any more. Still nothing is shown that the server did not send back.
-- Timing and cost are gone from that screen, with the rest of their removal
-  written down in D16 and not yet done.
+- Timing and cost are gone from the screen and, on the
+  `finished-stages-and-list-runs` branch, from the rest of the application
+  too (D16).
 
 ## Completed
 
@@ -160,6 +166,56 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] Both corpora driven end to end through export with the numbers recorded,
       and one kill-and-resume run showing nothing doubled.
 
+### `finished_stages`, the timing/cost removal, and `GET /runs` (branch `finished-stages-and-list-runs`)
+
+- [x] The brief's six Python and two front-end never-do tests were written and
+      run at the baseline commit `d4c9eab` before any implementation. Five of
+      the six Python tests share one file and failed together on
+      `ModuleNotFoundError: No module named 'app.runs.finished_stages'`; the
+      sixth (the MCP/HTTP identical-payload test) failed on
+      `GET /runs` answering `405 Method Not Allowed` and `list_runs` being an
+      unknown tool. Of the front end's cases, five passed as regression
+      guards and four failed, including a literal reproduction of the "1 Jan"
+      bug `new Date(null)` causes.
+- [x] `runs.finished_stages` (migration `20260814_0010`), a jsonb object keyed
+      by stage name and written with the same `||` merge `stage_timings` used,
+      replaces `stage_timings`, `token_usage`, `estimated_cost_usd` and
+      `cost_unknown_reason`, all dropped in the same migration.
+      `app/runs/finished_stages.py` replaces `app/runs/cost_and_timing.py`
+      with two functions: one that records a stage's mark, one that reads the
+      stored object back as an ordered list of stage names.
+- [x] Review's finished mark moved to the second of its two call sites in
+      `app/graph/register_graph.py`, after `review_finished_at` is set, so a
+      run still waiting for the Delivery Owner never reports Review finished.
+- [x] The token-usage plumbing removed end to end: `ReportedUsage` and
+      `ModelAnswer` out of `app/model/call_the_model.py` (it now returns the
+      reply text directly); `read_one_document`, `match_requirements` and
+      `examine_register` return just their answer; `CostRates`/`read_cost_rates`
+      out of `app/model/client.py`; the scripted client's `usage_metadata` out;
+      `rates_usd_per_token` out of `config/model.yaml`.
+- [x] `GET /runs` and the MCP tool `list_runs` (D14/D15) share one core
+      function, `app/runs/list_runs.py`, returning `{"runs": [...]}` — newest
+      first, no cap, `started_at` sent as `null` rather than substituted with
+      `created_at` for a run that has not started.
+- [x] `ui/src/Stages.jsx`'s precedence bug fixed: the run's own stage now wins
+      over a reported "done" only while the run is active (`running` or
+      `waiting for review`), so a `done` run no longer shows its last stage as
+      permanently "working".
+- [x] `ui/src/RunList.jsx` gets an explicit `started_at === null` check ahead
+      of `new Date(...)`, because `new Date(null)` is the 1970 epoch in
+      JavaScript, not `Invalid Date` — the existing `Number.isNaN` guard did
+      not catch it.
+- [x] `tests/runs/test_timing_and_cost.py` and one test in
+      `tests/infrastructure/test_schema.py` deleted outright: both proved
+      behaviour of the columns this work drops, not a weakening of either test.
+- [x] Assumption made beyond the brief's explicit list: two pre-existing tests
+      hardcoded a stale MCP tool count of six (`test_withdrawal.py`'s
+      `test_a_withdrawal_is_answered_through_the_same_six_mcp_tools`, and
+      `test_schema.py`'s now-deleted cost/usage-column test) — found by a
+      repository-wide grep, not the brief, and updated to match the seven
+      tools this work locks in D15.
+- [x] 129 Python tests and 20 front-end tests pass with no live API key.
+
 ### MCP slice (branch `mcp-tools`)
 
 - [x] Every existence check, refusal and reported shape moved out of the routes
@@ -191,10 +247,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 | Order | Work | Scope | Current state |
 |---|---|---|---|
 | 1 | Review screen redesign | Run list, section tabs, Tailwind tokens, demo server | Built on `review-screen-redesign`; documentation updated, awaiting merge |
-| 2 | `GET /runs` and the timing/cost removal | List endpoint plus MCP tool, `finished_stages`, and cutting D16's machinery | Not started; one brief, because the endpoint must not be built on a column that is about to be dropped |
 
-Every planned slice is built. What remains is the work above, the open
-fresh-clone and image-only verification, and the first live-model run.
+Every planned slice is built. What remains is the open fresh-clone and
+image-only verification, and the first live-model run.
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -215,8 +270,6 @@ working claim only after its own implementation and proof land.
 | Real SDK exception classification matches tests | Typed `status_code`; only scripted/401 path observed | Live provider failure evidence |
 | SDK retry is close enough to locked policy | Two attempts/120s configured; SDK owns wait | Live timing and explicit retry evidence |
 | Default OpenRouter model is suitable | Configured but never called | Bounded live-model run |
-| A real run's token counts resemble the scripted ones | Only scripted usage has ever been recorded; the roll-up and the arithmetic are proven, the inputs are not | One bounded live-model run, whose reported usage would replace the scripted numbers |
-| Reported usage arrives as `usage_metadata` from the provider | The boundary reads that field, and the scripted client fills it the same way | One bounded live-model run |
 
 ## Known limitations
 
@@ -257,14 +310,6 @@ working claim only after its own implementation and proof land.
   its evidence onto the row, and the row still reads `Withdrawn`. Nothing in
   this system updates a committed row's cells from later evidence, so there is
   no gate to carry it back and no honest status to carry it to.
-- Timing and cost are dropped (D16) but only removed from the screen so far, so
-  the application still records and reports them.
-- The run list reads `GET /runs`, which the application does not serve; only the
-  dev-only middleware under `ui/demo/` answers it, and against the application
-  the list shows the server's refusal.
-- The stage strip and the run list learn which stages a run finished from
-  `stage_timings`, the column D16 removes. That has to be settled before the
-  removal.
 - `GET /runs/{id}` returns no register rows, so the screen's register section
   is empty until that run has exported; a run closed without export never shows
   a register at all.
@@ -291,21 +336,19 @@ working claim only after its own implementation and proof land.
 
 ## Next actions
 
-1. Merge `review-screen-redesign`.
-2. Write and run the brief for `GET /runs` plus the timing and cost removal,
-   settling `finished_stages` first (D16).
-3. Decide whether one bounded live-model run is worth making.
-4. Decide whether the run logger should be given its own stdout handler, so the
+1. Merge `review-screen-redesign` and `finished-stages-and-list-runs`.
+2. Decide whether one bounded live-model run is worth making.
+3. Decide whether the run logger should be given its own stdout handler, so the
    INFO run events D16 describes reach a reader outside a test.
-5. Decide whether the already-read rule should settle a related additional
+4. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
 ## Verification evidence
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose -p operations-suite run --rm app pytest` | 2026-08-14, `operations-timing-cost` branch | 130 passed, no live key |
-| `npm --prefix ui test` | 2026-08-14, `review-screen-redesign` branch | 11 passed, 6 files, no live key. Two changed to open a section by its tab, and the cost file was deleted with the behaviour it covered |
+| `docker compose -p finished-stages run --rm app pytest` | 2026-08-14, `finished-stages-and-list-runs` branch | 129 passed, no live key |
+| `npm --prefix ui test` | 2026-08-14, `finished-stages-and-list-runs` branch | 20 passed, 8 files, no live key. Two new files cover the stage-strip precedence fix and the null-`started_at` fix |
 | Review screen run | 2026-08-14, `react-review-screen` branch | One run driven through `/ui` in a browser: three gates answered one at a time, one finding approved and one rejected, the review finished, and the exported register read back with its citations and the approved finding only |
 | Review screen polling | 2026-08-14, `react-review-screen` branch | A second run watched from `running`/`match` through to its recorded failure without a reload; Finish review was never offered and no register was shown |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
@@ -321,10 +364,9 @@ working claim only after its own implementation and proof land.
 | Same-project queue | 2026-08-14, `reliability-proof` branch | One waiting run across four requests; its batch held only the file that arrived after it was queued; it started by itself after a `done` run and after a `failed` one |
 | Buried instruction | 2026-08-14, `reliability-proof` branch | `meeting-notes-20-mar.md` read in a real run: the line stored and logged as an embedded instruction, one register row from the other document, the export gate the only question asked, and the export refused until it was approved |
 | New tests repeated | 2026-08-14, `reliability-proof` branch | Five runs in a row, five passes; no sleep added anywhere |
-| Intake portal timing and cost | 2026-08-14, `operations-timing-cost` branch | Two documents through export: ingest 0.005s, extract 0.005s, match 0.006s, examine 0.003s, review 0.206s, commit 0.011s, total 0.236s; 4 calls reported 4,400 prompt and 570 completion tokens, estimated 0.002672 USD. Scripted-client usage, so the cost is arithmetic, not a provider charge |
-| Northside Dental timing and cost | 2026-08-14, `operations-timing-cost` branch | Three documents (`.md`, `.docx`, `.pdf`) through export: ingest 0.029s, extract 0.011s, match 0.008s, examine 0.004s, review 0.152s, commit 0.013s, total 0.217s; 5 calls reported 5,600 prompt and 750 completion tokens, estimated 0.003440 USD. Scripted-client usage, as above |
-| Kill and resume, not doubled | 2026-08-14, `operations-timing-cost` branch | Killed inside Extract with the third document's call in flight; the resumed run asked about that document twice and still reported one `extract` entry, 5 calls reporting usage and 550 prompt tokens, not 650 |
 | Redesigned screen | 2026-08-14, `review-screen-redesign` branch | Four demo runs driven through it in a browser — at review, working, failed, exported — with gates answered and the accent clearing as they were. Against `ui/demo/` only; the screen has not been driven against the application since the redesign |
+| Rules-only run reports no Extract/Match | 2026-08-14, `finished-stages-and-list-runs` branch | A second run on a project whose rules changed and no document arrived: `finished_stages` read `["ingest", "examine"]` mid-review and `["ingest", "examine", "review", "commit"]` once done — never `extract` or `match` |
+| `GET /runs` and `list_runs` identical | 2026-08-14, `finished-stages-and-list-runs` branch | One run driven to Review; `GET /runs` and the MCP tool `list_runs` returned byte-identical payloads |
 | Live model | Never | Unverified |
 | Fresh clone/image-only | Not run yet | Open release gate |
 

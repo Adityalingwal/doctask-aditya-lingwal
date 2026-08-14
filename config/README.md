@@ -6,7 +6,7 @@ Everything that should be changeable without touching code lives here.
 |---|---|
 | `rules.yaml` | The rules the register is judged against in Examine. A default set ships with the repo so a fresh clone runs; set `RULES_CONFIG_PATH` to point at your own file instead. |
 | `formats.yaml` | The accepted file-format extensions (`.pdf`, `.docx`, `.md`, `.txt`) and the document page limit. Removing a format disables it; adding one only works if a reader for it exists in `app/ingest/` — a startup check says so if not. |
-| `model.yaml` | The OpenRouter model name, base URL, and the per-token rates a run estimates its cost with. Its `call:` block holds the model-call attempt count and per-call timeout. A working default ships with the repo; the API key is not stored here and comes from the environment. |
+| `model.yaml` | The OpenRouter model name and base URL. Its `call:` block holds the model-call attempt count and per-call timeout. A working default ships with the repo; the API key is not stored here and comes from the environment. |
 | `watcher.yaml` | `poll_seconds`, how often each project's source folder is looked at, and `quiet_seconds`, how long that folder must stop changing before the run reading it starts by itself. Set `WATCHER_CONFIG_PATH` to point at your own file instead. |
 
 Adding a rule, changing which formats are accepted, or changing how quickly the
@@ -26,23 +26,6 @@ key and what is wrong with it.
   queued. Files that arrive during a review wait for the run after it.
 - The watcher forgets what it has seen when the application restarts, so files
   that arrived while it was down are read by the next run started by hand.
-
-## Editing the rates in `model.yaml`
-
-`rates_usd_per_token` holds one rate for `prompt` tokens and one for
-`completion` tokens, in US dollars per token. A run multiplies the tokens the
-model reported by these, and reports the result as an **estimate** — it is what
-these rates say those tokens would cost, never a bill and never a figure read
-back from the provider.
-
-- The rates are read when the application starts, so an edit applies to runs
-  started after a restart.
-- If either rate is missing, is not a number, or the whole
-  `rates_usd_per_token` block is absent, the run still runs. It reports no cost
-  and says why, naming this file and the model it was configured with, rather
-  than assuming a rate.
-- A run whose model reported no token counts also reports no cost, and says
-  that instead of showing a zero.
 
 ## Editing `rules.yaml`
 

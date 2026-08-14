@@ -14,7 +14,6 @@ from sqlalchemy import create_engine, text
 
 from app.database import build_connection_pool
 from app.graph.register_graph import build_register_graph
-from app.model.client import read_cost_rates
 from app.model.scripted_client import build_scripted_client
 from app.review.review_queue import APPROVED, answer_decision, decisions_of_run
 from app.runs.run_records import claim_review_finished, read_run
@@ -43,7 +42,6 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 ACCEPTED_EXTENSIONS = frozenset({".md"})
 PAGE_LIMIT = 20
 RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
-MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 
 
 @contextmanager
@@ -256,7 +254,6 @@ async def _drive_review_replay(
                 ACCEPTED_EXTENSIONS,
                 PAGE_LIMIT,
                 RULES_CONFIG_PATH,
-                read_cost_rates(MODEL_CONFIG_PATH),
             )
 
             project_id, run_id = uuid4(), uuid4()

@@ -4,21 +4,32 @@
 const STAGE_ORDER = ["ingest", "extract", "match", "examine", "review", "commit"];
 
 const FAILED = "failed";
+// The run's own stage may still be mid-pass even after it has (prematurely)
+// reported itself finished — Extract writes its mark after every document,
+// not just the last one. Its own stage wins over "done" only while the run
+// is genuinely still working, i.e. one of these two statuses; otherwise a
+// `done` run would show `commit` as forever "working".
+const ACTIVE_STATUSES = ["running", "waiting for review"];
 
 /**
- * What the server has confirmed about each stage — never more than that: a
- * reported stage is finished, the run's own stage is working, and a stage the
- * run has already moved past without reporting means it never ran.
+ * What the server has confirmed about each stage — never more than that: the
+ * run's own stage wins while the run is still active, a reported stage is
+ * otherwise finished, and a stage the run has already moved past without
+ * reporting means it never ran.
  */
-export function stageStates(stage, status, reportedStages) {
-  const finished = new Set(reportedStages.map((reported) => reported.stage));
+export function stageStates(stage, status, finishedStages) {
+  const finished = new Set(finishedStages);
   const reached = STAGE_ORDER.indexOf(stage);
+  const active = ACTIVE_STATUSES.includes(status);
   return STAGE_ORDER.map((name, place) => {
+    if (name === stage && status === FAILED) {
+      return { name, state: FAILED };
+    }
+    if (name === stage && active) {
+      return { name, state: "working" };
+    }
     if (finished.has(name)) {
       return { name, state: "done" };
-    }
-    if (name === stage) {
-      return { name, state: status === FAILED ? FAILED : "working" };
     }
     if (reached > -1 && place < reached) {
       return { name, state: "never ran" };
@@ -28,10 +39,7 @@ export function stageStates(stage, status, reportedStages) {
 }
 
 export default function Stages({ run }) {
-  // The only thing still read out of `cost_and_timing` is which stages the
-  // run reported finishing. When that block leaves the API, the run needs
-  // another way to say the same thing.
-  const states = stageStates(run.stage, run.status, run.cost_and_timing.stages);
+  const states = stageStates(run.stage, run.status, run.finished_stages);
   return (
     <>
       <dl className="mb-6 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 font-mono text-sm">

@@ -12,6 +12,7 @@ from app.register.read_export import read_export
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
+from app.runs.list_runs import read_run_list
 from app.runs.run_lifecycle import RunEngine, require_run_engine, start_run
 from app.runs.run_status import read_run_status
 
@@ -27,7 +28,7 @@ MCP_INSTRUCTIONS = (
 
 
 def build_mcp_server(application: FastAPI) -> FastMCP:
-    """The six endpoints as six tools over the same core functions they call.
+    """The seven endpoints as seven tools over the same core functions they call.
 
     The tools close over the running application, so they share its connection
     pool and its run engine instead of holding a second copy of either.
@@ -61,6 +62,12 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
         """Read one run's durable status, stage, skips, decisions and findings."""
         async with application.state.pool.connection() as connection:
             return await read_run_status(connection, run_id)
+
+    @server.tool(name="list_runs")
+    async def list_runs_tool() -> dict[str, Any]:
+        """List every run: its project, status, start time and finished stages."""
+        async with application.state.pool.connection() as connection:
+            return await read_run_list(connection)
 
     @server.tool(name="submit_decision")
     async def submit_decision_tool(

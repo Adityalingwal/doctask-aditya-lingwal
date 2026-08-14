@@ -14,7 +14,7 @@ slice, the incremental update slice, and the review screen are implemented:
 
 - PostgreSQL stores projects, runs, documents, register rows, citations,
   review decisions, findings, audit entries, and LangGraph checkpoints.
-- FastAPI exposes six endpoints, and the same six operations are MCP tools
+- FastAPI exposes seven endpoints, and the same seven operations are MCP tools
   served by the same process over the same core functions.
 - A run returns immediately, continues in the app process, and is polled.
 - A run reads only the new and changed files in the folder, and leaves every
@@ -144,11 +144,12 @@ docker compose up --build
 
 The API is at `http://localhost:8000`; `GET /health` returns
 `{"status":"healthy"}`. Startup creates the synthetic **Acme intake portal**
-project if it is missing. The generated API schema at `/docs` shows the six
+project if it is missing. The generated API schema at `/docs` shows the seven
 operations:
 
 - `POST /projects`
 - `POST /runs`
+- `GET /runs`
 - `GET /runs/{id}`
 - `POST /runs/{id}/decisions`
 - `POST /runs/{id}/finish-review`
@@ -189,13 +190,12 @@ with the server's own reason beside it. Approve and Reject appear only while
 the server reports the run at review, and **Finish review** only once no
 decision is unanswered — the server refuses both otherwise.
 
-**The run list needs `GET /runs`, which the application does not serve yet.**
-Against the application the list shows the server's refusal rather than an
-invented or empty list. Only the dev-only middleware under `ui/demo/` answers
-that endpoint, and `npm --prefix ui run dev` serves four demo runs at
+The run list reads `GET /runs` — every run the application knows about, newest
+first, no cap — and polls it on the same interval as the open run. Separately,
+`npm --prefix ui run dev` serves four demo runs at
 <http://localhost:5173/demo> — one at review, one working, one failed, one
-exported — so the screen can be worked on without the application. None of that
-folder reaches a build.
+exported — through dev-only middleware under `ui/demo/`, so the screen can be
+worked on without the application. None of that folder reaches a build.
 
 Its own tests run without Docker and without a key:
 
@@ -203,11 +203,11 @@ Its own tests run without Docker and without a key:
 npm --prefix ui test
 ```
 
-Last verified on the `review-screen-redesign` branch: **11 passed**.
+Last verified on the `finished-stages-and-list-runs` branch: **20 passed**.
 
 ## Drive it from a machine
 
-The same six operations are MCP tools, mounted in the running application at
+The same seven operations are MCP tools, mounted in the running application at
 `http://localhost:8000/mcp/` over the streamable-HTTP transport. Each tool
 calls the core function its endpoint calls, so one operation answers the same
 through either door — including its refusal, which arrives with the cause and
@@ -217,6 +217,7 @@ the practical fix the endpoint would have given.
 |---|---|
 | `create_project` | `name`, `source_folder_path` |
 | `start_run` | `project_id` |
+| `list_runs` | *(none)* |
 | `get_run_status` | `run_id` |
 | `submit_decision` | `run_id`, `decision_id`, `outcome` (`approved` or `rejected`) |
 | `finish_review` | `run_id` |
@@ -256,17 +257,17 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `review-screen-redesign` branch: **130 passed**, real
-PostgreSQL, no live model key. Fresh-clone and image-only verification remain
-open release checks; this is a verified development-worktree command, not yet
-a fresh-machine claim.
+Last verified on the `finished-stages-and-list-runs` branch: **129 passed**,
+real PostgreSQL, no live model key. Fresh-clone and image-only verification
+remain open release checks; this is a verified development-worktree command,
+not yet a fresh-machine claim.
 
 ## Configuration
 
 | File | Purpose |
 |---|---|
 | `config/formats.yaml` | Declared extensions and document page limit |
-| `config/model.yaml` | OpenRouter model, endpoint, rates, attempts, timeout |
+| `config/model.yaml` | OpenRouter model, endpoint, call attempts, timeout |
 | `config/rules.yaml` | User-editable R1–R4 rule set Examine judges against |
 | `config/watcher.yaml` | Folder poll interval and the quiet period before a run auto-starts |
 | `ui/config/screen.json` | How often the review screen polls the run it is showing |
@@ -301,10 +302,6 @@ the next run and never to one already under way or already finished. Point
   Delivery Owner answers it.
 - A withdrawn row stays `Withdrawn` even if a later document asks for the
   requirement again.
-- Timing and cost are dropped. The review screen makes no claim about time or
-  money, but the application still records and reports them; removing that is
-  pending work.
-- The run list needs `GET /runs`, which the application does not serve yet.
 - `GET /runs/{id}` carries no register rows, so the review screen's register
   section stays empty until that run has exported one.
 - The review screen is built by Node, which the application image does not

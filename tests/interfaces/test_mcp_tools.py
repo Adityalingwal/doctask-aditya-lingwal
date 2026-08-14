@@ -32,6 +32,7 @@ LOCKED_TOOLS = [
     "finish_review",
     "get_export",
     "get_run_status",
+    "list_runs",
     "start_run",
     "submit_decision",
 ]
@@ -267,8 +268,24 @@ def test_a_core_refusal_reaches_a_tool_caller_with_its_cause_and_its_fix(
     assert "json or markdown" in unusable_format.text
 
 
-def test_the_server_offers_only_the_six_locked_tools(tmp_path: Path) -> None:
+def test_the_server_offers_only_the_seven_locked_tools(tmp_path: Path) -> None:
     with _application(tmp_path) as (application, _database_url, _source_folder):
         offered = tool_names(application.base_url)
 
     assert offered == LOCKED_TOOLS
+
+
+def test_the_list_tool_reports_the_same_runs_as_the_endpoint(
+    tmp_path: Path,
+) -> None:
+    with _application(tmp_path) as (application, _database_url, source_folder):
+        _run_at_review(application, "List tools intake portal", source_folder)
+
+        with application.client() as client:
+            over_http = client.get("/runs").json()
+
+        through_mcp = call_tool(application.base_url, "list_runs", {})
+
+    assert through_mcp.refused is False
+    assert through_mcp.payload == over_http
+    assert len(over_http["runs"]) == 1

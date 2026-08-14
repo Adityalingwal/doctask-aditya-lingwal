@@ -3276,3 +3276,66 @@ to prevent.
 
 **Not refused for ever:** if real use shows the click cost is genuinely painful,
 this is reopened with that evidence — a concrete scenario, not a preference.
+
+### Timing and cost, dropped rather than kept (2026-08-14, superseding D16's operations-slice wording)
+
+**Superseded wording**, from root `DECISIONS.md` D16 ("logging, and the
+dropped timing and cost") as it stood before this work, last marked "Removed
+from the screen; still present in the application": per-stage durations
+written to `runs.stage_timings`, keyed by the unit of work — the stage name,
+and `extract:<document_id>` for the per-document Extract pass, so a
+re-entered node overwrote its own key; Review timed on the database's clock
+via `started_at`/`review_finished_at` stored inside that same JSON; token
+counts read at the model boundary into `runs.token_usage`, keyed the same
+way; an estimated cost in `runs.estimated_cost_usd`, computed from
+`config/model.yaml`'s `rates_usd_per_token` and made nullable (migration
+`20260814_0009`) so a cost nobody could estimate was never shown as zero,
+with the reason in `runs.cost_unknown_reason`; and one `cost_and_timing`
+block reported by `read_run_status` to both doors.
+
+**Replacement:** migration `20260814_0010` drops `stage_timings`,
+`token_usage`, `estimated_cost_usd` and `cost_unknown_reason` outright and
+adds `runs.finished_stages` — a jsonb object keyed by stage name only
+(`{"ingest": true, ...}`), written with the same `||` merge so a re-entered
+node still overwrites its own key. `app/runs/cost_and_timing.py` is deleted;
+`app/runs/finished_stages.py` replaces it with two small functions — one that
+records a stage's mark, one that reads the stored object back as an ordered
+list of the stages that finished. `read_run_status` now reports
+`"finished_stages"` where `"cost_and_timing"` used to be, and no duration,
+token count or cost is recorded, reported or logged anywhere in the
+application.
+
+**Why now:** D16 already named this drop as decided — "Dropped, 2026-08-14 —
+timing and cost are being removed, not kept... This phase cuts scope rather
+than adds" — and named its one dependency: the run needed its own
+`finished_stages`, because the stage strip and the run list were both reading
+"which stages finished" out of `stage_timings`, the column being dropped.
+This work built `finished_stages` first and then removed the rest in one
+piece, exactly in that order.
+
+### MCP tool count, six to seven (2026-08-14, superseding D15's tool count and its `GET /runs` limitation)
+
+**Superseded wording**, from root `DECISIONS.md` D15: "MCP mirrors the six
+endpoints 1:1: `create_project`, `start_run`, `get_run_status`,
+`submit_decision`, `finish_review`, `get_export`." Its "Limitation, and the
+next piece of work" bullet read: "the run list reads `GET /runs`, **which the
+application does not serve.** Only the dev-only middleware in `ui/demo/`
+answers it, and against the real application the column shows the server's
+refusal rather than an invented or empty list. Building that endpoint and its
+MCP tool is pending."
+
+**Replacement:** `GET /runs` is built as one core function
+(`app/runs/list_runs.py`) that the HTTP route and a seventh MCP tool,
+`list_runs`, both call unchanged, returning `{"runs": [...]}` — newest first,
+no cap, each entry carrying the project name, status, `started_at` (`null`
+for a run that has not started), the count of unanswered decisions, and
+`finished_stages` as an ordered list. D15 now names seven tools, and the
+limitation bullet this superseded is gone because the thing it described no
+longer exists.
+
+**Why now:** the review screen's run list has read `GET /runs` since the
+2026-08-14 redesign, and the application never served it — only `ui/demo/`
+did, so the column showed the server's refusal against anything but the demo.
+Building it required `finished_stages` to exist first (see the entry above),
+since the list's own `finished_stages` field needed the same source the stage
+strip does.
