@@ -628,7 +628,7 @@ slice-1 scope.
   bare `404`.
 - **Status:** MCP **implemented and verified** — `tests/test_mcp_tools.py` and
   `tests/test_mcp_flow.py`, plus one run driven through the tools by hand.
-  React is **implemented and verified** — ten Vitest cases in `ui/tests/`, the
+  React is **implemented and verified** — thirteen Vitest cases in `ui/tests/`, the
   two route cases in `tests/test_review_screen_route.py`, and one whole run
   driven through the screen in a browser: three gates answered one at a time,
   the review finished, and the exported register read back with its citations.
@@ -636,8 +636,9 @@ slice-1 scope.
   later batched at the API layer; the screen answers one decision at a time
   because that is what `POST /runs/{id}/decisions` accepts.
 - Limitation: `GET /runs/{id}` carries no register rows, so the register
-  section is empty until the run has exported. Cost and timing are in no
-  response yet, so that section states its absence instead of showing a number.
+  section is empty until the run has exported. Cost and timing do reach that
+  response, and the section shows what the run recorded — or says the figure is
+  unknown and why, never a zero.
 - Limitation: the tools inherit the HTTP surface's lack of authentication, and
   the SDK's own host check answers `421` to a request whose `Host` is neither
   `localhost` nor `127.0.0.1`, so a client on another machine needs transport
@@ -723,7 +724,7 @@ slice-1 scope.
 | 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 124 Python and 11 front-end tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 130 Python and 13 front-end tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Verified on the demo document that buries the line |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Verified for both halves |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Verified with the scripted client; no provider cost measured |
