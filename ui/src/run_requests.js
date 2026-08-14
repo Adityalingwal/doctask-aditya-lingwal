@@ -2,6 +2,10 @@
 // same-origin and no host, key or token is configured anywhere in this folder.
 const JSON_FORMAT = "json";
 
+export async function readRuns() {
+  return await ask("GET", "/runs");
+}
+
 export async function readRun(runId) {
   return await ask("GET", `/runs/${encodeURIComponent(runId)}`);
 }

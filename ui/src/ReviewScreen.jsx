@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import Question from "./Question.jsx";
 import Register, { Examine } from "./Register.jsx";
+import RunList from "./RunList.jsx";
 import Section, { WaitingCount } from "./Section.jsx";
 import Stages from "./Stages.jsx";
 import screenConfig from "../config/screen.json";
@@ -10,6 +11,7 @@ import {
   finishReview,
   readExport,
   readRun,
+  readRuns,
 } from "./run_requests.js";
 
 // The one status in which the server accepts an answer or a finished review.
@@ -26,6 +28,24 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const [readRefusal, setReadRefusal] = useState(null);
   const [answerRefusal, setAnswerRefusal] = useState(null);
   const [answering, setAnswering] = useState(false);
+  // The run list is its own read with its own refusal: an application that
+  // cannot list runs can still answer perfectly well for the run being
+  // reviewed, and one refusal standing in for both would hide that.
+  const [runs, setRuns] = useState([]);
+  const [runsRefusal, setRunsRefusal] = useState(null);
+
+  const readListFromServer = useCallback(async () => {
+    const answered = await readRuns();
+    setRuns(answered.ok ? answered.body.runs : []);
+    setRunsRefusal(answered.ok ? null : answered.refusal);
+  }, []);
+
+  // A link to one run stays a link a reviewer can keep, so opening a run from
+  // the list writes it into the address without adding a history entry.
+  const openRun = useCallback((chosen) => {
+    setRunId(chosen);
+    window.history.replaceState(null, "", `/ui/?run=${encodeURIComponent(chosen)}`);
+  }, []);
 
   const readFromServer = useCallback(async () => {
     if (runId === "") {
@@ -53,9 +73,13 @@ export default function ReviewScreen({ runId: openedRunId }) {
 
   useEffect(() => {
     readFromServer();
-    const polling = setInterval(readFromServer, screenConfig.poll_interval_ms);
+    readListFromServer();
+    const polling = setInterval(() => {
+      readFromServer();
+      readListFromServer();
+    }, screenConfig.poll_interval_ms);
     return () => clearInterval(polling);
-  }, [readFromServer]);
+  }, [readFromServer, readListFromServer]);
 
   // Nothing the person clicked reaches the screen: the answer is sent, and what
   // is shown next is read back from the server that recorded it.
@@ -84,27 +108,36 @@ export default function ReviewScreen({ runId: openedRunId }) {
       : run.decisions.filter((decision) => decision.outcome === null).length;
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-line-strong bg-card">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <h1 className="m-0 font-mono text-base font-semibold tracking-tight">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-12">
+      {/* One sheet with a hard edge, split into the book's edge and its open
+          page. The two live inside the same border so the spine between them
+          is a fold rather than a gap. */}
+      <div className="edge-shadow grid grid-cols-1 border border-line-strong bg-card lg:grid-cols-[17rem_1fr]">
+        <RunList
+          runs={runs}
+          refusal={runsRefusal}
+          openRunId={runId}
+          onOpen={openRun}
+        >
+          <OpenRun runId={runId} onOpen={openRun} />
+        </RunList>
+
+        <main className="min-w-0 px-6 pb-16 sm:px-10">
+          <h1 className="m-0 border-b border-line py-5 font-mono text-sm font-semibold tracking-tight">
             Requirements-to-Delivery Register
             <span className="ml-3 font-normal text-ink-soft">run review</span>
           </h1>
-          <OpenRun runId={runId} onOpen={setRunId} />
-        </div>
-      </header>
 
-      <main className="mx-auto max-w-5xl px-6 pb-24">
-        {answerRefusal !== null && <Refusal text={answerRefusal} />}
-        {readRefusal !== null && <Refusal text={readRefusal} />}
+          {answerRefusal !== null && <Refusal text={answerRefusal} />}
+          {readRefusal !== null && <Refusal text={readRefusal} />}
 
-        {run === null ? (
-          <p className="mt-10 text-sm text-ink-soft">
-            Nothing is shown until the application answers for a run id.
-          </p>
-        ) : (
-          <div className="mt-10 flex flex-col gap-10">
+          {run === null ? (
+            <p className="mt-10 text-sm text-ink-soft">
+              Nothing is shown until the application answers for a run. Choose one
+              from the list, or open it by id.
+            </p>
+          ) : (
+            <div className="mt-10 flex flex-col gap-10">
             <Section number="01" name="Stages" headingId="stages-heading">
               <Stages run={run} />
             </Section>
@@ -152,9 +185,10 @@ export default function ReviewScreen({ runId: openedRunId }) {
             >
               <CostAndTiming reported={run.cost_and_timing} />
             </Section>
-          </div>
-        )}
-      </main>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -175,7 +209,7 @@ function OpenRun({ runId, onOpen }) {
   const [typed, setTyped] = useState(runId);
   return (
     <form
-      className="flex flex-wrap items-center gap-2"
+      className="flex flex-col gap-2"
       onSubmit={(submitted) => {
         submitted.preventDefault();
         onOpen(typed.trim());
@@ -189,11 +223,11 @@ function OpenRun({ runId, onOpen }) {
         name="run-id"
         value={typed}
         onChange={(typing) => setTyped(typing.target.value)}
-        className="w-64 border border-line-strong bg-paper px-2 py-1 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-signal-edge"
+        className="w-full border border-line-strong bg-card px-2 py-1 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-signal-edge"
       />
       <button
         type="submit"
-        className="edge-shadow-sm border border-line-strong bg-card px-3 py-1 font-mono text-xs font-semibold hover:bg-paper"
+        className="edge-shadow-sm self-start border border-line-strong bg-card px-3 py-1 font-mono text-xs font-semibold hover:bg-paper"
       >
         Show run
       </button>

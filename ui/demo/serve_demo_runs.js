@@ -431,6 +431,10 @@ export default function serveDemoRuns() {
           next();
           return;
         }
+        if (request.method === "GET" && parts.length === 1) {
+          reply(response, 200, { runs: Object.values(runs).map(runListEntry) });
+          return;
+        }
         const demoRun = runs[parts[1]];
         if (demoRun === undefined) {
           reply(response, 404, {
@@ -491,6 +495,43 @@ export default function serveDemoRuns() {
         next();
       });
     },
+  };
+}
+
+// One entry of the run list the column reads. Every field is one the run
+// itself already carries, so nothing here is a shape the application could not
+// answer with once `GET /runs` exists.
+const DEMO_PROJECT_NAMES = {
+  "demo-review": "Acme intake portal",
+  "demo-answered": "Acme intake portal",
+  "demo-running": "Northside Dental",
+  "demo-failed": "Northside Dental",
+  "demo-skipped": "Northside Dental",
+  "demo-rules-only": "Acme intake portal",
+  "demo-exported": "Northside Dental",
+};
+
+const DEMO_START_TIMES = {
+  "demo-review": "2026-08-14T20:41:00+00:00",
+  "demo-answered": "2026-08-14T19:12:00+00:00",
+  "demo-running": "2026-08-14T20:58:00+00:00",
+  "demo-failed": "2026-08-14T18:03:00+00:00",
+  "demo-skipped": "2026-08-13T16:20:00+00:00",
+  "demo-rules-only": "2026-08-13T11:47:00+00:00",
+  "demo-exported": "2026-08-12T09:30:00+00:00",
+};
+
+function runListEntry(demoRun) {
+  const run = demoRun.run;
+  return {
+    run_id: run.run_id,
+    project_name: DEMO_PROJECT_NAMES[run.run_id],
+    status: run.status,
+    started_at: DEMO_START_TIMES[run.run_id],
+    waiting_decisions: run.decisions.filter(
+      (decision) => decision.outcome === null,
+    ).length,
+    finished_stages: run.cost_and_timing.stages.map((stage) => stage.stage),
   };
 }
 
