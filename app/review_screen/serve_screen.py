@@ -29,6 +29,9 @@ def serve_review_screen(application: FastAPI, built_screen: Path, path: str) -> 
     async def unbuilt_review_screen() -> PlainTextResponse:
         return PlainTextResponse(
             f"the review screen is not built — run `{BUILD_COMMAND}` from the "
-            f"repository root, then reload {path}/.",
+            "repository root, then restart the application (`docker compose "
+            f"up --build`) and open {path}/ again. Reloading this page will "
+            "not help: whether the screen is served is decided when the "
+            "application starts.",
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )

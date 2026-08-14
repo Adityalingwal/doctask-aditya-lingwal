@@ -12,7 +12,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   MCP slice are merged into `main`.
 - The incremental update slice is merged; the React slice is built on
   `react-review-screen`, not yet merged.
-- 119 Python tests and 10 front-end tests pass without a live API key.
+- 119 Python tests and 11 front-end tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
@@ -109,6 +109,11 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       blocking spinner.
 - [x] `/ui` served by FastAPI from `ui/dist`, answering `503` with the build
       command when the screen has not been built.
+- [x] Review fix: a refused read and a refused answer are held apart, so a
+      refusal about one run cannot sit beside another run's confirmed data,
+      and a live refusal is not wiped by the next poll. The `503` message now
+      says to restart the application, because a screen built after startup is
+      not served by reloading the page.
 
 ### MCP slice (branch `mcp-tools`)
 

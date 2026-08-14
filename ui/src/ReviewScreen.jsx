@@ -17,7 +17,12 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const [runId, setRunId] = useState(openedRunId ?? "");
   const [run, setRun] = useState(null);
   const [exported, setExported] = useState(null);
-  const [refusal, setRefusal] = useState(null);
+  // Two refusals, because they stop being true at different moments: a refused
+  // read is answered by the next read that succeeds, while a refused answer
+  // stands until another answer is sent. One shared value would either leave a
+  // dead refusal beside confirmed data, or wipe a live one on the next poll.
+  const [readRefusal, setReadRefusal] = useState(null);
+  const [answerRefusal, setAnswerRefusal] = useState(null);
   const [answering, setAnswering] = useState(false);
 
   const readFromServer = useCallback(async () => {
@@ -28,10 +33,11 @@ export default function ReviewScreen({ runId: openedRunId }) {
     if (!answered.ok) {
       setRun(null);
       setExported(null);
-      setRefusal(answered.refusal);
+      setReadRefusal(answered.refusal);
       return;
     }
     setRun(answered.body);
+    setReadRefusal(null);
     if (!answered.body.exported) {
       setExported(null);
       return;
@@ -39,7 +45,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
     const register = await readExport(runId);
     setExported(register.ok ? register.body : null);
     if (!register.ok) {
-      setRefusal(register.refusal);
+      setReadRefusal(register.refusal);
     }
   }, [runId]);
 
@@ -55,7 +61,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
     async (decisionId, outcome) => {
       setAnswering(true);
       const answered = await answerDecision(runId, decisionId, outcome);
-      setRefusal(answered.ok ? null : answered.refusal);
+      setAnswerRefusal(answered.ok ? null : answered.refusal);
       await readFromServer();
       setAnswering(false);
     },
@@ -65,7 +71,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const finish = useCallback(async () => {
     setAnswering(true);
     const finished = await finishReview(runId);
-    setRefusal(finished.ok ? null : finished.refusal);
+    setAnswerRefusal(finished.ok ? null : finished.refusal);
     await readFromServer();
     setAnswering(false);
   }, [runId, readFromServer]);
@@ -74,9 +80,14 @@ export default function ReviewScreen({ runId: openedRunId }) {
     <main>
       <h1>Requirements-to-Delivery Register — run review</h1>
       <OpenRun runId={runId} onOpen={setRunId} />
-      {refusal !== null && (
+      {answerRefusal !== null && (
         <p className="refusal" role="alert">
-          {refusal}
+          {answerRefusal}
+        </p>
+      )}
+      {readRefusal !== null && (
+        <p className="refusal" role="alert">
+          {readRefusal}
         </p>
       )}
       {run === null ? (

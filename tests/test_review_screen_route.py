@@ -37,3 +37,8 @@ def test_unbuilt_review_screen_answers_with_the_command_that_builds_it(
 
     assert answered.status_code == 503
     assert BUILD_COMMAND in answered.text
+    # Whether the screen is mounted is decided once, at startup, so a build
+    # that happens afterwards cannot appear in the running application. Telling
+    # the reader to reload would send them round a loop that cannot end.
+    assert "restart" in answered.text
+    assert "reload" not in answered.text
