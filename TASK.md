@@ -239,11 +239,71 @@ A change is done only when all of these are true:
   - **Partial coverage** — you handled some of the failure cases the bug covers
     and missed the rest.
 
+## How a piece of work runs
+
+Every piece of work — code or documentation — runs the same loop. Do not
+improvise a different shape. Aditya's decision is the gate at three points, and
+the loop never advances past one of them on its own.
+
+1. **Decide in chat, then write a brief file** under `handoff/` — never a long
+   chat prompt. The folder is git-ignored, so briefs never reach history. The
+   brief carries the locked decisions verbatim, the file-by-file work, the
+   never-do tests, the verification protocol, the documentation to update, and
+   the hard bounds. **Ask which model before launching**, and do not start
+   while a required decision is still open.
+
+2. **Implementation goes to a background agent**, in its own worktree and
+   branch. It commits small, pushes, and **never opens a pull request and
+   never merges.** If it stops on a blocker it reports without committing the
+   guess.
+
+3. **The agent's last step is launching the review itself** — it writes the
+   reviewer's brief to `handoff/` and calls Codex read-only, so no second
+   hand-off is needed. Because it is briefing a reviewer on its own work, the
+   review brief's skeleton is fixed inside the implementation brief: the agent
+   fills in facts, it does not choose the scope it will be judged on. It must
+   not act on the findings — a fix applied after the review means the reviewed
+   code and the merged code are no longer the same thing.
+
+4. **Verify in the foreground, independently.** Read the review, check each
+   finding against the code yourself, and run both suites. Codex cannot run
+   them, so its verdict is code-level only and the foreground run is never
+   optional. Never report a count you did not see printed.
+
+5. **Bring the findings to Aditya and discuss them.** He decides what is fixed
+   and what is left. **Gate one.**
+
+6. **Fix what he chose, in the foreground, on the same branch** — test-first,
+   then commit and push.
+
+7. **Ask whether to open and merge the pull request. Gate two.** On his yes,
+   open it, merge it, then confirm it actually landed on `main` and pull.
+
+8. **Clean up**: remove the worktree, delete the branch locally and on the
+   remote, and delete the spent `handoff/` briefs. A stale brief read in a
+   later session is worse than no brief.
+
+9. **Then, and only then, start the conversation about the next brief. Gate
+   three.**
+
+**Stop when** the frozen checks pass, verification is complete, documentation
+matches observed reality, no in-scope blocker is unresolved, and review finds
+no merge blocker. **Reopen only for a concrete scenario with evidence.**
+Optional polish, imagined edge cases, already-declared limitations and
+deliberately later work do not reopen the loop — without this rule it never
+terminates.
+
+Both briefs carry the same hard bounds: two repair attempts per failing check,
+never rewrite a test to make it pass, never widen scope when stuck, each suite
+at most twice, and environment breakage is a blocker to report rather than a
+puzzle to solve.
+
 ## Git
 
 Work happens on a feature branch. **The decision to make a change permanent
 stays with Aditya; pressing the button may not.** He says so in chat, once per
-change, and only then does Claude act on it.
+change, and only then does Claude act on it. The full loop this sits inside is
+`## How a piece of work runs` above.
 
 - Default to a feature branch. Commit and push freely on it.
 - **A background agent never opens a pull request and never merges**, whatever
