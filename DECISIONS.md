@@ -65,7 +65,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
 | D13 | Run identity, statuses, lock, and queue | Mixed | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
-| D15 | MCP and React surfaces | MCP implemented and verified; React locked, not implemented | Storage and interfaces |
+| D15 | MCP and React surfaces | Both implemented and verified; React layout and visual treatment still open | Storage and interfaces |
 | D16 | Logging, timing, and cost | Mixed | Operations |
 | D17 | Repository layout, build order, tests, setup, and network bind | Mixed | Delivery plan and proof |
 
@@ -594,9 +594,30 @@ slice-1 scope.
   register, cost/timing. One generic question component serves all gates.
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
+- The screen reads `GET /runs/{id}` on a poll whose interval is
+  `ui/config/screen.json`, and reads `GET /runs/{id}/export` only once that
+  status says the run exported. Nothing a person clicked is shown: an answer is
+  posted and the screen then re-reads the run it was recorded against.
+- The screen's own toolchain is Vite and Vitest with jsdom and
+  `@testing-library/react`, all pinned exactly. React and `react-dom` are the
+  only runtime dependencies; no state library, CSS framework, component library
+  or icon set is installed.
+- FastAPI serves the built screen at `/ui` from `ui/dist`
+  (`app/review_screen/serve_screen.py`). Node is not in the image, so an
+  unbuilt checkout is answered `503` naming the build command rather than a
+  bare `404`.
 - **Status:** MCP **implemented and verified** — `tests/test_mcp_tools.py` and
   `tests/test_mcp_flow.py`, plus one run driven through the tools by hand.
-  React is **locked, not implemented**; layout/visual treatment remains open.
+  React is **implemented and verified** — ten Vitest cases in `ui/tests/`, the
+  two route cases in `tests/test_review_screen_route.py`, and one whole run
+  driven through the screen in a browser: three gates answered one at a time,
+  the review finished, and the exported register read back with its citations.
+  Layout and visual treatment remain open, and so does whether answers are
+  later batched at the API layer; the screen answers one decision at a time
+  because that is what `POST /runs/{id}/decisions` accepts.
+- Limitation: `GET /runs/{id}` carries no register rows, so the register
+  section is empty until the run has exported. Cost and timing are in no
+  response yet, so that section states its absence instead of showing a number.
 - Limitation: the tools inherit the HTTP surface's lack of authentication, and
   the SDK's own host check answers `421` to a request whose `Host` is neither
   `localhost` nor `127.0.0.1`, so a client on another machine needs transport
@@ -649,7 +670,7 @@ slice-1 scope.
 | 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 117 tests verified; later minima remain |
+| 7 | Automated proof | Key-free full suite with real paths | 119 Python and 10 front-end tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Locked, not implemented |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Mechanism built, proof pending |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
@@ -695,7 +716,10 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- React and cost/timing are locked but not implemented.
+- Cost/timing is locked but not implemented, and the review screen shows that
+  section as absent rather than as a zero.
+- The review screen is built by Node, which the application image does not
+  carry, so `ui/dist` must be built before the screen can be served.
 - The watcher holds what it last saw in memory, so a restart re-baselines every
   folder and a file that arrived while the application was down starts no run
   of its own.

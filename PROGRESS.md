@@ -10,8 +10,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 - Slice 1, the formats and types slice, the rules and findings slice, and the
   MCP slice are merged into `main`.
-- The incremental update slice is built on `incremental-update`, not yet merged.
-- 117 tests pass without a live API key.
+- The incremental update slice is merged; the React slice is built on
+  `react-review-screen`, not yet merged.
+- 119 Python tests and 10 front-end tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
@@ -33,6 +34,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   flight.
 - A document read again that stopped asking for something raises one withdrawal
   proposal for the row it supplied, and only for that row.
+- One review screen is served at `/ui`: five sections over the endpoints that
+  already exist, one question component for every gate, one answer at a time,
+  and nothing shown that the server did not send back.
 
 ## Completed
 
@@ -90,6 +94,22 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       absence written against the one the question named.
 - [x] Both corpora driven through a first and a second run inside the suite.
 
+### React slice (branch `react-review-screen`)
+
+- [x] Five never-do tests written and run before any implementation; all five
+      failed at the baseline on the screen module not existing.
+- [x] One page, five sections in the locked order, each showing only fields
+      `GET /runs/{id}` and `GET /runs/{id}/export` return.
+- [x] One `Question` component for every gate kind, with no branch on kind.
+- [x] An answer is posted and then read back: no click reaches the screen, and
+      a refused answer leaves the decision unanswered with the server's reason.
+- [x] Approve and Reject are offered only while the server reports the run at
+      review, and Finish review only once no decision is unanswered.
+- [x] Polling at the interval in `ui/config/screen.json`; no websocket, no
+      blocking spinner.
+- [x] `/ui` served by FastAPI from `ui/dist`, answering `503` with the build
+      command when the screen has not been built.
+
 ### MCP slice (branch `mcp-tools`)
 
 - [x] Every existence check, refusal and reported shape moved out of the routes
@@ -120,10 +140,9 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 | Order | Slice | Scope | Current state |
 |---|---|---|---|
-| 1 | Incremental proof | Watched folder, rules-only route, withdrawal, byte-identical unchanged-row proof | Built on `incremental-update`; awaiting review and merge |
-| 2 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
-| 3 | React | One-page five-section review surface | Designed |
-| 4 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
+| 1 | Reliability proof | Two-project concurrency, same-project queue, injection test | Partly built |
+| 2 | React | One-page five-section review surface | Built on `react-review-screen`; awaiting review and merge |
+| 3 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -185,7 +204,16 @@ working claim only after its own implementation and proof land.
   its evidence onto the row, and the row still reads `Withdrawn`. Nothing in
   this system updates a committed row's cells from later evidence, so there is
   no gate to carry it back and no honest status to carry it to.
-- No React or cost/timing reporting yet.
+- No cost/timing reporting yet, so the screen's cost-and-timing section states
+  that the API reports none rather than showing a measured-looking zero.
+- `GET /runs/{id}` returns no register rows, so the screen's register section
+  is empty until that run has exported; a run closed without export never shows
+  a register at all.
+- The screen is built by Node, which the application image does not carry, and
+  `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
+  `docker compose up`; the bind mount is what carries it into the container.
+  Image-only serving is part of the open fresh-clone verification.
+- The screen authenticates nobody, exactly as the endpoints behind it do not.
 - Neither door authenticates a caller; the MCP endpoint additionally answers
   `421` to a `Host` header other than `localhost` or `127.0.0.1`, so a client
   on another machine cannot reach it as it stands.
@@ -193,9 +221,9 @@ working claim only after its own implementation and proof land.
 
 ## Next three actions
 
-1. Review and merge the incremental-update branch.
-2. Start the reliability slice: two-project concurrency, same-project queue, and
-   the prompt-injection proof.
+1. Review and merge the reliability and React branches.
+2. Answer the two open React decisions: layout and visual treatment, and
+   whether review answers are ever batched at the API layer.
 3. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
@@ -203,7 +231,10 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-14, `incremental-update` branch | 117 passed, no live key |
+| `docker compose run --rm app pytest` | 2026-08-14, `react-review-screen` branch | 119 passed, no live key |
+| `npm --prefix ui test` | 2026-08-14, `react-review-screen` branch | 10 passed, 5 files, no live key |
+| Review screen run | 2026-08-14, `react-review-screen` branch | One run driven through `/ui` in a browser: three gates answered one at a time, one finding approved and one rejected, the review finished, and the exported register read back with its citations and the approved finding only |
+| Review screen polling | 2026-08-14, `react-review-screen` branch | A second run watched from `running`/`match` through to its recorded failure without a reload; Finish review was never offered and no register was shown |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
 | API flow | Slice 1 | One run driven by hand through review/export |
 | Northside Dental corpus run | 2026-08-13, `formats-and-types` branch | 6 documents read across `.md`/`.docx`/`.pdf`; unrelated skipped, related additional labelled without a row; 7 rows exported |

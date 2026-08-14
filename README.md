@@ -8,7 +8,7 @@ a human approval gate prevent unsupported rows from being exported.
 ## Current working scope
 
 Slice 1, the formats and types slice, the rules and findings slice, the MCP
-slice, and the incremental update slice are implemented:
+slice, the incremental update slice, and the review screen are implemented:
 
 `Document folder → Ingest → Extract → Match → Examine → Review → Commit → JSON/Markdown export`
 
@@ -23,6 +23,7 @@ slice, and the incremental update slice are implemented:
   by itself once the folder has settled.
 - Review decisions are one proposal at a time; export is unavailable until
   approved.
+- One browser page at `/ui` shows a run and answers its gates.
 - Examine judges the whole register against the rules the run froze and raises
   a finding as a question, never as an edit.
 - Startup resumes a run killed mid-flight from its durable checkpoint.
@@ -153,6 +154,47 @@ operations:
 - `POST /runs/{id}/finish-review`
 - `GET /runs/{id}/export?format=json|markdown`
 
+## The review screen
+
+One page shows one run and answers its gates. Build it once, then start the
+application:
+
+```bash
+npm --prefix ui ci && npm --prefix ui run build
+docker compose up --build
+```
+
+Open `http://localhost:8000/ui/?run=<run id>`, or open
+`http://localhost:8000/ui/` and paste a run id into the box. Until `ui/dist`
+exists, `/ui` answers `503` with the build command above rather than a bare
+`404`.
+
+The page has five sections, in this order:
+
+| Section | What it shows |
+|---|---|
+| Stages | The run's status and current stage, and the reason it ended early or failed |
+| Skipped | Each file or quote this run skipped, with the reason recorded on the run |
+| Needs your decision | Every gate the run raised, its frozen question and its answer, plus the rules the run was judged against |
+| Register | The exported register, its cells, its citations and its approved findings — once the run has exported one |
+| Cost and timing | That the API reports neither yet; the operations slice adds them |
+
+The page polls `GET /runs/{id}` every **3 seconds**; that interval lives in
+[`ui/config/screen.json`](ui/config/screen.json). Nothing shown comes from what
+was clicked: an answer is posted to `POST /runs/{id}/decisions` and the run is
+then read back, so a refused answer leaves the decision unanswered on screen
+with the server's own reason beside it. Approve and Reject appear only while
+the server reports the run at review, and **Finish review** only once no
+decision is unanswered — the server refuses both otherwise.
+
+Its own tests run without Docker and without a key:
+
+```bash
+npm --prefix ui test
+```
+
+Last verified on the `react-review-screen` branch: **10 passed**.
+
 ## Drive it from a machine
 
 The same six operations are MCP tools, mounted in the running application at
@@ -203,7 +245,7 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `incremental-update` branch: **117 passed**, real
+Last verified on the `react-review-screen` branch: **119 passed**, real
 PostgreSQL, no live model key. Fresh-clone and image-only verification remain
 open release checks; this is a verified development-worktree command, not yet
 a fresh-machine claim.
@@ -216,6 +258,7 @@ a fresh-machine claim.
 | `config/model.yaml` | OpenRouter model, endpoint, rates, attempts, timeout |
 | `config/rules.yaml` | User-editable R1–R4 rule set Examine judges against |
 | `config/watcher.yaml` | Folder poll interval and the quiet period before a run auto-starts |
+| `ui/config/screen.json` | How often the review screen polls the run it is showing |
 
 Adding or changing a rule is an edit to `config/rules.yaml`, never a code
 change. A run freezes the parsed rules when it starts, so an edit applies to
@@ -243,7 +286,13 @@ the next run and never to one already under way or already finished. Point
   Delivery Owner answers it.
 - A withdrawn row stays `Withdrawn` even if a later document asks for the
   requirement again.
-- React and cost/timing reporting are later slices.
+- Cost and timing reporting is a later slice, so the review screen's last
+  section says the API reports neither rather than showing a zero.
+- `GET /runs/{id}` carries no register rows, so the review screen's register
+  section stays empty until that run has exported one.
+- The review screen is built by Node, which the application image does not
+  carry; `ui/dist` must be built on the host before `docker compose up`, and
+  the development bind mount is what carries it into the container.
 - Neither the endpoints nor the MCP tools authenticate a caller, and the MCP
   endpoint answers `421 Misdirected Request` to a request whose `Host` is
   neither `localhost` nor `127.0.0.1`, so a client on another machine cannot
