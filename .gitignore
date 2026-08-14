@@ -39,3 +39,7 @@ build/
 
 # Handoff briefs and agent reports — working files, deleted once used
 handoff/
+
+# The scripted client's call log. Tests write it under a temporary directory;
+# this keeps a stray one at the repository root out of a commit.
+debug-model-calls.jsonl

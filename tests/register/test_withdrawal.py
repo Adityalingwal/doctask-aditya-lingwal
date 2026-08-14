@@ -398,7 +398,7 @@ def test_the_absence_is_cited_to_the_document_that_actually_stopped_asking(
         application = ApplicationProcess(
             database_url=database_url,
             script_path=script_path,
-            call_log_path=Path("/workspace/debug-model-calls.jsonl"),
+            call_log_path=tmp_path / "model-calls.jsonl",
         )
         application.start()
         try:
