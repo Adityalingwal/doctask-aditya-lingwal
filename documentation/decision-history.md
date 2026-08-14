@@ -3205,3 +3205,42 @@ its reason, not refused.
 **Found by:** the independent review of the incremental update slice, which
 read the code and found the decision text claiming behaviour the branch could
 not perform.
+
+### Timing and cost collection, from locked to built (2026-08-14, superseding D16's status)
+
+**Superseded wording**, from root `DECISIONS.md` D16 as it stood at `ae7a13e`:
+"Structured run events exist. Schema has timing/cost fields, but collection,
+roll-up, API reporting, measurements, and proof are not implemented. No measured
+model timing/cost exists."
+
+**Replacement:** the operations slice built all of it — durations written where
+each stage's pass ends, token counts read off the reply at one model boundary,
+the estimate from the configured rates, and one block reported by
+`read_run_status` to the endpoint, the MCP tool and the screen.
+
+**What is still not closed.** No live model has been called, so every token
+count recorded so far came from the scripted client. The roll-up and its
+arithmetic are proven; the inputs are fixtures. The measured stage durations are
+real, the estimated cost is arithmetic over scripted usage, and PROGRESS keeps
+that as an open assumption rather than closing it with a scripted run.
+
+### A run's cost may be unknown, not zero (2026-08-14, superseding the schema default)
+
+**Superseded wording**, from migration `20260812_0001`: `runs.estimated_cost_usd`
+was `NUMERIC(12,6) NOT NULL DEFAULT 0`.
+
+**Why it was wrong.** Zero is a figure. With a `NOT NULL DEFAULT 0` column, a run
+whose model reported no token count, and a run that genuinely cost nothing, are
+written down identically — and the first one is a cost nobody could estimate.
+The never-do case says such a run must say what it does not know rather than
+print a zero, and the column made that impossible to store.
+
+**Replacement:** migration `20260814_0009` drops the default, makes the column
+nullable, sets every existing zero to null, and adds `cost_unknown_reason` beside
+it so the run carries why there is no figure. Its downgrade puts the zeros back,
+which is the only shape the older column can hold.
+
+**Alternative rejected:** deriving "unknown" at the door from an empty
+`token_usage`. It would have been correct for the no-usage case and guesswork for
+the missing-rate case, which the writer knows and a reader would have had to
+infer.

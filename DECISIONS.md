@@ -66,7 +66,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D13 | Run identity, statuses, lock, and queue | Implemented and verified | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
 | D15 | MCP and React surfaces | Both implemented and verified; React layout and visual treatment still open | Storage and interfaces |
-| D16 | Logging, timing, and cost | Mixed | Operations |
+| D16 | Logging, timing, and cost | Implemented and verified with the scripted model | Operations |
 | D17 | Repository layout, build order, tests, setup, and network bind | Mixed | Delivery plan and proof |
 
 ## Product contract
@@ -649,13 +649,41 @@ slice-1 scope.
 
 - JSON-line stdout logs; every run event carries `run_id`. Log stage start/end,
   path-changing decisions, retries, and failures. Never log secrets or full
-  document text.
+  document text. Each stage-finished line now also carries its `seconds`, and a
+  stage that called the model carries that call's token counts.
 - Each stage records duration; run reports stage breakdown and total.
 - Estimated cost = model-reported tokens × configured rates, clearly labelled
   estimate rather than bill.
-- **Current status:** Structured run events exist. Schema has timing/cost
-  fields, but collection, roll-up, API reporting, measurements, and proof are
-  not implemented. No measured model timing/cost exists.
+- **Timing and usage are keyed, never accumulated.** `runs.stage_timings` and
+  `runs.token_usage` are objects keyed by the unit of work — the stage name,
+  and `extract:<document_id>` for the per-document Extract pass. A node that
+  re-enters after a kill (D12) overwrites its own key, so a resumed run cannot
+  double a duration or a token count. The duration is written where the pass
+  ends, so a killed pass leaves no half entry behind.
+- **Review is timed on the database's clock.** Its node is interrupted and
+  replayed, possibly by a second process, so no in-process clock spans it: the
+  entry stores `started_at` when Review begins and its duration is computed
+  from `review_finished_at`, which makes a replayed node write the same number.
+- **An unknown cost is null, never zero.** Migration `20260814_0009` makes
+  `estimated_cost_usd` nullable and adds `token_usage` and
+  `cost_unknown_reason`, because the old `NOT NULL DEFAULT 0` could not tell a
+  cost of zero from a cost nobody could estimate. A run whose calls reported no
+  token count, or whose model has no configured rate, reports the reason
+  instead of a figure.
+- **Rates are read at startup with the rest of `config/model.yaml`**, so a rate
+  edit applies to runs started after a restart; a missing or unusable rate
+  makes the estimate unknown and names the file, rather than stopping the run.
+- **Status:** **Implemented and verified** — 2026-08-14, by
+  `tests/test_timing_and_cost.py`: the estimate is labelled and never a bill,
+  an absent token count reports unknown rather than zero, a stage that did not
+  run has no duration, a killed and resumed run reports each stage once without
+  doubling its tokens, the new log fields carry no key or document text, and
+  the MCP `get_run_status` tool returns the same block as `GET /runs/{id}`
+  because both read it from `read_run_status`.
+- **Limitation:** a call whose answer could not be parsed or used records no
+  token count, so an estimate over a run with skipped documents is a lower
+  bound. Every figure so far comes from the scripted client, so the cost is
+  arithmetic over scripted usage and says nothing about a real provider.
 
 ## Delivery plan and proof
 
@@ -681,8 +709,9 @@ slice-1 scope.
   concurrency and injection tests were written against the lock, the queue and
   the Extract path exactly as the earlier slices left them, and none of them
   needed a line of that code changed.
-- Later slices: React → cost/timing. Exact scheduling may combine safe adjacent
-  work, but proof claims stay separate.
+- The operations slice is built: per-stage durations, the token roll-up taken
+  at the model boundary, the estimate from the configured rates, and the same
+  block through both doors and the screen. It is the last planned slice.
 
 ### Brief-behaviour acceptance summary
 
@@ -697,7 +726,7 @@ slice-1 scope.
 | 7 | Automated proof | Key-free full suite with real paths | 124 Python and 11 front-end tests verified; later minima remain |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Verified on the demo document that buries the line |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Verified for both halves |
-| 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Locked, not implemented |
+| 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Verified with the scripted client; no provider cost measured |
 
 ### Slice-1 test and setup contracts
 
@@ -739,8 +768,10 @@ slice-1 scope.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
   rather than read; chunking and OCR are not planned for V1.
-- Cost/timing is locked but not implemented, and the review screen shows that
-  section as absent rather than as a zero.
+- Every timing and token figure so far comes from the scripted client, so the
+  estimated cost is arithmetic over scripted usage, not a measured provider
+  charge. A call whose answer could not be used records no token count, so an
+  estimate over a run with skipped documents is a lower bound.
 - The review screen is built by Node, which the application image does not
   carry, so `ui/dist` must be built before the screen can be served.
 - The watcher holds what it last saw in memory, so a restart re-baselines every

@@ -154,6 +154,24 @@ operations:
 - `POST /runs/{id}/finish-review`
 - `GET /runs/{id}/export?format=json|markdown`
 
+### What a run reports about time and cost
+
+`GET /runs/{id}` — and the MCP `get_run_status` tool, which reads it from the
+same core function — carry a `cost_and_timing` block:
+
+| Field | What it holds |
+|---|---|
+| `stages` | One entry per stage that finished, with its duration in seconds. A stage that did not run is absent, never zero; Extract's entry covers every document of the batch |
+| `total_seconds` | Those durations added up |
+| `tokens` | The prompt and completion tokens the model reported, and how many calls did and did not report any |
+| `estimated_cost_usd` | Reported tokens × the rates in [`config/model.yaml`](config/model.yaml), or `null` |
+| `estimate_note` | That the figure is an estimate and not a bill |
+| `cost_unknown_reason` | Why there is no figure: no call reported a token count, or no rate is configured |
+
+The cost is an **estimate**, never a bill — what the configured rates say those
+reported tokens would cost. Rates are read from `config/model.yaml` when the
+application starts, so a rate edit applies to runs started after a restart.
+
 ## The review screen
 
 One page shows one run and answers its gates. Build it once, then start the
@@ -177,7 +195,7 @@ The page has five sections, in this order:
 | Skipped | Each file or quote this run skipped, with the reason recorded on the run |
 | Needs your decision | Every gate the run raised, its frozen question and its answer, plus the rules the run was judged against |
 | Register | The exported register, its cells, its citations and its approved findings — once the run has exported one |
-| Cost and timing | That the API reports neither yet; the operations slice adds them |
+| Cost and timing | How long each stage took, the tokens the model reported, and the estimated cost — or "unknown" with the reason, never a zero |
 
 The page polls `GET /runs/{id}` every **3 seconds**; that interval lives in
 [`ui/config/screen.json`](ui/config/screen.json). Nothing shown comes from what
@@ -290,8 +308,12 @@ the next run and never to one already under way or already finished. Point
   Delivery Owner answers it.
 - A withdrawn row stays `Withdrawn` even if a later document asks for the
   requirement again.
-- Cost and timing reporting is a later slice, so the review screen's last
-  section says the API reports neither rather than showing a zero.
+- The cost is an **estimate**: tokens the model reported, multiplied by the
+  rates in `config/model.yaml`. It is not a bill. Every figure recorded so far
+  came from the scripted model, so it is arithmetic over scripted usage rather
+  than a measured provider charge.
+- A model call whose answer could not be used records no token count, so a run
+  that skipped a document reports an estimate that is a lower bound.
 - `GET /runs/{id}` carries no register rows, so the review screen's register
   section stays empty until that run has exported one.
 - The review screen is built by Node, which the application image does not

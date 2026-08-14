@@ -211,6 +211,9 @@ def test_a_killed_and_resumed_run_reports_each_stage_once_without_doubling_token
                     >= len(KILLED_RUN_DOCUMENTS),
                     "the model has been asked about every document",
                 )
+                before_the_kill = client.get(f"/runs/{run_id}").json()[
+                    "cost_and_timing"
+                ]
             application.kill()
 
             application.start()
@@ -229,13 +232,18 @@ def test_a_killed_and_resumed_run_reports_each_stage_once_without_doubling_token
     assert markers.count(extract_marker("doc-3.md")) == 2
     assert stage_names == sorted(set(stage_names), key=stage_names.index)
     assert stage_names.count("extract") == 1
+    # The run had read at most every document once when it was killed, and the
+    # resumed run adds only Match and Examine to that, never a fourth Extract.
+    assert before_the_kill["tokens"]["calls_reporting_usage"] <= len(
+        KILLED_RUN_DOCUMENTS
+    )
+    assert reported["tokens"]["calls_reporting_usage"] == (
+        len(KILLED_RUN_DOCUMENTS) + 2
+    )
     assert reported["tokens"]["prompt"] == (
         every_extract
         + MATCH_USAGE["prompt_tokens"]
         + EXAMINE_USAGE["prompt_tokens"]
-    )
-    assert reported["tokens"]["calls_reporting_usage"] == (
-        len(KILLED_RUN_DOCUMENTS) + 2
     )
 
 

@@ -9,10 +9,10 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 ## Snapshot — 2026-08-14
 
 - Slice 1, the formats and types slice, the rules and findings slice, the MCP
-  slice, the incremental update slice and the reliability slice are merged into
-  `main`.
-- The React slice is built on `react-review-screen`, not yet merged.
-- 124 Python tests and 11 front-end tests pass without a live API key.
+  slice, the incremental update slice, the reliability slice and the React
+  slice are merged into `main`.
+- The operations slice is built on `operations-timing-cost`, not yet merged.
+- 130 Python tests and 13 front-end tests pass without a live API key.
 - No live model call has been made; all runs/tests used the scripted client.
 - Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
   Match → Examine → Review → Commit.
@@ -40,6 +40,12 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - One review screen is served at `/ui`: five sections over the endpoints that
   already exist, one question component for every gate, one answer at a time,
   and nothing shown that the server did not send back.
+- Every run records how long each stage took and what each model call reported
+  spending; `GET /runs/{id}` and the MCP `get_run_status` tool report the same
+  breakdown, token counts and estimated cost, and the screen shows them.
+- The estimate is tokens the model reported multiplied by the rates in
+  `config/model.yaml`. Every figure recorded so far came from the scripted
+  client, so it is arithmetic over scripted usage and not a provider charge.
 
 ## Completed
 
@@ -134,6 +140,26 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       says to restart the application, because a screen built after startup is
       not served by reloading the page.
 
+### Operations slice (branch `operations-timing-cost`)
+
+- [x] Six never-do tests written and run at the baseline commit `ae7a13e`
+      before any implementation; all six failed there, five on
+      `KeyError: 'cost_and_timing'` and one on `KeyError: 'seconds'`, and the
+      two front-end cases failed on the section that said the API reported
+      nothing.
+- [x] Stage durations written where each pass ends, keyed by the unit of work,
+      so a re-entered node replaces its own entry instead of adding one.
+- [x] Token counts read off the reply in one place, `app/model/call_the_model.py`,
+      and recorded against the stage that made the call.
+- [x] The estimate from the rates in `config/model.yaml`, stored in
+      `runs.estimated_cost_usd`, with a reason stored where there is no figure.
+- [x] Migration `20260814_0009`: `token_usage`, `cost_unknown_reason`, and a
+      nullable cost, because zero could not be told from unknown.
+- [x] One block reported by `read_run_status`, so the endpoint, the MCP tool
+      and the screen all show the same thing.
+- [x] Both corpora driven end to end through export with the numbers recorded,
+      and one kill-and-resume run showing nothing doubled.
+
 ### MCP slice (branch `mcp-tools`)
 
 - [x] Every existence check, refusal and reported shape moved out of the routes
@@ -164,8 +190,10 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 | Order | Slice | Scope | Current state |
 |---|---|---|---|
-| 1 | React | One-page five-section review surface | Built on `react-review-screen`; awaiting review and merge |
-| 2 | Operations | Stage timings, token/cost roll-up, measured evidence | Designed |
+| 1 | Operations | Stage timings, token/cost roll-up, reported evidence | Built on `operations-timing-cost`; awaiting review and merge |
+
+This was the last planned slice. What remains is the open fresh-clone and
+image-only verification, and the two open React questions.
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -186,6 +214,8 @@ working claim only after its own implementation and proof land.
 | Real SDK exception classification matches tests | Typed `status_code`; only scripted/401 path observed | Live provider failure evidence |
 | SDK retry is close enough to locked policy | Two attempts/120s configured; SDK owns wait | Live timing and explicit retry evidence |
 | Default OpenRouter model is suitable | Configured but never called | Bounded live-model run |
+| A real run's token counts resemble the scripted ones | Only scripted usage has ever been recorded; the roll-up and the arithmetic are proven, the inputs are not | One bounded live-model run, whose reported usage would replace the scripted numbers |
+| Reported usage arrives as `usage_metadata` from the provider | The boundary reads that field, and the scripted client fills it the same way | One bounded live-model run |
 
 ## Known limitations
 
@@ -226,8 +256,17 @@ working claim only after its own implementation and proof land.
   its evidence onto the row, and the row still reads `Withdrawn`. Nothing in
   this system updates a committed row's cells from later evidence, so there is
   no gate to carry it back and no honest status to carry it to.
-- No cost/timing reporting yet, so the screen's cost-and-timing section states
-  that the API reports none rather than showing a measured-looking zero.
+- Every stage duration is measured, but every token count and therefore every
+  estimated cost so far comes from the scripted client. The estimate is
+  arithmetic over scripted usage and says nothing about a real provider's
+  charge or latency.
+- A model call whose answer could not be parsed or used records no token count,
+  so a run that skipped a document reports an estimate that is a lower bound.
+- The stored estimate has six decimal places, so an estimate below
+  0.000001 USD would round to zero; at the configured rates that needs a run of
+  one or two tokens.
+- Review's duration measures how long a person took to answer, not how long the
+  system worked; it is computed from the run's two durable timestamps.
 - `GET /runs/{id}` returns no register rows, so the screen's register section
   is empty until that run has exported; a run closed without export never shows
   a register at all.
@@ -254,20 +293,22 @@ working claim only after its own implementation and proof land.
 
 ## Next actions
 
-1. Review and merge the React branch.
-2. Answer the two open React decisions: layout and visual treatment, and
+1. Review and merge the operations branch.
+2. Decide whether one bounded live-model run is worth making, which is the only
+   thing that would turn the estimate into evidence about a real provider.
+3. Answer the two open React decisions: layout and visual treatment, and
    whether review answers are ever batched at the API layer.
-3. Decide whether the run logger should be given its own stdout handler, so the
+4. Decide whether the run logger should be given its own stdout handler, so the
    INFO run events D16 describes reach a reader outside a test.
-4. Decide whether the already-read rule should settle a related additional
+5. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
 
 ## Verification evidence
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| `docker compose run --rm app pytest` | 2026-08-14, `react-review-screen` branch with `main` merged in | 124 passed, no live key |
-| `npm --prefix ui test` | 2026-08-14, `react-review-screen` branch | 11 passed, 6 files, no live key |
+| `docker compose -p operations-suite run --rm app pytest` | 2026-08-14, `operations-timing-cost` branch | 130 passed, no live key |
+| `npm --prefix ui test` | 2026-08-14, `operations-timing-cost` branch | 13 passed, 7 files, no live key |
 | Review screen run | 2026-08-14, `react-review-screen` branch | One run driven through `/ui` in a browser: three gates answered one at a time, one finding approved and one rejected, the review finished, and the exported register read back with its citations and the approved finding only |
 | Review screen polling | 2026-08-14, `react-review-screen` branch | A second run watched from `running`/`match` through to its recorded failure without a reload; Finish review was never offered and no register was shown |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
@@ -283,6 +324,9 @@ working claim only after its own implementation and proof land.
 | Same-project queue | 2026-08-14, `reliability-proof` branch | One waiting run across four requests; its batch held only the file that arrived after it was queued; it started by itself after a `done` run and after a `failed` one |
 | Buried instruction | 2026-08-14, `reliability-proof` branch | `meeting-notes-20-mar.md` read in a real run: the line stored and logged as an embedded instruction, one register row from the other document, the export gate the only question asked, and the export refused until it was approved |
 | New tests repeated | 2026-08-14, `reliability-proof` branch | Five runs in a row, five passes; no sleep added anywhere |
+| Intake portal timing and cost | 2026-08-14, `operations-timing-cost` branch | Two documents through export: ingest 0.005s, extract 0.005s, match 0.006s, examine 0.003s, review 0.206s, commit 0.011s, total 0.236s; 4 calls reported 4,400 prompt and 570 completion tokens, estimated 0.002672 USD. Scripted-client usage, so the cost is arithmetic, not a provider charge |
+| Northside Dental timing and cost | 2026-08-14, `operations-timing-cost` branch | Three documents (`.md`, `.docx`, `.pdf`) through export: ingest 0.029s, extract 0.011s, match 0.008s, examine 0.004s, review 0.152s, commit 0.013s, total 0.217s; 5 calls reported 5,600 prompt and 750 completion tokens, estimated 0.003440 USD. Scripted-client usage, as above |
+| Kill and resume, not doubled | 2026-08-14, `operations-timing-cost` branch | Killed inside Extract with the third document's call in flight; the resumed run asked about that document twice and still reported one `extract` entry, 5 calls reporting usage and 550 prompt tokens, not 650 |
 | Live model | Never | Unverified |
 | Fresh clone/image-only | Not run yet | Open release gate |
 
