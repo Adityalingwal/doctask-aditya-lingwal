@@ -3179,3 +3179,29 @@ incremental update slice: a second run over a changed document that drops a
 requirement raises exactly one withdrawal proposal, approval writes the
 `Status` cell change with audit, rejection leaves the row byte-identical, and
 no other document's silence raises anything.
+
+### A withdrawal is final in V1 (2026-08-14, superseding the return path)
+
+**Superseded wording**, from the entry above as it was locked earlier the same
+day: "a requirement that reappears later moves the row off `Withdrawn` through
+the ordinary gate, with no second mechanism."
+
+**Why it was wrong.** It described a capability this system has never had. An
+approved match moves citations onto the existing row; no path anywhere updates
+a committed row's cells from later evidence. The sentence was written from the
+outside, against the review, before the code was read.
+
+**Replacement:** a withdrawal is final in V1. A requirement asked for again
+merges its evidence onto the row, which still reads `Withdrawn`.
+
+**Why not build the return.** There is no honest status to return the row to.
+`No evidence yet` would deny testing evidence the row may already carry, and
+the status it held before the withdrawal described a world that has since
+changed. Choosing between them is a product decision, not an implementation
+detail, and building the first cell update from later evidence is a change to
+how the register works everywhere — not a repair to withdrawal. Deferred with
+its reason, not refused.
+
+**Found by:** the independent review of the incremental update slice, which
+read the code and found the decision text claiming behaviour the branch could
+not perform.

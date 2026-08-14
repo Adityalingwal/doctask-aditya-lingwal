@@ -9,8 +9,38 @@ from psycopg import AsyncConnection
 POSSIBLE_MATCH_DECISION = "possible match"
 EXPORT_DECISION = "export"
 FINDING_DECISION = "finding"
+WITHDRAWAL_DECISION = "withdrawal"
 APPROVED = "approved"
 REJECTED = "rejected"
+
+
+async def raise_withdrawal_decision(
+    connection: AsyncConnection,
+    run_id: UUID,
+    question: str,
+    candidate_register_row_id: UUID,
+    source_document_id: UUID,
+) -> UUID:
+    """Keep the document that stopped asking; the answer's evidence cites it.
+
+    A row can carry citations from more than one document, so which of them
+    dropped the requirement is known only here, where the question is written.
+    """
+    decision_id = uuid4()
+    await connection.execute(
+        "INSERT INTO decisions (id, run_id, kind, question, "
+        "candidate_register_row_id, source_document_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (
+            decision_id,
+            run_id,
+            WITHDRAWAL_DECISION,
+            question,
+            candidate_register_row_id,
+            source_document_id,
+        ),
+    )
+    return decision_id
 
 
 async def raise_finding_decision(
@@ -79,7 +109,8 @@ async def decisions_of_run(
 ) -> list[dict[str, Any]]:
     result = await connection.execute(
         "SELECT id, kind, question, proposed_register_row_id, "
-        "candidate_register_row_id, outcome, decided_at FROM decisions "
+        "candidate_register_row_id, source_document_id, outcome, decided_at "
+        "FROM decisions "
         "WHERE run_id = %s ORDER BY kind, id",
         (run_id,),
     )

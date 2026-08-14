@@ -18,6 +18,7 @@ from conftest import temporary_database
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BEFORE_THIS_SLICE = "20260813_0004"
+BEFORE_WITHDRAWAL = "20260813_0006"
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres@db:5432/register"
 POSTGRES_MAINTENANCE_DATABASE = "postgres"
@@ -96,6 +97,7 @@ EXPECTED_COLUMNS = {
         "question",
         "proposed_register_row_id",
         "candidate_register_row_id",
+        "source_document_id",
         "outcome",
         "decided_at",
     },
@@ -669,3 +671,34 @@ def test_new_run_cost_defaults_to_zero(database_connection: Connection) -> None:
     ).scalar_one()
 
     assert estimated_cost == Decimal("0")
+
+
+def test_a_downgrade_refuses_to_take_a_withdrawn_row_back_to_a_shape_without_it(
+) -> None:
+    with temporary_database() as database_url:
+        alembic_config = Config(PROJECT_ROOT / "alembic.ini")
+        alembic_config.set_main_option("sqlalchemy.url", database_url)
+        engine = create_engine(database_url)
+        try:
+            with engine.begin() as connection:
+                project_id = _insert_project(connection)
+                run_id = _insert_run(connection, project_id)
+                _insert_register_row(
+                    connection, project_id, run_id, status="Withdrawn"
+                )
+
+            with pytest.raises(RuntimeError) as refused:
+                command.downgrade(alembic_config, BEFORE_WITHDRAWAL)
+
+            with engine.connect() as connection:
+                still_there = connection.execute(
+                    text("SELECT status FROM register_rows")
+                ).scalars().all()
+        finally:
+            engine.dispose()
+
+    # The older shape has no status that means withdrawn, and the row is never
+    # deleted, so the downgrade says what is in the way and what to do about it.
+    assert "1 register row(s) are 'Withdrawn'" in str(refused.value)
+    assert "change its status, then run this downgrade again" in str(refused.value)
+    assert still_there == ["Withdrawn"]

@@ -9,13 +9,16 @@ from reportlab.pdfgen import canvas
 
 from app.examine.examine_register import EXAMINE_PROMPT_MARKER
 from app.extract.answer import MEETING_NOTES
-from app.match.match_requirements import MATCH_PROMPT_MARKER
+from app.match.match_requirements import EXISTING_ROW, MATCH_PROMPT_MARKER, NEW_ROW
 
 
 EXTRACT_MARKER = "File name: {source_file}"
 # Only Match is sent the requirements as JSON, so this marker picks out the
 # Match call of the run whose batch holds one named document.
 MATCH_BATCH_MARKER = '"source_file": "{source_file}"'
+# The register Match is shown is empty only before any row is committed, which
+# is what tells a first run's Match call apart from a later run's.
+EMPTY_REGISTER_MARKER = "Register rows:\n[]"
 
 # Not a secret: it locks a fixture that one test writes and throws away.
 FIXTURE_PDF_PASSWORD = "fixture-pdf-lock"
@@ -35,6 +38,31 @@ def write_meeting_note(folder: Path, source_file: str, requirement: str) -> str:
         encoding="utf-8",
     )
     return quote
+
+
+def write_client_requirements(
+    folder: Path,
+    source_file: str,
+    requirements: list[str],
+    date: str,
+) -> list[str]:
+    """One fabricated requirements document, and the words each citation traces to.
+
+    Written so the same file can be written again with one requirement removed,
+    which is what a withdrawal proposal is raised from.
+    """
+    quotes = [f"The client has approved {requirement}." for requirement in requirements]
+    numbered = "\n\n".join(
+        f"{position}. {quote}" for position, quote in enumerate(quotes, start=1)
+    )
+    (folder / source_file).write_text(
+        f"# Intake portal — client requirements\n\n"
+        f"**Date:** {date}\n\n"
+        "## Requirements\n\n"
+        f"{numbered}\n",
+        encoding="utf-8",
+    )
+    return quotes
 
 
 def write_pdf(path: Path, pages: list[list[str]]) -> None:
@@ -151,6 +179,24 @@ def extraction_answer_without_requirements() -> dict[str, Any]:
     }
 
 
+def dated_extraction_answer(
+    requirements: list[tuple[str, str]],
+    document_type: str,
+    date: str,
+) -> dict[str, Any]:
+    """Several requirements out of one document that states its own date."""
+    return {
+        "document_type": document_type,
+        "document_date": {"value": date, "quote": f"**Date:** {date}"},
+        "requirements": [
+            {"summary": summary, "quote": quote} for summary, quote in requirements
+        ],
+        "testing_observations": [],
+        "blockers": [],
+        "embedded_instructions": [],
+    }
+
+
 def match_answer(requirement_count: int) -> dict[str, Any]:
     return {
         "outcomes": [
@@ -173,12 +219,31 @@ def match_answer_existing_row(row_number: int) -> dict[str, Any]:
     }
 
 
+def match_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
+    """Match's answer per requirement: the row it matched, or None for a new row."""
+    return {
+        "outcomes": [
+            {
+                "requirement_index": index,
+                "outcome": NEW_ROW if row_number is None else EXISTING_ROW,
+                "row_number": row_number,
+            }
+            for index, row_number in enumerate(matched_row_numbers)
+        ]
+    }
+
+
 def extract_marker(source_file: str) -> str:
     return EXTRACT_MARKER.format(source_file=source_file)
 
 
 def match_marker() -> str:
     return MATCH_PROMPT_MARKER
+
+
+def match_marker_against_an_empty_register() -> str:
+    """The Match call of a run whose project has no committed row yet."""
+    return EMPTY_REGISTER_MARKER
 
 
 def examine_marker() -> str:

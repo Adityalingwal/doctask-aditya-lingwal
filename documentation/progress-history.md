@@ -8,6 +8,25 @@ actions live in root `PROGRESS.md`; the exact byte-for-byte source is
 
 New completed entries are added newest-first below this header.
 
+**2026-08-14.** Built the incremental update slice on `incremental-update`,
+cut from `main` at `4132a2e`. Written before its code: the seven never-do
+tests, run at that baseline. Three of them failed there and now pass — the
+watcher started nothing, no withdrawal was ever raised, and a rules-only run
+ended without changes instead of examining. The other four passed at the
+baseline and stay as regression guards: unaffected rows already came back
+byte-identical, an unchanged file was already never re-read, nothing deleted a
+row, and the export gate already held. Built: `config/watcher.yaml` and
+`app/runs/watch_source_folders.py`, which start a run through the same
+`start_or_queue_run` the endpoint uses; the rules-only route, from Ingest
+straight to Examine when the frozen rules differ from the ones the register was
+last judged against; and requirement withdrawal end to end — migration
+`20260814_0007`, `app/register/withdraw_rows.py`, the fourth review-queue kind,
+and the first absence citation this system has written. Extract now routes on
+to Match when the batch read a document a committed row came from, even with no
+requirement found, and Match makes no model call when there is nothing to
+match. Proof: 116 passed, no live API key; both corpora driven through a first
+and a second run with the unaffected rows compared as stored.
+
 **2026-08-13.** Built the two decisions locked earlier the same day and
 deliberately left unbuilt: the `review_finished_at` replay guard and the
 loopback-only network bind. Migration `20260813_0004` adds

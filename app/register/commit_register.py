@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from typing import Any, NamedTuple
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
 from app.examine.read_findings import findings_of_run
+from app.register.audit_entries import write_attachment, write_cell_change
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
 from app.register.export_register import build_export
+from app.register.withdraw_rows import apply_approved_withdrawals
 from app.review.review_queue import (
     APPROVED,
     POSSIBLE_MATCH_DECISION,
@@ -16,13 +18,10 @@ from app.review.review_queue import (
 )
 
 
-CELL_CHANGE_EVENT = "cell change"
-ATTACHMENT_EVENT = "attachment"
-
-
 class CommitResult(NamedTuple):
     committed_row_numbers: list[int]
     merged_row_numbers: list[int]
+    withdrawn_row_numbers: list[int]
     export: dict[str, Any]
 
 
@@ -77,6 +76,7 @@ async def commit_register(
         )
         committed_row_numbers.append(row["row_number"])
 
+    withdrawn_row_numbers = await apply_approved_withdrawals(connection, run_id)
     await _write_attachment_audit(connection, run_id)
     export = await build_export(connection, project, run_id, exported_at)
     await connection.execute(
@@ -86,6 +86,7 @@ async def commit_register(
     return CommitResult(
         committed_row_numbers=committed_row_numbers,
         merged_row_numbers=merged_row_numbers,
+        withdrawn_row_numbers=withdrawn_row_numbers,
         export=export,
     )
 
@@ -139,17 +140,11 @@ async def _write_attachment_audit(
     move when one arrives.
     """
     for finding in await findings_of_run(connection, run_id, approved_only=True):
-        await connection.execute(
-            "INSERT INTO audit (id, register_row_id, cell_name, event_kind, "
-            "old_value, new_value, run_id, source_document_id) "
-            "VALUES (%s, %s, NULL, %s, NULL, %s, %s, NULL)",
-            (
-                uuid4(),
-                finding["register_row_id"],
-                ATTACHMENT_EVENT,
-                f"{finding['rule_id']} — {finding['issue']}",
-                run_id,
-            ),
+        await write_attachment(
+            connection,
+            finding["register_row_id"],
+            f"{finding['rule_id']} — {finding['issue']}",
+            run_id,
         )
 
 
@@ -188,17 +183,12 @@ async def _write_audit_entries(
     }
     for cell_name, new_value in cells.items():
         source_file = source_file_by_cell.get(cell_name)
-        await connection.execute(
-            "INSERT INTO audit (id, register_row_id, cell_name, event_kind, "
-            "old_value, new_value, run_id, source_document_id) "
-            "VALUES (%s, %s, %s, %s, NULL, %s, %s, %s)",
-            (
-                uuid4(),
-                register_row_id,
-                cell_name,
-                CELL_CHANGE_EVENT,
-                new_value,
-                run_id,
-                document_id_by_file.get(source_file) if source_file else None,
-            ),
+        await write_cell_change(
+            connection,
+            register_row_id,
+            cell_name,
+            None,
+            new_value,
+            run_id,
+            document_id_by_file.get(source_file) if source_file else None,
         )

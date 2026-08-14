@@ -31,6 +31,7 @@ from app.model.scripted_client import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
 RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE = "RULES_CONFIG_PATH"
+WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE = "WATCHER_CONFIG_PATH"
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres@db:5432/register"
 POSTGRES_MAINTENANCE_DATABASE = "postgres"
 TEST_DATABASE_PREFIX = "register_test_"
@@ -76,6 +77,7 @@ class ApplicationProcess:
     call_log_path: Path
     delay_seconds: float = 0.0
     rules_config_path: Path | None = None
+    watcher_config_path: Path | None = None
     port: int = field(default_factory=lambda: _free_port())
     _process: subprocess.Popen | None = None
 
@@ -95,6 +97,10 @@ class ApplicationProcess:
         if self.rules_config_path is not None:
             environment[RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE] = str(
                 self.rules_config_path
+            )
+        if self.watcher_config_path is not None:
+            environment[WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE] = str(
+                self.watcher_config_path
             )
         self._process = subprocess.Popen(
             [
