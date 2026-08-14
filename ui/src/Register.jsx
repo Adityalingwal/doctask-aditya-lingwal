@@ -66,17 +66,20 @@ export default function Register({ exported }) {
         {exported.rows.map((row) => (
           <div key={row.row_number} className="border border-line bg-card px-4 py-3">
             <h4 className="eyebrow m-0 mb-2">Row {row.row_number}</h4>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {row.citations.map((citation, place) => (
-                <li key={place} className="text-sm">
-                  {citationLine(citation)}
+                <li key={place}>
+                  <Citation citation={citation} />
                 </li>
               ))}
             </ul>
             {row.findings.length > 0 && (
               <ul className="m-0 mt-3 flex list-none flex-col gap-2 border-t border-line p-0 pt-3">
                 {row.findings.map((finding) => (
-                  <li key={finding.rule_id} className="text-sm">
+                  <li
+                    key={finding.rule_id}
+                    className="border-l-4 border-caution py-1 pl-3 text-sm"
+                  >
                     {findingLine(finding)}
                   </li>
                 ))}
@@ -143,14 +146,27 @@ function StatusChip({ status }) {
 }
 
 // A citation is never shown without the file it came from: a quote carries the
-// place the reader derived, and an absence carries the statement instead.
-function citationLine(citation) {
-  if (citation.source_words === null) {
-    return `${citation.cell} — ${citation.source_file}: ${citation.absence_statement}`;
-  }
+// place the reader derived, and an absence carries the statement instead. The
+// two are drawn differently because they are different claims — one says a
+// document said this, the other says a document stopped saying it.
+function Citation({ citation }) {
+  const quoted = citation.source_words !== null;
   return (
-    `${citation.cell} — ${citation.source_file}, ${citation.place}: `
-    + `"${citation.source_words}"`
+    <>
+      <p className="eyebrow m-0">
+        {citation.cell} · {citation.source_file}
+        {quoted && citation.place !== null ? ` · ${citation.place}` : ""}
+      </p>
+      {quoted ? (
+        <p className="m-0 mt-1 border-l-2 border-line-strong pl-3 text-sm">
+          &ldquo;{citation.source_words}&rdquo;
+        </p>
+      ) : (
+        <p className="m-0 mt-1 border-l-2 border-line pl-3 text-sm text-ink-soft italic">
+          {citation.absence_statement}
+        </p>
+      )}
+    </>
   );
 }
 

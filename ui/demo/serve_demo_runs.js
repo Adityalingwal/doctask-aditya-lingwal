@@ -131,6 +131,89 @@ function demoRuns() {
       }),
     },
 
+    // Every gate answered but the review not finished: approved, rejected and
+    // one still waiting, so all three card states sit side by side.
+    "demo-answered": {
+      run: runReply({
+        run_id: "demo-answered",
+        status: "waiting for review",
+        stage: "review",
+        decisions: [
+          decisionReply({
+            decision_id: "demo-answered-1",
+            kind: "possible match",
+            question:
+              "Is 'Patients book online' the same requirement as row 2, "
+              + "'Online appointment booking'?",
+            outcome: "approved",
+          }),
+          decisionReply({
+            decision_id: "demo-answered-2",
+            kind: "rule finding",
+            question:
+              "R3 — row 3 'Staff day view' has not moved for 21 days, beyond "
+              + "max_days 14. Attach this finding to that row?",
+            outcome: "rejected",
+          }),
+          decisionReply({
+            decision_id: "demo-answered-3",
+            kind: "export",
+            question: "Export this register with 7 rows?",
+          }),
+        ],
+        examine: examineReply({ rows_examined: 7 }),
+      }),
+    },
+
+    // Documents read, none of them usable. This is the state a person most
+    // often has to make sense of without opening the folder themselves.
+    "demo-skipped": {
+      run: runReply({
+        run_id: "demo-skipped",
+        status: "ended without changes",
+        stage: "match",
+        ended_early_reason:
+          "every document in this batch was read and none of them asked for "
+          + "anything new, so no register row moved.",
+        decisions: [],
+        examine: null,
+        skipped: [
+          {
+            source_file: "northside-dental-brochure.pdf",
+            reason: "read as an unrelated document, so it produced no requirement",
+          },
+          {
+            source_file: "old-contract-scan.pdf",
+            reason:
+              "the file is a scanned image with no extractable text — export it "
+              + "as a text PDF, or supply the wording as .md, and run again",
+          },
+          {
+            source_file: "12-march-scope.docx",
+            quote_not_found: "patients should be able to reschedule without calling",
+            reason:
+              "the quoted words were not found in the extracted text, so no "
+              + "citation could be written for them",
+          },
+        ],
+        cost_and_timing: costAndTimingReply({
+          stages: [
+            { stage: "ingest", seconds: 0.044 },
+            { stage: "extract", seconds: 3.117 },
+            { stage: "match", seconds: 0.902 },
+          ],
+          total_seconds: 4.063,
+          tokens: {
+            prompt: 2100,
+            completion: 180,
+            calls_reporting_usage: 2,
+            calls_without_usage: 1,
+          },
+          estimated_cost_usd: "0.001164",
+        }),
+      }),
+    },
+
     // Only the rules changed, so Ingest routed straight to Examine (D03/D07).
     // Extract and Match never ran and never will on this run.
     "demo-rules-only": {
@@ -337,6 +420,13 @@ export default function serveDemoRuns() {
       server.middlewares.use(async (request, response, next) => {
         const url = new URL(request.url, "http://localhost");
         const parts = url.pathname.split("/").filter(Boolean);
+        // The index lives here rather than in the screen, so removing this
+        // folder and its one line of `vite.config.js` removes every trace of
+        // the demo without touching a single file under `src/`.
+        if (parts[0] === "demo" && parts.length === 1) {
+          respondWithIndex(response, Object.keys(runs));
+          return;
+        }
         if (parts[0] !== "runs") {
           next();
           return;
@@ -402,6 +492,49 @@ export default function serveDemoRuns() {
       });
     },
   };
+}
+
+const RUN_DESCRIPTIONS = {
+  "demo-review": "At review with four gates waiting — the accent, the counter and Finish review",
+  "demo-answered": "Approved, rejected and waiting gates side by side",
+  "demo-running": "Mid-extract: three stages ahead of it have not started",
+  "demo-failed": "Failed inside Extract, with the reason against that stage",
+  "demo-skipped": "Ended without changes; three documents skipped for three different reasons",
+  "demo-rules-only": "Rules-only route — Extract and Match never ran",
+  "demo-exported": "Done and exported: the full register, its evidence and one finding",
+};
+
+function respondWithIndex(response, runIds) {
+  const links = runIds
+    .map(
+      (id) =>
+        `<li><a href="/ui/?run=${id}"><code>${id}</code>`
+        + `<span>${RUN_DESCRIPTIONS[id] ?? ""}</span></a></li>`,
+    )
+    .join("");
+  response.statusCode = 200;
+  response.setHeader("Content-Type", "text/html; charset=utf-8");
+  response.end(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8">`
+    + `<title>Demo runs</title><style>`
+    + `body{background:#f6f5f1;color:#0f0f0e;font:14px/1.5 ui-sans-serif,system-ui;`
+    + `margin:0;padding:3rem 1.5rem;display:flex;justify-content:center}`
+    + `main{width:100%;max-width:44rem}`
+    + `h1{font:600 12px/1 ui-monospace,monospace;letter-spacing:.2em;`
+    + `text-transform:uppercase;color:#6b6b63;margin:0 0 1.5rem}`
+    + `ul{list-style:none;margin:0;padding:0;display:grid;gap:.75rem}`
+    + `a{display:block;background:#fff;border:1px solid #0f0f0e;padding:.75rem 1rem;`
+    + `text-decoration:none;color:inherit;box-shadow:2px 2px 0 0 #0f0f0e}`
+    + `a:hover{background:#cbf74a}`
+    + `code{font:600 13px ui-monospace,monospace}`
+    + `a code{display:block}`
+    + `span{color:#6b6b63;font-size:13px}`
+    + `p{color:#6b6b63;margin:1.5rem 0 0}`
+    + `</style></head><body><main><h1>Demo runs · dev server only</h1>`
+    + `<ul>${links}</ul>`
+    + `<p>These runs are served by <code>ui/demo/</code> and never reach a build.</p>`
+    + `</main></body></html>`,
+  );
 }
 
 function reply(response, status, body) {
