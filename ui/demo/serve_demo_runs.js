@@ -42,13 +42,6 @@ function demoRuns() {
           }),
           decisionReply({
             decision_id: "demo-decision-3",
-            kind: "withdrawal",
-            question:
-              "The 26 March scope was read in full and no longer asks for "
-              + "supporting document upload. Withdraw row 1?",
-          }),
-          decisionReply({
-            decision_id: "demo-decision-4",
             kind: "export",
             question: "Export this register with 7 rows and 1 approved finding?",
           }),
@@ -390,7 +383,7 @@ function runListEntry(demoRun) {
 }
 
 const RUN_DESCRIPTIONS = {
-  "demo-review": "At review with four gates waiting — the accent, the counter and Finish review",
+  "demo-review": "At review with three gates waiting — the accent, the counter and Finish review",
   "demo-running": "Working, on the rules-only route: Extract and Match never ran",
   "demo-failed": "Failed inside Extract, with three documents skipped for three different reasons",
   "demo-exported": "Done and exported: the full register, its evidence and one finding",

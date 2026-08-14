@@ -10,7 +10,6 @@ from app.examine.read_findings import findings_of_run
 from app.register.audit_entries import write_attachment, write_cell_change
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
 from app.register.export_register import build_export
-from app.register.withdraw_rows import apply_approved_withdrawals
 from app.review.review_queue import (
     APPROVED,
     POSSIBLE_MATCH_DECISION,
@@ -21,7 +20,6 @@ from app.review.review_queue import (
 class CommitResult(NamedTuple):
     committed_row_numbers: list[int]
     merged_row_numbers: list[int]
-    withdrawn_row_numbers: list[int]
     export: dict[str, Any]
 
 
@@ -76,7 +74,6 @@ async def commit_register(
         )
         committed_row_numbers.append(row["row_number"])
 
-    withdrawn_row_numbers = await apply_approved_withdrawals(connection, run_id)
     await _write_attachment_audit(connection, run_id)
     export = await build_export(connection, project, run_id, exported_at)
     await connection.execute(
@@ -86,7 +83,6 @@ async def commit_register(
     return CommitResult(
         committed_row_numbers=committed_row_numbers,
         merged_row_numbers=merged_row_numbers,
-        withdrawn_row_numbers=withdrawn_row_numbers,
         export=export,
     )
 

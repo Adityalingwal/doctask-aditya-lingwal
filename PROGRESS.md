@@ -36,13 +36,12 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   Northside Dental documents in `.md`, `.docx` and `.pdf`.
 - Rules are frozen per run, findings are gated one by one, and an approved
   finding attaches to its row without moving that row's fingerprint.
-- A second run reads only what changed and leaves every row it did not affect
-  byte-identical, proven on both corpora against the stored rows.
+- A second run reads only files it has never read before, by name or content,
+  and leaves every row an unaffected document supplied byte-identical, proven
+  on both corpora against the stored rows.
 - Each project's folder is watched: poll and quiet period come from
   `config/watcher.yaml`, and nothing starts behind a run that is already in
   flight.
-- A document read again that stopped asking for something raises one withdrawal
-  proposal for the row it supplied, and only for that row.
 - The review screen was rebuilt on `review-screen-redesign`: the viewport is
   split into a run list and one run's sections, read one at a time behind tabs,
   on Tailwind tokens with IBM Plex served from the repository. Nobody types a
@@ -60,6 +59,14 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   word, and a real folder created its project while the environment's
   missing `OPENROUTER_API_KEY` refused the run start — a second click did
   not create a second project. 25 front-end tests (was 20) and 129 Python
+  tests (unchanged) pass without a live key.
+- **2026-08-15, branch `read-each-document-once`:** requirement withdrawal is
+  removed, not disabled. A run now reads a document exactly once per project,
+  matched by name or by content, instead of re-reading a changed one; see the
+  branch's own entry under Completed and `documentation/progress-history.md`
+  for the full detail, and `documentation/decision-history.md` for why.
+  Migration `20260814_0011` was proven forward and backward on a real database
+  holding an approved withdrawal. 127 Python tests (was 129) and 27 front-end
   tests (unchanged) pass without a live key.
 
 ## Completed
@@ -110,13 +117,32 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] Watched folder in `app/runs/watch_source_folders.py`, starting runs
       through the same `start_or_queue_run` the endpoint calls.
 - [x] Rules-only route: Ingest straight to Examine when only the rules changed.
-- [x] Withdrawal end to end — migration `20260814_0007`, the fourth review-queue
-      kind, the `Withdrawn` status, the first absence citation, and the export
-      that shows it.
-- [x] Review fix: the decision stores the document that stopped asking
-      (migration `20260814_0008`), so a row cited to two documents has its
-      absence written against the one the question named.
 - [x] Both corpora driven through a first and a second run inside the suite.
+- [x] Withdrawal, built here (migrations `20260814_0007`/`0008`), was removed
+      2026-08-15 on `read-each-document-once` — see that entry below and
+      `documentation/decision-history.md`.
+
+### Requirement withdrawal removed; a document is read once, by name or content (branch `read-each-document-once`)
+
+- [x] Never-do tests written and run at the `main` baseline `826534e` before
+      any implementation; editing and renaming an already-read document both
+      failed there, four others passed as regression guards. Full detail:
+      `documentation/progress-history.md`, 2026-08-15.
+- [x] `app/ingest/collect_batch.py`'s already-read check: `AND` to a
+      parenthesised `OR`, with a skip reason naming which of name or content
+      matched. `app/register/withdraw_rows.py` deleted; its two routing-edge
+      conditions in `app/graph/register_graph.py` removed, the rules-only
+      route untouched; every other withdrawal symbol removed with its call
+      site and grepped afterward.
+- [x] Migration `20260814_0011` proven forward and backward by hand on a real
+      database holding an approved withdrawal from the pre-removal codebase.
+- [x] Both corpora hand-driven through all four cases: first run, a new
+      document, an edited document, a renamed document.
+- [x] `tests/register/test_withdrawal.py` deleted outright — the one deletion
+      this phase authorises. One corpus test and its supporting fixtures
+      deleted too, their premise no longer possible.
+- [x] 127 Python tests (was 129) and 27 front-end tests (unchanged) pass with
+      no live API key.
 
 ### Reliability slice (branch `reliability-proof`)
 
@@ -310,17 +336,12 @@ working claim only after its own implementation and proof land.
   of its own and is read by the next run started by hand.
 - Whatever the watcher first sees in a folder is not an arrival, so a project
   created over a folder of documents is read by `POST /runs`, not by itself.
-- A row two documents both supplied raises a withdrawal proposal when either of
-  them drops it. It is a question the Delivery Owner answers, never a change.
-- A document read again whose new extraction comes back a related additional or
-  unrelated document withdraws nothing: it never reaches Match, and silence from
-  it is silence.
-- A withdrawn row is examined like any other, so a rule such as R4 can still
-  raise a finding against it.
-- A withdrawal is final: a requirement a later document asks for again merges
-  its evidence onto the row, and the row still reads `Withdrawn`. Nothing in
-  this system updates a committed row's cells from later evidence, so there is
-  no gate to carry it back and no honest status to carry it to.
+- A document is read once per project, for its whole lifetime, matched by name
+  or by content. Deleting, renaming, or editing an already-read document does
+  nothing; a requirement a document no longer asks for keeps its row. See
+  README's "What this does not do, and why" for the full boundary and the
+  workflow answer (save an edited document under a new name to have the
+  revision read).
 - `GET /runs/{id}` returns no register rows, so the screen's register section
   is empty until that run has exported; a run closed without export never shows
   a register at all.
@@ -378,7 +399,11 @@ working claim only after its own implementation and proof land.
 | MCP flow | 2026-08-14, `mcp-tools` branch | One run created, started, polled, decided, finished and exported through the six tools; the export refused before approval |
 | Intake-portal second run | 2026-08-14, `incremental-update` branch | Meeting notes read first, then the written scope; rows 2 and 3 byte-identical, row 1's cells and fingerprint unmoved while an approved merge added its citations, rows 4 and 6 new |
 | Northside Dental second run | 2026-08-14, `incremental-update` branch | Meeting notes read first, then `.docx` scope and `.pdf` testing feedback; the SMS row byte-identical, rows 1 and 3 unmoved through their merges, rows 5 and 7 new |
-| Withdrawal on the corpus | 2026-08-14, `incremental-update` branch | The re-issued 26 March scope raised exactly one proposal, on the records-list row it dropped; approving it wrote `Withdrawn`, its cell audit and the absence citation, and the three meeting-note rows were byte-identical |
+| `docker compose -p read-once run --rm app pytest` | 2026-08-15, `read-each-document-once` branch | 127 passed, real PostgreSQL, no live key |
+| `npm --prefix ui test` | 2026-08-15, `read-each-document-once` branch | 27 passed, 13 files, no live key — unchanged from baseline; only a comment and a demo run changed |
+| Migration `20260814_0011` forward and backward on real data | 2026-08-15, `read-each-document-once` branch | Driven by hand on a database holding an approved withdrawal, produced from the pre-removal codebase: `alembic upgrade head` refused with `"1 register row(s) are 'Withdrawn' ... change its status, then run this migration again"`, rolled back cleanly (still at `20260814_0010`, the withdrawn row and its decision both intact); after changing that row's status, `alembic upgrade head` completed (column dropped, both checks narrowed, the `'withdrawal'`-kind decision deleted, no register row lost); `alembic downgrade 20260814_0010` restored the exact prior schema. Re-run independently a second time against a fresh database, because the code review could not reach a Docker socket and so could confirm this migration only by reading it; the refusal, the whole-transaction rollback and the retry all behaved identically |
+| Intake-portal corpus hand-driven, all four cases | 2026-08-15, `read-each-document-once` branch | First run: 6 rows committed. New document: register grew to 7 rows, all 6 prior rows byte-identical. Edited already-read document: skipped, reason named the name matched and to save it under a new name, no new Extract call for that file. Renamed already-read document: skipped, reason named the content matched under a different name |
+| Northside Dental corpus hand-driven, all four cases | 2026-08-15, `read-each-document-once` branch | Same four cases as the intake-portal run, same outcomes: first run 3 rows, new document made it 4 with the first 3 byte-identical, the edit and the rename were each skipped with the matching reason and no new model call |
 | Watched folder | 2026-08-14, `incremental-update` branch | An arriving file started a run by itself; a second file arriving during that run's review started nothing until the review finished |
 | Two projects at once | 2026-08-14, `reliability-proof` branch | Both runs live together — polled as `running` with a stage set, and two model calls started less than the 2-second call delay apart; rows, citations, decisions, findings and log lines each stayed with the run that produced them |
 | Same-project queue | 2026-08-14, `reliability-proof` branch | One waiting run across four requests; its batch held only the file that arrived after it was queued; it started by itself after a `done` run and after a `failed` one |

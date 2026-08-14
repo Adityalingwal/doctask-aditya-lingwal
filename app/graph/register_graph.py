@@ -41,10 +41,6 @@ from app.match.match_requirements import (
 from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
 from app.register.commit_register import commit_register
 from app.register.propose_rows import committed_rows, propose_rows
-from app.register.withdraw_rows import (
-    batch_reads_a_document_a_row_came_from,
-    propose_withdrawals,
-)
 from app.review.review_queue import ensure_export_decision, export_was_approved
 from app.run_logging import log_run_event
 from app.runs.finished_stages import record_stage_finished
@@ -80,16 +76,14 @@ CLOSE_WITHOUT_EXPORT_NODE = "close_without_export"
 
 SKIPPED_DOCUMENT_KIND = "document"
 NO_READABLE_FILE = (
-    "no new or changed file the system can read was waiting in the project "
-    "folder — add a document to it, or change one, and start another run."
+    "no new document the system can read was waiting in the project folder — "
+    "a document is read once, by name or content; add one this project has "
+    "never read, or save an edited document under a new name, and start "
+    "another run."
 )
 NOTHING_FOUND = (
     "no document in this batch reported a requirement that could be traced to "
     "its own words — nothing was proposed for the register."
-)
-REGISTER_UNCHANGED = (
-    "the register did not change by a single cell — every requirement in this "
-    "batch already had a row."
 )
 
 
@@ -99,10 +93,8 @@ class RunState(TypedDict, total=False):
     document_ids: list[str]
     next_document_index: int
     requirements_found: int
-    reads_a_row_source_again: bool
     examine_changed_rules: bool
     proposed_rows: int
-    withdrawals_proposed: int
     findings_raised: int
     ended_early_reason: str
     export_approved: bool
@@ -148,9 +140,6 @@ def build_register_graph(
                 page_limit,
             )
             await append_skipped(connection, run_id, batch.skipped)
-            reads_again = await batch_reads_a_document_a_row_came_from(
-                connection, run_id, project_id
-            )
             examine_changed_rules = (
                 not batch.document_ids
                 and bool(await committed_rows(connection, project_id))
@@ -172,7 +161,6 @@ def build_register_graph(
             "document_ids": [str(document_id) for document_id in batch.document_ids],
             "next_document_index": 0,
             "requirements_found": 0,
-            "reads_a_row_source_again": reads_again,
             "examine_changed_rules": examine_changed_rules,
         }
 
@@ -315,30 +303,18 @@ def build_register_graph(
                 requirements,
                 outcome_by_requirement,
             )
-            # After the proposals, so a row already under a possible-match
-            # question is not asked about twice.
-            withdrawn = await propose_withdrawals(
-                connection,
-                run_id,
-                project_id,
-                requirements,
-                outcome_by_requirement,
-            )
             await _finish_stage(connection, run_id, MATCH_STAGE)
 
         _log(
             logging.INFO,
             "match_finished",
-            f"Match proposed {len(proposed.proposed_row_ids)} row(s), asked the "
-            f"Delivery Owner about {len(proposed.gated_row_numbers)} and "
-            f"proposed withdrawing {len(withdrawn)}.",
+            f"Match proposed {len(proposed.proposed_row_ids)} row(s) and asked "
+            f"the Delivery Owner about {len(proposed.gated_row_numbers)}.",
             run_id,
             gated_rows=proposed.gated_row_numbers,
-            withdrawal_rows=withdrawn,
         )
         return {
             "proposed_rows": len(proposed.proposed_row_ids),
-            "withdrawals_proposed": len(withdrawn),
         }
 
     async def examine(state: RunState) -> dict[str, Any]:
@@ -461,7 +437,6 @@ def build_register_graph(
             run_id,
             committed_rows=result.committed_row_numbers,
             merged_rows=result.merged_row_numbers,
-            withdrawn_rows=result.withdrawn_row_numbers,
         )
         return {}
 
@@ -569,9 +544,8 @@ async def _settle_against_the_register(
 ) -> dict[int, tuple[str, int | None]]:
     """What Match says about each requirement this batch found.
 
-    A batch that found none is never sent to the model: there is nothing to
-    match, and it reached this stage only because a document it read again may
-    have stopped asking for something.
+    A batch that found none never reaches this stage: Extract routes on to
+    Match only when the batch found at least one requirement to match.
     """
     if not requirements:
         return {}
@@ -610,13 +584,13 @@ def _route_after_ingest(state: RunState) -> str:
 def _route_after_extract(state: RunState) -> str:
     if state["next_document_index"] < len(state["document_ids"]):
         return EXTRACT_NODE
-    if state.get("requirements_found") or state.get("reads_a_row_source_again"):
+    if state.get("requirements_found"):
         return MATCH_NODE
     return END_EARLY_NODE
 
 
 def _route_after_match(state: RunState) -> str:
-    if state.get("proposed_rows") or state.get("withdrawals_proposed"):
+    if state.get("proposed_rows"):
         return EXAMINE_NODE
     return END_EARLY_NODE
 
@@ -626,11 +600,14 @@ def _route_after_review(state: RunState) -> str:
 
 
 def _early_reason(state: RunState) -> str:
+    # Match is reached only when the batch found a requirement, and every
+    # requirement Match sees becomes a proposed row (app/register/propose_rows.py
+    # inserts one per requirement unconditionally) — so a run that reaches
+    # Match always has something to propose, and can only end early before it,
+    # for one of these two reasons.
     if not state.get("document_ids"):
         return NO_READABLE_FILE
-    if not state.get("requirements_found"):
-        return NOTHING_FOUND
-    return REGISTER_UNCHANGED
+    return NOTHING_FOUND
 
 
 def _resolve_folder(project_root: Path, project: dict[str, Any]) -> Path:

@@ -16,7 +16,7 @@ from tests.runs.application import PROJECT_ROOT, temporary_database
 
 
 BEFORE_THIS_SLICE = "20260813_0004"
-BEFORE_WITHDRAWAL = "20260813_0006"
+WITH_WITHDRAWAL = "20260814_0010"
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres@db:5432/register"
 POSTGRES_MAINTENANCE_DATABASE = "postgres"
@@ -94,7 +94,6 @@ EXPECTED_COLUMNS = {
         "question",
         "proposed_register_row_id",
         "candidate_register_row_id",
-        "source_document_id",
         "outcome",
         "decided_at",
     },
@@ -658,13 +657,22 @@ def test_register_row_refuses_status_outside_the_locked_set(
             )
 
 
-def test_a_downgrade_refuses_to_take_a_withdrawn_row_back_to_a_shape_without_it(
+def test_the_upgrade_removing_withdrawal_refuses_while_a_withdrawn_row_exists(
 ) -> None:
+    """20260814_0011 narrows the status check; a `Withdrawn` row must block it.
+
+    `Withdrawn` can no longer be inserted once 20260814_0011 has run (it is
+    outside `test_register_row_refuses_status_outside_the_locked_set`'s locked
+    set on purpose), so this drives the migration itself: land on the last
+    revision that still allows the status, write a row that holds it, then
+    upgrade to head and watch the migration refuse.
+    """
     with temporary_database() as database_url:
         alembic_config = Config(PROJECT_ROOT / "alembic.ini")
         alembic_config.set_main_option("sqlalchemy.url", database_url)
         engine = create_engine(database_url)
         try:
+            command.downgrade(alembic_config, WITH_WITHDRAWAL)
             with engine.begin() as connection:
                 project_id = _insert_project(connection)
                 run_id = _insert_run(connection, project_id)
@@ -673,7 +681,7 @@ def test_a_downgrade_refuses_to_take_a_withdrawn_row_back_to_a_shape_without_it(
                 )
 
             with pytest.raises(RuntimeError) as refused:
-                command.downgrade(alembic_config, BEFORE_WITHDRAWAL)
+                command.upgrade(alembic_config, "head")
 
             with engine.connect() as connection:
                 still_there = connection.execute(
@@ -682,8 +690,8 @@ def test_a_downgrade_refuses_to_take_a_withdrawn_row_back_to_a_shape_without_it(
         finally:
             engine.dispose()
 
-    # The older shape has no status that means withdrawn, and the row is never
-    # deleted, so the downgrade says what is in the way and what to do about it.
+    # The new schema has no status that means withdrawn, and the row is never
+    # deleted, so the migration says what is in the way and what to do about it.
     assert "1 register row(s) are 'Withdrawn'" in str(refused.value)
-    assert "change its status, then run this downgrade again" in str(refused.value)
+    assert "change its status, then run this migration again" in str(refused.value)
     assert still_there == ["Withdrawn"]
