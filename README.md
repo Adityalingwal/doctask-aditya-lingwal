@@ -168,6 +168,17 @@ docker compose up --build
 Open `http://localhost:8000/ui/`. Until `ui/dist` exists, `/ui` answers `503`
 with the build command above rather than a bare `404`.
 
+A first-time user, or any database with no runs yet, sees a form instead of
+"choose a run from the list beside this": a project name, the folder its
+documents arrive in, and a **Start run** button. It validates nothing itself
+— an empty name, a blank folder, or a folder that does not exist are all sent
+to the server as typed, and whatever it refuses with (`create_project`'s or
+`start_run`'s own sentence) is shown unchanged. The folder is read inside the
+application's container, so only a path inside the repository exists as far
+as it is concerned; `sample-projects/northside-dental` is a real example. The
+form is gone again once the first run exists — a second project still needs
+`POST /projects` by hand or the `create_project` MCP tool below.
+
 The viewport is split. Down the left is the list of runs: each card names the
 project, when the run started, which stages finished and what is still waiting,
 and opening one writes it into the address as `/ui/?run=<run id>`, so a link to
@@ -203,7 +214,7 @@ Its own tests run without Docker and without a key:
 npm --prefix ui test
 ```
 
-Last verified on the `finished-stages-and-list-runs` branch: **20 passed**.
+Last verified on the `start-a-run-from-the-screen` branch: **25 passed**.
 
 ## Drive it from a machine
 
@@ -317,6 +328,11 @@ the next run and never to one already under way or already finished. Point
 - The development Compose file bind-mounts the worktree, which exposes local
   `.env` and lets local files override the image; this is retained for
   iteration and is not yet removed for final image-only verification.
+- The screen's start-a-run form reads a folder inside the application's
+  container, whose only mount is `.:/workspace`, so a path outside the
+  repository does not exist as far as it is concerned and is refused.
+- The start-a-run form is gone once the first run exists; a second project
+  needs `POST /projects` by hand or the `create_project` MCP tool.
 
 ## Project truth
 

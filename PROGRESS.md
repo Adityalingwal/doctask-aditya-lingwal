@@ -50,6 +50,17 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - Timing and cost are gone from the screen and, on the
   `finished-stages-and-list-runs` branch, from the rest of the application
   too (D16).
+- **2026-08-15, branch `start-a-run-from-the-screen`:** the screen can now
+  start a run. A `StartRun` form (project name, source folder, `Start run`)
+  renders once `GET /runs` has answered with zero runs; it validates nothing
+  and shows the server's own refusal unchanged. A retry after a failed
+  `POST /runs` never repeats `POST /projects` (`projects.name` has no unique
+  constraint). Hand-driven against the application: an empty database showed
+  the form, a missing folder and a blank name were each refused word for
+  word, and a real folder created its project while the environment's
+  missing `OPENROUTER_API_KEY` refused the run start — a second click did
+  not create a second project. 25 front-end tests (was 20) and 129 Python
+  tests (unchanged) pass without a live key.
 
 ## Completed
 
@@ -318,6 +329,13 @@ working claim only after its own implementation and proof land.
   `docker compose up`; the bind mount is what carries it into the container.
   Image-only serving is part of the open fresh-clone verification.
 - The screen authenticates nobody, exactly as the endpoints behind it do not.
+- The screen's start-a-run form (2026-08-15) reads a folder inside the
+  application's container, whose only mount is `.:/workspace`, so a path
+  outside the repository is refused by `create_project`; this is deliberate,
+  not fixed by widening the mount (`docker-compose.yml` is untouched).
+- The start-a-run form disappears once the first run exists, because L1's
+  condition is a run list of exactly zero; a second project needs
+  `POST /projects` by hand or the `create_project` MCP tool.
 - A reported embedded instruction reaches a person only through the run's log
   line: `GET /runs/{id}` does not carry it, and neither does the export. D02
   scenario 9 makes it information rather than a gate, and there is currently no
@@ -348,7 +366,9 @@ working claim only after its own implementation and proof land.
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
 | `docker compose -p finished-stages run --rm app pytest` | 2026-08-14, `finished-stages-and-list-runs` branch | 129 passed, no live key |
+| `docker compose -p start-a-run run --rm app pytest` | 2026-08-15, `start-a-run-from-the-screen` branch | 129 passed, no live key — no Python changed, run to confirm nothing broke |
 | `npm --prefix ui test` | 2026-08-14, `finished-stages-and-list-runs` branch | 20 passed, 8 files, no live key. Two new files cover the stage-strip precedence fix and the null-`started_at` fix |
+| `npm --prefix ui test` | 2026-08-15, `start-a-run-from-the-screen` branch | 25 passed, 12 files, no live key. Four new files cover L1, L3, L4 and L5 for the start-a-run form; all four were written and run against the baseline first |
 | Review screen run | 2026-08-14, `react-review-screen` branch | One run driven through `/ui` in a browser: three gates answered one at a time, one finding approved and one rejected, the review finished, and the exported register read back with its citations and the approved finding only |
 | Review screen polling | 2026-08-14, `react-review-screen` branch | A second run watched from `running`/`match` through to its recorded failure without a reload; Finish review was never offered and no register was shown |
 | Kill-and-resume | Slice 1 | Real child process + `SIGKILL`; completed extraction not repeated |
@@ -367,6 +387,8 @@ working claim only after its own implementation and proof land.
 | Redesigned screen | 2026-08-14, `review-screen-redesign` branch | Four demo runs driven through it in a browser — at review, working, failed, exported — with gates answered and the accent clearing as they were. Against `ui/demo/` only; the screen has not been driven against the application since the redesign |
 | Rules-only run reports no Extract/Match | 2026-08-14, `finished-stages-and-list-runs` branch | A second run on a project whose rules changed and no document arrived: `finished_stages` read `["ingest", "examine"]` mid-review and `["ingest", "examine", "review", "commit"]` once done — never `extract` or `match` |
 | `GET /runs` and `list_runs` identical | 2026-08-14, `finished-stages-and-list-runs` branch | One run driven to Review; `GET /runs` and the MCP tool `list_runs` returned byte-identical payloads |
+| Start-a-run form | 2026-08-15, `start-a-run-from-the-screen` branch | Hand-driven in a browser against the application: an empty database showed the form; a folder that does not exist and a blank name were each refused with `create_project`'s own sentence, word for word, and nothing was created; a real folder (`sample-projects/northside-dental`) created its project (`POST /projects` 201) while the environment's empty `OPENROUTER_API_KEY` refused the run start (`POST /runs` 503); a second click retried only `POST /runs` — the `projects` table held exactly one row for it throughout. A run could not be watched through Ingest onward this way, because there is no live model key here |
+| Demo runs after this change | 2026-08-15, `start-a-run-from-the-screen` branch | `npm --prefix ui run dev`, all four demo runs (`demo-review`, `demo-running`, `demo-failed`, `demo-exported`) still listed and opened correctly; `ui/demo/serve_demo_runs.js` was not changed — it has no write path for `POST /projects` or `POST /runs`, but its run list is never empty, so the start-a-run form never renders against it and the gap does not show |
 | Live model | Never | Unverified |
 | Fresh clone/image-only | Not run yet | Open release gate |
 

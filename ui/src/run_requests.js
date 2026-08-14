@@ -6,6 +6,17 @@ export async function readRuns() {
   return await ask("GET", "/runs");
 }
 
+export async function createProject(name, sourceFolderPath) {
+  return await ask("POST", "/projects", {
+    name,
+    source_folder_path: sourceFolderPath,
+  });
+}
+
+export async function startRun(projectId) {
+  return await ask("POST", "/runs", { project_id: projectId });
+}
+
 export async function readRun(runId) {
   return await ask("GET", `/runs/${encodeURIComponent(runId)}`);
 }
