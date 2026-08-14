@@ -8,6 +8,55 @@ actions live in root `PROGRESS.md`; the exact byte-for-byte source is
 
 New completed entries are added newest-first below this header.
 
+**2026-08-14.** Built `runs.finished_stages`, removed timing and cost from the
+application in full, and built `GET /runs` plus its MCP tool `list_runs`, on
+`finished-stages-and-list-runs`, cut from `main` at `d4c9eab`. Written before
+any implementation: the brief's six Python and two front-end never-do tests,
+run at that baseline. Five of the six Python tests share one file and failed
+together on the whole `app.runs.finished_stages` module not existing; the
+sixth failed because `GET /runs` answered `405` and `list_runs` was an unknown
+tool. Of the front end's cases, five passed as regression guards and four
+failed, one of them reproducing the literal "1 Jan" bug `new Date(null)`
+causes for a run with no `started_at`. Built: migration `20260814_0010`, which
+drops `stage_timings`, `token_usage`, `estimated_cost_usd` and
+`cost_unknown_reason` and adds `runs.finished_stages`, a jsonb object keyed by
+stage name and written with the same `||` merge the dropped column used, so a
+re-entered node overwrites its own key; `app/runs/finished_stages.py`, which
+replaces the deleted `app/runs/cost_and_timing.py` with one function that
+records a stage's mark and one that reads it back as an ordered list of stage
+names; Review's finished mark moved to the second of its two call sites in
+`app/graph/register_graph.py`, after `review_finished_at` is set, so a run
+still waiting for the Delivery Owner is never reported finished; the whole
+token-usage chain removed — `ReportedUsage`/`ModelAnswer` out of
+`call_the_model.py`, `CostRates`/`read_cost_rates` out of `client.py`, and the
+three model-boundary functions (`read_one_document`, `match_requirements`,
+`examine_register`) now return just their answer; and `app/runs/list_runs.py`,
+one core function both `GET /runs` and `list_runs` call, returning
+`{"runs": [...]}`, newest first, no cap, `started_at` sent as `null` rather
+than substituted with `created_at`. On the screen: `Stages.jsx`'s precedence
+fixed so the run's own stage wins over a reported "done" only while the run is
+active, and `RunList.jsx` gets an explicit `started_at === null` check ahead of
+`new Date(...)`. `tests/runs/test_timing_and_cost.py` and one column-reading
+test in `test_schema.py` were deleted outright, and two pre-existing tests
+that hardcoded a stale six-tool MCP count were found by a repository grep and
+updated to seven. Proof: 129 Python tests and 20 front-end tests passed, no
+live API key.
+
+**The timing-and-cost verification this replaces**, kept here as the historical
+record now that the behaviour itself is gone: two documents through export —
+ingest 0.005s, extract 0.005s, match 0.006s, examine 0.003s, review 0.206s,
+commit 0.011s, total 0.236s; 4 calls reported 4,400 prompt and 570 completion
+tokens, estimated 0.002672 USD (Intake portal, `operations-timing-cost`
+branch, 2026-08-14). Three documents (`.md`, `.docx`, `.pdf`) through export —
+ingest 0.029s, extract 0.011s, match 0.008s, examine 0.004s, review 0.152s,
+commit 0.013s, total 0.217s; 5 calls reported 5,600 prompt and 750 completion
+tokens, estimated 0.003440 USD (Northside Dental, same branch and date). A run
+killed inside Extract with the third document's call in flight, resumed, asked
+about that document twice and still reported one `extract` entry, 5 calls
+reporting usage and 550 prompt tokens, not 650 (Kill and resume, not doubled,
+same branch and date). All three used the scripted client, so every figure was
+arithmetic over fixture tokens, never a measured provider charge.
+
 **2026-08-14.** Built the reliability slice on `reliability-proof`, cut from
 `main` at `bb24476`. Written before anything else: the five never-do tests, run
 at that baseline. All five passed there, so this slice added no production code

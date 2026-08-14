@@ -595,12 +595,13 @@ Eight domain tables: `projects`, `runs`, `documents`, `register_rows`,
 checkpoint tables in the same PostgreSQL. Alembic migrations exist from the
 first table.
 
-Six slice-1 API endpoints:
+Seven slice-1 API endpoints:
 
 | Endpoint | Job |
 |---|---|
 | `POST /projects` | Create project from name + source folder |
 | `POST /runs` | Start/queue run by project id; return immediately |
+| `GET /runs` | Every run, newest first: project, status, start time, waiting decisions, finished stages |
 | `GET /runs/{id}` | Durable status, stage, skips, failure, decisions |
 | `POST /runs/{id}/decisions` | Answer one decision UUID |
 | `POST /runs/{id}/finish-review` | Validate/claim review completion |
@@ -612,8 +613,9 @@ slice-1 scope.
 
 ### D15 — MCP and React
 
-- MCP mirrors the six endpoints 1:1: `create_project`, `start_run`,
-  `get_run_status`, `submit_decision`, `finish_review`, `get_export`.
+- MCP mirrors the seven endpoints 1:1: `create_project`, `start_run`,
+  `list_runs`, `get_run_status`, `submit_decision`, `finish_review`,
+  `get_export`.
 - It mounts in the FastAPI process at `/mcp` and calls the same core functions
   the endpoints call. Existence checks, refusals and the shape a caller is told
   live in core, so a door decides only how to carry a refusal, never what it
@@ -632,6 +634,12 @@ slice-1 scope.
   Section tabs carry `role="tab"`, not the button role, because choosing what to
   read is navigation — the only actions on a run stay Approve, Reject and
   Finish review.
+- **The stage strip's own stage wins over "done" only while the run is active**
+  (`running` or `waiting for review`). Extract writes its finished mark after
+  every document, not just the last one, so a batch's own stage can read
+  "finished" before the batch is done; the run's current stage overrides that
+  reading while the run is still working, but a `done`, `failed`, or otherwise
+  terminal run shows its last stage as `done`, not stuck "working" forever.
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
 - The screen reads `GET /runs/{id}` on a poll whose interval is
@@ -652,18 +660,18 @@ slice-1 scope.
   bare `404`.
 - **Status:** MCP **implemented and verified** — `tests/interfaces/test_mcp_tools.py`
   and `tests/interfaces/test_mcp_flow.py`, plus one run driven through the tools by hand.
-  React is **implemented, proof pending** for the redesigned screen: eleven
+  React is **implemented, proof pending** for the redesigned screen: twenty
   Vitest cases in `ui/tests/` and the two route cases in
   `tests/interfaces/test_review_screen_route.py` pass, but the screen has only been driven
   against `ui/demo/`, never against the application since the redesign. Layout
   and visual treatment are no longer open. Answering one decision at a time is
   locked in D02, and the screen must not offer any approve-all or batch-submit
   affordance.
-- **Limitation, and the next piece of work:** the run list reads `GET /runs`,
-  **which the application does not serve.** Only the dev-only middleware in
-  `ui/demo/` answers it, and against the real application the column shows the
-  server's refusal rather than an invented or empty list. Building that endpoint
-  and its MCP tool is pending.
+- `GET /runs` and `list_runs` are built, both calling `app/runs/list_runs.py`'s
+  one core function: every run, newest first, no cap, each carrying its
+  project name, status, `started_at` (`null` for a run that has not started
+  — never substituted with `created_at`), the count of unanswered decisions,
+  and `finished_stages` as an ordered list of stage names.
 - Limitation: `GET /runs/{id}` carries no register rows, so the register
   section is empty until the run has exported.
 - Limitation: the tools inherit the HTTP surface's lack of authentication, and
@@ -673,57 +681,36 @@ slice-1 scope.
 
 ## Operations
 
-### D16 — logging, and the dropped timing and cost
+### D16 — logging
 
 - JSON-line stdout logs; every run event carries `run_id`. Log stage start/end,
   path-changing decisions, retries, and failures. Never log secrets or full
-  document text. Each stage-finished line now also carries its `seconds`, and a
-  stage that called the model carries that call's token counts.
-- Each stage records duration; run reports stage breakdown and total.
-- Estimated cost = model-reported tokens × configured rates, clearly labelled
-  estimate rather than bill.
-- **Timing and usage are keyed, never accumulated.** `runs.stage_timings` and
-  `runs.token_usage` are objects keyed by the unit of work — the stage name,
-  and `extract:<document_id>` for the per-document Extract pass. A node that
-  re-enters after a kill (D12) overwrites its own key, so a resumed run cannot
-  double a duration or a token count. The duration is written where the pass
-  ends, so a killed pass leaves no half entry behind.
-- **Review is timed on the database's clock.** Its node is interrupted and
-  replayed, possibly by a second process, so no in-process clock spans it: the
-  entry stores `started_at` when Review begins and its duration is computed
-  from `review_finished_at`, which makes a replayed node write the same number.
-- **An unknown cost is null, never zero.** Migration `20260814_0009` makes
-  `estimated_cost_usd` nullable and adds `token_usage` and
-  `cost_unknown_reason`, because the old `NOT NULL DEFAULT 0` could not tell a
-  cost of zero from a cost nobody could estimate. A run whose calls reported no
-  token count, or whose model has no configured rate, reports the reason
-  instead of a figure.
-- **Rates are read at startup with the rest of `config/model.yaml`**, so a rate
-  edit applies to runs started after a restart; a missing or unusable rate
-  makes the estimate unknown and names the file, rather than stopping the run.
-- **Dropped, 2026-08-14 — timing and cost are being removed, not kept.** The
-  behaviour costs a column set, a migration, a module, a test file and a section
-  of screen, and returns a figure that was never a provider charge. This phase
-  cuts scope rather than adds, so it goes. Logging stays; only the `seconds` and
-  token fields on those lines go with it.
-- **Removed so far:** the whole Cost and timing section of the review screen,
-  its tab, the per-stage durations in the stage strip, and
-  `ui/tests/never_shows_a_cost_that_is_not_an_estimate.test.jsx`. The screen
-  makes no claim about time or money.
-- **Still to remove, as one piece of work:** `app/runs/cost_and_timing.py`,
-  `tests/runs/test_timing_and_cost.py`, the `runs.stage_timings`,
-  `runs.token_usage`, `runs.estimated_cost_usd` and `runs.cost_unknown_reason`
-  columns with a migration that drops them, the `usage_metadata` read in
-  `app/model/call_the_model.py`, the `seconds=` fields on the graph's log lines,
-  `rates_usd_per_token` in `config/model.yaml`, and this section.
-- **The one dependency to settle first.** Which stages a run finished is read
-  out of `stage_timings` today — by the stage strip and by the run list. The run
-  needs its own `finished_stages`, written where the duration is written now and
-  keyed the same way, so a node that re-enters after a kill (D12) overwrites its
-  own key instead of adding a second one. Deriving it from `runs.stage` instead
-  would be wrong: on the rules-only route Extract and Match never run, and the
-  screen would call them finished.
-- **Status:** **Removed from the screen; still present in the application.**
+  document text.
+- **Timing and cost are dropped, not deferred (2026-08-14).** They cost a
+  column set, a migration, a module, a test file and a section of screen, and
+  returned a figure that was never a provider charge. Nothing in the
+  application any longer records a duration, a token count or a cost, on a
+  log line or anywhere else — this phase cut that scope rather than adding to
+  it. `app/runs/cost_and_timing.py`, `tests/runs/test_timing_and_cost.py`,
+  the `runs.stage_timings`, `runs.token_usage`, `runs.estimated_cost_usd` and
+  `runs.cost_unknown_reason` columns (migration `20260814_0010`), the
+  `usage_metadata` read in `app/model/call_the_model.py`, and
+  `rates_usd_per_token` in `config/model.yaml` are all gone. History in
+  `documentation/decision-history.md`.
+- **What replaced it: `runs.finished_stages`.** A jsonb object keyed by stage
+  name only (`{"ingest": true, "extract": true, ...}`), written where each
+  stage's pass ends with the same `||` merge the dropped `stage_timings` used,
+  so a node that re-enters after a kill (D12) overwrites its own key instead
+  of adding a second one. `read_run_status` and `GET /runs`/`list_runs` both
+  report it as an ordered list of stage names
+  (`app/runs/finished_stages.py:ordered_finished_stages`), never the keyed
+  object and never the keys unordered.
+- **Why not derive it from `runs.stage` instead:** on the rules-only route
+  Ingest goes straight to Examine, so Extract and Match never execute; reading
+  the answer off `runs.stage` alone would call them finished the moment the
+  run reached a later stage. `finished_stages` records only what actually ran.
+- **Status:** Complete. Logging is JSON-line stdout with `run_id` on every
+  event; no timing, cost, or usage data exists anywhere in the application.
 
 ## Delivery plan and proof
 
@@ -845,7 +832,7 @@ ideas from resurfacing without duplicating their full prose here.
 | Five register statuses | D05 seven statuses including `No evidence yet` and `Withdrawn` |
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
-| Five API endpoints | D14 six endpoints including project creation |
+| Five/six API endpoints | D14 seven endpoints including `GET /runs` |
 | `done` as generic terminal state | D13 honest `failed`/`ended without changes`/`closed without export` |
 | Status-only already-read check | D03 extraction + export/unrelated/no-requirement rule |
 | Unmarked emptied merge proposal | D09 `merged_into_register_row_id` |
