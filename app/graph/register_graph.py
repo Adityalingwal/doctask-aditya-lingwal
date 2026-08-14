@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TypedDict
@@ -39,6 +40,8 @@ from app.match.match_requirements import (
     match_requirements,
 )
 from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
+from app.model.call_the_model import ReportedUsage
+from app.model.client import CostRates
 from app.register.commit_register import commit_register
 from app.register.propose_rows import committed_rows, propose_rows
 from app.register.withdraw_rows import (
@@ -47,6 +50,14 @@ from app.register.withdraw_rows import (
 )
 from app.review.review_queue import ensure_export_decision, export_was_approved
 from app.run_logging import log_run_event
+from app.runs.cost_and_timing import (
+    SECONDS_PLACES,
+    extract_key,
+    record_model_usage,
+    record_review_duration,
+    record_stage_duration,
+    start_review_timing,
+)
 from app.runs.run_records import (
     append_skipped,
     enter_stage,
@@ -115,12 +126,14 @@ def build_register_graph(
     accepted_extensions: frozenset[str],
     page_limit: int,
     rules_config_path: Path,
+    cost_rates: CostRates,
 ) -> CompiledStateGraph:
     """Wire the six pipeline stages, with everything they need passed in."""
 
     async def ingest(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
         project_id = UUID(state["project_id"])
+        started = time.monotonic()
         async with pool.connection() as connection:
             await enter_stage(connection, run_id, INGEST_STAGE)
             # Frozen before a single document is read, so that everything
@@ -135,6 +148,9 @@ def build_register_graph(
                     "on the project, then start another run."
                 )
                 _log(logging.ERROR, "ingest_folder_missing", reason, run_id)
+                await _finish_stage(
+                    connection, run_id, INGEST_STAGE, INGEST_STAGE, started
+                )
                 return {"document_ids": [], "ended_early_reason": reason}
 
             batch = await collect_batch(
@@ -156,6 +172,9 @@ def build_register_graph(
                     connection, run_id, project_id
                 )
             )
+            seconds = await _finish_stage(
+                connection, run_id, INGEST_STAGE, INGEST_STAGE, started
+            )
 
         _log(
             logging.INFO,
@@ -164,6 +183,7 @@ def build_register_graph(
             f"and skipped {len(batch.skipped)}.",
             run_id,
             skipped=batch.skipped,
+            seconds=seconds,
         )
         return {
             "document_ids": [str(document_id) for document_id in batch.document_ids],
@@ -177,6 +197,10 @@ def build_register_graph(
         run_id = UUID(state["run_id"])
         index = state["next_document_index"]
         document_id = UUID(state["document_ids"][index])
+        started = time.monotonic()
+        # This document's own key, so the pass that reads it again after a kill
+        # replaces what the killed pass recorded rather than adding to it.
+        this_document = extract_key(document_id)
 
         async with pool.connection() as connection:
             await enter_stage(connection, run_id, EXTRACT_STAGE)
@@ -188,7 +212,7 @@ def build_register_graph(
 
         source_file = document["source_path"]
         try:
-            answer = await read_one_document(
+            answer, usage = await read_one_document(
                 model_client, source_file, document["extracted_text"]
             )
         except UnrecognisedDocumentType as unrecognised:
@@ -210,6 +234,9 @@ def build_register_graph(
                             "reason": reason,
                         }
                     ],
+                )
+                await _finish_stage(
+                    connection, run_id, this_document, EXTRACT_STAGE, started
                 )
             return {"next_document_index": index + 1}
         except Exception as error:
@@ -235,6 +262,9 @@ def build_register_graph(
                             "reason": reason,
                         }
                     ],
+                )
+                await _finish_stage(
+                    connection, run_id, this_document, EXTRACT_STAGE, started
                 )
             return {"next_document_index": index + 1}
 
@@ -264,6 +294,12 @@ def build_register_graph(
                 (Jsonb(located.extraction), document_id),
             )
             await append_skipped(connection, run_id, skipped)
+            await record_model_usage(
+                connection, run_id, this_document, EXTRACT_STAGE, usage, cost_rates
+            )
+            seconds = await _finish_stage(
+                connection, run_id, this_document, EXTRACT_STAGE, started
+            )
 
         for instruction in located.extraction["embedded_instructions"]:
             _log(
@@ -282,6 +318,9 @@ def build_register_graph(
             run_id,
             document_type=answer.document_type.value,
             dropped=len(located.dropped),
+            seconds=seconds,
+            prompt_tokens=usage.prompt_tokens,
+            completion_tokens=usage.completion_tokens,
         )
         return {
             "next_document_index": index + 1,
@@ -292,12 +331,13 @@ def build_register_graph(
     async def match(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
         project_id = UUID(state["project_id"])
+        started = time.monotonic()
         async with pool.connection() as connection:
             await enter_stage(connection, run_id, MATCH_STAGE)
             requirements = await _requirements_of_batch(connection, run_id)
             register = await committed_rows(connection, project_id)
 
-        outcome_by_requirement = await _settle_against_the_register(
+        outcome_by_requirement, usage = await _settle_against_the_register(
             model_client, register, requirements
         )
 
@@ -318,6 +358,13 @@ def build_register_graph(
                 requirements,
                 outcome_by_requirement,
             )
+            if usage is not None:
+                await record_model_usage(
+                    connection, run_id, MATCH_STAGE, MATCH_STAGE, usage, cost_rates
+                )
+            seconds = await _finish_stage(
+                connection, run_id, MATCH_STAGE, MATCH_STAGE, started
+            )
 
         _log(
             logging.INFO,
@@ -328,6 +375,9 @@ def build_register_graph(
             run_id,
             gated_rows=proposed.gated_row_numbers,
             withdrawal_rows=withdrawn,
+            seconds=seconds,
+            prompt_tokens=None if usage is None else usage.prompt_tokens,
+            completion_tokens=None if usage is None else usage.completion_tokens,
         )
         return {
             "proposed_rows": len(proposed.proposed_row_ids),
@@ -337,13 +387,14 @@ def build_register_graph(
     async def examine(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
         project_id = UUID(state["project_id"])
+        started = time.monotonic()
         async with pool.connection() as connection:
             await enter_stage(connection, run_id, EXAMINE_STAGE)
             rules = await frozen_rules_of_run(connection, run_id)
             rows = await register_under_examination(connection, project_id, run_id)
 
         try:
-            found = await examine_register(model_client, rules, rows)
+            found, usage = await examine_register(model_client, rules, rows)
         except UnusableExamineAnswer:
             raise  # it already names its own cause and fix
         except Exception as error:
@@ -364,6 +415,12 @@ def build_register_graph(
                 "UPDATE runs SET examined_row_count = %s WHERE id = %s",
                 (len(rows), run_id),
             )
+            await record_model_usage(
+                connection, run_id, EXAMINE_STAGE, EXAMINE_STAGE, usage, cost_rates
+            )
+            seconds = await _finish_stage(
+                connection, run_id, EXAMINE_STAGE, EXAMINE_STAGE, started
+            )
 
         _log(
             logging.INFO,
@@ -374,6 +431,9 @@ def build_register_graph(
             run_id,
             rules_that_ran=[rule["id"] for rule in rules]
             + [check["id"] for check in DELIVERABLE_CHECKS],
+            seconds=seconds,
+            prompt_tokens=usage.prompt_tokens,
+            completion_tokens=usage.completion_tokens,
         )
         return {"findings_raised": len(found)}
 
@@ -402,6 +462,7 @@ def build_register_graph(
                 )
                 await enter_stage(connection, run_id, REVIEW_STAGE)
                 await set_run_status(connection, run_id, WAITING_FOR_REVIEW)
+                await start_review_timing(connection, run_id)
 
             _log(
                 logging.INFO,
@@ -415,6 +476,10 @@ def build_register_graph(
         async with pool.connection() as connection:
             await set_run_status(connection, run_id, RUNNING)
             approved = await export_was_approved(connection, run_id)
+            # From the two durable timestamps, so a replayed Review node writes
+            # the same wait it wrote before rather than a second, longer one.
+            await record_review_duration(connection, run_id)
+
         _log(
             logging.INFO,
             "review_finished",
@@ -426,6 +491,7 @@ def build_register_graph(
     async def commit(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
         project_id = UUID(state["project_id"])
+        started = time.monotonic()
         async with pool.connection() as connection:
             project = await read_project(connection, project_id)
             async with connection.transaction():
@@ -437,6 +503,9 @@ def build_register_graph(
                     datetime.now(timezone.utc).isoformat(),
                 )
                 await set_run_status(connection, run_id, DONE)
+            seconds = await _finish_stage(
+                connection, run_id, COMMIT_STAGE, COMMIT_STAGE, started
+            )
 
         _log(
             logging.INFO,
@@ -447,6 +516,7 @@ def build_register_graph(
             committed_rows=result.committed_row_numbers,
             merged_rows=result.merged_row_numbers,
             withdrawn_rows=result.withdrawn_row_numbers,
+            seconds=seconds,
         )
         return {}
 
@@ -533,21 +603,39 @@ def build_register_graph(
     return graph.compile(checkpointer=checkpointer)
 
 
+async def _finish_stage(
+    connection: AsyncConnection,
+    run_id: UUID,
+    key: str,
+    stage: str,
+    started: float,
+) -> float:
+    """Write one pass of one stage's duration where that pass ends.
+
+    Written at the end rather than accumulated, so a stage killed part way
+    leaves no half duration for a resumed pass to add to, and keyed so a
+    re-entered node replaces its own entry instead of writing a second one.
+    """
+    seconds = time.monotonic() - started
+    await record_stage_duration(connection, run_id, key, stage, seconds)
+    return round(seconds, SECONDS_PLACES)
+
+
 async def _settle_against_the_register(
     model_client: BaseChatModel,
     register: list[dict[str, Any]],
     requirements: list[dict[str, Any]],
-) -> dict[int, tuple[str, int | None]]:
+) -> tuple[dict[int, tuple[str, int | None]], ReportedUsage | None]:
     """What Match says about each requirement this batch found.
 
     A batch that found none is never sent to the model: there is nothing to
     match, and it reached this stage only because a document it read again may
-    have stopped asking for something.
+    have stopped asking for something. No call means no usage to report.
     """
     if not requirements:
-        return {}
+        return {}, None
     try:
-        answer = await match_requirements(model_client, register, requirements)
+        answer, usage = await match_requirements(model_client, register, requirements)
     except IncompleteMatchAnswer:
         raise  # it already names its own cause and fix
     except Exception as error:
@@ -567,7 +655,7 @@ async def _settle_against_the_register(
             outcome.row_number,
         )
         for outcome in answer.outcomes
-    }
+    }, usage
 
 
 def _route_after_ingest(state: RunState) -> str:

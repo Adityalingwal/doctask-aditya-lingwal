@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -52,6 +51,8 @@ EXPECTED_COLUMNS = {
         "rules_snapshot",
         "rules_fingerprint",
         "examined_row_count",
+        "token_usage",
+        "cost_unknown_reason",
         "created_at",
     },
     "documents": {
@@ -661,16 +662,20 @@ def test_register_row_refuses_status_outside_the_locked_set(
             )
 
 
-def test_new_run_cost_defaults_to_zero(database_connection: Connection) -> None:
+def test_a_new_run_holds_no_cost_until_one_is_estimated(
+    database_connection: Connection,
+) -> None:
+    """A zero cannot be told from a cost nobody could estimate; null can."""
     project_id = _insert_project(database_connection)
     run_id = _insert_run(database_connection, project_id)
 
-    estimated_cost = database_connection.execute(
-        text("SELECT estimated_cost_usd FROM runs WHERE id = :id"),
+    estimated_cost, token_usage = database_connection.execute(
+        text("SELECT estimated_cost_usd, token_usage FROM runs WHERE id = :id"),
         {"id": run_id},
-    ).scalar_one()
+    ).one()
 
-    assert estimated_cost == Decimal("0")
+    assert estimated_cost is None
+    assert token_usage == {}
 
 
 def test_a_downgrade_refuses_to_take_a_withdrawn_row_back_to_a_shape_without_it(

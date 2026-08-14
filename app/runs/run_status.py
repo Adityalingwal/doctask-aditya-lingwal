@@ -7,6 +7,7 @@ from psycopg import AsyncConnection
 
 from app.examine.read_findings import examine_under_review
 from app.review.review_queue import decisions_of_run
+from app.runs.cost_and_timing import cost_and_timing_of_run
 from app.runs.run_records import require_run
 
 
@@ -35,5 +36,6 @@ async def read_run_status(
             for decision in decisions
         ],
         "examine": await examine_under_review(connection, run),
+        "cost_and_timing": cost_and_timing_of_run(run),
         "exported": run["export_json"] is not None,
     }

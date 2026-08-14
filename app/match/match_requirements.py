@@ -8,6 +8,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from app.extract.answer import json_object_in
+from app.model.call_the_model import ReportedUsage, call_the_model
 
 
 NEW_ROW = "new row"
@@ -64,11 +65,13 @@ async def match_requirements(
     model_client: BaseChatModel,
     register_rows: list[dict[str, Any]],
     requirements: list[dict[str, Any]],
-) -> MatchAnswer:
-    reply = await model_client.ainvoke(_match_prompt(register_rows, requirements))
-    answer = MatchAnswer.model_validate_json(json_object_in(str(reply.content)))
+) -> tuple[MatchAnswer, ReportedUsage]:
+    answered = await call_the_model(
+        model_client, _match_prompt(register_rows, requirements)
+    )
+    answer = MatchAnswer.model_validate_json(json_object_in(answered.text))
     _refuse_an_incomplete_answer(answer, len(requirements))
-    return answer
+    return answer, answered.usage
 
 
 def _refuse_an_incomplete_answer(answer: MatchAnswer, asked_about: int) -> None:
