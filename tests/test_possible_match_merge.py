@@ -22,7 +22,7 @@ from register_documents import (
     no_findings_answer,
     write_meeting_note,
 )
-from test_examine_findings import examine_answer, one_finding
+from examine_answers import examine_answer, one_finding
 
 
 FIRST_FILE = "meeting-note.md"

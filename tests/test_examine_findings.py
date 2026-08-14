@@ -27,6 +27,7 @@ from conftest import (
     wait_until,
     write_script,
 )
+from examine_answers import R1_ISSUE, examine_answer, one_finding
 from register_documents import (
     extract_marker,
     extraction_answer,
@@ -44,11 +45,6 @@ DELIVERABLE_CHECKS = ("D1", "D2")
 # params, so reporting the text alone never says which limit a run was judged
 # against.
 R3_MAX_DAYS = 14
-R1_ISSUE = (
-    "The register row rests on a meeting note; no client requirements document "
-    "read for this project states it in writing."
-)
-R1_EVIDENCE = "Row #1 cites meeting-note.md only."
 
 TWO_RULES = """\
 rules:
@@ -73,24 +69,6 @@ rules:
   - id: R5
     text: "Every requirement names the person who asked for it."
 """
-
-
-def examine_answer(findings: list[dict[str, Any]]) -> dict[str, Any]:
-    return {"findings": findings}
-
-
-def one_finding(
-    rule_id: str = "R1",
-    row_number: int = 1,
-    issue: str = R1_ISSUE,
-    evidence: str = R1_EVIDENCE,
-) -> dict[str, Any]:
-    return {
-        "rule_id": rule_id,
-        "row_number": row_number,
-        "issue": issue,
-        "evidence": evidence,
-    }
 
 
 @contextmanager
