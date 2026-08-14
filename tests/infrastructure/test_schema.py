@@ -12,10 +12,9 @@ from sqlalchemy import Connection, Engine, create_engine, inspect, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import IntegrityError
 
-from tests.runs.application import temporary_database
+from tests.runs.application import PROJECT_ROOT, temporary_database
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BEFORE_THIS_SLICE = "20260813_0004"
 BEFORE_WITHDRAWAL = "20260813_0006"
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"

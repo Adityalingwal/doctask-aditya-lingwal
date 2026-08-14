@@ -17,10 +17,9 @@ from app.examine.frozen_rules import (
     load_rules,
 )
 from app.runs.statuses import RUNNING
-from tests.runs.application import temporary_database
+from tests.runs.application import PROJECT_ROOT, temporary_database
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SHIPPED_RULES_FILE = PROJECT_ROOT / "config" / "rules.yaml"
 
 PLAIN_RULES = """\

@@ -17,11 +17,11 @@ from app.model.client import (
     build_model_client,
 )
 from app.model.scripted_client import SCRIPT_PATH_ENVIRONMENT_VARIABLE
-from tests.runs.application import write_script
+from tests.runs.application import PROJECT_ROOT, write_script
 from tests.documents.register_documents import examine_marker
 
 
-MODEL_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "model.yaml"
+MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 FROZEN_RULES = [
     {
         "id": "R1",

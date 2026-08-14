@@ -16,6 +16,7 @@ from app.model.client import (
 from app.model.scripted_client import SCRIPT_PATH_ENVIRONMENT_VARIABLE
 from tests.runs.application import (
     ApplicationProcess,
+    PROJECT_ROOT,
     temporary_database,
     wait_for_run_status,
     write_script,
@@ -28,7 +29,7 @@ from tests.documents.register_documents import (
 )
 
 
-MODEL_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "model.yaml"
+MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 DOCUMENTS = {
     "doc-1.md": "an email to the operations team on intake form submit",
     "doc-2.md": "the same notification sent over WhatsApp",

@@ -15,9 +15,10 @@ from app.model.scripted_client import (
     CALL_LOG_PATH_ENVIRONMENT_VARIABLE,
     SCRIPT_PATH_ENVIRONMENT_VARIABLE,
 )
+from tests.runs.application import PROJECT_ROOT
 
 
-MODEL_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "model.yaml"
+MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 
 
 def _write_script(tmp_path: Path) -> Path:
