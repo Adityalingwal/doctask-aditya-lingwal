@@ -55,6 +55,7 @@ def locate_extraction(
             dropped.append(
                 {
                     "kind": kind,
+                    "file": source_file,
                     "summary": summary,
                     "quote": quote,
                     "reason": (
