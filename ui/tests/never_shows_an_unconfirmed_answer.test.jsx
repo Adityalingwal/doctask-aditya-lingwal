@@ -6,6 +6,7 @@ import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
 import {
   decisionReply,
+  projectsReply,
   runId,
   runReply,
   serverAnswering,
@@ -20,6 +21,7 @@ test("a refused answer leaves the decision unanswered on screen and shows the se
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,
@@ -62,6 +64,7 @@ test("an answered decision reads back the outcome the server returned, not the b
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,

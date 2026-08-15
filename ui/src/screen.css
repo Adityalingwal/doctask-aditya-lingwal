@@ -136,6 +136,12 @@
     background-size: 220% 100%;
     animation: signal-slide 1.4s linear infinite;
   }
+
+  /* L4: the one pulsing thing on a project card is this single dot, on a
+     two-second cycle — never the card itself, never the row of stage marks. */
+  .pulse-dot {
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
 }
 
 @keyframes signal-slide {
@@ -147,6 +153,16 @@
   }
 }
 
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* A run that is working should not keep moving for someone who asked the
    system to stop moving things. */
 @media (prefers-reduced-motion: reduce) {
@@ -154,5 +170,9 @@
     animation: none;
     background-image: none;
     background-color: var(--color-signal);
+  }
+
+  .pulse-dot {
+    animation: none;
   }
 }

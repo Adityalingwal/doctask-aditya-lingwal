@@ -24,15 +24,20 @@ async def read_project_list(
     Add-project dropdown both come from this single unconditional read, so
     there is no per-project fetch and no conditional refresh to reason about.
     A run's own `started_at` is sent as `null` when it has not started, never
-    substituted with `created_at`, and the list carries no cap.
+    substituted with `created_at`, and the list carries no cap. `stage` and
+    `row_count` are carried alongside `status` because the project card and
+    the run row (L4/L6) show a live run's stage strip and an exported run's
+    row count, neither of which the flat status word alone can answer.
     """
     result = await connection.execute(
         "SELECT projects.id AS project_id, projects.name AS project_name, "
         "projects.source_folder_path AS source_folder_path, "
         "projects.created_at AS project_created_at, "
         "runs.id AS run_id, runs.status AS run_status, "
+        "runs.current_stage AS run_current_stage, "
         "runs.started_at AS run_started_at, runs.created_at AS run_created_at, "
         "runs.finished_stages AS run_finished_stages, "
+        "jsonb_array_length(runs.export_json -> 'rows') AS run_row_count, "
         "(SELECT count(*) FROM decisions WHERE decisions.run_id = runs.id "
         "AND decisions.outcome IS NULL) AS waiting_decisions, "
         "ROW_NUMBER() OVER (PARTITION BY runs.project_id ORDER BY "
@@ -41,9 +46,13 @@ async def read_project_list(
         "ORDER BY projects.created_at ASC, runs.created_at DESC"
     )
     rows = await result.fetchall()
+    projects_root, available_folders = _available_folders(
+        project_root, projects_config_path
+    )
     return {
         "projects": _grouped_by_project(rows),
-        "available_folders": _available_folders(project_root, projects_config_path),
+        "projects_root": projects_root,
+        "available_folders": available_folders,
     }
 
 
@@ -79,12 +88,14 @@ def _grouped_by_project(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "run_id": str(row["run_id"]),
                 "run_number": row["run_number"],
                 "status": row["run_status"],
+                "stage": row["run_current_stage"],
                 # Sent unchanged rather than substituted with created_at: a run
                 # that has not started must say so, not report a moment it
                 # started as a fact.
                 "started_at": _isoformat(row["run_started_at"]),
                 "waiting_decisions": row["waiting_decisions"],
                 "finished_stages": ordered_finished_stages(row["run_finished_stages"]),
+                "row_count": row["run_row_count"],
             }
         )
     return list(projects.values())
@@ -94,11 +105,15 @@ def _isoformat(value: Any) -> str | None:
     return value.isoformat() if value is not None else None
 
 
-def _available_folders(project_root: Path, projects_config_path: Path) -> list[str]:
-    """The folders a person may point a new project at, as project-root-relative paths.
+def _available_folders(
+    project_root: Path, projects_config_path: Path
+) -> tuple[str, list[str]]:
+    """The projects root, and the folders a person may point a new project at.
 
     Read fresh on every call, the same unconditional-read philosophy as L1: the
-    dropdown is never stale because nothing about it is cached.
+    dropdown is never stale because nothing about it is cached. The root is
+    returned alongside the folders because the Add-project box (L8/screen 2)
+    states where a new folder must be put even when none exist there yet.
     """
     parsed = _read_projects_config(projects_config_path)
     projects_root = Path(parsed[PROJECTS_ROOT_KEY])
@@ -111,11 +126,12 @@ def _available_folders(project_root: Path, projects_config_path: Path) -> list[s
             f"root, but {resolved_root} does not exist — create it, or point "
             f"{PROJECTS_ROOT_KEY} at a folder that does, then try again."
         )
-    return sorted(
+    folders = sorted(
         f"{projects_root}/{entry.name}"
         for entry in resolved_root.iterdir()
         if entry.is_dir()
     )
+    return str(projects_root), folders
 
 
 def _read_projects_config(projects_config_path: Path) -> dict[str, Any]:

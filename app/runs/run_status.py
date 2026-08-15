@@ -32,6 +32,10 @@ async def read_run_status(
                 "kind": decision["kind"],
                 "question": decision["question"],
                 "outcome": decision["outcome"],
+                "rule_text": decision["rule_text"],
+                "row_number": decision["finding_row_number"],
+                "issue": decision["issue"],
+                "evidence": decision["evidence"],
             }
             for decision in decisions
         ],

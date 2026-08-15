@@ -20,16 +20,3 @@ export default function Section({ number, name, headingId, count, children }) {
     </section>
   );
 }
-
-// The count that earns the accent: work the run is still waiting on. Everything
-// else the screen counts stays grey.
-export function WaitingCount({ waiting }) {
-  if (waiting === 0) {
-    return <span className="eyebrow">nothing waiting</span>;
-  }
-  return (
-    <span className="border border-signal-edge bg-signal px-2.5 py-1 font-mono text-xs font-semibold tracking-wide text-ink">
-      {waiting} waiting
-    </span>
-  );
-}

@@ -562,12 +562,18 @@ Seven slice-1 API endpoints:
 | Endpoint | Job |
 |---|---|
 | `POST /projects` | Create project from name + source folder |
+| `GET /projects` | Every project, each with its runs nested, in one answer (L1) — the folders `POST /projects` may point at ride along too |
 | `POST /runs` | Start/queue run by project id; return immediately |
-| `GET /runs` | Every run, newest first: project, status, start time, waiting decisions, finished stages |
 | `GET /runs/{id}` | Durable status, stage, skips, failure, decisions |
 | `POST /runs/{id}/decisions` | Answer one decision UUID |
 | `POST /runs/{id}/finish-review` | Validate/claim review completion |
 | `GET /runs/{id}/export` | Approved JSON or Markdown export |
+
+`GET /runs` (every run, flat, newest first) is replaced by `GET /projects`,
+not kept beside it — two list shapes for the same data was exactly the drift
+this repository's conventions forbid. Superseded wording:
+`documentation/decision-history.md`, "The screen becomes projects, and
+inside each project its runs."
 
 Startup seeds the demo project only when `projects` is empty, using the same
 core creation function as the endpoint. **Implemented and verified** in
@@ -575,61 +581,75 @@ slice-1 scope.
 
 ### D15 — MCP and React
 
-- MCP mirrors the seven endpoints 1:1: `create_project`, `start_run`,
-  `list_runs`, `get_run_status`, `submit_decision`, `finish_review`,
+- MCP mirrors the seven endpoints 1:1: `create_project`, `list_projects`,
+  `start_run`, `get_run_status`, `submit_decision`, `finish_review`,
   `get_export`.
 - It mounts in the FastAPI process at `/mcp` and calls the same core functions
   the endpoints call. Existence checks, refusals and the shape a caller is told
   live in core, so a door decides only how to carry a refusal, never what it
-  says: `UnknownId`, `NotPossibleNow`, `UnusableRequest` and `RunsUnavailable`
-  become 404, 409, 400 and 503 over HTTP and reach a tool caller as the same
-  sentence.
+  says: `UnknownId`, `NotPossibleNow`, `UnusableRequest`, `RunsUnavailable`
+  and `ProjectsUnavailable` become 404, 409, 400, 503 and 503 over HTTP and
+  reach a tool caller as the same sentence.
 - The dependency is the official `mcp` SDK pinned at `1.29.0`. Its 2.x line was
   days old and changes the HTTP stack it depends on; `fastmcp` would put a
   second server framework beside FastAPI.
-- React is one screen filling the viewport: a run list down the left, and to its
-  right one run's sections read one at a time behind tabs — stages, skipped,
-  needs your decision, register. One generic question component serves all
-  gates, with no branch on gate kind. The two columns scroll independently.
-- The run list replaces pasting a run id: a card carries the project name, when
-  the run started, which stages finished and what is waiting, and never a UUID.
-  Section tabs carry `role="tab"`, not the button role, because choosing what to
-  read is navigation — the only actions on a run stay Approve, Reject and
-  Finish review.
+- **The screen is three columns (L1–L10, locked 2026-08-15, superseding the
+  single run list — see `documentation/decision-history.md`):** projects
+  (20rem), one selected project's runs (13rem, collapsible to a strip that
+  keeps the open run's number visible), and the open run's detail — stages,
+  skipped, needs your decision, register, read one at a time behind tabs, as
+  before. One generic question component still serves every gate, with no
+  branch on gate kind.
+- A project card shows a status mark (`●` running, pulsing; `◍` at review,
+  still; `○` nothing live — never the card or the stage row), its run count,
+  its most recent run's date, and — only while live — the active run's stage
+  strip or its waiting-decision count. A card never shows a folder path; the
+  path is shown in exactly one place, the Add-project box, while a folder is
+  being chosen. A project can hold at most one `running`/`needs review` run
+  (the partial unique index), so the card never sums waiting decisions across
+  runs, and a failed or superseded run's leftover unanswered decisions are
+  never counted anywhere — `app/review/submit_decision.py` refuses an answer
+  on a run that is not at review.
+- Section tabs still carry `role="tab"`, not the button role, because
+  choosing what to read is navigation — the only actions on a run stay
+  Approve, Reject and Finish review.
 - **The stage strip's own stage wins over "done" only while the run is active**
   (`running` or `needs review`). Extract writes its finished mark after
   every document, not just the last one, so a batch's own stage can read
   "finished" before the batch is done; the run's current stage overrides that
   reading while the run is still working, but a `done`, `failed`, or otherwise
   terminal run shows its last stage as `done`, not stuck "working" forever.
-- **The screen gained one way in, not a dashboard (2026-08-15):** a
-  `StartRun` form — project name, source folder, one `Start run` button —
-  renders in the reading pane in place of "Nothing is shown until the
-  application answers for a run", but only once `GET /runs` has actually
-  answered and returned zero runs; a run-list refusal keeps that paragraph
-  instead, never a form over an application that could not be reached. It
-  validates nothing itself — every refusal shown is `create_project`'s or
-  `start_run`'s own sentence, because core owns what is usable, not this
-  door. The component holds the `project_id` `POST /projects` returns in its
-  own state, so a retry after a failed `POST /runs` skips the create and
-  retries only `POST /runs`. This matters because `projects.name` carries no
-  unique constraint — `migrations/versions/20260812_0001_create_slice_1_tables.py`
-  declares only a primary key on `id` — so retrying the create would leave a
-  second project over the same folder and the watcher polling it twice. For
-  the same reason the button stays disabled through the parent's re-read
-  rather than being re-enabled when `POST /runs` answers: the form is still on
-  screen for that round trip, and a second click there starts another run,
-  which the server does not refuse — it queues one behind the first.
-  D15's "no dashboard, no settings" lock still stands: this form is the one
-  exception already named as a gap, not an invitation to add more — no
-  folder picker, no project dropdown, and no "New project" affordance once a
-  run exists (see the limitation below).
+- **A project is created, and its first run started, from `AddProject.jsx`**
+  (superseding the `StartRun` form): a box the `Add project +` button at the
+  bottom of the projects column opens, in every state — empty or not, no
+  inline first-time form. Folder first, then name: the folder is a dropdown
+  of what `config/projects.yaml`'s configured root holds on disk, never
+  invented and never created by the system; choosing one derives the name
+  (`northside-dental` → `Northside Dental`), still editable. The box may
+  refuse to send an empty name or an unchosen folder, in its own words — the
+  one client-side check this screen makes; every other rule, including
+  whether the folder exists, stays the server's, shown unchanged under
+  "Could not create this project", never "the server refused". The two
+  retry/disable behaviours the old form had are unchanged: a retry after a
+  failed `POST /runs` never repeats `POST /projects` — `projects.name`
+  carries no unique constraint
+  (`migrations/versions/20260812_0001_create_slice_1_tables.py` declares only
+  a primary key on `id`), so retrying the create would leave a second
+  project over the same folder and the watcher polling it twice — and the
+  button stays disabled through the parent's re-read. Unlike the old form,
+  this box does not disappear once a run exists: the limitation that closed
+  is below.
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
-- The screen reads `GET /runs/{id}` on a poll whose interval is
-  `ui/config/screen.json`, and reads `GET /runs/{id}/export` only once that
-  status says the run exported. Nothing a person clicked is shown: an answer is
-  posted and the screen then re-reads the run it was recorded against.
+- **The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on
+  the same fixed interval (`ui/config/screen.json`), whatever is on screen
+  and whatever a run's status is (L1, locked 2026-08-15).** There is no
+  per-project runs endpoint and no conditional refresh: at this size the
+  payload is a few kilobytes, and one unconditional read is easier to reason
+  about than conditional refresh rules. `GET /runs/{id}/export` is read only
+  once a run's status says it exported. Nothing a person clicked is shown: an
+  answer is posted and the screen then re-reads the run it was recorded
+  against.
 - The screen's own toolchain is Vite and Vitest with jsdom and
   `@testing-library/react`, all pinned exactly. React and `react-dom` remain the
   only runtime dependencies. **Tailwind CSS 4.3.3 is installed** as a build-time
@@ -644,27 +664,19 @@ slice-1 scope.
   bare `404`.
 - **Status:** MCP **implemented and verified** — `tests/interfaces/test_mcp_tools.py`
   and `tests/interfaces/test_mcp_flow.py`, plus one run driven through the tools by hand.
-  React is **implemented**; 25 Vitest cases in `ui/tests/` and the two route
-  cases in `tests/interfaces/test_review_screen_route.py` pass. The
-  start-a-run form is **verified against the application** (2026-08-15,
-  hand-driven in a browser): an empty database showed the form; a folder
-  that does not exist and a blank name were each refused with `create_project`'s
-  own sentence; `POST /projects` succeeded for a real folder while the
-  environment's missing `OPENROUTER_API_KEY` refused `POST /runs`, and a
-  second click retried only `POST /runs` — the `projects` table held one row
-  for that project throughout, proving the L4 retry live, not only in a test.
-  A run could not be watched through to review this way, because this
-  environment has no live model key. The rest of the redesigned screen —
-  decisions, answer, finish, register — remains **proof pending**, driven
-  only against `ui/demo/`, never against the application since the redesign.
-  Layout and visual treatment are no longer open. Answering one decision at a
-  time is locked in D02, and the screen must not offer any approve-all or
+  React is **implemented**; the projects-and-runs screen (2026-08-15) passes
+  its front-end suite and is hand-verified against the application — see
+  `PROGRESS.md` for the driven scenarios and what each showed. Layout and
+  visual treatment are no longer open. Answering one decision at a time is
+  locked in D02, and the screen must not offer any approve-all or
   batch-submit affordance.
-- `GET /runs` and `list_runs` are built, both calling `app/runs/list_runs.py`'s
-  one core function: every run, newest first, no cap, each carrying its
-  project name, status, `started_at` (`null` for a run that has not started
-  — never substituted with `created_at`), the count of unanswered decisions,
-  and `finished_stages` as an ordered list of stage names.
+- `GET /projects` and `list_projects` are built, both calling
+  `app/projects/list_projects.py`'s one core function: every project, run
+  count, most recent run date, and its runs nested (id, run number within
+  the project, status, `started_at` — `null` for a run that has not started,
+  never substituted with `created_at` — stage, waiting-decision count,
+  finished stages, and row count once exported), plus the projects root and
+  the folders inside it, no cap on any list.
 - Limitation: `GET /runs/{id}` carries no register rows, so the register
   section is empty until the run has exported.
 - Limitation: the tools inherit the HTTP surface's lack of authentication, and
@@ -679,10 +691,6 @@ slice-1 scope.
   grow the already-too-broad development mount `PROGRESS.md` lists as an
   active blocker, and put an unauthenticated screen in front of the host
   filesystem.
-- Limitation: the start form disappears once the first run exists — L1's
-  condition is a run list of exactly zero. A second project needs
-  `POST /projects` by hand or the `create_project` MCP tool; there is no
-  "New project" affordance to cover this.
 
 ## Operations
 
@@ -706,8 +714,8 @@ slice-1 scope.
   name only (`{"ingest": true, "extract": true, ...}`), written where each
   stage's pass ends with the same `||` merge the dropped `stage_timings` used,
   so a node that re-enters after a kill (D12) overwrites its own key instead
-  of adding a second one. `read_run_status` and `GET /runs`/`list_runs` both
-  report it as an ordered list of stage names
+  of adding a second one. `read_run_status` and `GET /projects`/`list_projects`
+  both report it as an ordered list of stage names
   (`app/runs/finished_stages.py:ordered_finished_stages`), never the keyed
   object and never the keys unordered.
 - **Why not derive it from `runs.stage` instead:** on the rules-only route
@@ -742,10 +750,12 @@ slice-1 scope.
   needed a line of that code changed.
 - The operations slice was built and then cut back: its timing and cost are
   dropped (D16), leaving structured run logging as what it contributed.
-- `GET /runs` and its `list_runs` tool complete the seventh surface on both
-  doors, and `runs.finished_stages` replaced what the dropped timings were
-  being read for. Every planned slice is now built; what remains is the open
-  fresh-clone and image-only verification and the first live-model run.
+- `runs.finished_stages` replaced what the dropped timings were being read
+  for. The seventh surface on both doors was `GET /runs`/`list_runs`, then
+  `GET /projects`/`list_projects` replaced it in place (2026-08-15) once the
+  screen became projects, and inside each project its runs. Every planned
+  slice is now built; what remains is the open fresh-clone and image-only
+  verification and the first live-model run.
 
 ### Brief-behaviour acceptance summary
 
@@ -783,18 +793,12 @@ slice-1 scope.
 
 1. Task 2 orchestration: high-level `create_agent` versus raw StateGraph.
 2. Nothing open here: the screen's layout and visual treatment were settled
-   on 2026-08-14 with the run list, the section tabs and the Tailwind tokens.
+   on 2026-08-14 with the run list and the Tailwind tokens, and resettled
+   2026-08-15 into the three-column projects-and-runs shape (D15,
+   `documentation/decision-history.md`) — item 5 below is resolved by it.
 3. Whether real document sizes justify pgvector retrieval or Extract fan-out.
 4. Exact later-slice storage choices where this file explicitly leaves them
    open; do not invent them before their slice.
-5. **How the run list is organised once runs accumulate (2026-08-15).** It is
-   a flat list of every run across every project today, newest first, which
-   is right while there are a handful. Runs never stop being created, so one
-   project's history will eventually crowd out another's. The likely answer
-   is grouping the cards under a project heading rather than a two-level
-   navigation, because a project asks for no work of its own and a second
-   click would hide what is waiting. Left open; settling it is not part of
-   this work.
 
 ## Known limitations and unverified assumptions
 
@@ -840,7 +844,7 @@ ideas from resurfacing without duplicating their full prose here.
 | Five register statuses | D05 six statuses including `No evidence yet` |
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
-| Five/six API endpoints | D14 seven endpoints including `GET /runs` |
+| Five/six API endpoints; flat `GET /runs` run list | D14 seven endpoints including `GET /projects`, every project with its runs nested |
 | `done` as generic terminal state | D13 honest `failed`/`no changes`/`export rejected` |
 | Status-only already-read check | D03 extraction + export/unrelated/no-requirement rule |
 | Already-read matched by name AND content; requirement withdrawal | D03 read-once rule matched by name OR content; withdrawal removed |

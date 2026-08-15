@@ -1,6 +1,6 @@
-// L7 — once a run exists the form is gone, so it must never start a second
-// one. The gap this covers is the one between `POST /runs` answering and the
-// parent finishing its re-read: the form is still mounted through it, and if
+// L7 — once the box's own work is under way it must never start a second
+// run. The gap this covers is the one between `POST /runs` answering and the
+// parent finishing its re-read: the box is still mounted through it, and if
 // the button is live a second click sends another `POST /runs` with the
 // project id already in hand. The server does not refuse that — it queues a
 // waiting run behind the active one (app/runs/run_lifecycle.py) — so the
@@ -9,12 +9,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
-import StartRun from "../src/StartRun.jsx";
+import AddProject from "../src/AddProject.jsx";
 import { serverAnswering } from "./server_replies.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+const FOLDER = "sample-projects/northside-dental";
 
 test("never_starts_a_second_run_while_the_first_is_being_opened", async () => {
   const projectId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
@@ -41,16 +43,21 @@ test("never_starts_a_second_run_while_the_first_is_being_opened", async () => {
     }),
   );
 
-  render(<StartRun onStarted={onStarted} />);
+  render(
+    <AddProject
+      projectsRoot="sample-projects"
+      availableFolders={[FOLDER]}
+      onStarted={onStarted}
+      onClose={() => {}}
+    />,
+  );
 
+  fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
   fireEvent.change(screen.getByLabelText(/project name/i), {
     target: { value: "Northside Dental" },
   });
-  fireEvent.change(screen.getByLabelText(/folder/i), {
-    target: { value: "sample-projects/northside-dental" },
-  });
 
-  const startButton = screen.getByRole("button", { name: /start run/i });
+  const startButton = screen.getByRole("button", { name: /create and start run/i });
 
   await act(async () => {
     startButton.click();

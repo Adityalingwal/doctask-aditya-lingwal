@@ -19,8 +19,7 @@ export default function Register({ exported }) {
   return (
     <>
       <p className="eyebrow m-0 mb-4">
-        {exported.project.name} · exported {exported.exported_at} · run{" "}
-        {exported.run_id}
+        {exported.project.name} · exported {formattedExportDate(exported.exported_at)}
       </p>
 
       <div className="overflow-x-auto border border-line bg-card">
@@ -99,20 +98,20 @@ export function Examine({ examine }) {
   return (
     <>
       <p className="eyebrow m-0 mb-3">
-        rules run against {examine.rows_examined} register row(s)
+        {plural(examine.rules.length, "rule")} ran against{" "}
+        {plural(examine.rows_examined, "row")}
       </p>
-      <ul className="m-0 flex list-none flex-col gap-1.5 p-0 font-mono text-sm">
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {examine.rules.map((rule) => (
-          <li key={rule.id}>
-            <span className="mr-2 font-semibold">{rule.id}</span>
-            {rule.text}
-            {rule.params === undefined ? "" : ` (${settingsOf(rule.params)})`}
+          <li key={rule.id} className="flex gap-2">
+            <span aria-hidden="true">·</span>
+            <span>{foldedRuleText(rule)}</span>
           </li>
         ))}
       </ul>
       {examine.findings.length === 0 ? (
         <p className="mt-4 text-ink-soft">
-          No findings — no register row broke one of those rules.
+          No findings — no row broke any of these rules.
         </p>
       ) : (
         <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
@@ -151,10 +150,11 @@ function StatusChip({ status }) {
 // document said this, the other says a document stopped saying it.
 function Citation({ citation }) {
   const quoted = citation.source_words !== null;
+  const cellHeading = CELL_HEADINGS[citation.cell] ?? citation.cell;
   return (
     <>
       <p className="eyebrow m-0">
-        {citation.cell} · {citation.source_file}
+        {cellHeading} · {citation.source_file}
         {quoted && citation.place !== null ? ` · ${citation.place}` : ""}
       </p>
       {quoted ? (
@@ -171,14 +171,37 @@ function Citation({ citation }) {
 }
 
 function findingLine(finding) {
-  return (
-    `Row ${finding.row_number} ${finding.rule_id} — ${finding.issue} `
-    + `(${finding.evidence})`
+  return `Row ${finding.row_number} — ${finding.issue} (${finding.evidence})`;
+}
+
+// A rule's own parameters, folded into its sentence: R3's config text names
+// max_days directly ("blocked beyond max_days days"), and this replaces that
+// word with the value the run judged against — never printed after the
+// sentence as "(max_days: 14)".
+function foldedRuleText(rule) {
+  const params = rule.params ?? {};
+  return Object.entries(params).reduce(
+    (text, [name, value]) => text.replaceAll(name, String(value)),
+    rule.text,
   );
 }
 
-function settingsOf(params) {
-  return Object.entries(params)
-    .map(([name, value]) => `${name}: ${value}`)
-    .join(", ");
+function plural(count, noun) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+// The export timestamp, formatted for a reader rather than shown as the raw
+// ISO value the server stores it as (screen 7).
+function formattedExportDate(iso) {
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) {
+    return iso;
+  }
+  const datePart = moment.toLocaleString(undefined, { day: "numeric", month: "short" });
+  const timePart = moment.toLocaleString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${datePart}, ${timePart}`;
 }

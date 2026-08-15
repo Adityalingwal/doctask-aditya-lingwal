@@ -5,6 +5,7 @@ import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
 import {
   decisionReply,
+  projectsReply,
   runId,
   runReply,
   serverAnswering,
@@ -25,6 +26,7 @@ test("finishing the review is not offered while one decision is still unanswered
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,
@@ -38,13 +40,14 @@ test("finishing the review is not offered while one decision is still unanswered
   await screen.findByText(unanswered.question);
 
   expect(screen.queryByRole("button", { name: /finish review/i })).toBeNull();
-  expect(document.body.textContent).toMatch(/1 decision/i);
+  expect(screen.getByText("Answer all 1 to finish this review.")).toBeTruthy();
 });
 
 test("finishing the review is offered once the server reports every decision answered", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,

@@ -3,7 +3,13 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
-import { exportReply, runId, runReply, serverAnswering } from "./server_replies.js";
+import {
+  exportReply,
+  projectsReply,
+  runId,
+  runReply,
+  serverAnswering,
+} from "./server_replies.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -13,6 +19,7 @@ test("a run the server reports running is not shown as finished anywhere on the 
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,
@@ -24,15 +31,19 @@ test("a run the server reports running is not shown as finished anywhere on the 
   render(<ReviewScreen runId={runId} />);
   const stages = await screen.findByRole("region", { name: /stages/i });
 
-  expect(stages.textContent).toContain("running");
+  // Screen 3: the identifier lines above the strip — run, project, status —
+  // are gone, so the run's own status is not printed as text here at all;
+  // what stands in for it is the active stage's own box reading "working".
   expect(stages.textContent).toContain("extract");
+  expect(stages.textContent).toContain("working");
   expect(document.body.textContent).not.toMatch(/finished|complete|\bdone\b/i);
 });
 
-test("the register section says the register is not exported rather than showing one", async () => {
+test("the register section says nothing has exported yet rather than showing one", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,
@@ -46,6 +57,6 @@ test("the register section says the register is not exported rather than showing
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(within(register).queryByRole("table")).toBeNull();
-  expect(register.textContent).toMatch(/not exported/i);
+  expect(register.textContent).toMatch(/nothing exported yet/i);
   expect(register.textContent).not.toContain(exportReply().rows[0].cells.what_was_asked);
 });

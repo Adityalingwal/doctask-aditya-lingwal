@@ -1,6 +1,6 @@
 // The six stages in the order the graph runs them. A run does not always visit
 // all six: a rules-only run goes from Ingest straight to Examine (D03/D07), so
-// the strip has to say "this one never ran" rather than "this one is coming".
+// the strip has to say "not needed" rather than "this one is coming".
 const STAGE_ORDER = ["ingest", "extract", "match", "examine", "review", "commit"];
 
 const FAILED = "failed";
@@ -15,7 +15,7 @@ const ACTIVE_STATUSES = ["running", "needs review"];
  * What the server has confirmed about each stage — never more than that: the
  * run's own stage wins while the run is still active, a reported stage is
  * otherwise finished, and a stage the run has already moved past without
- * reporting means it never ran.
+ * reporting means it was not needed.
  */
 export function stageStates(stage, status, finishedStages) {
   const finished = new Set(finishedStages);
@@ -32,25 +32,19 @@ export function stageStates(stage, status, finishedStages) {
       return { name, state: "done" };
     }
     if (reached > -1 && place < reached) {
-      return { name, state: "never ran" };
+      return { name, state: "not needed" };
     }
-    return { name, state: "not started" };
+    return { name, state: "pending" };
   });
 }
 
+// Screen 3: the identifier lines this strip used to print above itself — run,
+// project, status — are gone. Both ids stay in the address bar, and the
+// status is already on the project card and the run's tab badge.
 export default function Stages({ run }) {
   const states = stageStates(run.stage, run.status, run.finished_stages);
   return (
     <>
-      <dl className="mb-6 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 font-mono text-sm">
-        <dt className="text-ink-soft">run</dt>
-        <dd className="m-0 break-all">{run.run_id}</dd>
-        <dt className="text-ink-soft">project</dt>
-        <dd className="m-0 break-all">{run.project_id}</dd>
-        <dt className="text-ink-soft">status</dt>
-        <dd className="m-0">{run.status}</dd>
-      </dl>
-
       <ol className="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-3 lg:grid-cols-6">
         {states.map((stage) => (
           <StageBox key={stage.name} stage={stage} />
@@ -59,7 +53,9 @@ export default function Stages({ run }) {
 
       {run.ended_early_reason !== null && (
         <p className="mt-5 border-l-4 border-caution pl-3 text-sm">
-          <span className="eyebrow block">ended early</span>
+          {/* The eyebrow prints the run's own stored status — "no changes" —
+              uppercased by .eyebrow's own CSS, never a label of its own. */}
+          <span className="eyebrow block">{run.status}</span>
           {run.ended_early_reason}
         </p>
       )}
@@ -78,8 +74,8 @@ function StageBox({ stage }) {
     done: "border-line-strong bg-card",
     working: "border-signal-edge bg-signal/25",
     failed: "border-danger bg-card",
-    "never ran": "border-line bg-transparent border-dashed",
-    "not started": "border-line bg-transparent border-dashed opacity-60",
+    "not needed": "border-line bg-transparent border-dashed",
+    pending: "border-line bg-transparent border-dashed opacity-60",
   }[stage.state];
 
   return (

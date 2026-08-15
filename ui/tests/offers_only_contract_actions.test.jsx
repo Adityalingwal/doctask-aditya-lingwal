@@ -6,6 +6,7 @@ import { openSection } from "./open_section.js";
 import {
   decisionReply,
   exportReply,
+  projectsReply,
   runId,
   runReply,
   serverAnswering,
@@ -31,6 +32,7 @@ test("a run at review offers approve, reject and finish review and no other acti
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,
@@ -43,7 +45,11 @@ test("a run at review offers approve, reject and finish review and no other acti
   await openSection(/decisions/i);
   await screen.findByRole("button", { name: /finish review/i });
 
-  const offered = screen
+  // Scoped to the reading pane: the screen's own chrome — Add project,
+  // collapse the runs column — offers buttons too, and this test is only
+  // about what a run's own content may act on.
+  const readingPane = screen.getByRole("main");
+  const offered = within(readingPane)
     .getAllByRole("button")
     .map((button) => button.textContent.trim().toLowerCase());
   expect(offered.every((label) => ALLOWED_BUTTONS.includes(label))).toBe(true);
@@ -60,6 +66,7 @@ test("an exported register offers no control at all and no cell that can be edit
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,

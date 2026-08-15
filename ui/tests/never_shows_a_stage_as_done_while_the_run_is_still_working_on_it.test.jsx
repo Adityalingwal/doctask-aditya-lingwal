@@ -47,16 +47,16 @@ test("a run whose export was rejected shows review done, not working", () => {
   expect(states.find((stage) => stage.name === "review").state).toBe("done");
 });
 
-test("a rules-only run never shows extract or match as anything but never ran", () => {
+test("a rules-only run never shows extract or match as anything but not needed", () => {
   const states = stageStates("examine", "running", ["ingest"]);
 
-  expect(states.find((stage) => stage.name === "extract").state).toBe("never ran");
-  expect(states.find((stage) => stage.name === "match").state).toBe("never ran");
+  expect(states.find((stage) => stage.name === "extract").state).toBe("not needed");
+  expect(states.find((stage) => stage.name === "match").state).toBe("not needed");
   expect(states.find((stage) => stage.name === "examine").state).toBe("working");
 });
 
-test("a stage the run has not reached yet reads not started", () => {
+test("a stage the run has not reached yet reads pending", () => {
   const states = stageStates("extract", "running", ["ingest"]);
 
-  expect(states.find((stage) => stage.name === "commit").state).toBe("not started");
+  expect(states.find((stage) => stage.name === "commit").state).toBe("pending");
 });
