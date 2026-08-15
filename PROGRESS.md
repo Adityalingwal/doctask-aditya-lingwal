@@ -497,6 +497,61 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       `test_an_absolute_projects_root_is_refused_naming_the_fix`, plus the
       front-end `never_calls_a_register_empty_before_it_has_been_read`.
 
+### Five defects found while walking the flow (branch `defects-found-while-walking-the-flow`)
+
+- [x] `append_skipped` reconciles against what the run has already recorded
+      instead of appending unconditionally, so a stage LangGraph replays from
+      its start on resume no longer records the same skipped file twice. The
+      comparison is over the whole entry, every key, so two different
+      requirements dropped from one file — which share `kind`, `file` and
+      `reason` and differ only in `summary` and `quote` — are never collapsed
+      into one (`test_a_replayed_stage_does_not_record_the_same_skipped_file_
+      twice`, `test_two_different_dropped_quotes_from_one_file_are_both_kept`).
+- [x] `locate_quote` finds every occurrence of a quote and names every place
+      it sits, in document order, instead of citing the first offset as if it
+      were the only one — a repeated line is ordinary in a testing feedback
+      document restating one finding against several requirements
+      (`test_a_quote_appearing_under_two_headings_names_both_places`,
+      `test_a_quote_appearing_once_still_names_that_one_place`).
+- [x] `locate_quote` also normalises curly quotes, en/em dashes and the
+      `fi`/`fl` ligatures to their plain equivalents before matching — the
+      same rendering-difference tolerance whitespace already had, not the
+      similarity matching the design refuses. Case is deliberately not
+      normalised. The offset map keeps a one-character-to-two-character
+      replacement aligned, and the citation still quotes the document's own
+      characters, never the normalised ones
+      (`test_a_curly_apostrophe_in_the_document_matches_a_straight_one_in_the_
+      quote`, `test_a_ligature_in_a_pdf_does_not_shift_the_place_the_citation_
+      names`, `test_the_citation_keeps_the_documents_own_characters_not_the_
+      normalised_ones`).
+- [x] A dropped quote's entry carries `file`, the same key the other Skipped
+      entries already use, and the screen tells it apart from a whole skipped
+      document by the presence of `summary` rather than by `file` alone, so
+      it is never shown as though the file itself was never read
+      (`test_a_dropped_quote_names_the_file_and_what_was_dropped`,
+      `test_a_dropped_quote_is_never_shown_as_a_file_that_was_not_read`).
+- [x] `read_pdf` guards pdfplumber's own parsing failure the way
+      `pdf_page_count` already guards pypdf's, so a PDF sound enough to have
+      its pages counted but whose content stream cannot be parsed is skipped
+      with its reason instead of failing the whole run. Reproduced with a
+      fabricated fixture (a font object overwritten with same-length garbage):
+      pypdf still counts its one page, pdfplumber raises its own
+      `PdfminerException`
+      (`test_a_pdf_that_cannot_be_parsed_is_skipped_and_the_batch_continues`).
+- [x] All five defects' tests were written and run at the baseline commit
+      `38ec73b` before their fix; each failed there, except the ligature
+      offset test, which is a regression guard and already passed. 148 Python
+      tests (was 141) and 43 front-end tests (was 41) pass with no live API
+      key — both counts read from the suites' own printed summary.
+- [x] Reviewed by Codex (`-s read-only`, CLI `0.147.0`,
+      `handoff/review-report-defects-walking-the-flow.md`): **merge-ready**,
+      zero findings — the four priority hunts (offset alignment, the
+      whole-entry comparison, the dropped-quote/unread-file distinction, and
+      the PDF guard's exception type) and the four Definition-of-done failure
+      modes all came back clean. Codex could not run either suite (no Docker
+      socket in its sandbox), so its verdict is code-level only; both suites
+      were run in the foreground independently, as recorded above.
+
 ### Reliability slice (branch `reliability-proof`)
 
 - [x] Five never-do tests written and run at the baseline commit `bb24476`
