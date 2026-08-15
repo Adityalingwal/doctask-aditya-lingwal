@@ -135,7 +135,10 @@ exists for.
 A document is skipped, with its reason recorded on the run, when it is longer
 than the page limit, when a PDF is encrypted, and when a PDF has no text layer
 because it was scanned. The page limit applies to PDFs, the only declared
-format that reports a page count.
+format that reports a page count. None of these is written to the `documents`
+table, so unlike a document that was read and finished with, a skipped one is
+not "already read" — the next run reads it again, and pays for it again if a
+model call was what failed.
 
 ## Run locally
 
@@ -159,8 +162,8 @@ project if it is missing. The generated API schema at `/docs` shows the seven
 operations:
 
 - `POST /projects`
+- `GET /projects`
 - `POST /runs`
-- `GET /runs`
 - `GET /runs/{id}`
 - `POST /runs/{id}/decisions`
 - `POST /runs/{id}/finish-review`
@@ -179,45 +182,59 @@ docker compose up --build
 Open `http://localhost:8000/ui/`. Until `ui/dist` exists, `/ui` answers `503`
 with the build command above rather than a bare `404`.
 
-A first-time user, or any database with no runs yet, sees a form instead of
-"choose a run from the list beside this": a project name, the folder its
-documents arrive in, and a **Start run** button. It validates nothing itself
-— an empty name, a blank folder, or a folder that does not exist are all sent
-to the server as typed, and whatever it refuses with (`create_project`'s or
-`start_run`'s own sentence) is shown unchanged. The folder is read inside the
-application's container, so only a path inside the repository exists as far
-as it is concerned; `sample-projects/northside-dental` is a real example. The
-form is gone again once the first run exists — a second project still needs
-`POST /projects` by hand or the `create_project` MCP tool below.
+The viewport is three columns. On the left, every project: a status mark
+(a lime dot pulsing while a run works, a lime ring while one waits at review,
+a grey ring when nothing on it is live), its run count, the date of its most
+recent run, and — only while something is live — the active run's stage strip
+or how many decisions it is waiting on. No folder path appears on a card.
+A full-width **Add project +** button sits at the bottom of this column in
+every state, empty or not; it opens a box with a dropdown of the folders
+already inside the configured projects root (never invented, never created by
+the screen), a name derived from the chosen folder and still editable, and a
+**Create and start run** button. The box refuses to send an empty name or an
+unchosen folder in its own words; every other rule, including whether the
+folder actually exists, is the server's, shown under "Could not create this
+project" exactly as it answered.
 
-The viewport is split. Down the left is the list of runs: each card names the
-project, when the run started, which stages finished and what is still waiting,
-and opening one writes it into the address as `/ui/?run=<run id>`, so a link to
-one run is a link that can be kept. No run id is ever typed.
+The middle column lists the selected project's runs, newest first — run
+number, when it started, and either its live stage strip, its status, or its
+row count once it has exported — and collapses to a narrow strip (keeping the
+open run's number visible) so the register table can take the full width
+while it is being read. Opening a run writes it into the address as
+`/ui/?run=<run id>`, so a link to one run is a link that can be kept. No run
+id is ever typed.
 
 To the right, one run's sections are read one at a time behind tabs:
 
 | Section | What it shows |
 |---|---|
-| Stages | Every stage of the run — finished, working, never ran, or not started — and the reason it ended early or failed, against the stage it failed at |
+| Stages | Every stage of the run — done, working, not needed, or pending — and the reason it ended early or failed, against the stage it failed at |
 | Skipped | Each file or quote this run skipped, with the reason recorded on the run |
 | Needs your decision | Every gate the run raised, its frozen question and its answer, plus the rules the run was judged against |
 | Register | The exported register, its cells, its citations and its approved findings — once the run has exported one |
 
-The page polls `GET /runs/{id}` every **3 seconds**; that interval lives in
-[`ui/config/screen.json`](ui/config/screen.json). Nothing shown comes from what
+The page polls `GET /projects` and `GET /runs/{id}` every **3 seconds**
+unconditionally — whatever is on screen, whatever a run's status is; that
+interval lives in [`ui/config/screen.json`](ui/config/screen.json). This is
+deliberate: at this size the payload is a few kilobytes, and one
+unconditional read is easier to reason about than conditional refresh rules.
+If a poll cannot reach the application at all, a strip under the header says
+so and whatever was last read stays on screen underneath, unchanged; a
+refusal the application did answer (a run that does not exist, say) is shown
+beside the data it refused, not as that strip. Nothing shown comes from what
 was clicked: an answer is posted to `POST /runs/{id}/decisions` and the run is
 then read back, so a refused answer leaves the decision unanswered on screen
 with the server's own reason beside it. Approve and Reject appear only while
 the server reports the run at review, and **Finish review** only once no
 decision is unanswered — the server refuses both otherwise.
 
-The run list reads `GET /runs` — every run the application knows about, newest
-first, no cap — and polls it on the same interval as the open run. Separately,
-`npm --prefix ui run dev` serves four demo runs at
+Separately, `npm --prefix ui run dev` serves demo runs at
 <http://localhost:5173/demo> — one at review, one working, one failed, one
-exported — through dev-only middleware under `ui/demo/`, so the screen can be
-worked on without the application. None of that folder reaches a build.
+exported — through dev-only middleware under `ui/demo/`, so a single run's
+sections can be worked on without the application; that demo server predates
+this screen's three-column redesign and mocks only the single-run endpoints,
+not `GET /projects`, so the projects and runs columns themselves are not
+demonstrated there. None of that folder reaches a build.
 
 Its own tests run without Docker and without a key:
 
@@ -225,7 +242,7 @@ Its own tests run without Docker and without a key:
 npm --prefix ui test
 ```
 
-Last verified on the `start-a-run-from-the-screen` branch: **25 passed**.
+Last verified on the `front-end-projects-and-runs` branch: **32 passed**.
 
 ## Drive it from a machine
 
@@ -238,8 +255,8 @@ the practical fix the endpoint would have given.
 | Tool | Arguments |
 |---|---|
 | `create_project` | `name`, `source_folder_path` |
+| `list_projects` | *(none)* — every project, each with its runs nested |
 | `start_run` | `project_id` |
-| `list_runs` | *(none)* |
 | `get_run_status` | `run_id` |
 | `submit_decision` | `run_id`, `decision_id`, `outcome` (`approved` or `rejected`) |
 | `finish_review` | `run_id` |
@@ -279,7 +296,7 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `finished-stages-and-list-runs` branch: **129 passed**,
+Last verified on the `front-end-projects-and-runs` branch: **131 passed**,
 real PostgreSQL, no live model key. Fresh-clone and image-only verification
 remain open release checks; this is a verified development-worktree command,
 not yet a fresh-machine claim.
@@ -290,6 +307,7 @@ not yet a fresh-machine claim.
 |---|---|
 | `config/formats.yaml` | Declared extensions and document page limit |
 | `config/model.yaml` | OpenRouter model, endpoint, call attempts, timeout |
+| `config/projects.yaml` | The projects root the Add-project box's folder dropdown lists |
 | `config/rules.yaml` | User-editable R1–R4 rule set Examine judges against |
 | `config/watcher.yaml` | Folder poll interval and the quiet period before a run auto-starts |
 | `ui/config/screen.json` | How often the review screen polls the run it is showing |
@@ -315,6 +333,10 @@ the next run and never to one already under way or already finished. Point
   errors still reach the container's output.
 - A kill after a model response but before its checkpoint can repeat that one
   paid call; earlier completed calls and register rows do not duplicate.
+- A run that fails is not restarted by itself, and nothing it read counts as
+  read: because none of that run's documents finished (no extraction was
+  ever written for them), the next run started on that project reads them
+  again from the start.
 - A run waiting for Review holds the project lock; later files wait.
 - The watcher forgets what it has seen when the application restarts, so a file
   that arrived while it was down starts no run of its own; the next run started
@@ -334,11 +356,15 @@ the next run and never to one already under way or already finished. Point
 - The development Compose file bind-mounts the worktree, which exposes local
   `.env` and lets local files override the image; this is retained for
   iteration and is not yet removed for final image-only verification.
-- The screen's start-a-run form reads a folder inside the application's
-  container, whose only mount is `.:/workspace`, so a path outside the
-  repository does not exist as far as it is concerned and is refused.
-- The start-a-run form is gone once the first run exists; a second project
-  needs `POST /projects` by hand or the `create_project` MCP tool.
+- The Add-project box reads a folder inside the application's container,
+  whose only mount is `.:/workspace`, so a path outside the repository does
+  not exist as far as it is concerned and is refused; its dropdown only ever
+  lists what `config/projects.yaml`'s configured root actually holds.
+- The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on a
+  fixed interval, whatever is on screen and whatever a run's status is —
+  there is no per-project runs endpoint and no conditional refresh. At this
+  size the payload is a few kilobytes, and one unconditional read is easier
+  to reason about than conditional refresh rules.
 
 ## Project truth
 

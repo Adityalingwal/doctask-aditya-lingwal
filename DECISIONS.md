@@ -66,7 +66,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D12 | State, checkpoints, node re-entry, and Extract-call idempotency | Mixed | Reliability and concurrency |
 | D13 | Run identity, statuses, lock, and queue | Implemented and verified | Reliability and concurrency |
 | D14 | Database and API surface | Implemented and verified in slice-1 scope | Storage and interfaces |
-| D15 | MCP and React surfaces | MCP implemented and verified; the redesigned screen's start-a-run form is verified against the application, the rest is proof pending | Storage and interfaces |
+| D15 | MCP and React surfaces | Implemented and verified — MCP by test and by hand; the three-column projects-and-runs screen by its front-end suite and hand-driven against the application | Storage and interfaces |
 | D16 | Logging; timing and cost dropped | Logging implemented and verified; timing and cost removed from the screen and from the application | Operations |
 | D17 | Repository layout, build order, tests, setup, and network bind | Mixed | Delivery plan and proof |
 
