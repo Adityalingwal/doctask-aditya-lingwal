@@ -3,7 +3,13 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
-import { exportReply, runId, runReply, serverAnswering } from "./server_replies.js";
+import {
+  exportReply,
+  projectsReply,
+  runId,
+  runReply,
+  serverAnswering,
+} from "./server_replies.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -14,6 +20,7 @@ test("every citation names the source file and the place the server gave it", as
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,
@@ -56,6 +63,7 @@ test("a citation whose quoted words the server did not send is never shown as a 
   vi.stubGlobal(
     "fetch",
     serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
         path: `/runs/${runId}`,

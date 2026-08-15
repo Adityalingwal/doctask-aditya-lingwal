@@ -68,6 +68,16 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   Migration `20260814_0011` was proven forward and backward on a real database
   holding an approved withdrawal. 127 Python tests (was 129) and 27 front-end
   tests (unchanged) pass without a live key.
+- **2026-08-15, branch `front-end-projects-and-runs`:** the screen becomes
+  projects, and inside each project its runs — see the branch's own entry
+  under Completed for the full detail. Four run statuses are renamed
+  (`waiting`→`queued`, `waiting for review`→`needs review`, `closed without
+  export`→`export rejected`, `ended without changes`→`no changes`); migration
+  `20260815_0012` narrows `ck_runs_status` and rebuilds both partial unique
+  indexes, proven forward and backward by hand. `GET /runs` and `list_runs`
+  are replaced by `GET /projects` and `list_projects` (endpoint and tool
+  counts stay at seven). 131 Python tests (was 127) and 32 front-end tests
+  (was 27) pass without a live key.
 
 ## Completed
 
@@ -87,7 +97,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] `.md` batch collection, exact quote location, extraction, matching.
 - [x] Possible-match review, atomic finish-review claim, commit, export.
 - [x] Six API endpoints and startup project seeding.
-- [x] `failed`, `ended without changes`, `closed without export` semantics.
+- [x] `failed`, `no changes`, `export rejected` semantics.
 - [x] Configuration-vs-transient model failure classification.
 - [x] Already-read correction for failed, unrelated, and no-requirement docs.
 - [x] Ingest/Match node re-entry idempotency and merged-proposal marker.
@@ -143,6 +153,182 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       deleted too, their premise no longer possible.
 - [x] 127 Python tests (was 129) and 27 front-end tests (unchanged) pass with
       no live API key.
+
+### The screen becomes projects, and inside each project its runs (branch `front-end-projects-and-runs`)
+
+- [x] **The status rename and its migration, proven first, in isolation, before
+      anything else started** (the brief's own ordering, because a missed
+      literal in a partial unique index breaks the project lock without
+      failing any test): `app/runs/statuses.py`'s four values renamed;
+      migration `20260815_0012` narrows `ck_runs_status` and rebuilds both
+      `uq_runs_one_active_per_project` and `uq_runs_one_waiting_per_project`,
+      whose `postgresql_where` clauses named the old statuses as literals.
+      Proven forward and backward by hand against real PostgreSQL, seeded
+      with one run in each of the four old statuses: `alembic upgrade head`
+      renamed every row and rebuilt the check constraint and both index
+      predicates (confirmed via `pg_get_constraintdef`/`pg_indexes`);
+      inserting a second `needs review` or a second `queued` run on the same
+      project then raised `UniqueViolation` against the rebuilt indexes by
+      name; `alembic downgrade` restored the exact prior shape; a second
+      `alembic upgrade head` re-applied cleanly. The rename's ~74 literal
+      occurrences across `tests/`, `ui/tests/` and `ui/src/` were updated by a
+      scripted find/replace, which corrupted three lines of plain English
+      that happened to contain "waiting for review" as prose rather than the
+      status value (a prompt-injection fixture sentence, a `wait_until`
+      description, and a code comment) — caught by the first post-rename test
+      run and hand-corrected; see `documentation/decision-history.md`.
+- [x] `GET /projects` and MCP tool `list_projects` replace `GET /runs` and
+      `list_runs` (removed, not kept beside), both calling
+      `app/projects/list_projects.py`'s one core function: every project with
+      its runs nested (run number, status, `started_at` — never substituted
+      with `created_at` — stage, waiting-decision count, finished stages, row
+      count once exported), plus the projects root and the folders inside it.
+      Endpoint and MCP tool counts both stay at seven.
+      `test_the_project_list_and_the_list_projects_tool_return_identical_payloads`
+      proves the HTTP and MCP doors byte-identical.
+- [x] Every sentence in the brief's screen-messages table rewritten at its
+      named source (never in the front end): `app/projects/create_project.py`,
+      `app/ingest/collect_batch.py`/`read_pdf.py`/`read_docx.py`/
+      `read_source_document.py`, `app/extract/read_document.py`,
+      `app/graph/register_graph.py` (including the new three-way early-exit
+      split — no files at all, files found but all skipped, documents read
+      but nothing stated a requirement), `app/model/client.py`,
+      `app/model/call_failure.py`, `app/runs/run_lifecycle.py`. Where a
+      message doubled as the log line, the log keeps the old detailed
+      wording and the screen-facing value is now the terse one — never the
+      other way round.
+- [x] The screen rebuilt as three columns: `ui/src/ProjectList.jsx` (new),
+      `ui/src/RunColumn.jsx` (new, with the collapse control), `ui/src/
+      AddProject.jsx` (new, replaces `StartRun.jsx`, carries over its retry
+      and disabled-button behaviour unchanged), `ui/src/StageMarks.jsx` (new,
+      the compact six-mark strip shared by a project card and a run row).
+      `ui/src/RunList.jsx` and `ui/src/StartRun.jsx` deleted.
+      `ui/src/run_requests.js`: `readRuns` → `readProjects`; the
+      network-unreachable message rewritten and marked `unreachable: true`,
+      distinct from a reachable refusal, so screen 11's strip and a normal
+      per-panel refusal never fire off the same signal.
+      `ui/src/Stages.jsx`: the three identifier lines (run/project/status)
+      removed; stage words renamed `pending`/`not needed`.
+      `ui/src/Register.jsx`: export header drops the run id and formats the
+      timestamp for a reader; citation cells named by heading, not
+      `snake_case`; rules listed without ids as `·` bullets, a rule's own
+      parameters folded into its sentence (`config/rules.yaml`'s R3 text
+      edited to carry the word "days" so the fold reads "beyond 14 days",
+      not "beyond 14" — the one config edit this work needed beyond what the
+      brief named); heading reads "N rules ran against M rows".
+      `ui/src/Question.jsx`: a finding decision renders as three labelled
+      parts (Rule / Row N breaks it / Evidence) and never a rule code — which
+      needed `decisions_of_run` (`app/review/review_queue.py`) extended to
+      join `findings` and `register_rows` for `rule_text`/`row_number`/
+      `issue`/`evidence`, since the flat `question` sentence embeds the rule
+      code and can't be split safely. `ui/src/Refusal.jsx`: optional
+      `heading` prop, so the Add-project box shows "Could not create this
+      project" instead of "the server refused".
+- [x] `config/projects.yaml` (new): `projects_root: sample-projects`, and its
+      entry in `config/README.md`.
+- [x] All 14 never-do tests named in the brief: 7 Python
+      (`tests/projects/test_list_projects.py` new file for 4 of them;
+      `tests/runs/test_finished_stages.py` and `tests/interfaces/
+      test_mcp_tools.py` adapted for 2; `tests/runs/test_same_project_queue.py`
+      and `tests/infrastructure/test_schema.py`'s existing lock tests
+      confirmed still passing and still exercising the real partial unique
+      indexes, not a Python-side check) and 7 front-end (4 new files; 3
+      renamed/rewritten onto the new components — `never_offers_the_start_
+      form_in_place_of_a_refusal` became `never_offers_the_add_project_box_
+      in_place_of_a_refusal`, testing that the box is not offered at all
+      while unconfirmed rather than testing it is hidden, since L8 makes the
+      button unconditional; `never_invents_its_own_reason_for_refusing_to_
+      start` rewritten because L9 (locked the same day) reverses the
+      original file's premise — the screen may now refuse an empty name or
+      folder in its own words, which the old test asserted it must never do).
+- [x] Two new backend fields not named in the brief's file list, both
+      required by a locked screen mockup and added with their own tests: a
+      finding decision's `rule_text`/`row_number`/`issue`/`evidence`
+      (screen 4's three-part display), and a run's `stage`/`row_count`
+      alongside its `status` (L4's stage strip on a live project card, L6's
+      row count on an exported run row).
+- [x] Hand-driven against the real application (`docker compose`, no live
+      model key; a scripted client for the scenarios needing one): the
+      Add-project box's dropdown listing exactly `sample-projects/`'s two
+      real folders, choosing one deriving the name, a real `POST /projects`
+      succeeding while `POST /runs` refused for the missing key under
+      "Could not create this project", a retry repeating only `POST /runs`;
+      the runs column collapsed and expanded; the application stopped
+      mid-poll showing "CANNOT REACH THE APPLICATION" over project cards
+      that stayed on screen, then recovering once restarted; the project
+      lock live — `POST /runs` twice in a row on one project returned
+      `"status":"running"` then `"status":"queued"`; a finding's three-part
+      display, a rule's folded parameter ("beyond 14 days"), the "6 rules
+      ran against 1 row" heading, a `failed` run's exact screen-6 text, a
+      `no changes` run's "No files were found in this folder.", and the
+      export header's "Project name · exported 15 Aug, 19:35" — all matched
+      the brief's locked wording exactly, once a day-month date-order bug
+      caught during this pass (`toLocaleString`'s locale-dependent ordering
+      gave "Aug 15" in this environment; replaced with a fixed `format_date.js`
+      helper, `ui/src/ProjectList.jsx`/`RunColumn.jsx`/`Register.jsx`) was
+      fixed. Screen 1's exact zero-project state and the never-do test for
+      an empty-but-existing folder's "No files were found" sentence were
+      not separately hand-driven (the demo project always seeds at startup,
+      so a truly empty project list cannot be reached by hand in this
+      environment) but are proven by the message living correctly in
+      `app/graph/register_graph.py` and by the general Screen 1 "no runs"
+      sub-state being confirmed both by hand and by the front-end suite.
+- [x] Reviewed by Codex (`-s read-only`, CLI `0.147.0`,
+      `handoff/review-report-front-end-projects-and-runs.md`): **not
+      merge-ready**, one P1 and eight P2/P3 findings, none fixed by the
+      implementer per protocol (a fix after review would make the reviewed
+      and merged code diverge). P1: `openRun` (`ReviewScreen.jsx`) does not
+      clear `run`/`exported` when switching runs, so stale decisions/buttons
+      can briefly target the newly selected run's id before the new read
+      lands. P2s: `ui/demo/serve_demo_runs.js` still serves the old flat
+      `/runs` list and has no `/projects` route, so `/demo` no longer loads
+      (a pre-existing gap, already named as a limitation, but Codex is right
+      that the README's demo claim needs qualifying); `waiting` (decisions
+      badge/count) is not scoped to a run at review, so L5 is violated
+      outside the project card; a network failure during an answer/finish/
+      create-project action sets a per-panel refusal instead of routing
+      through the same `unreachable` signal as the poll, so screen 11's
+      single-strip rule does not hold for actions; the screen-6 three-line
+      shape and the 403/401 second line are one concatenated string, not
+      structurally three lines; `read_document.py`'s dropped-quote sentence
+      interpolates `{kind}`, so a dropped testing-observation/blocker does
+      not end in "...this requirement was dropped" as the locked sentence
+      requires; the unrelated-document skip has no separate detailed
+      `log_reason` (unlike the other two rewritten skip reasons in the same
+      file); the live status marks use `text-signal-edge` (dark) rather than
+      `text-signal` (lime); the Add-project helper line states the "never
+      creates one" explanation L8 says needs none. P3: `DECISIONS.md` still
+      says `Question` has "no branch on gate kind", which is now false since
+      it branches on `finding`. Reviewed against `a85b431`, code-level only —
+      Codex's sandbox has no Docker socket, so it could not run either
+      suite, the migration, or a browser; its own report says so. The
+      migration predicates/downgrade, endpoint/tool counts, shared core
+      functions, status rename, absence of a status-label map, and the L9
+      test supersession all independently confirmed as shown, not claimed.
+- [x] 131 Python tests (was 127) and 32 front-end tests (was 27) pass
+      without a live API key.
+- [x] Review findings repaired in the foreground, on the same branch, after
+      Aditya decided each one. Fixed: the P1 (`openRun` now clears the run,
+      its export and both refusals, so the previous run's decisions never sit
+      beside buttons that act on the newly opened one); the decisions badge
+      counts only a run the server reports at review; an action that never
+      reached the application raises screen 11's strip instead of a per-panel
+      refusal, in `ReviewScreen` and in `AddProject`, and does **not** re-read
+      afterwards — a re-read would clear the strip a moment after raising it;
+      the unrelated-document skip regained its detailed log line; the two live
+      marks and the loading line use the locked colours; `DECISIONS.md`'s
+      `Question` sentence and the README's demo paragraph now say what is
+      true. Deliberately not fixed, each decided by Aditya: the screen-6
+      cause and restart notice stay one string (the words are right, only the
+      line break is missing); the dropped-quote sentence keeps naming the kind
+      that was actually dropped, which is more honest than the locked wording
+      and supersedes it; `ui/demo/` is left stale and the README now says so.
+- [x] Three tests written before those fixes and run against the branch as it
+      stood: all three failed there —
+      `never_shows_the_previous_runs_decisions_after_opening_another_run`,
+      `the_decisions_tab_counts_only_a_run_the_server_says_is_at_review`, and
+      `never_calls_an_unreachable_application_a_refusal`. 35 front-end tests
+      (was 32) and 131 Python tests pass after the repair, both with no key.
 
 ### Reliability slice (branch `reliability-proof`)
 
@@ -236,7 +422,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       `created_at` for a run that has not started.
 - [x] `ui/src/Stages.jsx`'s precedence bug fixed: the run's own stage now wins
       over a reported "done" only while the run is active (`running` or
-      `waiting for review`), so a `done` run no longer shows its last stage as
+      `needs review`), so a `done` run no longer shows its last stage as
       permanently "working".
 - [x] `ui/src/RunList.jsx` gets an explicit `started_at === null` check ahead
       of `new Date(...)`, because `new Date(null)` is the 1970 epoch in
@@ -323,6 +509,12 @@ working claim only after its own implementation and proof land.
   exports, is not counted as already read, so the next run reads and pays for
   it again. A related additional document that lists none is unaffected.
 - One Extract call may repeat in the answer-to-checkpoint kill window.
+- A run that fails is not restarted by itself, and nothing it read counts as
+  read — the next run started on that project reads its documents again.
+- A document skipped rather than read (too long, encrypted, wrong format, a
+  failed model call) is never written to `documents`, so it is not "already
+  read" either; the next run attempts it again, paying again if a model call
+  was what failed.
 - A rejected finding stays suppressed if later evidence strengthens it.
 - A finding already approved onto a row is not re-examined by a later run; a
   rules change is applied the next time a run examines that register.
@@ -343,20 +535,21 @@ working claim only after its own implementation and proof land.
   workflow answer (save an edited document under a new name to have the
   revision read).
 - `GET /runs/{id}` returns no register rows, so the screen's register section
-  is empty until that run has exported; a run closed without export never shows
-  a register at all.
+  is empty until that run has exported; a run whose export was rejected never
+  shows a register at all.
 - The screen is built by Node, which the application image does not carry, and
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.
   Image-only serving is part of the open fresh-clone verification.
 - The screen authenticates nobody, exactly as the endpoints behind it do not.
-- The screen's start-a-run form (2026-08-15) reads a folder inside the
-  application's container, whose only mount is `.:/workspace`, so a path
-  outside the repository is refused by `create_project`; this is deliberate,
-  not fixed by widening the mount (`docker-compose.yml` is untouched).
-- The start-a-run form disappears once the first run exists, because L1's
-  condition is a run list of exactly zero; a second project needs
-  `POST /projects` by hand or the `create_project` MCP tool.
+- The Add-project box reads a folder inside the application's container,
+  whose only mount is `.:/workspace`, so a path outside the repository is
+  refused by `create_project`; this is deliberate, not fixed by widening the
+  mount (`docker-compose.yml` is untouched).
+- The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on a
+  fixed interval, whatever is on screen and whatever a run's status is
+  (L1, locked 2026-08-15) — there is no per-project runs endpoint and no
+  conditional refresh.
 - A reported embedded instruction reaches a person only through the run's log
   line: `GET /runs/{id}` does not carry it, and neither does the export. D02
   scenario 9 makes it information rather than a gate, and there is currently no

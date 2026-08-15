@@ -76,7 +76,7 @@ def test_a_second_run_on_one_project_waits_while_the_first_holds_the_lock(
                 while_running = runs_of_project(database_url, project_id)
 
                 at_review = wait_for_run_status(
-                    client, running_run, "waiting for review"
+                    client, running_run, "needs review"
                 )
                 asked_again = [
                     client.post("/runs", json={"project_id": project_id}).json()
@@ -87,27 +87,27 @@ def test_a_second_run_on_one_project_waits_while_the_first_holds_the_lock(
                 approve_every_decision_and_finish_review(client, running_run)
                 wait_for_run_status(client, running_run, "done")
                 wait_for_run_status(
-                    client, queued["run_id"], "ended without changes"
+                    client, queued["run_id"], "no changes"
                 )
                 after_both = runs_of_project(database_url, project_id)
         finally:
             application.stop()
 
-    assert queued["status"] == "waiting"
+    assert queued["status"] == "queued"
     assert queued["run_id"] != running_run
-    assert while_running == [(running_run, "running"), (queued["run_id"], "waiting")]
-    assert at_review["status"] == "waiting for review"
+    assert while_running == [(running_run, "running"), (queued["run_id"], "queued")]
+    assert at_review["status"] == "needs review"
     # However often a run is asked for, the same one waiting run comes back.
     assert asked_again == [
-        {"run_id": queued["run_id"], "status": "waiting"}
+        {"run_id": queued["run_id"], "status": "queued"}
     ] * TIMES_ASKED_AGAIN
     assert while_at_review == [
-        (running_run, "waiting for review"),
-        (queued["run_id"], "waiting"),
+        (running_run, "needs review"),
+        (queued["run_id"], "queued"),
     ]
     assert after_both == [
         (running_run, "done"),
-        (queued["run_id"], "ended without changes"),
+        (queued["run_id"], "no changes"),
     ]
 
 
@@ -143,7 +143,7 @@ def test_a_queued_run_forms_its_batch_when_it_starts_not_when_it_was_queued(
             with application.client() as client:
                 project_id = _project(client, "Batch-at-start portal", source_folder)
                 first_run = _start(client, project_id)
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 queued_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
@@ -154,7 +154,7 @@ def test_a_queued_run_forms_its_batch_when_it_starts_not_when_it_was_queued(
 
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
-                wait_for_run_status(client, queued_run, "waiting for review")
+                wait_for_run_status(client, queued_run, "needs review")
                 approve_every_decision_and_finish_review(client, queued_run)
                 wait_for_run_status(client, queued_run, "done")
 

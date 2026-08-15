@@ -2,8 +2,8 @@
 // same-origin and no host, key or token is configured anywhere in this folder.
 const JSON_FORMAT = "json";
 
-export async function readRuns() {
-  return await ask("GET", "/runs");
+export async function readProjects() {
+  return await ask("GET", "/projects");
 }
 
 export async function createProject(name, sourceFolderPath) {
@@ -39,7 +39,12 @@ export async function finishReview(runId) {
   return await ask("POST", `/runs/${encodeURIComponent(runId)}/finish-review`);
 }
 
-/** One request, answered as either the server's body or the server's refusal. */
+/**
+ * One request, answered as either the server's body or a refusal. `unreachable`
+ * is true only when the request never reached the application at all (screen
+ * 11) — a real answer the server sent back, refusal or not, is never marked
+ * this way, because the application plainly is reachable in that case.
+ */
 async function ask(method, path, payload) {
   let response;
   try {
@@ -48,12 +53,12 @@ async function ask(method, path, payload) {
       headers: payload === undefined ? {} : { "Content-Type": "application/json" },
       body: payload === undefined ? undefined : JSON.stringify(payload),
     });
-  } catch (unreachable) {
+  } catch {
     return {
       ok: false,
+      unreachable: true,
       refusal:
-        `${method} ${path} did not reach the application (${unreachable.message}) `
-        + "— check that `docker compose up` is still running and reload this page.",
+        "Check that Docker is running, then reload this page.",
     };
   }
   const body = await response.json();

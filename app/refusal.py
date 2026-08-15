@@ -24,3 +24,8 @@ class UnusableRequest(Refused):
 
 class RunsUnavailable(Refused):
     """No run can start, because the model client could not be built."""
+
+
+class ProjectsUnavailable(Refused):
+    """The project list cannot be read, because config/projects.yaml is
+    missing, unreadable, or names a root that does not exist."""

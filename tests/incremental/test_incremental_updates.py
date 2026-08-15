@@ -102,7 +102,7 @@ def _project_of_two_documents(
 
 def _exported_run(client: httpx.Client, project_id: str) -> str:
     run_id = client.post("/runs", json={"project_id": project_id}).json()["run_id"]
-    wait_for_run_status(client, run_id, "waiting for review")
+    wait_for_run_status(client, run_id, "needs review")
     approve_every_decision_and_finish_review(client, run_id)
     wait_for_run_status(client, run_id, "done")
     return run_id
@@ -204,7 +204,7 @@ def test_a_second_run_proposal_reaches_the_register_only_after_the_export_gate(
             second_run = client.post(
                 "/runs", json={"project_id": project_id}
             ).json()["run_id"]
-            at_review = wait_for_run_status(client, second_run, "waiting for review")
+            at_review = wait_for_run_status(client, second_run, "needs review")
             # The proposal is waiting, and the register has not moved for it.
             while_waiting = stored_rows(database_url, project_id)
 
@@ -221,7 +221,7 @@ def test_a_second_run_proposal_reaches_the_register_only_after_the_export_gate(
                 },
             ).raise_for_status()
             client.post(f"/runs/{second_run}/finish-review").raise_for_status()
-            wait_for_run_status(client, second_run, "closed without export")
+            wait_for_run_status(client, second_run, "export rejected")
             after_rejection = stored_rows(database_url, project_id)
 
     assert while_waiting == after_first_run
@@ -285,7 +285,7 @@ def test_a_changed_rules_file_re_examines_the_register_without_reading_a_documen
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, unchanged_run, "ended without changes"
+                    client, unchanged_run, "no changes"
                 )
         finally:
             application.stop()
@@ -301,4 +301,6 @@ def test_a_changed_rules_file_re_examines_the_register_without_reading_a_documen
     assert examined["rows_examined"] == 1
     assert [rule["id"] for rule in examined["rules"]] == ["R1", "R9", "D1", "D2"]
     assert after_rules_run[UNTOUCHED_ROW] == after_first_run[UNTOUCHED_ROW]
-    assert "no new document" in ended["ended_early_reason"]
+    assert ended["ended_early_reason"] == (
+        "Nothing was read — all 1 file was skipped. See the Skipped tab for why."
+    )

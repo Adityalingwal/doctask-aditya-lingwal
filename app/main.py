@@ -33,6 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATABASE_URL_ENVIRONMENT_VARIABLE = "DATABASE_URL"
 FORMATS_CONFIG_PATH = PROJECT_ROOT / "config" / "formats.yaml"
 MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
+PROJECTS_CONFIG_PATH = PROJECT_ROOT / "config" / "projects.yaml"
 RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE = "RULES_CONFIG_PATH"
 DEFAULT_RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
 WATCHER_CONFIG_PATH_ENVIRONMENT_VARIABLE = "WATCHER_CONFIG_PATH"
@@ -77,6 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     app.state.pool = pool
     app.state.project_root = PROJECT_ROOT
+    app.state.projects_config_path = PROJECTS_CONFIG_PATH
     app.state.run_engine, app.state.run_engine_unavailable = _build_run_engine(
         pool,
         checkpointer,

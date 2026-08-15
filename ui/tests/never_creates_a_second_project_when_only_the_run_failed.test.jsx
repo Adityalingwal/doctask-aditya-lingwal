@@ -9,12 +9,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
-import StartRun from "../src/StartRun.jsx";
+import AddProject from "../src/AddProject.jsx";
 import { serverAnswering } from "./server_replies.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+const FOLDER = "sample-projects/northside-dental";
 
 test("never_creates_a_second_project_when_only_the_run_failed", async () => {
   const projectId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
@@ -48,16 +50,21 @@ test("never_creates_a_second_project_when_only_the_run_failed", async () => {
   vi.stubGlobal("fetch", answering);
 
   const onStarted = vi.fn();
-  render(<StartRun onStarted={onStarted} />);
+  render(
+    <AddProject
+      projectsRoot="sample-projects"
+      availableFolders={[FOLDER]}
+      onStarted={onStarted}
+      onClose={() => {}}
+    />,
+  );
 
+  fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
   fireEvent.change(screen.getByLabelText(/project name/i), {
     target: { value: "Northside Dental" },
   });
-  fireEvent.change(screen.getByLabelText(/folder/i), {
-    target: { value: "sample-projects/northside-dental" },
-  });
 
-  const startButton = screen.getByRole("button", { name: /start run/i });
+  const startButton = screen.getByRole("button", { name: /create and start run/i });
 
   await act(async () => {
     startButton.click();

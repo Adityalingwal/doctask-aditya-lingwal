@@ -122,13 +122,13 @@ EXPECTED_COLUMNS = {
     },
 }
 RUN_STATUSES = (
-    "waiting",
+    "queued",
     "running",
-    "waiting for review",
+    "needs review",
     "done",
-    "closed without export",
+    "export rejected",
     "failed",
-    "ended without changes",
+    "no changes",
 )
 REGISTER_ROW_STATUSES = (
     "Done",
@@ -364,8 +364,8 @@ def test_run_requires_one_existing_project(
     ("first_status", "second_status"),
     [
         ("running", "running"),
-        ("waiting for review", "running"),
-        ("running", "waiting for review"),
+        ("needs review", "running"),
+        ("running", "needs review"),
     ],
 )
 def test_project_refuses_a_second_active_run(
@@ -385,11 +385,11 @@ def test_project_refuses_a_second_waiting_run(
     database_connection: Connection,
 ) -> None:
     project_id = _insert_project(database_connection)
-    _insert_run(database_connection, project_id, status="waiting")
+    _insert_run(database_connection, project_id, status="queued")
 
     with pytest.raises(IntegrityError):
         with database_connection.begin_nested():
-            _insert_run(database_connection, project_id, status="waiting")
+            _insert_run(database_connection, project_id, status="queued")
 
 
 def test_run_refuses_a_second_row_for_the_same_document(

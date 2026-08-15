@@ -22,7 +22,7 @@ from tests.documents.register_documents import (
 
 SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
-WAITING_FOR_REVIEW = "waiting for review"
+WAITING_FOR_REVIEW = "needs review"
 DONE = "done"
 
 
@@ -68,7 +68,7 @@ def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> N
             run_id = started.payload["run_id"]
             at_review = wait_until(
                 lambda: _status_of(base_url, run_id, WAITING_FOR_REVIEW),
-                "the run reports it is waiting for review",
+                "the run reports its status as needs review",
             )
             export_decision = next(
                 decision

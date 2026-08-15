@@ -107,10 +107,10 @@ def test_two_projects_running_at_once_never_appear_in_each_others_work(
                 )
 
                 alpha_at_review = wait_for_run_status(
-                    client, alpha_run, "waiting for review"
+                    client, alpha_run, "needs review"
                 )
                 beta_at_review = wait_for_run_status(
-                    client, beta_run, "waiting for review"
+                    client, beta_run, "needs review"
                 )
                 approve_every_decision_and_finish_review(client, alpha_run)
                 approve_every_decision_and_finish_review(client, beta_run)

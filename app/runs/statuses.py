@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 
-WAITING = "waiting"
+WAITING = "queued"
 RUNNING = "running"
-WAITING_FOR_REVIEW = "waiting for review"
+WAITING_FOR_REVIEW = "needs review"
 DONE = "done"
-CLOSED_WITHOUT_EXPORT = "closed without export"
+CLOSED_WITHOUT_EXPORT = "export rejected"
 FAILED = "failed"
-ENDED_WITHOUT_CHANGES = "ended without changes"
+ENDED_WITHOUT_CHANGES = "no changes"
 
 TERMINAL_STATUSES = (DONE, CLOSED_WITHOUT_EXPORT, FAILED, ENDED_WITHOUT_CHANGES)
 # The project's durable lock is exactly these two: a run in any other status

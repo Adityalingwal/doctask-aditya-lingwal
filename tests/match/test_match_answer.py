@@ -170,7 +170,7 @@ def test_an_incomplete_match_answer_fails_the_run_and_proposes_nothing(
 
     assert proposed == 0
     assert failed["exported"] is False
-    assert "IncompleteMatchAnswer" in failed["failure_reason"]
     assert "answered for [1, 2]" in failed["failure_reason"]
+    assert "This run will not restart by itself." in failed["failure_reason"]
     assert after_failure["status"] == "running"
     assert after_restart["status"] == "failed"

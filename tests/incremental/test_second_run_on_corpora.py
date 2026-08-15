@@ -86,7 +86,7 @@ def _two_runs_over(
 
 def _exported_run(client: Any, project_id: str) -> str:
     run_id = client.post("/runs", json={"project_id": project_id}).json()["run_id"]
-    wait_for_run_status(client, run_id, "waiting for review")
+    wait_for_run_status(client, run_id, "needs review")
     approve_every_decision_and_finish_review(client, run_id)
     wait_for_run_status(client, run_id, "done")
     return run_id

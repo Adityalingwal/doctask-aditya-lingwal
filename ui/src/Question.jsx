@@ -1,7 +1,10 @@
-// One component for every gate. The kind, the question and the answer are all
-// read off the decision the server froze, so a possible match, a conflict, a
-// rule finding and the export gate render through this same code with no
-// branch on which of them it is.
+const FINDING_KIND = "finding";
+
+// One component for every gate. The kind and the answer are read off the
+// decision the server froze, so a possible match, a conflict, a rule finding
+// and the export gate render through this same code with no branch on which
+// of them it is — except a finding's own body (screen 4), which the flat
+// `question` sentence cannot carry without a rule code in it.
 //
 // The accent is on the left edge of a decision nobody has answered yet, and it
 // is the only accent in the card: Approve and Reject look identical, because a
@@ -27,9 +30,13 @@ export default function Question({ decision, reviewing, onAnswer, answering }) {
         </p>
       </div>
 
-      <p className="m-0 max-w-prose px-5 py-5 text-[17px] leading-relaxed">
-        {decision.question}
-      </p>
+      {decision.kind === FINDING_KIND ? (
+        <FindingBody decision={decision} />
+      ) : (
+        <p className="m-0 max-w-prose px-5 py-5 text-[17px] leading-relaxed">
+          {decision.question}
+        </p>
+      )}
 
       {reviewing && (
         // An answer may change until finish-review (D02), so a decision the
@@ -49,6 +56,24 @@ export default function Question({ decision, reviewing, onAnswer, answering }) {
         </p>
       )}
     </li>
+  );
+}
+
+// A finding in three labelled parts, and never a rule code: the rule's own
+// words, the row and what it did to break the rule, and the evidence — no
+// R1, no D1, anywhere on this screen (screen 4).
+function FindingBody({ decision }) {
+  return (
+    <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-4 px-5 py-5">
+      <dt className="eyebrow whitespace-nowrap">Rule</dt>
+      <dd className="m-0 max-w-prose text-[15px] leading-relaxed">
+        {decision.rule_text}
+      </dd>
+      <dt className="eyebrow whitespace-nowrap">Row {decision.row_number} breaks it</dt>
+      <dd className="m-0 max-w-prose text-[15px] leading-relaxed">{decision.issue}</dd>
+      <dt className="eyebrow whitespace-nowrap">Evidence</dt>
+      <dd className="m-0 max-w-prose text-[15px] leading-relaxed">{decision.evidence}</dd>
+    </dl>
   );
 }
 

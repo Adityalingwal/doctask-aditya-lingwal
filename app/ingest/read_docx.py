@@ -27,10 +27,8 @@ def read_docx(path: Path) -> str:
         document = Document(str(path))
     except (PackageNotFoundError, BadZipFile) as damaged:
         raise DocumentUnreadable(
-            f"{path.name} could not be opened as a Word document — the file is "
-            "damaged, or something that is not a Word file was given a .docx "
-            "name; open it in Word, save a working copy into the project "
-            "folder, and start another run."
+            "This Word file could not be opened — it is damaged, or not a "
+            ".docx."
         ) from damaged
 
     lines: list[str] = []

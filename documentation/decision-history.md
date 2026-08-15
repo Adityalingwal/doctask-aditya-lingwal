@@ -3471,3 +3471,80 @@ meaning") that withdrawal alone had implemented had never been asked for by
 the brief either — it was our own decision, dated 2026-08-14, now reversed
 the next day once the model-call risk was weighed against how little of the
 brief it served.
+
+### The screen becomes projects, and inside each project its runs (2026-08-15, superseding D14's endpoint table, D15's screen shape and start-form, and D13's run-status names)
+
+**Superseded wording**, from root `DECISIONS.md` D14's endpoint table:
+"| `GET /runs` | Every run, newest first: project, status, start time, waiting
+decisions, finished stages |". D15's tool list: "MCP mirrors the seven
+endpoints 1:1: `create_project`, `start_run`, `list_runs`, `get_run_status`,
+`submit_decision`, `finish_review`, `get_export`." D15's screen shape: "React
+is one screen filling the viewport: a run list down the left, and to its
+right one run's sections read one at a time behind tabs... The run list
+replaces pasting a run id: a card carries the project name, when the run
+started, which stages finished and what is waiting, and never a UUID." D15's
+start-form paragraph (locked 2026-08-15, superseded the same day): a
+`StartRun` form — project name, source folder, one `Start run` button —
+rendered in the reading pane only once `GET /runs` answered with zero runs,
+validated nothing itself, held the `project_id` `POST /projects` returned so
+a retry skipped the create, and disappeared once any run existed with no way
+to create a second project from the screen. D15's limitation bullet on this:
+"the start form disappears once the first run exists — L1's condition is a
+run list of exactly zero. A second project needs `POST /projects` by hand or
+the `create_project` MCP tool; there is no 'New project' affordance to cover
+this." D13's run statuses: "`waiting`, `running`, `waiting for review`,
+`done`, `closed without export`, `failed`, `ended without changes`." with
+"`done` means export exists. `closed without export` means export was
+rejected. `failed` is deliberate unrecoverable stop. Early exits use `ended
+without changes` plus a reason."
+
+**Replacement:** the flat run list is gone. `GET /projects` replaces
+`GET /runs` — every project, each with its runs nested, in one answer
+(`app/projects/list_projects.py:read_project_list`), and `list_projects`
+replaces `list_runs` as the seventh MCP tool over the same core function.
+Endpoint and tool counts both stay at seven. The screen is three columns:
+projects (20rem, `ui/src/ProjectList.jsx`), one selected project's runs
+(13rem, collapsible, `ui/src/RunColumn.jsx`), and the open run's detail
+(unchanged). A project card carries a status mark (`●` running and pulsing,
+`◍` at review and still, `○` nothing live — the pulse is one dot on a
+two-second cycle, never the card or the stage strip, and a still dot under
+`prefers-reduced-motion: reduce`), its run count, the date of its most
+recent run, and — only while something is live — the active run's stage
+strip or its waiting-decision count; a card never shows a folder path. A
+project is created and its first run started from `ui/src/AddProject.jsx`, a
+box a full-width `Add project +` button at the bottom of the projects column
+opens in every state, empty or not — no inline first-time form and no
+condition on the run list being empty. Folder first, then name: the folder
+comes from a dropdown of what `config/projects.yaml`'s configured root
+actually holds on disk (never invented, never created by the system), and
+choosing one derives the name, still editable. The two behaviours the old
+form had are unchanged in the new box: a retry after a failed `POST /runs`
+never repeats `POST /projects`, and the button stays disabled through the
+parent's re-read. Unlike the old form, this box does not disappear once a
+run exists — a second, third, or later project is created from the same
+button the first one was, closing the limitation quoted above. One rule did
+change: the box may now refuse to send an empty name or an unchosen folder,
+in its own words ("Give this project a name.", "Choose the folder to
+watch.") — every other rule, including whether the chosen folder exists,
+still stays the server's, shown unchanged. The screen polls `GET /projects`
+and `GET /runs/{id}` unconditionally, on the same fixed interval, whatever
+is on screen — deliberate, not a gap: at this size the payload is a few
+kilobytes, and one unconditional read is easier to reason about than
+conditional refresh rules. Four run statuses are renamed so the screen can
+print the stored value verbatim instead of holding a label map: `waiting` →
+`queued`, `waiting for review` → `needs review`, `closed without export` →
+`export rejected`, `ended without changes` → `no changes`; `running`,
+`done` and `failed` are unchanged. Migration `20260815_0012` narrows
+`ck_runs_status` to the new values and rebuilds both partial unique indexes
+(`uq_runs_one_active_per_project`, `uq_runs_one_waiting_per_project`), whose
+`postgresql_where` clauses named the old statuses as literals; proven forward
+and backward by hand (`PROGRESS.md`).
+
+**Why now:** the run list showed every run of every project in one flat
+column — a project with three runs looked like three projects, a project
+with none was invisible, and there was no way to create a second project
+once the first run existed. This gives the screen the shape the data already
+had. The status rename exists only because of the new lock it enables: the
+screen shows the stored value verbatim, with no label map and no branch on
+status to decide what to print, so a stored word that used to read badly for
+a person is the word that changes instead of the code that displays it.

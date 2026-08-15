@@ -14,6 +14,7 @@ from app.ingest.unreadable_document import DocumentUnreadable
 
 
 SKIPPED_FILE_KIND = "file"
+UNREADABLE_FORMAT = "Not a format this system reads. It reads .md, .pdf, .docx and .txt."
 
 
 class CollectedBatch(NamedTuple):
@@ -37,26 +38,8 @@ async def collect_batch(
     async with connection.transaction():
         for path in sorted(_top_level_files(source_folder)):
             extension = path.suffix.lower()
-            if extension not in accepted_extensions:
-                skipped.append(
-                    _skipped(
-                        path.name,
-                        f"unsupported format — {extension or 'no extension'} is "
-                        "not listed in config/formats.yaml; add it there and add "
-                        "a reader for it.",
-                    )
-                )
-                continue
-            if extension not in READER_EXTENSIONS:
-                skipped.append(
-                    _skipped(
-                        path.name,
-                        f"no reader for {extension} in this release — the "
-                        "formats read so far are "
-                        f"{', '.join(sorted(READER_EXTENSIONS))}; remove the "
-                        "line from config/formats.yaml or add a reader for it.",
-                    )
-                )
+            if extension not in accepted_extensions or extension not in READER_EXTENSIONS:
+                skipped.append(_skipped(path.name, UNREADABLE_FORMAT))
                 continue
 
             try:
@@ -68,12 +51,7 @@ async def collect_batch(
                 continue
             except OSError as error:
                 skipped.append(
-                    _skipped(
-                        path.name,
-                        f"could not be read from {source_folder} "
-                        f"({error.strerror}) — check the file is still present "
-                        "and readable, then run again.",
-                    )
+                    _skipped(path.name, f"Could not be opened ({error.strerror}).")
                 )
                 continue
 
@@ -184,18 +162,5 @@ async def _already_read_by_name_or_content(
 
 def _already_read_reason(matched: str) -> str:
     if matched == "both":
-        return (
-            "unchanged since an earlier run read it and finished with what it "
-            "said — an unchanged document is never read or sent to a model "
-            "again."
-        )
-    if matched == "name":
-        return (
-            "this name was already read here, with different words — a "
-            "document is read once by name; save this revision under a new "
-            "name to have it read."
-        )
-    return (
-        "these words were already read here under a different name — "
-        "renaming a file does not make it new."
-    )
+        return "Already read, and unchanged since."
+    return "Read before — an edited or renamed file is not read again."

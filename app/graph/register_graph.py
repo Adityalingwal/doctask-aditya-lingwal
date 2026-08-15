@@ -75,22 +75,23 @@ END_EARLY_NODE = "end_early"
 CLOSE_WITHOUT_EXPORT_NODE = "close_without_export"
 
 SKIPPED_DOCUMENT_KIND = "document"
-NO_READABLE_FILE = (
-    "no new document the system can read was waiting in the project folder — "
-    "a document is read once, by name or content; add one this project has "
-    "never read, or save an edited document under a new name, and start "
-    "another run."
-)
-NOTHING_FOUND = (
-    "no document in this batch reported a requirement that could be traced to "
-    "its own words — nothing was proposed for the register."
-)
+NO_FILES_FOUND = "No files were found in this folder."
+NOTHING_FOUND = "The documents were read, but none of them stated a requirement."
+
+
+def _nothing_read_reason(skipped_count: int) -> str:
+    file_word = "file was" if skipped_count == 1 else "files were"
+    return (
+        f"Nothing was read — all {skipped_count} {file_word} skipped. See "
+        "the Skipped tab for why."
+    )
 
 
 class RunState(TypedDict, total=False):
     run_id: str
     project_id: str
     document_ids: list[str]
+    skipped_count: int
     next_document_index: int
     requirements_found: int
     examine_changed_rules: bool
@@ -159,6 +160,7 @@ def build_register_graph(
         )
         return {
             "document_ids": [str(document_id) for document_id in batch.document_ids],
+            "skipped_count": len(batch.skipped),
             "next_document_index": 0,
             "requirements_found": 0,
             "examine_changed_rules": examine_changed_rules,
@@ -183,13 +185,16 @@ def build_register_graph(
                 model_client, source_file, document["extracted_text"]
             )
         except UnrecognisedDocumentType as unrecognised:
-            reason = (
+            skip_reason = "The model gave an unknown document type."
+            log_reason = (
                 f"{source_file} was skipped: {unrecognised}. The other "
                 "documents in the batch continue and the next run reads this "
                 "one again; if the type keeps coming back invented, name a "
                 "stronger model in config/model.yaml."
             )
-            _log(logging.WARNING, "extract_document_type_unrecognised", reason, run_id)
+            _log(
+                logging.WARNING, "extract_document_type_unrecognised", log_reason, run_id
+            )
             async with pool.connection() as connection:
                 await append_skipped(
                     connection,
@@ -198,7 +203,7 @@ def build_register_graph(
                         {
                             "kind": SKIPPED_DOCUMENT_KIND,
                             "file": source_file,
-                            "reason": reason,
+                            "reason": skip_reason,
                         }
                     ],
                 )
@@ -209,13 +214,14 @@ def build_register_graph(
             # skipping every document would export an empty register instead
             # of the practical explanation.
             raise_if_configuration_failure(error)
-            reason = (
+            skip_reason = "The model call failed for this file."
+            log_reason = (
                 f"{source_file} was skipped after the model call failed "
                 f"({describe_unreadable_answer(error)}) — the other documents "
                 "in the batch continue, and the next run reads this document "
                 "again."
             )
-            _log(logging.ERROR, "extract_document_skipped", reason, run_id)
+            _log(logging.ERROR, "extract_document_skipped", log_reason, run_id)
             async with pool.connection() as connection:
                 await append_skipped(
                     connection,
@@ -224,7 +230,7 @@ def build_register_graph(
                         {
                             "kind": SKIPPED_DOCUMENT_KIND,
                             "file": source_file,
-                            "reason": reason,
+                            "reason": skip_reason,
                         }
                     ],
                 )
@@ -244,11 +250,19 @@ def build_register_graph(
                 {
                     "kind": SKIPPED_DOCUMENT_KIND,
                     "file": source_file,
-                    "reason": (
-                        "the document is not about this client engagement, so "
-                        "nothing from it was proposed for the register."
-                    ),
+                    "reason": "This document is not related to this client or project.",
                 }
+            )
+            # The screen's sentence is short on purpose; the log keeps the
+            # detail, exactly as the unknown-type and failed-call paths do.
+            _log(
+                logging.INFO,
+                "extract_document_unrelated",
+                f"{source_file} was read and labelled as not about this "
+                "client engagement, so nothing from it was proposed for the "
+                "register; it counts as read and no later run pays to read "
+                "it again.",
+                run_id,
             )
 
         async with pool.connection() as connection:
@@ -371,7 +385,7 @@ def build_register_graph(
         # resume, so this node cannot otherwise tell a first entry from a
         # post-review replay. review_finished_at is the durable fact that
         # tells them apart: once it is set, raising the export decision,
-        # entering the stage, reporting 'waiting for review', and the
+        # entering the stage, reporting 'needs review', and the
         # interrupt itself must not happen again.
         if run["review_finished_at"] is None:
             async with pool.connection() as connection:
@@ -604,10 +618,11 @@ def _early_reason(state: RunState) -> str:
     # requirement Match sees becomes a proposed row (app/register/propose_rows.py
     # inserts one per requirement unconditionally) — so a run that reaches
     # Match always has something to propose, and can only end early before it,
-    # for one of these two reasons.
-    if not state.get("document_ids"):
-        return NO_READABLE_FILE
-    return NOTHING_FOUND
+    # for one of these three reasons.
+    if state.get("document_ids"):
+        return NOTHING_FOUND
+    skipped_count = state.get("skipped_count", 0)
+    return _nothing_read_reason(skipped_count) if skipped_count else NO_FILES_FOUND
 
 
 def _resolve_folder(project_root: Path, project: dict[str, Any]) -> Path:

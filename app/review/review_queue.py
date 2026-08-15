@@ -77,11 +77,24 @@ async def decisions_of_run(
     connection: AsyncConnection,
     run_id: UUID,
 ) -> list[dict[str, Any]]:
+    """Every decision this run raised, a finding's own rule/row/evidence included.
+
+    The screen shows a finding as three labelled parts and never a rule code
+    (screen 4), which the flat `question` sentence alone cannot carry — so a
+    finding decision is joined to its row in `findings` for `rule_text`,
+    `issue` and `evidence`, and to `register_rows` for the row number the
+    finding is against. Every other kind of decision carries these as `null`.
+    """
     result = await connection.execute(
-        "SELECT id, kind, question, proposed_register_row_id, "
-        "candidate_register_row_id, outcome, decided_at "
+        "SELECT decisions.id, decisions.kind, decisions.question, "
+        "decisions.proposed_register_row_id, "
+        "decisions.candidate_register_row_id, decisions.outcome, "
+        "decisions.decided_at, findings.rule_text, findings.issue, "
+        "findings.evidence, register_rows.row_number AS finding_row_number "
         "FROM decisions "
-        "WHERE run_id = %s ORDER BY kind, id",
+        "LEFT JOIN findings ON findings.decision_key = decisions.id "
+        "LEFT JOIN register_rows ON register_rows.id = findings.register_row_id "
+        "WHERE decisions.run_id = %s ORDER BY decisions.kind, decisions.id",
         (run_id,),
     )
     return list(await result.fetchall())

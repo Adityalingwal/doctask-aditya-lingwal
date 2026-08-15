@@ -23,7 +23,7 @@ function demoRuns() {
     "demo-review": {
       run: runReply({
         run_id: "demo-review",
-        status: "waiting for review",
+        status: "needs review",
         stage: "review",
         decisions: [
           decisionReply({

@@ -92,7 +92,7 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
                 exporting_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, exporting_run, "waiting for review")
+                wait_for_run_status(client, exporting_run, "needs review")
                 approve_every_decision_and_finish_review(client, exporting_run)
                 exported = wait_for_run_status(client, exporting_run, "done")
 
@@ -100,7 +100,7 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, second_run, "ended without changes"
+                    client, second_run, "no changes"
                 )
         finally:
             application.stop()
@@ -125,7 +125,7 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
     assert list(second_batch) == [UNREAD_FILE]
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
     assert [entry["file"] for entry in skipped_files] == [READ_FILE]
-    assert "read it and finished with what it said" in skipped_files[0]["reason"]
+    assert skipped_files[0]["reason"] == "Already read, and unchanged since."
 
 
 def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> None:
@@ -164,7 +164,7 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
 
@@ -177,7 +177,7 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, second_run, "ended without changes"
+                    client, second_run, "no changes"
                 )
         finally:
             application.stop()
@@ -185,7 +185,9 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
     assert recorded_markers(call_log_path).count(extract_marker(READ_FILE)) == 1
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
     assert [entry["file"] for entry in skipped_files] == [READ_FILE]
-    assert "new name" in skipped_files[0]["reason"]
+    assert skipped_files[0]["reason"] == (
+        "Read before — an edited or renamed file is not read again."
+    )
 
 
 def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
@@ -226,7 +228,7 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
                 after_first_run = stored_rows(database_url, project_id)
@@ -239,7 +241,7 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, second_run, "ended without changes"
+                    client, second_run, "no changes"
                 )
                 after_second_run = stored_rows(database_url, project_id)
         finally:
@@ -248,7 +250,9 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
     assert recorded_markers(call_log_path).count(extract_marker(ORIGINAL_NAME)) == 1
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
     assert [entry["file"] for entry in skipped_files] == [RENAMED_NAME]
-    assert "different name" in skipped_files[0]["reason"]
+    assert skipped_files[0]["reason"] == (
+        "Read before — an edited or renamed file is not read again."
+    )
     # No second set of rows: the register is exactly what the first run wrote.
     assert after_second_run == after_first_run
 
@@ -287,7 +291,7 @@ def test_a_deleted_document_never_removes_a_row(tmp_path: Path) -> None:
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
                 after_first_run = stored_rows(database_url, project_id)
@@ -296,7 +300,7 @@ def test_a_deleted_document_never_removes_a_row(tmp_path: Path) -> None:
                 second_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, second_run, "ended without changes")
+                wait_for_run_status(client, second_run, "no changes")
                 after_second_run = stored_rows(database_url, project_id)
         finally:
             application.stop()
@@ -377,7 +381,7 @@ def _markers_from_two_runs_over(
                     run_id = client.post(
                         "/runs", json={"project_id": project_id}
                     ).json()["run_id"]
-                    wait_for_run_status(client, run_id, "ended without changes")
+                    wait_for_run_status(client, run_id, "no changes")
         finally:
             application.stop()
 

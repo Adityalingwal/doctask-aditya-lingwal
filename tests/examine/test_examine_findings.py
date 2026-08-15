@@ -27,7 +27,7 @@ from tests.runs.application import (
     wait_until,
     write_script,
 )
-from tests.examine.answers import R1_ISSUE, examine_answer, one_finding
+from tests.examine.answers import R1_EVIDENCE, R1_ISSUE, examine_answer, one_finding
 from tests.documents.register_documents import (
     extract_marker,
     extraction_answer,
@@ -112,7 +112,7 @@ def _run_at_review(
                 ).json()["run_id"]
                 wait_until(
                     lambda: client.get(f"/runs/{run_id}").json()["status"]
-                    == "waiting for review",
+                    == "needs review",
                     "the run reaches Review",
                 )
             yield application, database_url, run_id
@@ -200,6 +200,16 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
         with application.client() as client:
             waiting = client.get(f"/runs/{run_id}").json()
             finding_decision = _decision_of_kind(waiting, "finding")
+            # Screen 4 shows a finding as its rule's own words, the row and
+            # what broke it, and the evidence — never a rule code — so the
+            # door must carry these separately from the flat `question`.
+            assert finding_decision["rule_text"] == (
+                "Anything built must have a written requirement; a verbal "
+                "mention is not enough."
+            )
+            assert finding_decision["row_number"] == 1
+            assert finding_decision["issue"] == R1_ISSUE
+            assert finding_decision["evidence"] == R1_EVIDENCE
             refusal = client.post(f"/runs/{run_id}/finish-review")
             export_attempt = client.get(f"/runs/{run_id}/export")
 
@@ -398,7 +408,7 @@ def test_editing_the_rules_file_after_a_run_started_leaves_that_run_examining(
                     lambda: (
                         client.get(f"/runs/{run_id}").json()
                         if client.get(f"/runs/{run_id}").json()["status"]
-                        == "waiting for review"
+                        == "needs review"
                         else None
                     ),
                     "the run reaches Review",

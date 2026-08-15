@@ -58,7 +58,7 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
                 exporting_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, exporting_run, "waiting for review")
+                wait_for_run_status(client, exporting_run, "needs review")
                 approve_every_decision_and_finish_review(client, exporting_run)
                 wait_for_run_status(client, exporting_run, "done")
 
@@ -66,17 +66,19 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, unchanged_run, "ended without changes"
+                    client, unchanged_run, "no changes"
                 )
                 # The lock is a run in an active status, so a project whose run
-                # ended without changes must take another run straight away.
+                # reports no changes must take another run straight away.
                 after_ending = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()
         finally:
             application.stop()
 
-    assert "no new document" in ended["ended_early_reason"]
+    assert ended["ended_early_reason"] == (
+        "Nothing was read — all 1 file was skipped. See the Skipped tab for why."
+    )
     assert ended["exported"] is False
     assert ended["failure_reason"] is None
     assert after_ending["status"] == "running"

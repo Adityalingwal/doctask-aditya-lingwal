@@ -82,8 +82,9 @@ def test_missing_api_key_names_the_cause_and_the_fix() -> None:
     with pytest.raises(RuntimeError) as refusal:
         build_model_client(MODEL_CONFIG_PATH, {API_KEY_ENVIRONMENT_VARIABLE: ""})
 
-    assert API_KEY_ENVIRONMENT_VARIABLE in str(refusal.value)
-    assert ".env.example" in str(refusal.value)
+    assert str(refusal.value) == (
+        "The OpenRouter key is missing. Add it to your environment variables."
+    )
 
 
 def test_unknown_model_client_names_both_supported_clients() -> None:

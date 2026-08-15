@@ -48,8 +48,8 @@ async def create_project(
     resolved = folder if folder.is_absolute() else project_root / folder
     if not resolved.is_dir():
         raise SourceFolderMissing(
-            f"the source folder '{source_folder_path}' does not exist — create "
-            "it, or give a path that does, then create the project again."
+            f"the folder '{source_folder_path}' is not there — put it there, "
+            "or use one that exists, then try again."
         )
 
     project_id = uuid4()

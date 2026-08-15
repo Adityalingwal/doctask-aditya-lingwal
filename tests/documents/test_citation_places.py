@@ -113,7 +113,7 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, run_id, "waiting for review")
+                wait_for_run_status(client, run_id, "needs review")
                 approve_every_decision_and_finish_review(client, run_id)
                 wait_for_run_status(client, run_id, "done")
                 export = client.get(f"/runs/{run_id}/export").json()

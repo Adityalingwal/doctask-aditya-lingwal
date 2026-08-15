@@ -104,7 +104,7 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
 
-                at_review = wait_for_run_status(client, run_id, "waiting for review")
+                at_review = wait_for_run_status(client, run_id, "needs review")
                 refused_export = client.get(f"/runs/{run_id}/export")
                 approve_every_decision_and_finish_review(client, run_id)
                 wait_for_run_status(client, run_id, "done")
