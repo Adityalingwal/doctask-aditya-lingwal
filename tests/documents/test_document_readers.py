@@ -89,9 +89,7 @@ def test_a_pdf_longer_than_the_page_limit_is_never_read(tmp_path: Path) -> None:
             application.stop()
 
     skipped = _skipped_entry(ended, OVERSIZED_PDF)
-    assert "21 pages" in skipped["reason"]
-    assert "20" in skipped["reason"]
-    assert "config/formats.yaml" in skipped["reason"]
+    assert skipped["reason"] == "21 pages — this system reads up to 20 pages."
     # Never read means never extracted and never paid for.
     assert recorded_markers(call_log_path) == []
 
@@ -147,8 +145,9 @@ def test_an_encrypted_pdf_is_skipped_with_the_reason_and_the_batch_continues(
         read_files = _documents_in(database_url)
 
     skipped = _skipped_entry(finished, ENCRYPTED_PDF)
-    assert "encrypted" in skipped["reason"]
-    assert "password" in skipped["reason"]
+    assert skipped["reason"] == (
+        "This PDF is password-protected. Add an unprotected copy instead."
+    )
     # Not an empty document row that later stages would read as "said nothing".
     assert read_files == [MARKDOWN_FILE]
     assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
@@ -192,8 +191,9 @@ def test_a_scanned_pdf_is_skipped_with_its_own_reason_rather_than_read_as_empty(
         read_files = _documents_in(database_url)
 
     skipped = _skipped_entry(ended, SCANNED_PDF)
-    assert "no text layer" in skipped["reason"]
-    assert "scanned" in skipped["reason"]
+    assert skipped["reason"] == (
+        "This PDF is scanned images, not text. Supply a text version."
+    )
     assert read_files == []
     assert recorded_markers(call_log_path) == []
 
@@ -275,8 +275,9 @@ def test_only_the_extensions_the_config_accepts_reach_a_reader(
     assert read_files == sorted([MARKDOWN_FILE, DOCX_FILE, TEXT_FILE, PDF_FILE])
     assert extract_marker(SPREADSHEET_FILE) not in recorded_markers(call_log_path)
     skipped = _skipped_entry(finished, SPREADSHEET_FILE)
-    assert "unsupported format" in skipped["reason"]
-    assert "config/formats.yaml" in skipped["reason"]
+    assert skipped["reason"] == (
+        "Not a format this system reads. It reads .md, .pdf, .docx and .txt."
+    )
     assert sorted(row["cells"]["what_was_asked"] for row in export["rows"]) == sorted(
         [MARKDOWN_REQUIREMENT, DOCX_REQUIREMENT, TEXT_REQUIREMENT, PDF_REQUIREMENT]
     )
@@ -303,7 +304,7 @@ def test_a_docx_reader_never_adds_words_the_document_does_not_contain(
         )
 
 
-def test_a_corrupt_docx_is_skipped_with_a_reason_naming_the_cause_and_the_fix(
+def test_a_corrupt_docx_is_skipped_with_a_reason_naming_the_cause(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / DOCX_FILE
@@ -312,10 +313,9 @@ def test_a_corrupt_docx_is_skipped_with_a_reason_naming_the_cause_and_the_fix(
     with pytest.raises(DocumentUnreadable) as unreadable:
         read_source_document(path, PAGE_LIMIT)
 
-    reason = str(unreadable.value)
-    assert DOCX_FILE in reason
-    assert "Word" in reason
-    assert "run" in reason
+    assert str(unreadable.value) == (
+        "This Word file could not be opened — it is damaged, or not a .docx."
+    )
 
 
 def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
@@ -366,7 +366,7 @@ def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
         read_files = _documents_in(database_url)
 
     skipped = _skipped_entry(finished, PDF_FILE)
-    assert "PDF" in skipped["reason"]
+    assert skipped["reason"] == "This PDF could not be opened — it is damaged, or not a PDF."
     # One damaged file loses its own document, never the rest of the batch.
     assert read_files == [MARKDOWN_FILE]
     assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [

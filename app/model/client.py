@@ -52,9 +52,8 @@ def _build_openrouter_client(
     api_key = environment.get(API_KEY_ENVIRONMENT_VARIABLE, "")
     if not api_key:
         raise RuntimeError(
-            f"{API_KEY_ENVIRONMENT_VARIABLE} is empty — copy .env.example to "
-            ".env and put an OpenRouter API key in it, then start the run "
-            "again."
+            "The OpenRouter key is missing. Add it to your environment "
+            "variables."
         )
     call_settings = model_config["call"]
     return ChatOpenAI(

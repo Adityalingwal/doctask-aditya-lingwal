@@ -43,9 +43,6 @@ def read_source_document(path: Path, page_limit: int) -> str:
         pages = reader.count_pages(path)
         if pages > page_limit:
             raise DocumentUnreadable(
-                f"{path.name} is {pages} pages, longer than the {page_limit} "
-                "page limit set by document_page_limit in config/formats.yaml "
-                "— split it into shorter documents, or raise that limit, then "
-                "start another run."
+                f"{pages} pages — this system reads up to {page_limit} pages."
             )
     return reader.read_text(path)

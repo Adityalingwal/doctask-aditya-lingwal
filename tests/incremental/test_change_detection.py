@@ -125,7 +125,7 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
     assert list(second_batch) == [UNREAD_FILE]
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
     assert [entry["file"] for entry in skipped_files] == [READ_FILE]
-    assert "read it and finished with what it said" in skipped_files[0]["reason"]
+    assert skipped_files[0]["reason"] == "Already read, and unchanged since."
 
 
 def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> None:
@@ -185,7 +185,9 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
     assert recorded_markers(call_log_path).count(extract_marker(READ_FILE)) == 1
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
     assert [entry["file"] for entry in skipped_files] == [READ_FILE]
-    assert "new name" in skipped_files[0]["reason"]
+    assert skipped_files[0]["reason"] == (
+        "Read before — an edited or renamed file is not read again."
+    )
 
 
 def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
@@ -248,7 +250,9 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
     assert recorded_markers(call_log_path).count(extract_marker(ORIGINAL_NAME)) == 1
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
     assert [entry["file"] for entry in skipped_files] == [RENAMED_NAME]
-    assert "different name" in skipped_files[0]["reason"]
+    assert skipped_files[0]["reason"] == (
+        "Read before — an edited or renamed file is not read again."
+    )
     # No second set of rows: the register is exactly what the first run wrote.
     assert after_second_run == after_first_run
 

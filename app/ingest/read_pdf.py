@@ -28,17 +28,13 @@ def pdf_page_count(path: Path) -> int:
         # one does, so encryption is answered before the count is attempted.
         if reader.is_encrypted:
             raise DocumentUnreadable(
-                f"{path.name} is encrypted, so its text cannot be read — open "
-                "it with its password, save an unprotected copy into the "
-                "project folder, and start another run."
+                "This PDF is password-protected. Add an unprotected copy "
+                "instead."
             )
         return len(reader.pages)
     except PyPdfError as damaged:
         raise DocumentUnreadable(
-            f"{path.name} could not be opened as a PDF — the file is damaged or "
-            "incomplete, or something that is not a PDF was given a .pdf name; "
-            "replace it with a working copy in the project folder and start "
-            "another run."
+            "This PDF could not be opened — it is damaged, or not a PDF."
         ) from damaged
 
 
@@ -49,8 +45,6 @@ def read_pdf(path: Path) -> str:
 
     if not any(page.strip() for page in pages):
         raise DocumentUnreadable(
-            f"{path.name} has no text layer, so it is a scanned image rather "
-            "than a text document — this system does not run OCR; supply a "
-            "text-based export of it and start another run."
+            "This PDF is scanned images, not text. Supply a text version."
         )
     return PAGE_SEPARATOR.join(pages)

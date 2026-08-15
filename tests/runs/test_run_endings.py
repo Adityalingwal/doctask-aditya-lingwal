@@ -76,7 +76,9 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
         finally:
             application.stop()
 
-    assert "no new document" in ended["ended_early_reason"]
+    assert ended["ended_early_reason"] == (
+        "Nothing was read — all 1 file was skipped. See the Skipped tab for why."
+    )
     assert ended["exported"] is False
     assert ended["failure_reason"] is None
     assert after_ending["status"] == "running"

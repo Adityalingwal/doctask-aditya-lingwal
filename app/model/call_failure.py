@@ -3,16 +3,16 @@ from __future__ import annotations
 
 CONFIGURATION_FAILURE_FIXES = {
     401: (
-        "the model provider refused the API key (HTTP 401) — put a working "
-        "OPENROUTER_API_KEY in .env"
+        "the model provider refused the API key (HTTP 401) — check the "
+        "OpenRouter key in your environment variables"
     ),
     402: (
         "the OpenRouter account has no credit left (HTTP 402) — add credit to "
         "the account"
     ),
     403: (
-        "the model provider refused this key for this model (HTTP 403) — put a "
-        "key that may use it in .env, or name a model the key may use in "
+        "the model provider refused this key for this model (HTTP 403) — use "
+        "a key that may, or name a model the key may use in "
         "config/model.yaml"
     ),
     404: (
@@ -40,7 +40,7 @@ def raise_if_configuration_failure(error: Exception) -> None:
     if fix is None:
         return
     raise ModelConfigurationFailure(
-        f"Every model call in this run would fail the same way: {fix}."
+        f"{fix}. Every call in this run would have failed the same way."
     ) from error
 
 

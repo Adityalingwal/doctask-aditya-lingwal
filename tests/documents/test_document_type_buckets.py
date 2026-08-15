@@ -92,8 +92,7 @@ def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continu
         if entry.get("file") == INVENTED_TYPE_FILE
     ]
     assert len(skipped) == 1
-    assert "document type not recognised" in skipped[0]["reason"]
-    assert INVENTED_TYPE in skipped[0]["reason"]
+    assert skipped[0]["reason"] == "The model gave an unknown document type."
     # The invented type never became a row, and the run it shared a batch with
     # still exported the register.
     assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
@@ -154,7 +153,7 @@ def test_a_related_additional_document_is_labelled_but_never_creates_a_row_alone
     # what it must not do is put a row in the register by itself.
     assert extraction["document_type"] == RELATED_ADDITIONAL
     assert len(extraction["requirements"]) == 1
-    assert "no document in this batch reported a requirement" in (
-        ended["ended_early_reason"]
+    assert ended["ended_early_reason"] == (
+        "The documents were read, but none of them stated a requirement."
     )
     assert ended["exported"] is False

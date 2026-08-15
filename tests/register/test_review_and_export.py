@@ -250,4 +250,6 @@ def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
     dropped = [entry for entry in status["skipped"] if entry["kind"] == "requirement"]
     assert len(dropped) == 1
     assert dropped[0]["quote"] == paraphrased
-    assert SOURCE_FILE in dropped[0]["reason"]
+    assert dropped[0]["reason"] == (
+        "These words were not found in the file, so this requirement was dropped."
+    )

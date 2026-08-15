@@ -166,13 +166,16 @@ async def _execute(
         # A run that stopped deliberately is never resumed: the same input
         # would stop it again. A killed process leaves 'running' behind
         # instead, and that is what startup resume takes over.
-        failure_reason = (
+        failure_reason = f"{error} This run will not restart by itself."
+        log_run_event(
+            logging.ERROR,
+            "run_failed",
             f"The run stopped on {type(error).__name__}: {error} It is "
             "'failed' and is not started again by itself — fix the cause "
             "named here and start another run. Nothing this run read counts "
-            "as read, so the next run reads those documents again."
+            "as read, so the next run reads those documents again.",
+            str(run_id),
         )
-        log_run_event(logging.ERROR, "run_failed", failure_reason, str(run_id))
         async with engine.pool.connection() as connection:
             await record_run_failure(connection, run_id, failure_reason)
     await _start_waiting_run(engine, project_id)

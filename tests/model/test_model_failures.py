@@ -103,8 +103,11 @@ def test_a_refused_key_fails_the_run_instead_of_skipping_every_document(
     assert proposed == []
     assert failed["skipped"] == []
     assert failed["exported"] is False
-    assert "OPENROUTER_API_KEY in .env" in failed["failure_reason"]
+    assert "check the OpenRouter key in your environment variables" in (
+        failed["failure_reason"]
+    )
     assert "HTTP 401" in failed["failure_reason"]
+    assert "This run will not restart by itself." in failed["failure_reason"]
 
 
 def test_a_timed_out_document_is_skipped_while_the_batch_continues(
@@ -133,5 +136,5 @@ def test_a_timed_out_document_is_skipped_while_the_batch_continues(
     ]
     assert len(skipped_documents) == 1
     assert skipped_documents[0]["file"] == FIRST_FILE
-    assert "the next run reads this document again" in skipped_documents[0]["reason"]
+    assert skipped_documents[0]["reason"] == "The model call failed for this file."
     assert at_review["failure_reason"] is None

@@ -58,9 +58,8 @@ def locate_extraction(
                     "summary": summary,
                     "quote": quote,
                     "reason": (
-                        f"the quoted words were not found in {source_file} — "
-                        "the model did not copy them exactly, so this "
-                        f"{kind} was dropped; add it by hand if it is real."
+                        "These words were not found in the file, so this "
+                        f"{kind} was dropped."
                     ),
                 }
             )
