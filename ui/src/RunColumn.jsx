@@ -2,6 +2,7 @@
 // collapse control that gives the register table the full width when it is
 // being read. Collapse state lives in the parent and is not persisted — a
 // reload always comes back expanded.
+import { dayMonthTime } from "./format_date.js";
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 import StageMarks from "./StageMarks.jsx";
 
@@ -125,17 +126,5 @@ function RowDetail({ run }) {
 }
 
 function startedOn(startedAt) {
-  if (startedAt === null) {
-    return "—";
-  }
-  const moment = new Date(startedAt);
-  if (Number.isNaN(moment.getTime())) {
-    return startedAt;
-  }
-  return moment.toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return startedAt === null ? "—" : dayMonthTime(startedAt);
 }

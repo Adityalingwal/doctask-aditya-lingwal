@@ -2,6 +2,7 @@
 // Add-project button pinned at the bottom in every state. A card never shows
 // a folder path — the path is shown in exactly one place, the Add-project
 // box, while a folder is being chosen (L7).
+import { dayMonth } from "./format_date.js";
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 import StageMarks from "./StageMarks.jsx";
 
@@ -81,7 +82,7 @@ function ProjectCard({ project, open, onOpen }) {
         <p className="m-0 mt-1 flex items-center justify-between gap-3 font-mono text-xs text-ink-soft">
           <span>{runCount(project.run_count)}</span>
           {project.most_recent_run_at !== null && (
-            <span>last {shortDate(project.most_recent_run_at)}</span>
+            <span>last {dayMonth(project.most_recent_run_at)}</span>
           )}
         </p>
         {/* A fixed-height slot, live or not, so the poll bringing the same
@@ -134,12 +135,4 @@ function StatusMark({ live }) {
 
 function runCount(count) {
   return `${count} run${count === 1 ? "" : "s"}`;
-}
-
-function shortDate(iso) {
-  const moment = new Date(iso);
-  if (Number.isNaN(moment.getTime())) {
-    return iso;
-  }
-  return moment.toLocaleString(undefined, { day: "numeric", month: "short" });
 }

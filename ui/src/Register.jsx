@@ -1,4 +1,5 @@
 import screenConfig from "../config/screen.json";
+import { dayMonthTime } from "./format_date.js";
 
 // D05 fixes the seven cell names; the export sends the column keys, not the
 // words a person reads. An unknown key is shown as the server sent it rather
@@ -19,7 +20,7 @@ export default function Register({ exported }) {
   return (
     <>
       <p className="eyebrow m-0 mb-4">
-        {exported.project.name} · exported {formattedExportDate(exported.exported_at)}
+        {exported.project.name} · exported {dayMonthTime(exported.exported_at)}
       </p>
 
       <div className="overflow-x-auto border border-line bg-card">
@@ -188,20 +189,4 @@ function foldedRuleText(rule) {
 
 function plural(count, noun) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
-
-// The export timestamp, formatted for a reader rather than shown as the raw
-// ISO value the server stores it as (screen 7).
-function formattedExportDate(iso) {
-  const moment = new Date(iso);
-  if (Number.isNaN(moment.getTime())) {
-    return iso;
-  }
-  const datePart = moment.toLocaleString(undefined, { day: "numeric", month: "short" });
-  const timePart = moment.toLocaleString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return `${datePart}, ${timePart}`;
 }
