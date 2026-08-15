@@ -7,6 +7,22 @@ from typing import NamedTuple
 PLACE_BEFORE_FIRST_HEADING = "before the first heading"
 HEADING_MARKER = "#"
 
+# Rendering differences between a document's own characters and a live
+# model's reply, or between what pdfplumber emits and a plain-text quote —
+# the same character rendered another way, exactly as "\n" and a space
+# already are. Case is deliberately not in this table: a changed case is a
+# changed word, not a rendering difference.
+CHARACTER_RENDERING_VARIANTS: dict[str, str] = {
+    "‘": "'",  # left single quotation mark
+    "’": "'",  # right single quotation mark / curly apostrophe
+    "“": '"',  # left double quotation mark
+    "”": '"',  # right double quotation mark
+    "–": "-",  # en dash
+    "—": "-",  # em dash
+    "ﬁ": "fi",  # fi ligature
+    "ﬂ": "fl",  # fl ligature
+}
+
 
 class QuoteLocation(NamedTuple):
     place: str
@@ -74,7 +90,8 @@ def _find_all(haystack: str, needle: str) -> list[int]:
 
 
 def _normalise(text: str) -> str:
-    return " ".join(text.split())
+    mapped = "".join(CHARACTER_RENDERING_VARIANTS.get(character, character) for character in text)
+    return " ".join(mapped.split())
 
 
 def _normalise_with_offsets(text: str) -> tuple[str, list[int]]:
@@ -88,7 +105,11 @@ def _normalise_with_offsets(text: str) -> tuple[str, list[int]]:
                 offsets.append(index)
             previous_was_space = True
             continue
-        characters.append(character)
-        offsets.append(index)
+        # A one-character-to-two-character replacement (ﬁ -> fi) must append
+        # the original index for each character it produces, or every offset
+        # after it shifts and the citation names the wrong place.
+        for mapped_character in CHARACTER_RENDERING_VARIANTS.get(character, character):
+            characters.append(mapped_character)
+            offsets.append(index)
         previous_was_space = False
     return "".join(characters), offsets
