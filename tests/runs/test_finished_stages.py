@@ -17,6 +17,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -50,68 +51,64 @@ def test_a_rules_only_run_never_reports_extract_or_match_as_finished(
 ) -> None:
     source_file = "meeting-notes-10-mar.md"
     requirement = "an email to the operations team on intake form submit"
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, source_file, requirement)
-    rules_config_path = tmp_path / "rules.yaml"
-    rules_config_path.write_text(
-        "rules:\n  - id: R1\n    text: \"Anything built must be written down.\"\n",
-        encoding="utf-8",
-    )
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(source_file): extraction_answer(requirement, quote),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-            rules_config_path=rules_config_path,
+    with temporary_project_folder("rules-only") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, source_file, requirement)
+        rules_config_path = tmp_path / "rules.yaml"
+        rules_config_path.write_text(
+            "rules:\n  - id: R1\n    text: \"Anything built must be written down.\"\n",
+            encoding="utf-8",
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Rules-only intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(source_file): extraction_answer(requirement, quote),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
+        )
 
-                # First run: reads the one document, proposes and exports a row.
-                first_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, first_run, "needs review")
-                approve_every_decision_and_finish_review(client, first_run)
-                wait_for_run_status(client, first_run, "done")
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_config_path,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
 
-                # Second run: only the rules changed, so Ingest routes straight
-                # to Examine (D03/D07). Extract and Match never execute.
-                rules_config_path.write_text(
-                    "rules:\n  - id: R1\n    text: \"Anything built must be "
-                    "written down.\"\n  - id: R9\n    text: \"Every requirement "
-                    "names the person who asked for it.\"\n",
-                    encoding="utf-8",
-                )
-                rules_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, rules_run, "needs review")
-                rules_run_at_review = client.get(f"/runs/{rules_run}").json()
-                approve_every_decision_and_finish_review(client, rules_run)
-                wait_for_run_status(client, rules_run, "done")
-                rules_run_done = client.get(f"/runs/{rules_run}").json()
-        finally:
-            application.stop()
+                    # First run: reads the one document, proposes and exports a row.
+                    first_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, first_run, "needs review")
+                    approve_every_decision_and_finish_review(client, first_run)
+                    wait_for_run_status(client, first_run, "done")
+
+                    # Second run: only the rules changed, so Ingest routes straight
+                    # to Examine (D03/D07). Extract and Match never execute.
+                    rules_config_path.write_text(
+                        "rules:\n  - id: R1\n    text: \"Anything built must be "
+                        "written down.\"\n  - id: R9\n    text: \"Every requirement "
+                        "names the person who asked for it.\"\n",
+                        encoding="utf-8",
+                    )
+                    rules_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, rules_run, "needs review")
+                    rules_run_at_review = client.get(f"/runs/{rules_run}").json()
+                    approve_every_decision_and_finish_review(client, rules_run)
+                    wait_for_run_status(client, rules_run, "done")
+                    rules_run_done = client.get(f"/runs/{rules_run}").json()
+            finally:
+                application.stop()
 
     # Neither snapshot of the rules-only run — mid-review or done — ever
     # reports extract or match, because on this route they never ran.
@@ -156,41 +153,37 @@ async def _mark_extract_finished_twice() -> dict[str, Any]:
 def test_a_review_still_waiting_is_never_reported_as_finished(tmp_path: Path) -> None:
     source_file = "meeting-note.md"
     requirement = "an email to the operations team on intake form submit"
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, source_file, requirement)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(source_file): extraction_answer(requirement, quote),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("waiting-review") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, source_file, requirement)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(source_file): extraction_answer(requirement, quote),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Waiting review intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                waiting = wait_for_run_status(client, run_id, "needs review")
-        finally:
-            application.stop()
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    waiting = wait_for_run_status(client, run_id, "needs review")
+            finally:
+                application.stop()
 
     assert "review" not in waiting["finished_stages"]
     assert waiting["finished_stages"] == ["ingest", "extract", "match", "examine"]

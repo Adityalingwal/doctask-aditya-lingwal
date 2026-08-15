@@ -12,6 +12,7 @@ from tests.runs.application import (
     logged_run_events,
     recorded_calls,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     wait_until,
     write_script,
@@ -53,78 +54,76 @@ MODEL_DELAY_SECONDS = 2.0
 def test_two_projects_running_at_once_never_appear_in_each_others_work(
     tmp_path: Path,
 ) -> None:
-    alpha_folder = tmp_path / "alpha"
-    alpha_folder.mkdir()
-    beta_folder = tmp_path / "beta"
-    beta_folder.mkdir()
-    alpha_quote = write_meeting_note(
-        alpha_folder,
-        ALPHA_FILE,
-        "the operations team to be notified whenever the intake form is sent",
-    )
-    beta_quote = write_meeting_note(
-        beta_folder,
-        BETA_FILE,
-        "each dentist to see their own appointments for the day",
-    )
+    with temporary_project_folder("alpha") as (alpha_folder, alpha_folder_path):
+        with temporary_project_folder("beta") as (beta_folder, beta_folder_path):
+            alpha_quote = write_meeting_note(
+                alpha_folder,
+                ALPHA_FILE,
+                "the operations team to be notified whenever the intake form is sent",
+            )
+            beta_quote = write_meeting_note(
+                beta_folder,
+                BETA_FILE,
+                "each dentist to see their own appointments for the day",
+            )
 
-    script_path = tmp_path / "script.json"
-    call_log_path = tmp_path / "model-calls.jsonl"
-    log_path = tmp_path / "application.log"
-    write_script(
-        script_path,
-        {
-            extract_marker(ALPHA_FILE): extraction_answer(ALPHA_ROW, alpha_quote),
-            extract_marker(BETA_FILE): extraction_answer(BETA_ROW, beta_quote),
-            match_marker_for_batch_with(ALPHA_FILE): match_answer(1),
-            match_marker_for_batch_with(BETA_FILE): match_answer(1),
-            examine_marker_for_register_holding(ALPHA_ROW): _one_finding(ALPHA_ISSUE),
-            examine_marker_for_register_holding(BETA_ROW): _one_finding(BETA_ISSUE),
-        },
-    )
+            script_path = tmp_path / "script.json"
+            call_log_path = tmp_path / "model-calls.jsonl"
+            log_path = tmp_path / "application.log"
+            write_script(
+                script_path,
+                {
+                    extract_marker(ALPHA_FILE): extraction_answer(ALPHA_ROW, alpha_quote),
+                    extract_marker(BETA_FILE): extraction_answer(BETA_ROW, beta_quote),
+                    match_marker_for_batch_with(ALPHA_FILE): match_answer(1),
+                    match_marker_for_batch_with(BETA_FILE): match_answer(1),
+                    examine_marker_for_register_holding(ALPHA_ROW): _one_finding(ALPHA_ISSUE),
+                    examine_marker_for_register_holding(BETA_ROW): _one_finding(BETA_ISSUE),
+                },
+            )
 
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=call_log_path,
-            delay_seconds=MODEL_DELAY_SECONDS,
-            log_path=log_path,
-        )
-        application.start()
-        try:
-            with application.client() as client:
-                alpha_project = _project(client, "Alpha intake portal", alpha_folder)
-                beta_project = _project(client, "Beta dental clinic", beta_folder)
-
-                alpha_run = _start(client, alpha_project)
-                beta_run = _start(client, beta_project)
-                stages_at_one_moment = wait_until(
-                    lambda: _stages_while_both_are_running(
-                        client, alpha_run, beta_run
-                    ),
-                    "both runs report a stage while both are running",
+            with temporary_database() as database_url:
+                application = ApplicationProcess(
+                    database_url=database_url,
+                    script_path=script_path,
+                    call_log_path=call_log_path,
+                    delay_seconds=MODEL_DELAY_SECONDS,
+                    log_path=log_path,
                 )
+                application.start()
+                try:
+                    with application.client() as client:
+                        alpha_project = _project(client, "Alpha intake portal", alpha_folder_path)
+                        beta_project = _project(client, "Beta dental clinic", beta_folder_path)
 
-                alpha_at_review = wait_for_run_status(
-                    client, alpha_run, "needs review"
-                )
-                beta_at_review = wait_for_run_status(
-                    client, beta_run, "needs review"
-                )
-                approve_every_decision_and_finish_review(client, alpha_run)
-                approve_every_decision_and_finish_review(client, beta_run)
-                wait_for_run_status(client, alpha_run, "done")
-                wait_for_run_status(client, beta_run, "done")
+                        alpha_run = _start(client, alpha_project)
+                        beta_run = _start(client, beta_project)
+                        stages_at_one_moment = wait_until(
+                            lambda: _stages_while_both_are_running(
+                                client, alpha_run, beta_run
+                            ),
+                            "both runs report a stage while both are running",
+                        )
 
-            alpha_rows = stored_rows(database_url, alpha_project)
-            beta_rows = stored_rows(database_url, beta_project)
-            alpha_findings = findings_of_run(database_url, alpha_run)
-            beta_findings = findings_of_run(database_url, beta_run)
-            alpha_documents = documents_of_run(database_url, alpha_run)
-            beta_documents = documents_of_run(database_url, beta_run)
-        finally:
-            application.stop()
+                        alpha_at_review = wait_for_run_status(
+                            client, alpha_run, "needs review"
+                        )
+                        beta_at_review = wait_for_run_status(
+                            client, beta_run, "needs review"
+                        )
+                        approve_every_decision_and_finish_review(client, alpha_run)
+                        approve_every_decision_and_finish_review(client, beta_run)
+                        wait_for_run_status(client, alpha_run, "done")
+                        wait_for_run_status(client, beta_run, "done")
+
+                    alpha_rows = stored_rows(database_url, alpha_project)
+                    beta_rows = stored_rows(database_url, beta_project)
+                    alpha_findings = findings_of_run(database_url, alpha_run)
+                    beta_findings = findings_of_run(database_url, beta_run)
+                    alpha_documents = documents_of_run(database_url, alpha_run)
+                    beta_documents = documents_of_run(database_url, beta_run)
+                finally:
+                    application.stop()
 
     assert stages_at_one_moment is not None
     assert _overlapping_calls(call_log_path) is not None
@@ -184,10 +183,10 @@ def _one_finding(issue: str) -> dict[str, Any]:
     }
 
 
-def _project(client: httpx.Client, name: str, source_folder: Path) -> str:
+def _project(client: httpx.Client, name: str, source_folder_path: str) -> str:
     return client.post(
         "/projects",
-        json={"name": name, "source_folder_path": str(source_folder)},
+        json={"source_folder_path": source_folder_path},
     ).json()["project_id"]
 
 

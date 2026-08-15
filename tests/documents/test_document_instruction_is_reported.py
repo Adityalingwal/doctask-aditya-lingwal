@@ -11,6 +11,7 @@ from tests.runs.application import (
     approve_every_decision_and_finish_review,
     logged_run_events,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -62,61 +63,57 @@ NOT_EXPORTED_YET = 409
 def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    for source_file in (BENIGN_NOTES, NOTES_CARRYING_THE_INSTRUCTION):
-        shutil.copy(INTAKE_PORTAL / source_file, source_folder / source_file)
+    with temporary_project_folder("buried-instruction") as (source_folder, source_folder_path):
+        for source_file in (BENIGN_NOTES, NOTES_CARRYING_THE_INSTRUCTION):
+            shutil.copy(INTAKE_PORTAL / source_file, source_folder / source_file)
 
-    script_path = tmp_path / "script.json"
-    log_path = tmp_path / "application.log"
-    write_script(
-        script_path,
-        {
-            extract_marker(BENIGN_NOTES): dated_extraction_answer(
-                [(BENIGN_REQUIREMENT, BENIGN_QUOTE)],
-                MEETING_NOTES,
-                "10 March 2026",
-            ),
-            extract_marker(NOTES_CARRYING_THE_INSTRUCTION): _reported_instruction(),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-            log_path=log_path,
+        script_path = tmp_path / "script.json"
+        log_path = tmp_path / "application.log"
+        write_script(
+            script_path,
+            {
+                extract_marker(BENIGN_NOTES): dated_extraction_answer(
+                    [(BENIGN_REQUIREMENT, BENIGN_QUOTE)],
+                    MEETING_NOTES,
+                    "10 March 2026",
+                ),
+                extract_marker(NOTES_CARRYING_THE_INSTRUCTION): _reported_instruction(),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Intake portal with a buried instruction",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
 
-                at_review = wait_for_run_status(client, run_id, "needs review")
-                refused_export = client.get(f"/runs/{run_id}/export")
-                approve_every_decision_and_finish_review(client, run_id)
-                wait_for_run_status(client, run_id, "done")
-                exported = client.get(f"/runs/{run_id}/export").json()
-
-            documents = documents_of_run(database_url, run_id)
-            extraction = extraction_of_document(
-                database_url, run_id, NOTES_CARRYING_THE_INSTRUCTION
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+                log_path=log_path,
             )
-            register = stored_rows(database_url, project_id)
-        finally:
-            application.stop()
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+
+                    at_review = wait_for_run_status(client, run_id, "needs review")
+                    refused_export = client.get(f"/runs/{run_id}/export")
+                    approve_every_decision_and_finish_review(client, run_id)
+                    wait_for_run_status(client, run_id, "done")
+                    exported = client.get(f"/runs/{run_id}/export").json()
+
+                documents = documents_of_run(database_url, run_id)
+                extraction = extraction_of_document(
+                    database_url, run_id, NOTES_CARRYING_THE_INSTRUCTION
+                )
+                register = stored_rows(database_url, project_id)
+            finally:
+                application.stop()
 
     # The document really was read, so everything below is about a run that saw
     # the instruction rather than one that never met it.

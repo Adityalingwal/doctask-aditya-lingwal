@@ -11,6 +11,7 @@ from tests.runs.application import (
     model_call_failure,
     recorded_markers,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -53,71 +54,67 @@ RENAMED_NAME = "calendar-note-v2.md"
 def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    read_quote = write_meeting_note(source_folder, READ_FILE, READ_REQUIREMENT)
-    write_meeting_note(source_folder, UNREAD_FILE, UNREAD_REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(UNREAD_FILE): model_call_failure(
-                "Request timed out after 120 seconds"
-            ),
-            extract_marker(READ_FILE): extraction_answer(
-                READ_REQUIREMENT, read_quote
-            ),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("half-read") as (source_folder, source_folder_path):
+        read_quote = write_meeting_note(source_folder, READ_FILE, READ_REQUIREMENT)
+        write_meeting_note(source_folder, UNREAD_FILE, UNREAD_REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(UNREAD_FILE): model_call_failure(
+                    "Request timed out after 120 seconds"
+                ),
+                extract_marker(READ_FILE): extraction_answer(
+                    READ_REQUIREMENT, read_quote
+                ),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Half-read intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
 
-                exporting_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, exporting_run, "needs review")
-                approve_every_decision_and_finish_review(client, exporting_run)
-                exported = wait_for_run_status(client, exporting_run, "done")
-
-                second_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                ended = wait_for_run_status(
-                    client, second_run, "no changes"
-                )
-        finally:
-            application.stop()
-
-        engine = create_engine(database_url)
-        with engine.connect() as connection:
-            second_batch = (
-                connection.execute(
-                    text(
-                        "SELECT source_path FROM documents WHERE run_id = :run_id"
-                    ),
-                    {"run_id": second_run},
-                )
-                .scalars()
-                .all()
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
             )
-        engine.dispose()
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+
+                    exporting_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, exporting_run, "needs review")
+                    approve_every_decision_and_finish_review(client, exporting_run)
+                    exported = wait_for_run_status(client, exporting_run, "done")
+
+                    second_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    ended = wait_for_run_status(
+                        client, second_run, "no changes"
+                    )
+            finally:
+                application.stop()
+
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                second_batch = (
+                    connection.execute(
+                        text(
+                            "SELECT source_path FROM documents WHERE run_id = :run_id"
+                        ),
+                        {"run_id": second_run},
+                    )
+                    .scalars()
+                    .all()
+                )
+            engine.dispose()
 
     assert exported["exported"] is True
     # The document Extract could not read is not "already read", however well
@@ -130,57 +127,53 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
 
 def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> None:
     """L1: a document is read once, by name — editing it does not reopen it."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, READ_FILE, READ_REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    call_log_path = tmp_path / "model-calls.jsonl"
-    write_script(
-        script_path,
-        {
-            extract_marker(READ_FILE): extraction_answer(READ_REQUIREMENT, quote),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=call_log_path,
+    with temporary_project_folder("edited-document") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, READ_FILE, READ_REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        call_log_path = tmp_path / "model-calls.jsonl"
+        write_script(
+            script_path,
+            {
+                extract_marker(READ_FILE): extraction_answer(READ_REQUIREMENT, quote),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Edited intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
 
-                first_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, first_run, "needs review")
-                approve_every_decision_and_finish_review(client, first_run)
-                wait_for_run_status(client, first_run, "done")
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=call_log_path,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
 
-                # Edited and re-saved under the same name: the words changed,
-                # the file did not move.
-                write_meeting_note(
-                    source_folder, READ_FILE, "a completely different ask"
-                )
-                second_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                ended = wait_for_run_status(
-                    client, second_run, "no changes"
-                )
-        finally:
-            application.stop()
+                    first_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, first_run, "needs review")
+                    approve_every_decision_and_finish_review(client, first_run)
+                    wait_for_run_status(client, first_run, "done")
+
+                    # Edited and re-saved under the same name: the words changed,
+                    # the file did not move.
+                    write_meeting_note(
+                        source_folder, READ_FILE, "a completely different ask"
+                    )
+                    second_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    ended = wait_for_run_status(
+                        client, second_run, "no changes"
+                    )
+            finally:
+                application.stop()
 
     assert recorded_markers(call_log_path).count(extract_marker(READ_FILE)) == 1
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
@@ -192,60 +185,56 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
 
 def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
     """L1: a document is read once, by content — renaming it does not reopen it."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    (source_folder / ORIGINAL_NAME).write_text(RENAME_CONTENT, encoding="utf-8")
-    script_path = tmp_path / "script.json"
-    call_log_path = tmp_path / "model-calls.jsonl"
-    write_script(
-        script_path,
-        {
-            extract_marker(ORIGINAL_NAME): extraction_answer(
-                RENAME_REQUIREMENT, RENAME_QUOTE
-            ),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=call_log_path,
+    with temporary_project_folder("renamed-document") as (source_folder, source_folder_path):
+        (source_folder / ORIGINAL_NAME).write_text(RENAME_CONTENT, encoding="utf-8")
+        script_path = tmp_path / "script.json"
+        call_log_path = tmp_path / "model-calls.jsonl"
+        write_script(
+            script_path,
+            {
+                extract_marker(ORIGINAL_NAME): extraction_answer(
+                    RENAME_REQUIREMENT, RENAME_QUOTE
+                ),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Renamed intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
 
-                first_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, first_run, "needs review")
-                approve_every_decision_and_finish_review(client, first_run)
-                wait_for_run_status(client, first_run, "done")
-                after_first_run = stored_rows(database_url, project_id)
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=call_log_path,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
 
-                (source_folder / ORIGINAL_NAME).unlink()
-                (source_folder / RENAMED_NAME).write_text(
-                    RENAME_CONTENT, encoding="utf-8"
-                )
-                second_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                ended = wait_for_run_status(
-                    client, second_run, "no changes"
-                )
-                after_second_run = stored_rows(database_url, project_id)
-        finally:
-            application.stop()
+                    first_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, first_run, "needs review")
+                    approve_every_decision_and_finish_review(client, first_run)
+                    wait_for_run_status(client, first_run, "done")
+                    after_first_run = stored_rows(database_url, project_id)
+
+                    (source_folder / ORIGINAL_NAME).unlink()
+                    (source_folder / RENAMED_NAME).write_text(
+                        RENAME_CONTENT, encoding="utf-8"
+                    )
+                    second_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    ended = wait_for_run_status(
+                        client, second_run, "no changes"
+                    )
+                    after_second_run = stored_rows(database_url, project_id)
+            finally:
+                application.stop()
 
     assert recorded_markers(call_log_path).count(extract_marker(ORIGINAL_NAME)) == 1
     skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
@@ -258,52 +247,48 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
 
 
 def test_a_deleted_document_never_removes_a_row(tmp_path: Path) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, READ_FILE, READ_REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(READ_FILE): extraction_answer(READ_REQUIREMENT, quote),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("deleted-document") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, READ_FILE, READ_REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(READ_FILE): extraction_answer(READ_REQUIREMENT, quote),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Deleted-file intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
 
-                first_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, first_run, "needs review")
-                approve_every_decision_and_finish_review(client, first_run)
-                wait_for_run_status(client, first_run, "done")
-                after_first_run = stored_rows(database_url, project_id)
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
 
-                (source_folder / READ_FILE).unlink()
-                second_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, second_run, "no changes")
-                after_second_run = stored_rows(database_url, project_id)
-        finally:
-            application.stop()
+                    first_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, first_run, "needs review")
+                    approve_every_decision_and_finish_review(client, first_run)
+                    wait_for_run_status(client, first_run, "done")
+                    after_first_run = stored_rows(database_url, project_id)
+
+                    (source_folder / READ_FILE).unlink()
+                    second_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, second_run, "no changes")
+                    after_second_run = stored_rows(database_url, project_id)
+            finally:
+                application.stop()
 
     # Deleting the file removes nothing from the register: every row it
     # supplied comes back exactly as the first run wrote it.
@@ -313,17 +298,16 @@ def test_a_deleted_document_never_removes_a_row(tmp_path: Path) -> None:
 def test_an_unchanged_unrelated_document_is_not_sent_to_the_model_twice(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, UNRELATED_FILE, UNRELATED_REQUIREMENT)
+    with temporary_project_folder("stray-file") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, UNRELATED_FILE, UNRELATED_REQUIREMENT)
 
-    markers = _markers_from_two_runs_over(
-        tmp_path,
-        source_folder,
-        UNRELATED_FILE,
-        unrelated_extraction_answer(UNRELATED_REQUIREMENT, quote),
-        "Intake portal with a stray file",
-    )
+        markers = _markers_from_two_runs_over(
+            tmp_path,
+            source_folder_path,
+            UNRELATED_FILE,
+            unrelated_extraction_answer(UNRELATED_REQUIREMENT, quote),
+            "Intake portal with a stray file",
+        )
 
     # A run holding only an unrelated document never exports, so an export can
     # never be what settles this document. Reading it again would buy the same
@@ -334,24 +318,23 @@ def test_an_unchanged_unrelated_document_is_not_sent_to_the_model_twice(
 def test_an_unchanged_document_that_asked_for_nothing_is_not_sent_twice(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    write_meeting_note(source_folder, SILENT_FILE, "a schedule the team already keeps")
+    with temporary_project_folder("silent-document") as (source_folder, source_folder_path):
+        write_meeting_note(source_folder, SILENT_FILE, "a schedule the team already keeps")
 
-    markers = _markers_from_two_runs_over(
-        tmp_path,
-        source_folder,
-        SILENT_FILE,
-        extraction_answer_without_requirements(),
-        "Intake portal with a note asking for nothing",
-    )
+        markers = _markers_from_two_runs_over(
+            tmp_path,
+            source_folder_path,
+            SILENT_FILE,
+            extraction_answer_without_requirements(),
+            "Intake portal with a note asking for nothing",
+        )
 
     assert markers.count(extract_marker(SILENT_FILE)) == 1
 
 
 def _markers_from_two_runs_over(
     tmp_path: Path,
-    source_folder: Path,
+    source_folder_path: str,
     source_file: str,
     extraction: dict[str, Any],
     project_name: str,
@@ -372,10 +355,7 @@ def _markers_from_two_runs_over(
             with application.client() as client:
                 project_id = client.post(
                     "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
+                    json={"source_folder_path": source_folder_path},
                 ).json()["project_id"]
                 for _ in range(2):
                     run_id = client.post(

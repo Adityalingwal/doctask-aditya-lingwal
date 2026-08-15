@@ -24,6 +24,7 @@ from app.runs.statuses import RUNNING
 from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
+    temporary_project_folder,
     wait_until,
     write_script,
 )
@@ -78,46 +79,42 @@ def _run_at_review(
     examine: dict[str, Any],
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
     """One run driven through the API, with Examine scripted, parked at Review."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            EXAMINE_PROMPT_MARKER: examine,
-            extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("run-at-review") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                EXAMINE_PROMPT_MARKER: examine,
+                extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_until(
-                    lambda: client.get(f"/runs/{run_id}").json()["status"]
-                    == "needs review",
-                    "the run reaches Review",
-                )
-            yield application, database_url, run_id
-        finally:
-            application.stop()
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_until(
+                        lambda: client.get(f"/runs/{run_id}").json()["status"]
+                        == "needs review",
+                        "the run reaches Review",
+                    )
+                yield application, database_url, run_id
+            finally:
+                application.stop()
 
 
 def _answer(client: Any, run_id: str, decision_id: str, outcome: str) -> None:
@@ -356,72 +353,68 @@ def test_examine_asks_about_a_problem_instead_of_editing_the_register_cell(
 def test_editing_the_rules_file_after_a_run_started_leaves_that_run_examining(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    rules_path = tmp_path / "rules.yaml"
-    rules_path.write_text(TWO_RULES, encoding="utf-8")
-    frozen_fingerprint = fingerprint_of_rules(load_rules(rules_path))
-    script_path = tmp_path / "script.json"
-    # The marker is the rule text as it stood when the run started: an Examine
-    # call carrying the edited rules matches no scripted answer and the run
-    # fails instead of quietly examining against the new file.
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            '"max_days": 14': examine_answer([]),
-            extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-            delay_seconds=1.0,
-            rules_config_path=rules_path,
+    with temporary_project_folder("rules-edited-mid-run") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        rules_path = tmp_path / "rules.yaml"
+        rules_path.write_text(TWO_RULES, encoding="utf-8")
+        frozen_fingerprint = fingerprint_of_rules(load_rules(rules_path))
+        script_path = tmp_path / "script.json"
+        # The marker is the rule text as it stood when the run started: an Examine
+        # call carrying the edited rules matches no scripted answer and the run
+        # fails instead of quietly examining against the new file.
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                '"max_days": 14': examine_answer([]),
+                extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
+            },
         )
-        application.start()
-        engine = create_engine(database_url)
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Rules edited mid-run",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_until(
-                    lambda: _frozen_rules_of(engine, run_id) is not None,
-                    "the run freezes the rules it started with",
-                )
-                rules_path.write_text(
-                    TWO_RULES_EDITED_AFTER_THE_RUN_STARTED, encoding="utf-8"
-                )
-                waiting = wait_until(
-                    lambda: (
-                        client.get(f"/runs/{run_id}").json()
-                        if client.get(f"/runs/{run_id}").json()["status"]
-                        == "needs review"
-                        else None
-                    ),
-                    "the run reaches Review",
-                )
-            frozen = _frozen_rules_of(engine, run_id)
-            with engine.connect() as connection:
-                fingerprint = connection.execute(
-                    text("SELECT rules_fingerprint FROM runs WHERE id = :id"),
-                    {"id": run_id},
-                ).scalar_one()
-        finally:
-            engine.dispose()
-            application.stop()
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+                delay_seconds=1.0,
+                rules_config_path=rules_path,
+            )
+            application.start()
+            engine = create_engine(database_url)
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_until(
+                        lambda: _frozen_rules_of(engine, run_id) is not None,
+                        "the run freezes the rules it started with",
+                    )
+                    rules_path.write_text(
+                        TWO_RULES_EDITED_AFTER_THE_RUN_STARTED, encoding="utf-8"
+                    )
+                    waiting = wait_until(
+                        lambda: (
+                            client.get(f"/runs/{run_id}").json()
+                            if client.get(f"/runs/{run_id}").json()["status"]
+                            == "needs review"
+                            else None
+                        ),
+                        "the run reaches Review",
+                    )
+                frozen = _frozen_rules_of(engine, run_id)
+                with engine.connect() as connection:
+                    fingerprint = connection.execute(
+                        text("SELECT rules_fingerprint FROM runs WHERE id = :id"),
+                        {"id": run_id},
+                    ).scalar_one()
+            finally:
+                engine.dispose()
+                application.stop()
 
     assert [rule["id"] for rule in frozen] == ["R1", "R3"]
     assert frozen[1]["params"]["max_days"] == 14

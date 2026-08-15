@@ -9,6 +9,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -47,40 +48,36 @@ def _two_runs_over(
     answers: dict[str, dict],
 ) -> tuple[dict[int, Any], dict[int, Any], list[str]]:
     """Run one corpus project twice, and report the register after each run."""
-    source_folder = tmp_path / "corpus"
-    source_folder.mkdir()
-    for file_name in first_batch:
-        _copy_corpus_file(corpus, source_folder, file_name)
+    with temporary_project_folder("corpus") as (source_folder, source_folder_path):
+        for file_name in first_batch:
+            _copy_corpus_file(corpus, source_folder, file_name)
 
-    script_path = tmp_path / "script.json"
-    write_script(script_path, answers)
+        script_path = tmp_path / "script.json"
+        write_script(script_path, answers)
 
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-        )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                _exported_run(client, project_id)
-                after_first_run = stored_rows(database_url, project_id)
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    _exported_run(client, project_id)
+                    after_first_run = stored_rows(database_url, project_id)
 
-                for file_name in second_batch:
-                    _copy_corpus_file(corpus, source_folder, file_name)
-                second_run = _exported_run(client, project_id)
-                after_second_run = stored_rows(database_url, project_id)
-                read_again = documents_of_run(database_url, second_run)
-        finally:
-            application.stop()
+                    for file_name in second_batch:
+                        _copy_corpus_file(corpus, source_folder, file_name)
+                    second_run = _exported_run(client, project_id)
+                    after_second_run = stored_rows(database_url, project_id)
+                    read_again = documents_of_run(database_url, second_run)
+            finally:
+                application.stop()
     return after_first_run, after_second_run, read_again
 
 

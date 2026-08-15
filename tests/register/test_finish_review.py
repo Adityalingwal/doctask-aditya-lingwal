@@ -23,6 +23,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -50,43 +51,39 @@ def _run_ready_to_finish(
     project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
     """One run at Review with every decision already approved."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-            extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("ready-to-finish") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+                extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, run_id, "needs review")
-                approve_every_decision(client, run_id)
-            yield application, database_url, run_id
-        finally:
-            application.stop()
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, run_id, "needs review")
+                    approve_every_decision(client, run_id)
+                yield application, database_url, run_id
+            finally:
+                application.stop()
 
 
 def test_finish_review_is_accepted_once(tmp_path: Path) -> None:

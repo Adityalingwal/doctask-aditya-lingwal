@@ -12,6 +12,7 @@ from tests.runs.application import (
     approve_every_decision_and_finish_review,
     recorded_markers,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -47,57 +48,53 @@ def _project_of_two_documents(
     will answer for each; only the first is in the watched folder to begin with,
     so the second run really is a second run over one arriving document.
     """
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    waiting_folder = tmp_path / "not-yet-delivered"
-    waiting_folder.mkdir()
+    with temporary_project_folder("two-documents") as (source_folder, source_folder_path):
+        waiting_folder = tmp_path / "not-yet-delivered"
+        waiting_folder.mkdir()
 
-    first_quote = write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
-    second_quote = write_meeting_note(waiting_folder, SECOND_FILE, SECOND_REQUIREMENT)
+        first_quote = write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
+        second_quote = write_meeting_note(waiting_folder, SECOND_FILE, SECOND_REQUIREMENT)
 
-    script_path = tmp_path / "script.json"
-    call_log_path = tmp_path / "model-calls.jsonl"
-    write_script(
-        script_path,
-        {
-            extract_marker(FIRST_FILE): extraction_answer(
-                FIRST_REQUIREMENT, first_quote
-            ),
-            extract_marker(SECOND_FILE): extraction_answer(
-                SECOND_REQUIREMENT, second_quote
-            ),
-            match_marker_against_an_empty_register(): match_answer(1),
-            match_marker(): match_answer_of([None]),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=call_log_path,
+        script_path = tmp_path / "script.json"
+        call_log_path = tmp_path / "model-calls.jsonl"
+        write_script(
+            script_path,
+            {
+                extract_marker(FIRST_FILE): extraction_answer(
+                    FIRST_REQUIREMENT, first_quote
+                ),
+                extract_marker(SECOND_FILE): extraction_answer(
+                    SECOND_REQUIREMENT, second_quote
+                ),
+                match_marker_against_an_empty_register(): match_answer(1),
+                match_marker(): match_answer_of([None]),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                yield (
-                    application,
-                    database_url,
-                    project_id,
-                    source_folder,
-                    waiting_folder,
-                    call_log_path,
-                )
-        finally:
-            application.stop()
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=call_log_path,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    yield (
+                        application,
+                        database_url,
+                        project_id,
+                        source_folder,
+                        waiting_folder,
+                        call_log_path,
+                    )
+            finally:
+                application.stop()
 
 
 def _exported_run(client: httpx.Client, project_id: str) -> str:
@@ -231,64 +228,60 @@ def test_a_second_run_proposal_reaches_the_register_only_after_the_export_gate(
 def test_a_changed_rules_file_re_examines_the_register_without_reading_a_document(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
-    rules_config_path = tmp_path / "rules.yaml"
-    rules_config_path.write_text(
-        "rules:\n  - id: R1\n    text: \"Anything built must be written down.\"\n",
-        encoding="utf-8",
-    )
-    script_path = tmp_path / "script.json"
-    call_log_path = tmp_path / "model-calls.jsonl"
-    write_script(
-        script_path,
-        {
-            extract_marker(FIRST_FILE): extraction_answer(FIRST_REQUIREMENT, quote),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=call_log_path,
-            rules_config_path=rules_config_path,
+    with temporary_project_folder("re-examined") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
+        rules_config_path = tmp_path / "rules.yaml"
+        rules_config_path.write_text(
+            "rules:\n  - id: R1\n    text: \"Anything built must be written down.\"\n",
+            encoding="utf-8",
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Re-examined intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                _exported_run(client, project_id)
-                after_first_run = stored_rows(database_url, project_id)
+        script_path = tmp_path / "script.json"
+        call_log_path = tmp_path / "model-calls.jsonl"
+        write_script(
+            script_path,
+            {
+                extract_marker(FIRST_FILE): extraction_answer(FIRST_REQUIREMENT, quote),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
+        )
 
-                rules_config_path.write_text(
-                    "rules:\n  - id: R1\n    text: \"Anything built must be "
-                    "written down.\"\n  - id: R9\n    text: \"Every requirement "
-                    "names the person who asked for it.\"\n",
-                    encoding="utf-8",
-                )
-                rules_run = _exported_run(client, project_id)
-                after_rules_run = stored_rows(database_url, project_id)
-                rules_run_batch = documents_of_run(database_url, rules_run)
-                examined = client.get(f"/runs/{rules_run}").json()["examine"]
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=call_log_path,
+                rules_config_path=rules_config_path,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    _exported_run(client, project_id)
+                    after_first_run = stored_rows(database_url, project_id)
 
-                unchanged_run = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                ended = wait_for_run_status(
-                    client, unchanged_run, "no changes"
-                )
-        finally:
-            application.stop()
+                    rules_config_path.write_text(
+                        "rules:\n  - id: R1\n    text: \"Anything built must be "
+                        "written down.\"\n  - id: R9\n    text: \"Every requirement "
+                        "names the person who asked for it.\"\n",
+                        encoding="utf-8",
+                    )
+                    rules_run = _exported_run(client, project_id)
+                    after_rules_run = stored_rows(database_url, project_id)
+                    rules_run_batch = documents_of_run(database_url, rules_run)
+                    examined = client.get(f"/runs/{rules_run}").json()["examine"]
+
+                    unchanged_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    ended = wait_for_run_status(
+                        client, unchanged_run, "no changes"
+                    )
+            finally:
+                application.stop()
 
     markers = recorded_markers(call_log_path)
     # The rules-only run examined the register without reading or matching

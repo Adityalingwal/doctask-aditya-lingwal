@@ -9,6 +9,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -36,55 +37,51 @@ RELATED_ADDITIONAL = "related additional document"
 def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continues(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    ordinary_quote = write_meeting_note(
-        source_folder, ORDINARY_FILE, ORDINARY_REQUIREMENT
-    )
-    retro_quote = write_meeting_note(
-        source_folder, INVENTED_TYPE_FILE, RETRO_REQUIREMENT
-    )
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(ORDINARY_FILE): extraction_answer(
-                ORDINARY_REQUIREMENT, ordinary_quote
-            ),
-            extract_marker(INVENTED_TYPE_FILE): extraction_answer(
-                RETRO_REQUIREMENT, retro_quote
-            )
-            | {"document_type": INVENTED_TYPE},
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("invented-type") as (source_folder, source_folder_path):
+        ordinary_quote = write_meeting_note(
+            source_folder, ORDINARY_FILE, ORDINARY_REQUIREMENT
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Intake portal with an invented type",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, run_id, "needs review")
-                approve_every_decision_and_finish_review(client, run_id)
-                finished = wait_for_run_status(client, run_id, "done")
-                export = client.get(f"/runs/{run_id}/export").json()
-        finally:
-            application.stop()
+        retro_quote = write_meeting_note(
+            source_folder, INVENTED_TYPE_FILE, RETRO_REQUIREMENT
+        )
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(ORDINARY_FILE): extraction_answer(
+                    ORDINARY_REQUIREMENT, ordinary_quote
+                ),
+                extract_marker(INVENTED_TYPE_FILE): extraction_answer(
+                    RETRO_REQUIREMENT, retro_quote
+                )
+                | {"document_type": INVENTED_TYPE},
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
+        )
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, run_id, "needs review")
+                    approve_every_decision_and_finish_review(client, run_id)
+                    finished = wait_for_run_status(client, run_id, "done")
+                    export = client.get(f"/runs/{run_id}/export").json()
+            finally:
+                application.stop()
 
     skipped = [
         entry
@@ -103,50 +100,46 @@ def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continu
 def test_a_related_additional_document_is_labelled_but_never_creates_a_row_alone(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, HANDOVER_FILE, HANDOVER_REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(HANDOVER_FILE): extraction_answer(
-                HANDOVER_REQUIREMENT, quote
-            )
-            | {"document_type": RELATED_ADDITIONAL},
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("handover-summary") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, HANDOVER_FILE, HANDOVER_REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(HANDOVER_FILE): extraction_answer(
+                    HANDOVER_REQUIREMENT, quote
+                )
+                | {"document_type": RELATED_ADDITIONAL},
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Intake portal with a handover summary",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                ended = wait_for_run_status(client, run_id, "no changes")
-        finally:
-            application.stop()
 
-        engine = create_engine(database_url)
-        with engine.connect() as connection:
-            stored = connection.execute(
-                text("SELECT extraction FROM documents WHERE source_path = :path"),
-                {"path": HANDOVER_FILE},
-            ).scalar_one()
-        engine.dispose()
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    ended = wait_for_run_status(client, run_id, "no changes")
+            finally:
+                application.stop()
+
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                stored = connection.execute(
+                    text("SELECT extraction FROM documents WHERE source_path = :path"),
+                    {"path": HANDOVER_FILE},
+                ).scalar_one()
+            engine.dispose()
 
     extraction = stored if isinstance(stored, dict) else json.loads(stored)
     # Processed and labelled, and its evidence kept for the slices that read it;
