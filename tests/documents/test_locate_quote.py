@@ -17,9 +17,15 @@ visitor submits the intake form.
 
 ## Next steps
 
-The client asked for the operations team to receive a notification whenever a
-visitor submits the intake form.
+Confirm the notification wording with the client before it is built.
 """
+
+# The brief's own confirmed repro for a sentence restated under two headings —
+# ordinary in a testing feedback document restating the same finding against
+# several requirements.
+REPEATED_UNDER_TWO_HEADINGS = (
+    "# A\n\nThe login page is not working.\n\n# B\n\nThe login page is not working.\n"
+)
 
 
 def test_quote_broken_across_lines_is_found_under_its_own_heading() -> None:
@@ -46,11 +52,24 @@ def test_quote_the_model_invented_is_not_located() -> None:
     assert locate_quote(MEETING_NOTE, "the client wants search on old records") is None
 
 
-def test_repeated_words_resolve_to_their_first_occurrence() -> None:
-    location = locate_quote(MEETING_NOTE, "The client asked for the operations team")
+def test_a_quote_appearing_under_two_headings_names_both_places() -> None:
+    location = locate_quote(REPEATED_UNDER_TWO_HEADINGS, "The login page is not working.")
 
     assert location is not None
-    assert location.place == "Discussion"
+    assert location.place == "A, B"
+    # The document's own words, from the first occurrence — the place names
+    # every heading, but the quoted text is not repeated.
+    assert location.source_words == "The login page is not working."
+
+
+def test_a_quote_appearing_once_still_names_that_one_place() -> None:
+    location = locate_quote(
+        "# A\n\nThe login page is not working.\n\n# B\n\nEverything else passed.\n",
+        "The login page is not working.",
+    )
+
+    assert location is not None
+    assert location.place == "A"
 
 
 def test_quote_above_every_heading_says_so_rather_than_naming_a_later_heading() -> None:
