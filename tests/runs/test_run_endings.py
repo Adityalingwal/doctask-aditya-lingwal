@@ -69,7 +69,7 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
                     client, unchanged_run, "no changes"
                 )
                 # The lock is a run in an active status, so a project whose run
-                # no changes must take another run straight away.
+                # reports no changes must take another run straight away.
                 after_ending = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()
