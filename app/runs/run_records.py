@@ -121,9 +121,29 @@ async def append_skipped(
     run_id: UUID,
     entries: list[dict[str, str]],
 ) -> None:
+    """Add only the entries this run has not already recorded.
+
+    LangGraph replays an interrupted node from its start on resume, so a
+    stage killed after it wrote its skip entries recomputes and hands them
+    here again. The whole entry is compared, every key — a dropped quote and
+    a whole skipped document do not share the same keys, and two different
+    requirements dropped from one file share every key but `summary` and
+    `quote`, so comparing a chosen few would treat them as duplicates and
+    drop a real one.
+    """
     if not entries:
         return
-    await connection.execute(
-        "UPDATE runs SET skipped = skipped || %s WHERE id = %s",
-        (Jsonb(entries), run_id),
-    )
+    async with connection.transaction():
+        result = await connection.execute(
+            "SELECT skipped FROM runs WHERE id = %s FOR UPDATE",
+            (run_id,),
+        )
+        row = await result.fetchone()
+        already_stored = row["skipped"] if row else []
+        new_entries = [entry for entry in entries if entry not in already_stored]
+        if not new_entries:
+            return
+        await connection.execute(
+            "UPDATE runs SET skipped = skipped || %s WHERE id = %s",
+            (Jsonb(new_entries), run_id),
+        )
