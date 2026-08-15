@@ -273,8 +273,38 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       environment) but are proven by the message living correctly in
       `app/graph/register_graph.py` and by the general Screen 1 "no runs"
       sub-state being confirmed both by hand and by the front-end suite.
-- [x] Reviewed by Codex (`-s read-only`, CLI `0.147.0`): see this section's
-      final update below for the verdict once the review returns.
+- [x] Reviewed by Codex (`-s read-only`, CLI `0.147.0`,
+      `handoff/review-report-front-end-projects-and-runs.md`): **not
+      merge-ready**, one P1 and eight P2/P3 findings, none fixed by the
+      implementer per protocol (a fix after review would make the reviewed
+      and merged code diverge). P1: `openRun` (`ReviewScreen.jsx`) does not
+      clear `run`/`exported` when switching runs, so stale decisions/buttons
+      can briefly target the newly selected run's id before the new read
+      lands. P2s: `ui/demo/serve_demo_runs.js` still serves the old flat
+      `/runs` list and has no `/projects` route, so `/demo` no longer loads
+      (a pre-existing gap, already named as a limitation, but Codex is right
+      that the README's demo claim needs qualifying); `waiting` (decisions
+      badge/count) is not scoped to a run at review, so L5 is violated
+      outside the project card; a network failure during an answer/finish/
+      create-project action sets a per-panel refusal instead of routing
+      through the same `unreachable` signal as the poll, so screen 11's
+      single-strip rule does not hold for actions; the screen-6 three-line
+      shape and the 403/401 second line are one concatenated string, not
+      structurally three lines; `read_document.py`'s dropped-quote sentence
+      interpolates `{kind}`, so a dropped testing-observation/blocker does
+      not end in "...this requirement was dropped" as the locked sentence
+      requires; the unrelated-document skip has no separate detailed
+      `log_reason` (unlike the other two rewritten skip reasons in the same
+      file); the live status marks use `text-signal-edge` (dark) rather than
+      `text-signal` (lime); the Add-project helper line states the "never
+      creates one" explanation L8 says needs none. P3: `DECISIONS.md` still
+      says `Question` has "no branch on gate kind", which is now false since
+      it branches on `finding`. Reviewed against `a85b431`, code-level only —
+      Codex's sandbox has no Docker socket, so it could not run either
+      suite, the migration, or a browser; its own report says so. The
+      migration predicates/downgrade, endpoint/tool counts, shared core
+      functions, status rename, absence of a status-label map, and the L9
+      test supersession all independently confirmed as shown, not claimed.
 - [x] 131 Python tests (was 127) and 32 front-end tests (was 27) pass
       without a live API key.
 
