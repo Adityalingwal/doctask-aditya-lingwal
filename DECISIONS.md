@@ -561,7 +561,7 @@ Seven slice-1 API endpoints:
 
 | Endpoint | Job |
 |---|---|
-| `POST /projects` | Create project from name + source folder |
+| `POST /projects` | Get-or-create the one project for a source folder (§ folder identity below); no name field |
 | `GET /projects` | Every project, each with its runs nested, in one answer (L1) — the folders `POST /projects` may point at ride along too |
 | `POST /runs` | Start/queue run by project id; return immediately |
 | `GET /runs/{id}` | Durable status, stage, skips, failure, decisions |
@@ -575,9 +575,26 @@ this repository's conventions forbid. Superseded wording:
 `documentation/decision-history.md`, "The screen becomes projects, and
 inside each project its runs."
 
-Startup seeds the demo project only when `projects` is empty, using the same
-core creation function as the endpoint. **Implemented and verified** in
-slice-1 scope.
+**A folder is a project's identity (locked 2026-08-16, superseding the demo
+seed's own "is `projects` empty" check and the claim that `projects.name`
+carries no unique constraint — history: "A folder is a project, and the
+register moves to the project").** `source_folder_path` is unique
+(`uq_projects_source_folder_path`, migration `20260815_0013`), and
+`create_project` (`app/projects/create_project.py`) is get-or-create: two
+calls for one folder return the same project id, `created: false` the
+second time; a `UniqueViolation` from a concurrent creator is caught and
+re-read rather than failed. A project's name is derived from its folder
+(`intake-portal` → `Intake Portal`) and is **never accepted from a
+caller** — no `name` parameter, field, or MCP argument anywhere. There is no
+rename. `source_folder_path` is confined to `config/projects.yaml`'s
+configured root: an absolute path or one containing `..` is refused
+outright, and what remains must resolve directly inside the root, not the
+root itself and not nested two levels down — closing a real hole (a folder
+pointed at the repository root would have read `README.md`/`TASK.md`/
+`DECISIONS.md` as client documents, reachable from curl and MCP before this
+change). Startup seeds the demo project with one `create_project` call for
+`sample-projects/intake-portal`; get-or-create alone makes a restart safe.
+**Implemented and verified** in slice-1 scope.
 
 ### D15 — MCP and React
 
@@ -596,11 +613,10 @@ slice-1 scope.
 - **The screen is three columns (L1–L10, locked 2026-08-15, superseding the
   single run list — see `documentation/decision-history.md`):** projects
   (20rem), one selected project's runs (13rem, collapsible to a strip that
-  keeps the open run's number visible), and the open run's detail — stages,
-  skipped, needs your decision, register, read one at a time behind tabs, as
-  before. One question component serves every gate; it branches only on a
-  `finding`, which is shown as rule, row and evidence rather than as one
-  sentence.
+  keeps the open run's number visible), and the open run's detail, read one
+  at a time behind tabs. One question component serves every gate; it
+  branches only on a `finding`, which is shown as rule, row and evidence
+  rather than as one sentence.
 - A project card shows a status mark (`●` running, pulsing; `◍` at review,
   still; `○` nothing live — never the card or the stage row), its run count,
   its most recent run's date, and — only while live — the active run's stage
@@ -613,7 +629,9 @@ slice-1 scope.
   on a run that is not at review.
 - Section tabs still carry `role="tab"`, not the button role, because
   choosing what to read is navigation — the only actions on a run stay
-  Approve, Reject and Finish review.
+  Approve, Reject and Finish review. **A run panel has three tabs — Stages,
+  Skipped, Decisions (locked 2026-08-16, superseding a fourth Register tab —
+  see the register bullet below).**
 - **The stage strip's own stage wins over "done" only while the run is active**
   (`running` or `needs review`). Extract writes its finished mark after
   every document, not just the last one, so a batch's own stage can read
@@ -623,23 +641,23 @@ slice-1 scope.
 - **A project is created, and its first run started, from `AddProject.jsx`**
   (superseding the `StartRun` form): a box the `Add project +` button at the
   bottom of the projects column opens, in every state — empty or not, no
-  inline first-time form. Folder first, then name: the folder is a dropdown
-  of what `config/projects.yaml`'s configured root holds on disk, never
-  invented and never created by the system; choosing one derives the name
-  (`northside-dental` → `Northside Dental`), still editable. The box may
-  refuse to send an empty name or an unchosen folder, in its own words — the
-  one client-side check this screen makes; every other rule, including
-  whether the folder exists, stays the server's, shown unchanged under
-  "Could not create this project", never "the server refused". The two
-  retry/disable behaviours the old form had are unchanged: a retry after a
-  failed `POST /runs` never repeats `POST /projects` — `projects.name`
-  carries no unique constraint
-  (`migrations/versions/20260812_0001_create_slice_1_tables.py` declares only
-  a primary key on `id`), so retrying the create would leave a second
-  project over the same folder and the watcher polling it twice — and the
-  button stays disabled through the parent's re-read. Unlike the old form,
-  this box does not disappear once a run exists: the limitation that closed
-  is below.
+  inline first-time form. **There is no name field (locked 2026-08-16,
+  superseding the folder-then-name paragraph and its empty-name check — see
+  D14's folder-identity bullet).** The box chooses only a folder — a dropdown
+  of what `config/projects.yaml`'s configured root holds on disk, filtered to
+  folders that do not already carry a project, never invented and never
+  created by the system; when nothing is left the dropdown stays where it
+  is, disabled, its one option reading "No folder left to add." instead of
+  "Choose a folder." Its own check is only that a folder is chosen ("Choose
+  the folder to watch."); every other rule, including whether the folder
+  exists, stays the server's, shown unchanged under "Could not create this
+  project", never "the server refused". A retry after a failed `POST /runs`
+  never repeats `POST /projects` — held client-side via the returned
+  `project_id`, belt-and-suspenders now that `source_folder_path` also
+  carries a real unique constraint (D14) — and the button stays disabled
+  through the parent's re-read. This box does not disappear once a run
+  exists: a second, third, or later project is created from the same
+  button the first one was.
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
 - **The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on
@@ -678,20 +696,27 @@ slice-1 scope.
   never substituted with `created_at` — stage, waiting-decision count,
   finished stages, and row count once exported), plus the projects root and
   the folders inside it, no cap on any list.
-- Limitation: `GET /runs/{id}` carries no register rows, so the register
-  section is empty until the run has exported.
+- **The register is the project's own panel, not a run's tab (locked
+  2026-08-16, superseding the register-tab limitation below — history: "A
+  folder is a project, and the register moves to the project").**
+  `register_rows` was already keyed by `project_id` with `is_committed`, one
+  register per project accumulating across runs; only the screen's
+  presentation contradicted that. A `Register` entry sits above a project's
+  runs in the middle column (`ui/src/RunColumn.jsx`), showing the row count
+  of the newest run that has exported, if any; opening it shows the register
+  in the right panel — the same panel a run opens into, reusing
+  `ui/src/Register.jsx` unchanged — and clears whatever run was open, its
+  export and both refusals, the same clearing rule `openRun` already
+  follows. **No new endpoint and no new core function:** the panel is built
+  from the two calls that already exist — `GET /projects` (runs newest
+  first, each carrying `row_count`, non-null only once exported) to find the
+  most recent exported run, then `GET /runs/{id}/export` for its register.
+  Before any run has exported, the panel reads exactly "Nothing has been
+  added to this register yet." — never an empty table.
 - Limitation: the tools inherit the HTTP surface's lack of authentication, and
   the SDK's own host check answers `421` to a request whose `Host` is neither
   `localhost` nor `127.0.0.1`, so a client on another machine needs transport
   work that is not designed yet.
-- Limitation: the source folder a project names is read inside the
-  application's container, whose only mount is `.:/workspace`, so only a path
-  inside the repository exists as far as it is concerned; a path like
-  `/Users/name/Downloads/client-docs` is refused, correctly, by
-  `create_project`. Deliberately not fixed by widening the mount — that would
-  grow the already-too-broad development mount `PROGRESS.md` lists as an
-  active blocker, and put an unauthenticated screen in front of the host
-  filesystem.
 
 ## Operations
 

@@ -78,6 +78,15 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   are replaced by `GET /projects` and `list_projects` (endpoint and tool
   counts stay at seven). 131 Python tests (was 127) and 32 front-end tests
   (was 27) pass without a live key.
+- **2026-08-16, branch `folder-is-a-project-and-register-moves`:** a folder is
+  now a project's identity (get-or-create, unique `source_folder_path`, name
+  derived and never accepted, confined to the projects root), and the
+  register moved from a run's own tab to the project's own panel — see the
+  branch's own entry under Completed for the full detail. Migration
+  `20260815_0013` adds the unique constraint, proven forward and backward by
+  hand, including the duplicate-refusal path. Endpoint and MCP tool counts
+  stay at seven; no new door was added for the register. 138 Python tests
+  (was 131) and 40 front-end tests (was 32) pass without a live key.
 
 ## Completed
 
@@ -330,6 +339,131 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       `never_calls_an_unreachable_application_a_refusal`. 35 front-end tests
       (was 32) and 131 Python tests pass after the repair, both with no key.
 
+### A folder is a project, and the register moves to the project (branch `folder-is-a-project-and-register-moves`)
+
+- [x] **Never-do tests written and run at `main`'s baseline `a436393` before
+      any implementation**, per the brief's protocol: 7 Python
+      (`tests/projects/test_create_project.py` new, 5 tests;
+      `tests/register/test_review_question_wording.py` new, 2 tests) and 5
+      front-end (all new files). All 12 failed at that baseline — none
+      passed there, so none is a false regression guard. Full per-test
+      baseline results are in the scratchpad report referenced below.
+- [x] `create_project` (`app/projects/create_project.py`) rewritten as
+      get-or-create: takes only `source_folder_path`, returns
+      `CreatedProject(project_id, created)`; a `UniqueViolation` from a
+      concurrent creator (HTTP, MCP and the startup demo seed all reach this
+      function independently) is caught and re-read rather than failed. The
+      name is derived from the folder's last path segment
+      (dashes/underscores → spaces, each word capitalised) and is never
+      accepted as input anywhere. `_confined_folder` refuses an absolute
+      path or one containing `..` outright, then requires the resolved path
+      to sit directly inside the resolved projects root — not the root
+      itself, not nested two levels down, and a symlink leaving the root is
+      caught by `Path.resolve()`. `app/projects/list_projects.py` gained
+      `read_projects_root`, shared by both the dropdown's folder list and
+      the confinement check, so they can never disagree about where the
+      root actually is.
+- [x] `POST /projects` and the MCP `create_project` tool both lost `name`;
+      their answer gained `created`. `app/main.py`'s `ensure_demo_project`
+      call is now one `create_project` call for
+      `sample-projects/intake-portal` — the project-specific "does a row
+      named X exist" check it used is gone, get-or-create alone makes a
+      restart safe. Endpoint and MCP tool counts stay at seven.
+- [x] Migration `20260815_0013` adds `uq_projects_source_folder_path`;
+      proven forward and backward by hand against a real database: seeded
+      two projects over one folder before the migration existed (schema at
+      `20260815_0012`), `alembic upgrade head` refused, naming both project
+      ids and the folder, and the transaction rolled back (`alembic
+      current` still read `20260815_0012`, no constraint present); resolved
+      the duplicate; `alembic upgrade head` then succeeded and the
+      constraint was confirmed present via `pg_constraint`; `alembic
+      downgrade -1` dropped it (confirmed absent); `alembic upgrade head`
+      re-applied cleanly.
+- [x] The register moved from a run's own tab to the project's own panel.
+      `ui/src/RunColumn.jsx` gained a `Register` entry above a project's
+      runs, showing the row count of the newest exported run if any.
+      Opening it (`ReviewScreen.jsx`'s new `openRegister`) clears whatever
+      run was open — its export and both refusals — the same clearing rule
+      `openRun` already followed. A run panel now has three tabs (Stages,
+      Skipped, Decisions); `ui/src/Register.jsx` is reused unchanged for the
+      project panel. No new endpoint, no new core function: the panel reads
+      `GET /projects` (runs newest first, `row_count` non-null once
+      exported) to find the most recent exported run, then
+      `GET /runs/{id}/export` for its register. Before any run has
+      exported, the panel reads exactly "Nothing has been added to this
+      register yet." — never an empty table.
+- [x] The review question's wording changed from "Export the
+      Requirements-to-Delivery Register for {name}, with {n} row(s)
+      proposed by this run?" to "Add this run's changes to the register?"
+      (`app/graph/register_graph.py`) — no row count, so a rules-only run
+      (zero proposed rows, examining the whole register under changed
+      rules) still asks the same question. The gate itself, `runs.status`'s
+      `export rejected`, and `runs.export_json`/`GET /runs/{id}/export` are
+      unchanged in behaviour.
+- [x] **A real bug found and fixed outside the brief's scope, while wiring
+      the register panel's polling:** `readRegisterFromServer` initially
+      depended on the `projects` array directly. Since `GET /projects`
+      answers with a new array reference every poll, and the polling
+      `useEffect` depends on this callback, each poll tore the interval down
+      and rebuilt it — which re-ran `readProjectsFromServer()` immediately,
+      producing yet another new array, rebuilding the callback again. This
+      surfaced as a genuine front-end test failure
+      (`never_calls_an_unreachable_application_a_refusal` hung, and
+      `never_shows_the_previous_runs_decisions_after_opening_another_run`'s
+      cleared-decisions assertion failed) before the cause was traced. Fixed
+      by reading `projects` through a ref updated during render, so
+      `readRegisterFromServer` depends only on the cheap, navigation-driven
+      primitives `registerOpen` and `selectedProjectId` (mirroring how
+      `readFromServer` already depends only on `runId`). The two tests above
+      are the regression guard; both pass now.
+- [x] ~22 existing Python test files (every one that created a project by
+      name over a `tmp_path` folder) converted onto a new
+      `temporary_project_folder` helper (`tests/runs/application.py`), which
+      creates a real, uniquely-named folder directly inside the repository's
+      actual `sample-projects/` and removes it afterward — `tmp_path` is
+      never inside the configured projects root, so the new confinement
+      rule would otherwise refuse every one of them. A "waiting"/staging
+      folder that is never itself sent to `POST /projects` (e.g.
+      `test_watched_folder.py`, `test_incremental_updates.py`) was left
+      under `tmp_path`, unchanged. `tests/interfaces/test_mcp_tools.py`'s
+      `project["name"] == "..."` lookup (now meaningless — names are
+      derived) was changed to match on `source_folder_path`. Done by a
+      background sub-agent given a precise, example-driven brief; every
+      file independently spot-checked afterward.
+- [x] Three UI test files that opened a run's old `Register` tab
+      (`shows_every_citation_with_its_source.test.jsx`,
+      `never_calls_a_running_run_finished.test.jsx`,
+      `offers_only_contract_actions.test.jsx`) rewritten to open the
+      project's register panel instead. Three files that rendered
+      `AddProject` directly and typed into its removed name field
+      (`never_invents_its_own_reason_for_refusing_to_start.test.jsx`,
+      `never_creates_a_second_project_when_only_the_run_failed.test.jsx`,
+      `never_starts_a_second_run_while_the_first_is_being_opened.test.jsx`)
+      had that step removed and gained the now-required `projects` prop;
+      the first file's empty-name sub-test (a rule that no longer exists)
+      was deleted rather than kept failing. `never_shows_a_project_the_
+      server_has_not_confirmed.test.jsx`'s premise (typing a fake name,
+      proving it never renders) had nothing left to substitute 1:1 once the
+      field was gone, so it was simplified to prove the same L5 principle
+      through the project's own server-confirmed name instead.
+- [x] Hand-driven against the real application (`docker compose`, scripted
+      model client, no live key): the Add-project dropdown showing only
+      folders without a project and losing them one by one as projects were
+      created; "No folder left to add." once all three were taken; `POST
+      /projects` twice for one folder returning the same `project_id` with
+      `"created": false` the second time, and `projects` holding exactly one
+      row per folder; `..`, `/` and `/workspace` each refused by name; a
+      project's Register panel reading "Nothing has been added to this
+      register yet." before any export and the full table (cells,
+      citations, rules and findings) after one; opening a run's Decisions
+      tab and then that project's Register leaving no trace of the run's
+      decisions or its Approve/Reject buttons; and the review question
+      reading exactly "Add this run's changes to the register?" No
+      screenshot or log captured a secret.
+- [x] 138 Python tests (was 131) and 40 front-end tests (was 32) pass
+      without a live API key — both counts read from the suites' own
+      printed summary lines, not claimed from memory.
+
 ### Reliability slice (branch `reliability-proof`)
 
 - [x] Five never-do tests written and run at the baseline commit `bb24476`
@@ -534,18 +668,31 @@ working claim only after its own implementation and proof land.
   README's "What this does not do, and why" for the full boundary and the
   workflow answer (save an edited document under a new name to have the
   revision read).
-- `GET /runs/{id}` returns no register rows, so the screen's register section
-  is empty until that run has exported; a run whose export was rejected never
-  shows a register at all.
+- A project's register panel shows the empty line
+  ("Nothing has been added to this register yet.") until that project has a
+  run that has exported — a new project, a first run still working, or a
+  run whose export was rejected all read the same way, since none of them
+  has moved `row_count` off `null` yet.
 - The screen is built by Node, which the application image does not carry, and
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.
   Image-only serving is part of the open fresh-clone verification.
 - The screen authenticates nobody, exactly as the endpoints behind it do not.
-- The Add-project box reads a folder inside the application's container,
-  whose only mount is `.:/workspace`, so a path outside the repository is
-  refused by `create_project`; this is deliberate, not fixed by widening the
-  mount (`docker-compose.yml` is untouched).
+- A folder that exists but the application cannot read is accepted by
+  `create_project`, which only checks that it is a directory; the failure
+  appears later inside Ingest as an `OSError` per file.
+- A run waiting for review holds its project's lock until a person answers
+  it. There is no timeout and no way to abandon a run, so a review left
+  unanswered stops that project from starting another run. This is
+  deliberate: expiring a review would be the system deciding on the
+  person's behalf.
+- The race in `app/runs/run_lifecycle.py:85-92`: when a run is running and
+  another is queued, a third request can find both inserts refused and then
+  find the queued run already promoted, so `already_waiting` is `None` and
+  the caller gets a `TypeError` and a 500 with no sentence instead of a
+  refusal. Deliberately not fixed — the fix is small but an honest test for
+  it is not, and the window needs three concurrent requests on one project.
+  Named here so nobody reports it as new.
 - The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on a
   fixed interval, whatever is on screen and whatever a run's status is
   (L1, locked 2026-08-15) — there is no per-project runs endpoint and no
@@ -607,6 +754,11 @@ working claim only after its own implementation and proof land.
 | `GET /runs` and `list_runs` identical | 2026-08-14, `finished-stages-and-list-runs` branch | One run driven to Review; `GET /runs` and the MCP tool `list_runs` returned byte-identical payloads |
 | Start-a-run form | 2026-08-15, `start-a-run-from-the-screen` branch | Hand-driven in a browser against the application: an empty database showed the form; a folder that does not exist and a blank name were each refused with `create_project`'s own sentence, word for word, and nothing was created; a real folder (`sample-projects/northside-dental`) created its project (`POST /projects` 201) while the environment's empty `OPENROUTER_API_KEY` refused the run start (`POST /runs` 503); a second click retried only `POST /runs` — the `projects` table held exactly one row for it throughout. A run could not be watched through Ingest onward this way, because there is no live model key here |
 | Demo runs after this change | 2026-08-15, `start-a-run-from-the-screen` branch | `npm --prefix ui run dev`, all four demo runs (`demo-review`, `demo-running`, `demo-failed`, `demo-exported`) still listed and opened correctly; `ui/demo/serve_demo_runs.js` was not changed — it has no write path for `POST /projects` or `POST /runs`, but its run list is never empty, so the start-a-run form never renders against it and the gap does not show |
+| `docker compose -p folder-verify run --rm app pytest` | 2026-08-16, `folder-is-a-project-and-register-moves` branch | 138 passed, real PostgreSQL, no live key |
+| `npm --prefix ui test` | 2026-08-16, `folder-is-a-project-and-register-moves` branch | 40 passed, 25 files, no live key |
+| Migration `20260815_0013` forward and backward on real data | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Seeded two projects over one folder at revision `20260815_0012`; `alembic upgrade head` refused, naming both project ids and the folder, transaction rolled back (`alembic current` still `20260815_0012`, constraint absent via `pg_constraint`); duplicate resolved by hand; `alembic upgrade head` then succeeded and the constraint was confirmed present; `alembic downgrade -1` dropped it (confirmed absent); `alembic upgrade head` re-applied cleanly |
+| Folder-is-a-project hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Real application, scripted model, browser: Add-project dropdown listed all three unclaimed folders, then two, then showed "No folder left to add." once all three had projects; the demo project's derived name read "Intake Portal"; a new project's derived name read "Hand Drive Check" from `sample-projects/hand-drive-check`; `POST /projects` twice for one folder returned the same `project_id` with `"created": false` the second time and `projects` held exactly one row per folder (confirmed by direct query); `..`, `/` and `/workspace` were each refused by name over HTTP, no row added by any of the three |
+| Register-moves hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Same session: a project that had never run read "Nothing has been added to this register yet."; a run driven to Review showed the question "Add this run's changes to the register?" verbatim; after approving and finishing, its project's Register entry read "1 row" and opening it showed the full table with citations and rules; opening the run's own Decisions tab (showing the answered export decision) and then clicking Register left no trace of the run's decision or its Approve/Reject buttons on screen |
 | Live model | Never | Unverified |
 | Fresh clone/image-only | Not run yet | Open release gate |
 
