@@ -83,8 +83,15 @@ export default function ReviewScreen({ runId: openedRunId }) {
 
   // A link to one run stays a link a reviewer can keep, so opening a run from
   // a column writes it into the address without adding a history entry.
+  // What the last run said goes with it: until the new read answers, the
+  // screen shows nothing rather than the previous run's decisions beside
+  // buttons that already act on this one.
   const openRun = useCallback((chosen) => {
     setRunId(chosen);
+    setRun(null);
+    setExported(null);
+    setReadRefusal(null);
+    setAnswerRefusal(null);
     window.history.replaceState(null, "", `/ui/?run=${encodeURIComponent(chosen)}`);
   }, []);
 
@@ -148,24 +155,43 @@ export default function ReviewScreen({ runId: openedRunId }) {
 
   // Nothing the person clicked reaches the screen: the answer is sent, and what
   // is shown next is read back from the server that recorded it.
+  // An action that never reached the application is screen 11's strip, not a
+  // refusal: the application said nothing, so "the server refused" would put
+  // words in the mouth of something that was not running.
+  // Answers false when the request never landed, because there is then
+  // nothing new to read back — and re-reading would clear the strip a moment
+  // after raising it, leaving no sign that the click did nothing.
+  const actionReachedTheApplication = useCallback((acted) => {
+    if (acted.unreachable) {
+      setUnreachable(true);
+      setAnswerRefusal(null);
+      return false;
+    }
+    setUnreachable(false);
+    setAnswerRefusal(acted.ok ? null : acted.refusal);
+    return true;
+  }, []);
+
   const answer = useCallback(
     async (decisionId, outcome) => {
       setAnswering(true);
-      const answered = await answerDecision(runId, decisionId, outcome);
-      setAnswerRefusal(answered.ok ? null : answered.refusal);
-      await readFromServer();
+      const acted = await answerDecision(runId, decisionId, outcome);
+      if (actionReachedTheApplication(acted)) {
+        await readFromServer();
+      }
       setAnswering(false);
     },
-    [runId, readFromServer],
+    [runId, readFromServer, actionReachedTheApplication],
   );
 
   const finish = useCallback(async () => {
     setAnswering(true);
     const finished = await finishReview(runId);
-    setAnswerRefusal(finished.ok ? null : finished.refusal);
-    await readFromServer();
+    if (actionReachedTheApplication(finished)) {
+      await readFromServer();
+    }
     setAnswering(false);
-  }, [runId, readFromServer]);
+  }, [runId, readFromServer, actionReachedTheApplication]);
 
   // L5: nothing the person typed into the Add-project box reaches the screen.
   // The list is re-read and the run the server actually created is what gets
@@ -179,8 +205,11 @@ export default function ReviewScreen({ runId: openedRunId }) {
     [readProjectsFromServer, openRun],
   );
 
+  // L5: only a run the server says is at review has work waiting. Decisions
+  // left unanswered on a run that stopped can never be answered — counting
+  // them would offer work the server refuses.
   const waiting =
-    run === null
+    run === null || run.status !== WAITING_FOR_REVIEW
       ? 0
       : run.decisions.filter((decision) => decision.outcome === null).length;
 
@@ -347,6 +376,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
           availableFolders={availableFolders}
           onStarted={startedRun}
           onClose={() => setAddProjectOpen(false)}
+          onUnreachable={() => setUnreachable(true)}
         />
       )}
     </div>
@@ -358,7 +388,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
 function Loading() {
   return (
     <div className="flex h-full items-center justify-center">
-      <p className="m-0 flex items-center gap-2 text-ink-soft">
+      <p className="m-0 flex items-center gap-2 text-ink">
         <span className="inline-block h-2 w-2 bg-signal" aria-hidden="true" />
         Loading…
       </p>

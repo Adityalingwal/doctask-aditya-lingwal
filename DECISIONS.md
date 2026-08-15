@@ -598,8 +598,9 @@ slice-1 scope.
   (20rem), one selected project's runs (13rem, collapsible to a strip that
   keeps the open run's number visible), and the open run's detail — stages,
   skipped, needs your decision, register, read one at a time behind tabs, as
-  before. One generic question component still serves every gate, with no
-  branch on gate kind.
+  before. One question component serves every gate; it branches only on a
+  `finding`, which is shown as rule, row and evidence rather than as one
+  sentence.
 - A project card shows a status mark (`●` running, pulsing; `◍` at review,
   still; `○` nothing live — never the card or the stage row), its run count,
   its most recent run's date, and — only while live — the active run's stage

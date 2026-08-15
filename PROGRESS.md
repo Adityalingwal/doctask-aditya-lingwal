@@ -307,6 +307,28 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       test supersession all independently confirmed as shown, not claimed.
 - [x] 131 Python tests (was 127) and 32 front-end tests (was 27) pass
       without a live API key.
+- [x] Review findings repaired in the foreground, on the same branch, after
+      Aditya decided each one. Fixed: the P1 (`openRun` now clears the run,
+      its export and both refusals, so the previous run's decisions never sit
+      beside buttons that act on the newly opened one); the decisions badge
+      counts only a run the server reports at review; an action that never
+      reached the application raises screen 11's strip instead of a per-panel
+      refusal, in `ReviewScreen` and in `AddProject`, and does **not** re-read
+      afterwards — a re-read would clear the strip a moment after raising it;
+      the unrelated-document skip regained its detailed log line; the two live
+      marks and the loading line use the locked colours; `DECISIONS.md`'s
+      `Question` sentence and the README's demo paragraph now say what is
+      true. Deliberately not fixed, each decided by Aditya: the screen-6
+      cause and restart notice stay one string (the words are right, only the
+      line break is missing); the dropped-quote sentence keeps naming the kind
+      that was actually dropped, which is more honest than the locked wording
+      and supersedes it; `ui/demo/` is left stale and the README now says so.
+- [x] Three tests written before those fixes and run against the branch as it
+      stood: all three failed there —
+      `never_shows_the_previous_runs_decisions_after_opening_another_run`,
+      `the_decisions_tab_counts_only_a_run_the_server_says_is_at_review`, and
+      `never_calls_an_unreachable_application_a_refusal`. 35 front-end tests
+      (was 32) and 131 Python tests pass after the repair, both with no key.
 
 ### Reliability slice (branch `reliability-proof`)
 

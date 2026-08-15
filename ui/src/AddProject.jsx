@@ -13,7 +13,13 @@ const NO_FOLDER_CHECK = "Choose the folder to watch.";
 // than "the server refused" (screen 2). What it tells its parent is one
 // thing, the id of the run the server started; the parent decides what
 // happens next (L5), the same as the start-a-run form it replaces.
-export default function AddProject({ projectsRoot, availableFolders, onStarted, onClose }) {
+export default function AddProject({
+  projectsRoot,
+  availableFolders,
+  onStarted,
+  onClose,
+  onUnreachable,
+}) {
   const [sourceFolderPath, setSourceFolderPath] = useState("");
   const [name, setName] = useState("");
   const [nameEditedByUser, setNameEditedByUser] = useState(false);
@@ -48,12 +54,24 @@ export default function AddProject({ projectsRoot, availableFolders, onStarted, 
     setRefusal(null);
     setStarting(true);
 
+    // Screen 11: a request that never reached the application is not a
+    // refusal. The strip under the header says so once, and this box says
+    // nothing rather than blaming a server that never answered.
+    const stopOn = (acted) => {
+      if (acted.unreachable) {
+        setRefusal(null);
+        onUnreachable();
+      } else {
+        setRefusal(acted.refusal);
+      }
+      setStarting(false);
+    };
+
     let usableProjectId = projectId;
     if (usableProjectId === null) {
       const created = await createProject(name, sourceFolderPath);
       if (!created.ok) {
-        setRefusal(created.refusal);
-        setStarting(false);
+        stopOn(created);
         return;
       }
       usableProjectId = created.body.project_id;
@@ -62,8 +80,7 @@ export default function AddProject({ projectsRoot, availableFolders, onStarted, 
 
     const started = await startRun(usableProjectId);
     if (!started.ok) {
-      setRefusal(started.refusal);
-      setStarting(false);
+      stopOn(started);
       return;
     }
     // `starting` is deliberately left set. The parent's re-read is a round

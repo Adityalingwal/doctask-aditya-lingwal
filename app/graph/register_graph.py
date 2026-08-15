@@ -253,6 +253,17 @@ def build_register_graph(
                     "reason": "This document is not related to this client or project.",
                 }
             )
+            # The screen's sentence is short on purpose; the log keeps the
+            # detail, exactly as the unknown-type and failed-call paths do.
+            _log(
+                logging.INFO,
+                "extract_document_unrelated",
+                f"{source_file} was read and labelled as not about this "
+                "client engagement, so nothing from it was proposed for the "
+                "register; it counts as read and no later run pays to read "
+                "it again.",
+                run_id,
+            )
 
         async with pool.connection() as connection:
             await connection.execute(

@@ -121,13 +121,13 @@ function StatusMark({ live }) {
   }
   if (live.status === NEEDS_REVIEW) {
     return (
-      <span aria-hidden="true" className="text-signal-edge">
+      <span aria-hidden="true" className="text-signal">
         ◍
       </span>
     );
   }
   return (
-    <span aria-hidden="true" className="pulse-dot text-signal-edge">
+    <span aria-hidden="true" className="pulse-dot text-signal">
       ●
     </span>
   );

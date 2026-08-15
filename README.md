@@ -228,13 +228,11 @@ with the server's own reason beside it. Approve and Reject appear only while
 the server reports the run at review, and **Finish review** only once no
 decision is unanswered — the server refuses both otherwise.
 
-Separately, `npm --prefix ui run dev` serves demo runs at
-<http://localhost:5173/demo> — one at review, one working, one failed, one
-exported — through dev-only middleware under `ui/demo/`, so a single run's
-sections can be worked on without the application; that demo server predates
-this screen's three-column redesign and mocks only the single-run endpoints,
-not `GET /projects`, so the projects and runs columns themselves are not
-demonstrated there. None of that folder reaches a build.
+The dev-only middleware under `ui/demo/`, served by `npm --prefix ui run dev`,
+**no longer works with this screen**: it answers the removed `GET /runs` and
+has no `GET /projects`, which the screen now reads before it renders anything,
+so those pages stay on `Loading…`. Use the application itself. None of that
+folder reaches a build.
 
 Its own tests run without Docker and without a key:
 
