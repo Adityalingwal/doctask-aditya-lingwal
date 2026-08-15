@@ -105,6 +105,30 @@ def _isoformat(value: Any) -> str | None:
     return value.isoformat() if value is not None else None
 
 
+def read_projects_root(
+    project_root: Path, projects_config_path: Path
+) -> tuple[str, Path]:
+    """The projects root as configured, and as a real, resolved directory.
+
+    Shared with `create_project` (app/projects/create_project.py), which
+    confines every caller-supplied folder to this same resolved root — one
+    reading of `config/projects.yaml`, so the dropdown and the confinement
+    check can never disagree about where the root actually is.
+    """
+    parsed = _read_projects_config(projects_config_path)
+    projects_root = Path(parsed[PROJECTS_ROOT_KEY])
+    resolved_root = (
+        projects_root if projects_root.is_absolute() else project_root / projects_root
+    ).resolve()
+    if not resolved_root.is_dir():
+        raise ProjectsUnavailable(
+            f"{projects_config_path} names '{projects_root}' as the projects "
+            f"root, but {resolved_root} does not exist — create it, or point "
+            f"{PROJECTS_ROOT_KEY} at a folder that does, then try again."
+        )
+    return str(projects_root), resolved_root
+
+
 def _available_folders(
     project_root: Path, projects_config_path: Path
 ) -> tuple[str, list[str]]:
@@ -115,23 +139,15 @@ def _available_folders(
     returned alongside the folders because the Add-project box (L8/screen 2)
     states where a new folder must be put even when none exist there yet.
     """
-    parsed = _read_projects_config(projects_config_path)
-    projects_root = Path(parsed[PROJECTS_ROOT_KEY])
-    resolved_root = (
-        projects_root if projects_root.is_absolute() else project_root / projects_root
+    projects_root, resolved_root = read_projects_root(
+        project_root, projects_config_path
     )
-    if not resolved_root.is_dir():
-        raise ProjectsUnavailable(
-            f"{projects_config_path} names '{projects_root}' as the projects "
-            f"root, but {resolved_root} does not exist — create it, or point "
-            f"{PROJECTS_ROOT_KEY} at a folder that does, then try again."
-        )
     folders = sorted(
         f"{projects_root}/{entry.name}"
         for entry in resolved_root.iterdir()
         if entry.is_dir()
     )
-    return str(projects_root), folders
+    return projects_root, folders
 
 
 def _read_projects_config(projects_config_path: Path) -> dict[str, Any]:

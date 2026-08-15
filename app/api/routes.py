@@ -40,9 +40,10 @@ REFUSAL_STATUS_CODES = (
 
 
 class CreateProject(BaseModel):
-    # Both fields are only carried here. What counts as usable is core's answer,
-    # so that this door and the MCP tool refuse the same request the same way.
-    name: str
+    # Only carried here. What counts as usable is core's answer, so that this
+    # door and the MCP tool refuse the same request the same way. There is no
+    # `name` field: the project's name is derived from the folder, in core,
+    # never supplied by a caller.
     source_folder_path: str
 
 
@@ -65,15 +66,15 @@ def add_refusal_responses(application: FastAPI) -> None:
 async def create_one_project(
     request: Request,
     payload: CreateProject,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     async with request.app.state.pool.connection() as connection:
-        project_id = await create_project(
+        created = await create_project(
             connection,
-            payload.name,
             payload.source_folder_path,
             request.app.state.project_root,
+            request.app.state.projects_config_path,
         )
-    return {"project_id": str(project_id)}
+    return {"project_id": str(created.project_id), "created": created.created}
 
 
 @router.get("/projects")

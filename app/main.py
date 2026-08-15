@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     async with pool.connection() as connection:
-        await ensure_demo_project(connection, PROJECT_ROOT)
+        await ensure_demo_project(connection, PROJECT_ROOT, PROJECTS_CONFIG_PATH)
 
     engine = app.state.run_engine
     watching: asyncio.Task | None = None

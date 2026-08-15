@@ -41,16 +41,21 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
     )
 
     @server.tool(name="create_project")
-    async def create_project_tool(name: str, source_folder_path: str) -> dict[str, str]:
-        """Create one project reading a source folder, and return its id."""
+    async def create_project_tool(source_folder_path: str) -> dict[str, Any]:
+        """Get or create the one project for this folder, and return its id.
+
+        The folder is the project's identity and its name is derived from it
+        — this tool takes no name. Calling it again for a folder that already
+        has a project returns that project's id and `created: false`.
+        """
         async with application.state.pool.connection() as connection:
-            project_id = await create_project(
+            created = await create_project(
                 connection,
-                name,
                 source_folder_path,
                 application.state.project_root,
+                application.state.projects_config_path,
             )
-        return {"project_id": str(project_id)}
+        return {"project_id": str(created.project_id), "created": created.created}
 
     @server.tool(name="start_run")
     async def start_run_tool(project_id: UUID) -> dict[str, str]:

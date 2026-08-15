@@ -377,7 +377,6 @@ def build_register_graph(
 
     async def review(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
-        project_id = UUID(state["project_id"])
         async with pool.connection() as connection:
             run = await read_run(connection, run_id)
 
@@ -389,14 +388,16 @@ def build_register_graph(
         # interrupt itself must not happen again.
         if run["review_finished_at"] is None:
             async with pool.connection() as connection:
-                project = await read_project(connection, project_id)
+                # No row count in the question: a rules-only run reaches
+                # Review with zero proposed rows and still commits merges and
+                # findings, so a wording naming a count would read wrongly
+                # there. This gate is the one place a human approves the
+                # whole run's work (working notes line 161), not a download
+                # prompt, so "export" is never the verb here.
                 await ensure_export_decision(
                     connection,
                     run_id,
-                    f"Export the Requirements-to-Delivery Register for "
-                    f"{project['name']}, with "
-                    f"{state.get('proposed_rows', 0)} row(s) proposed by this "
-                    "run?",
+                    "Add this run's changes to the register?",
                 )
                 await enter_stage(connection, run_id, REVIEW_STAGE)
                 await set_run_status(connection, run_id, WAITING_FOR_REVIEW)
