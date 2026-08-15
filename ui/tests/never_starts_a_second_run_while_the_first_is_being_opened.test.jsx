@@ -47,15 +47,13 @@ test("never_starts_a_second_run_while_the_first_is_being_opened", async () => {
     <AddProject
       projectsRoot="sample-projects"
       availableFolders={[FOLDER]}
+      projects={[]}
       onStarted={onStarted}
       onClose={() => {}}
     />,
   );
 
   fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
-  fireEvent.change(screen.getByLabelText(/project name/i), {
-    target: { value: "Northside Dental" },
-  });
 
   const startButton = screen.getByRole("button", { name: /create and start run/i });
 

@@ -1,10 +1,11 @@
 // L4 — the button makes two calls, and the first one must never happen twice.
-// `projects.name` carries no unique constraint (migrations/versions/
-// 20260812_0001_create_slice_1_tables.py declares only a primary key on
-// `id`), so retrying a failed `POST /runs` by creating a second project over
-// the same folder would leave the watcher polling that folder twice. The
-// component must hold the `project_id` `POST /projects` returned and skip the
-// create on retry.
+// A folder is now the project's identity (a real unique constraint on
+// `projects.source_folder_path`, migrations/versions/20260815_0013), and
+// `POST /projects` get-or-creates, so a second call over the same folder
+// would no longer create a duplicate row — but it would still be one wasted
+// round trip on every retry, and the whole point of holding `project_id`
+// client-side is to skip it. The component must hold the `project_id`
+// `POST /projects` returned and skip the create on retry.
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -26,7 +27,7 @@ test("never_creates_a_second_project_when_only_the_run_failed", async () => {
     {
       method: "POST",
       path: "/projects",
-      reply: { status: 201, body: { project_id: projectId } },
+      reply: { status: 201, body: { project_id: projectId, created: true } },
     },
     {
       method: "POST",
@@ -54,15 +55,13 @@ test("never_creates_a_second_project_when_only_the_run_failed", async () => {
     <AddProject
       projectsRoot="sample-projects"
       availableFolders={[FOLDER]}
+      projects={[]}
       onStarted={onStarted}
       onClose={() => {}}
     />,
   );
 
   fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
-  fireEvent.change(screen.getByLabelText(/project name/i), {
-    target: { value: "Northside Dental" },
-  });
 
   const startButton = screen.getByRole("button", { name: /create and start run/i });
 

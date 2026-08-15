@@ -1,13 +1,12 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
-import { openSection } from "./open_section.js";
 import {
   exportReply,
+  projectReply,
   projectsReply,
   runId,
-  runReply,
   serverAnswering,
 } from "./server_replies.js";
 
@@ -15,23 +14,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// The register is the project's own panel (section 2.3), reached from the
+// Register entry above a project's runs — not from a run's own tabs, which
+// no longer include one.
+function exportedProject(rowCount) {
+  const run = { ...projectReply().runs[0], row_count: rowCount };
+  return projectReply({ runs: [run] });
+}
+
 test("every citation names the source file and the place the server gave it", async () => {
   const exported = exportReply();
   vi.stubGlobal(
     "fetch",
     serverAnswering([
-      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
-        path: `/runs/${runId}`,
-        reply: { body: runReply({ status: "done", stage: "commit", exported: true }) },
+        path: "/projects",
+        reply: { body: projectsReply({ projects: [exportedProject(exported.rows.length)] }) },
       },
       { method: "GET", path: `/runs/${runId}/export`, reply: { body: exported } },
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/register/i);
+  render(<ReviewScreen runId="" />);
+  fireEvent.click(await screen.findByText(exportedProject(1).name));
+  fireEvent.click(await screen.findByRole("link", { name: /register/i }));
   const register = await screen.findByRole("region", { name: /register/i });
 
   const [present, absence] = exported.rows[0].citations;
@@ -63,18 +70,18 @@ test("a citation whose quoted words the server did not send is never shown as a 
   vi.stubGlobal(
     "fetch",
     serverAnswering([
-      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
       {
         method: "GET",
-        path: `/runs/${runId}`,
-        reply: { body: runReply({ status: "done", stage: "commit", exported: true }) },
+        path: "/projects",
+        reply: { body: projectsReply({ projects: [exportedProject(exported.rows.length)] }) },
       },
       { method: "GET", path: `/runs/${runId}/export`, reply: { body: exported } },
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/register/i);
+  render(<ReviewScreen runId="" />);
+  fireEvent.click(await screen.findByText(exportedProject(1).name));
+  fireEvent.click(await screen.findByRole("link", { name: /register/i }));
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(register.textContent).toContain("12-march-scope.md");
