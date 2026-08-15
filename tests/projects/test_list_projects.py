@@ -10,7 +10,24 @@ import pytest
 from app.database import build_connection_pool
 from app.projects.list_projects import read_project_list
 from app.refusal import ProjectsUnavailable
-from tests.runs.application import PROJECT_ROOT, temporary_database
+from tests.documents.register_documents import (
+    examine_marker,
+    extract_marker,
+    extraction_answer,
+    match_answer,
+    match_marker,
+    no_findings_answer,
+    write_meeting_note,
+)
+from tests.runs.application import (
+    PROJECT_ROOT,
+    ApplicationProcess,
+    approve_every_decision_and_finish_review,
+    temporary_database,
+    wait_for_run_status,
+    wait_until,
+    write_script,
+)
 
 
 def test_a_project_with_no_runs_still_appears_in_the_project_list() -> None:
@@ -45,6 +62,77 @@ async def _project_list_after_creating_one_project() -> dict[str, Any]:
                 )
         finally:
             await pool.close()
+
+
+def test_a_runs_stage_and_row_count_are_carried_alongside_its_status(
+    tmp_path: Path,
+) -> None:
+    """L4/L6: a project card and a run row show a live run's stage strip, or
+    an exported run's row count — neither of which the flat status word
+    alone can answer, so `list_projects` must carry both."""
+    source_folder = tmp_path / "intake-portal"
+    source_folder.mkdir()
+    quote = write_meeting_note(source_folder, "meeting-note.md", "a weekly digest")
+    script_path = tmp_path / "script.json"
+    write_script(
+        script_path,
+        {
+            extract_marker("meeting-note.md"): extraction_answer(
+                "a weekly digest", quote
+            ),
+            match_marker(): match_answer(1),
+            examine_marker(): no_findings_answer(),
+        },
+    )
+
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=tmp_path / "model-calls.jsonl",
+            delay_seconds=1.0,
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects",
+                    json={
+                        "name": "Stage and row count portal",
+                        "source_folder_path": str(source_folder),
+                    },
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+
+                # Ingest has not necessarily entered a stage the instant
+                # POST /runs returns, so wait for one before reading the list.
+                wait_until(
+                    lambda: client.get(f"/runs/{run_id}").json()["stage"] is not None,
+                    "the run enters a stage",
+                )
+                while_running = _project_of(client, project_id)["runs"][0]
+
+                wait_for_run_status(client, run_id, "needs review")
+                approve_every_decision_and_finish_review(client, run_id)
+                wait_for_run_status(client, run_id, "done")
+
+                once_exported = _project_of(client, project_id)["runs"][0]
+        finally:
+            application.stop()
+
+    assert while_running["status"] == "running"
+    assert while_running["stage"] is not None
+    assert while_running["row_count"] is None
+
+    assert once_exported["status"] == "done"
+    assert once_exported["row_count"] == 1
+
+
+def _project_of(client, project_id: str) -> dict[str, Any]:
+    projects = client.get("/projects").json()["projects"]
+    return next(project for project in projects if project["project_id"] == project_id)
 
 
 def test_the_project_list_never_names_a_folder_the_projects_root_does_not_hold(
