@@ -23,6 +23,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -47,50 +48,45 @@ RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
 @contextmanager
 def _run_ready_to_finish(
     tmp_path: Path,
-    project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
     """One run at Review with every decision already approved."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-            extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("ready-to-finish") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+                extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, run_id, "needs review")
-                approve_every_decision(client, run_id)
-            yield application, database_url, run_id
-        finally:
-            application.stop()
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, run_id, "needs review")
+                    approve_every_decision(client, run_id)
+                yield application, database_url, run_id
+            finally:
+                application.stop()
 
 
 def test_finish_review_is_accepted_once(tmp_path: Path) -> None:
-    with _run_ready_to_finish(tmp_path, "Twice finished intake portal") as (
+    with _run_ready_to_finish(tmp_path) as (
         application,
         database_url,
         run_id,
@@ -130,7 +126,7 @@ def test_finish_review_is_accepted_once(tmp_path: Path) -> None:
 
 
 def test_a_decision_cannot_change_after_finish_review(tmp_path: Path) -> None:
-    with _run_ready_to_finish(tmp_path, "Late change intake portal") as (
+    with _run_ready_to_finish(tmp_path) as (
         application,
         _database_url,
         run_id,
@@ -170,7 +166,7 @@ def test_decision_refused_after_review_finished_even_if_status_regresses(
     genuinely finished, proves the durable review_finished_at guard is what
     refuses it — not a status value that a bug could put back.
     """
-    with _run_ready_to_finish(tmp_path, "Regressed status intake portal") as (
+    with _run_ready_to_finish(tmp_path) as (
         application,
         database_url,
         run_id,

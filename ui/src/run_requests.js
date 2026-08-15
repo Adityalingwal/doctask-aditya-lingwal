@@ -6,9 +6,8 @@ export async function readProjects() {
   return await ask("GET", "/projects");
 }
 
-export async function createProject(name, sourceFolderPath) {
+export async function createProject(sourceFolderPath) {
   return await ask("POST", "/projects", {
-    name,
     source_folder_path: sourceFolderPath,
   });
 }
@@ -63,9 +62,22 @@ async function ask(method, path, payload) {
   }
   const body = await response.json();
   if (!response.ok) {
-    // The refusal a core function wrote already names the cause and the fix;
-    // rewriting it here would put a second, weaker sentence in front of it.
-    return { ok: false, refusal: body.detail ?? `${method} ${path} answered ${response.status}.` };
+    const detail = body.detail;
+    if (detail === undefined) {
+      return { ok: false, refusal: `${method} ${path} answered ${response.status}.` };
+    }
+    if (typeof detail === "string") {
+      // The refusal a core function wrote already names the cause and the
+      // fix; rewriting it here would put a second, weaker sentence in front
+      // of it.
+      return { ok: false, refusal: detail };
+    }
+    // FastAPI's own validation error sends `detail` as a list of objects,
+    // which this screen cannot render as a sentence. The whole body still
+    // reaches the console, so the actual cause is not lost — only kept off
+    // the screen a caller who is not a developer would be reading.
+    console.error("The application refused this request with a body this screen cannot read:", body);
+    return { ok: false, refusal: "The application did not accept this request." };
   }
   return { ok: true, body };
 }

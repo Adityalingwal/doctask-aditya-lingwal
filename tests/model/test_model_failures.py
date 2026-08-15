@@ -9,6 +9,7 @@ from tests.runs.application import (
     ApplicationProcess,
     model_call_failure,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -34,53 +35,48 @@ REFUSED_KEY_STATUS = 401
 def _run_over_two_documents(
     tmp_path: Path,
     answers: dict[str, Any],
-    project_name: str,
     reached_status: str,
 ) -> tuple[dict[str, Any], list[str]]:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
-    write_meeting_note(source_folder, SECOND_FILE, SECOND_REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(script_path, answers)
+    with temporary_project_folder("model-failures") as (source_folder, source_folder_path):
+        write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
+        write_meeting_note(source_folder, SECOND_FILE, SECOND_REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(script_path, answers)
 
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-        )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                run = wait_for_run_status(client, run_id, reached_status)
-        finally:
-            application.stop()
-
-        engine = create_engine(database_url)
-        with engine.connect() as connection:
-            proposed = (
-                connection.execute(
-                    text(
-                        "SELECT what_was_asked FROM register_rows "
-                        "WHERE proposed_by_run_id = :run_id"
-                    ),
-                    {"run_id": run_id},
-                )
-                .scalars()
-                .all()
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
             )
-        engine.dispose()
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    run = wait_for_run_status(client, run_id, reached_status)
+            finally:
+                application.stop()
+
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                proposed = (
+                    connection.execute(
+                        text(
+                            "SELECT what_was_asked FROM register_rows "
+                            "WHERE proposed_by_run_id = :run_id"
+                        ),
+                        {"run_id": run_id},
+                    )
+                    .scalars()
+                    .all()
+                )
+            engine.dispose()
     return run, list(proposed)
 
 
@@ -94,7 +90,6 @@ def test_a_refused_key_fails_the_run_instead_of_skipping_every_document(
                 "Incorrect API key provided", REFUSED_KEY_STATUS
             )
         },
-        "Refused key intake portal",
         "failed",
     )
 
@@ -126,7 +121,6 @@ def test_a_timed_out_document_is_skipped_while_the_batch_continues(
             match_marker(): match_answer(1),
             examine_marker(): no_findings_answer(),
         },
-        "Timed out intake portal",
         "needs review",
     )
 

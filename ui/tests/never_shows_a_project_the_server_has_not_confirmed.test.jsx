@@ -1,8 +1,9 @@
-// L5 — after the box's `POST /runs` succeeds, nothing the person typed is
-// rendered. The screen re-reads the project list through
+// L5 — after the box's `POST /runs` succeeds, nothing the person chose is
+// rendered directly. The screen re-reads the project list through
 // `readProjectsFromServer` and opens the returned `run_id` through
-// `openRun`, so what appears is what the server confirmed, not the
-// submitted values.
+// `openRun`, so what appears — including the project's own name, derived
+// from the folder in core and never supplied by this screen — is what the
+// server confirmed, not a value this screen guessed at itself.
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -19,7 +20,6 @@ const FOLDER = "sample-projects/does-not-matter";
 test("never_shows_a_project_the_server_has_not_confirmed", async () => {
   const startedRunId = "9f9f9f9f-1111-4b22-8333-444455556666";
   const serverProjectId = "8e8e8e8e-2222-4c33-9444-555566667777";
-  const typedName = "typed-name-should-never-appear";
   let runStarted = false;
 
   const answering = serverAnswering([
@@ -59,7 +59,7 @@ test("never_shows_a_project_the_server_has_not_confirmed", async () => {
     {
       method: "POST",
       path: "/projects",
-      reply: { status: 201, body: { project_id: serverProjectId } },
+      reply: { status: 201, body: { project_id: serverProjectId, created: true } },
     },
     {
       method: "POST",
@@ -91,21 +91,18 @@ test("never_shows_a_project_the_server_has_not_confirmed", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: /add project/i }));
   fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
-  fireEvent.change(screen.getByLabelText(/project name/i), {
-    target: { value: typedName },
-  });
 
   await act(async () => {
     screen.getByRole("button", { name: /create and start run/i }).click();
   });
 
   // The name appears both on the project's new card and as the reading
-  // pane's heading — both read from the server, neither from what was
-  // typed, so more than one match is the expected, correct outcome.
+  // pane's heading — both read from the server's next `GET /projects`, a
+  // name this screen never sent (there is no name field at all; a project's
+  // name is derived from its folder, in core).
   await waitFor(() => {
     expect(screen.getAllByText("Server-confirmed project").length).toBeGreaterThan(0);
   });
-  expect(screen.queryByText(typedName)).toBeNull();
 
   // Proving L5, not just L4: the list was re-read (not merely trusted) and
   // the run was opened through the id the server returned in its own reply.

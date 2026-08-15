@@ -1,8 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
-import { openSection } from "./open_section.js";
 import {
   exportReply,
   projectsReply,
@@ -39,7 +38,7 @@ test("a run the server reports running is not shown as finished anywhere on the 
   expect(document.body.textContent).not.toMatch(/finished|complete|\bdone\b/i);
 });
 
-test("the register section says nothing has exported yet rather than showing one", async () => {
+test("the project's register panel says nothing has been added yet rather than showing one", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
@@ -53,10 +52,10 @@ test("the register section says nothing has exported yet rather than showing one
   );
 
   render(<ReviewScreen runId={runId} />);
-  await openSection(/register/i);
+  fireEvent.click(await screen.findByRole("link", { name: /register/i }));
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(within(register).queryByRole("table")).toBeNull();
-  expect(register.textContent).toMatch(/nothing exported yet/i);
+  expect(register.textContent).toMatch(/nothing has been added to this register yet/i);
   expect(register.textContent).not.toContain(exportReply().rows[0].cells.what_was_asked);
 });

@@ -24,6 +24,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     wait_until,
     write_script,
@@ -70,57 +71,53 @@ def test_a_runs_stage_and_row_count_are_carried_alongside_its_status(
     """L4/L6: a project card and a run row show a live run's stage strip, or
     an exported run's row count — neither of which the flat status word
     alone can answer, so `list_projects` must carry both."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, "meeting-note.md", "a weekly digest")
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker("meeting-note.md"): extraction_answer(
-                "a weekly digest", quote
-            ),
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-            delay_seconds=1.0,
+    with temporary_project_folder("stage-and-row-count") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, "meeting-note.md", "a weekly digest")
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker("meeting-note.md"): extraction_answer(
+                    "a weekly digest", quote
+                ),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Stage and row count portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
 
-                # Ingest has not necessarily entered a stage the instant
-                # POST /runs returns, so wait for one before reading the list.
-                wait_until(
-                    lambda: client.get(f"/runs/{run_id}").json()["stage"] is not None,
-                    "the run enters a stage",
-                )
-                while_running = _project_of(client, project_id)["runs"][0]
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+                delay_seconds=1.0,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
 
-                wait_for_run_status(client, run_id, "needs review")
-                approve_every_decision_and_finish_review(client, run_id)
-                wait_for_run_status(client, run_id, "done")
+                    # Ingest has not necessarily entered a stage the instant
+                    # POST /runs returns, so wait for one before reading the list.
+                    wait_until(
+                        lambda: client.get(f"/runs/{run_id}").json()["stage"] is not None,
+                        "the run enters a stage",
+                    )
+                    while_running = _project_of(client, project_id)["runs"][0]
 
-                once_exported = _project_of(client, project_id)["runs"][0]
-        finally:
-            application.stop()
+                    wait_for_run_status(client, run_id, "needs review")
+                    approve_every_decision_and_finish_review(client, run_id)
+                    wait_for_run_status(client, run_id, "done")
+
+                    once_exported = _project_of(client, project_id)["runs"][0]
+            finally:
+                application.stop()
 
     assert while_running["status"] == "running"
     assert while_running["stage"] is not None
@@ -149,23 +146,38 @@ def test_the_project_list_never_names_a_folder_the_projects_root_does_not_hold(
     (projects_root / "northside-dental" / "not-a-top-level-folder").mkdir()
 
     config_path = tmp_path / "projects.yaml"
-    config_path.write_text(f"projects_root: {projects_root}\n")
+    config_path.write_text("projects_root: clients\n")
 
-    folders = asyncio.run(_available_folders(config_path))
+    folders = asyncio.run(_available_folders(config_path, project_root=tmp_path))
 
-    assert folders == [
-        f"{projects_root}/acme-intake",
-        f"{projects_root}/northside-dental",
-    ]
+    assert folders == ["clients/acme-intake", "clients/northside-dental"]
 
 
-async def _available_folders(config_path: Path) -> list[str]:
+def test_an_absolute_projects_root_is_refused_naming_the_fix(tmp_path: Path) -> None:
+    # The dropdown offers `<projects_root>/<folder>` and `create_project`
+    # refuses every absolute path, so an absolute root would advertise folders
+    # that creation always rejects. Refused where the root is read, once, so
+    # neither side can be configured into disagreeing with the other.
+    (tmp_path / "clients").mkdir()
+    config_path = tmp_path / "projects.yaml"
+    config_path.write_text(f"projects_root: {tmp_path / 'clients'}\n")
+
+    with pytest.raises(ProjectsUnavailable) as refused:
+        asyncio.run(_available_folders(config_path, project_root=tmp_path))
+
+    assert "absolute" in str(refused.value)
+    assert "projects_root" in str(refused.value)
+
+
+async def _available_folders(
+    config_path: Path, project_root: Path = PROJECT_ROOT
+) -> list[str]:
     with temporary_database() as database_url:
         pool = build_connection_pool(database_url)
         await pool.open(wait=True)
         try:
             async with pool.connection() as connection:
-                listed = await read_project_list(connection, PROJECT_ROOT, config_path)
+                listed = await read_project_list(connection, project_root, config_path)
                 return listed["available_folders"]
         finally:
             await pool.close()

@@ -1,7 +1,7 @@
-// The runs column (L6): one selected project's runs, newest first, and the
-// collapse control that gives the register table the full width when it is
-// being read. Collapse state lives in the parent and is not persisted — a
-// reload always comes back expanded.
+// The runs column (L6): a Register entry (section 2.3) above one selected
+// project's runs, newest first, and the collapse control that gives the
+// reading pane the full width when it is being read. Collapse state lives in
+// the parent and is not persisted — a reload always comes back expanded.
 import { dayMonthTime } from "./format_date.js";
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 import StageMarks from "./StageMarks.jsx";
@@ -9,7 +9,15 @@ import StageMarks from "./StageMarks.jsx";
 const RUNNING = "running";
 const NEEDS_REVIEW = "needs review";
 
-export default function RunColumn({ project, selectedRunId, onOpenRun, collapsed, onToggleCollapse }) {
+export default function RunColumn({
+  project,
+  selectedRunId,
+  registerOpen,
+  onOpenRun,
+  onOpenRegister,
+  collapsed,
+  onToggleCollapse,
+}) {
   const listPane = useScrollbarWhileScrolling();
   const openRun = project?.runs.find((run) => run.run_id === selectedRunId) ?? null;
 
@@ -28,6 +36,9 @@ export default function RunColumn({ project, selectedRunId, onOpenRun, collapsed
           <p className="mt-4 font-mono text-xs text-ink-soft" title={`Run ${openRun.run_number}`}>
             #{openRun.run_number}
           </p>
+        )}
+        {openRun === null && registerOpen && (
+          <p className="mt-4 font-mono text-xs text-ink-soft">Register</p>
         )}
       </div>
     );
@@ -52,25 +63,68 @@ export default function RunColumn({ project, selectedRunId, onOpenRun, collapsed
           <p className="m-0 px-4 py-4 text-sm text-ink-soft">
             Choose a project to see its runs.
           </p>
-        ) : project.runs.length === 0 ? (
-          <p className="m-0 px-4 py-4 text-sm text-ink-soft">
-            This project has not run yet.
-          </p>
         ) : (
           <ul className="m-0 flex list-none flex-col p-0">
-            {project.runs.map((run) => (
-              <RunRow
-                key={run.run_id}
-                run={run}
-                open={run.run_id === selectedRunId}
-                onOpen={onOpenRun}
-              />
-            ))}
+            <RegisterRow
+              open={registerOpen}
+              rowCount={latestRowCount(project)}
+              onOpen={() => onOpenRegister(project.project_id)}
+            />
+            {project.runs.length === 0 ? (
+              <li className="px-4 py-4 text-sm text-ink-soft">
+                This project has not run yet.
+              </li>
+            ) : (
+              project.runs.map((run) => (
+                <RunRow
+                  key={run.run_id}
+                  run={run}
+                  open={run.run_id === selectedRunId}
+                  onOpen={onOpenRun}
+                />
+              ))
+            )}
           </ul>
         )}
       </nav>
     </div>
   );
+}
+
+// The Register entry sits above a project's runs (section 2.3): the register
+// is one thing the project holds, not one more run. Its row count comes from
+// the same run list already shown below it — the newest run whose row_count
+// is not null — rather than a second read.
+function RegisterRow({ open, rowCount, onOpen }) {
+  return (
+    <li>
+      <a
+        href="#"
+        aria-current={open ? "page" : undefined}
+        onClick={(clicked) => {
+          clicked.preventDefault();
+          onOpen();
+        }}
+        className={`block border-b border-line-strong px-4 py-3 ${
+          open ? "border-l-4 border-l-ink bg-card pl-3" : "hover:bg-signal/15"
+        }`}
+      >
+        <p className="m-0 flex items-baseline justify-between gap-2 font-mono text-xs font-semibold">
+          <span>Register</span>
+          {rowCount !== null && (
+            <span className="text-ink-soft">
+              {rowCount} row{rowCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </p>
+      </a>
+    </li>
+  );
+}
+
+function latestRowCount(project) {
+  const latestExportedRun = project.runs.find((run) => run.row_count !== null);
+  return latestExportedRun === undefined ? null : latestExportedRun.row_count;
 }
 
 function RunRow({ run, open, onOpen }) {

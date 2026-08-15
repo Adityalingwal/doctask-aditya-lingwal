@@ -157,8 +157,9 @@ docker compose up --build
 ```
 
 The API is at `http://localhost:8000`; `GET /health` returns
-`{"status":"healthy"}`. Startup creates the synthetic **Acme intake portal**
-project if it is missing. The generated API schema at `/docs` shows the seven
+`{"status":"healthy"}`. Startup creates the demo project over
+`sample-projects/intake-portal` — shown as **Intake Portal**, its derived
+name — if it is missing. The generated API schema at `/docs` shows the seven
 operations:
 
 - `POST /projects`
@@ -189,20 +190,26 @@ recent run, and — only while something is live — the active run's stage stri
 or how many decisions it is waiting on. No folder path appears on a card.
 A full-width **Add project +** button sits at the bottom of this column in
 every state, empty or not; it opens a box with a dropdown of the folders
-already inside the configured projects root (never invented, never created by
-the screen), a name derived from the chosen folder and still editable, and a
-**Create and start run** button. The box refuses to send an empty name or an
-unchosen folder in its own words; every other rule, including whether the
-folder actually exists, is the server's, shown under "Could not create this
-project" exactly as it answered.
+inside the configured projects root that do not already carry a project
+(never invented, never created by the screen; when none are left the
+dropdown stays where it is, disabled, reading "No folder left to add.") and a
+**Create and start run** button. There is no name field — a project's name is
+derived from its folder, on the server, and cannot be typed. The box refuses
+to send an unchosen folder in its own words; every other rule, including
+whether the folder actually exists or sits inside the configured projects
+root, is the server's, shown under "Could not create this project" exactly
+as it answered.
 
-The middle column lists the selected project's runs, newest first — run
-number, when it started, and either its live stage strip, its status, or its
-row count once it has exported — and collapses to a narrow strip (keeping the
-open run's number visible) so the register table can take the full width
-while it is being read. Opening a run writes it into the address as
-`/ui/?run=<run id>`, so a link to one run is a link that can be kept. No run
-id is ever typed.
+The middle column lists the selected project's own **Register** — the row
+count of its newest run that has exported, if any — above that project's
+runs, newest first: run number, when it started, and either its live stage
+strip, its status, or its row count once it has exported. The column
+collapses to a narrow strip (keeping the open run's number, or "Register",
+visible) so the reading pane can take the full width while it is being read.
+Opening a run writes it into the address as `/ui/?run=<run id>`, so a link to
+one run is a link that can be kept; no run id is ever typed. Opening the
+register clears whatever run was open — its export and both refusals — so a
+previous run's decisions never sit beside it.
 
 To the right, one run's sections are read one at a time behind tabs:
 
@@ -211,7 +218,11 @@ To the right, one run's sections are read one at a time behind tabs:
 | Stages | Every stage of the run — done, working, not needed, or pending — and the reason it ended early or failed, against the stage it failed at |
 | Skipped | Each file or quote this run skipped, with the reason recorded on the run |
 | Needs your decision | Every gate the run raised, its frozen question and its answer, plus the rules the run was judged against |
-| Register | The exported register, its cells, its citations and its approved findings — once the run has exported one |
+
+Opening the project's own **Register** entry (middle column) shows the same
+right-hand panel, with the project's whole committed register — its cells,
+its citations and its approved findings — or, before any run has ever
+exported, the line "Nothing has been added to this register yet."
 
 The page polls `GET /projects` and `GET /runs/{id}` every **3 seconds**
 unconditionally — whatever is on screen, whatever a run's status is; that
@@ -240,7 +251,7 @@ Its own tests run without Docker and without a key:
 npm --prefix ui test
 ```
 
-Last verified on the `front-end-projects-and-runs` branch: **32 passed**.
+Last verified on the `folder-is-a-project-and-register-moves` branch: **40 passed**.
 
 ## Drive it from a machine
 
@@ -252,7 +263,7 @@ the practical fix the endpoint would have given.
 
 | Tool | Arguments |
 |---|---|
-| `create_project` | `name`, `source_folder_path` |
+| `create_project` | `source_folder_path` — get-or-create; no name (derived from the folder) |
 | `list_projects` | *(none)* — every project, each with its runs nested |
 | `start_run` | `project_id` |
 | `get_run_status` | `run_id` |
@@ -294,10 +305,10 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `front-end-projects-and-runs` branch: **131 passed**,
-real PostgreSQL, no live model key. Fresh-clone and image-only verification
-remain open release checks; this is a verified development-worktree command,
-not yet a fresh-machine claim.
+Last verified on the `folder-is-a-project-and-register-moves` branch: **138
+passed**, real PostgreSQL, no live model key. Fresh-clone and image-only
+verification remain open release checks; this is a verified
+development-worktree command, not yet a fresh-machine claim.
 
 ## Configuration
 
@@ -339,8 +350,6 @@ the next run and never to one already under way or already finished. Point
 - The watcher forgets what it has seen when the application restarts, so a file
   that arrived while it was down starts no run of its own; the next run started
   by hand reads it.
-- `GET /runs/{id}` carries no register rows, so the review screen's register
-  section stays empty until that run has exported one.
 - The review screen is built by Node, which the application image does not
   carry; `ui/dist` must be built on the host before `docker compose up`, and
   the development bind mount is what carries it into the container.
@@ -354,10 +363,20 @@ the next run and never to one already under way or already finished. Point
 - The development Compose file bind-mounts the worktree, which exposes local
   `.env` and lets local files override the image; this is retained for
   iteration and is not yet removed for final image-only verification.
-- The Add-project box reads a folder inside the application's container,
-  whose only mount is `.:/workspace`, so a path outside the repository does
-  not exist as far as it is concerned and is refused; its dropdown only ever
-  lists what `config/projects.yaml`'s configured root actually holds.
+- A project's folder must sit directly inside `config/projects.yaml`'s
+  configured root (`sample-projects/` by default) — not the root itself, not
+  nested inside a sub-folder, and never given as an absolute path or with
+  `..`; `POST /projects` refuses anything else, naming the cause and the
+  fix. The Add-project box's dropdown only ever lists what that root
+  actually holds on disk. Two spellings of one folder — `sample-projects/x`,
+  `sample-projects/./x`, `sample-projects/x/` — reach the same project, because
+  the folder is stored as the one path it resolves to rather than as the
+  string a caller typed.
+- `config/projects.yaml`'s `projects_root` must itself be a folder inside the
+  repository, given as a relative path such as `sample-projects`. An absolute
+  root is refused where the file is read: the dropdown would then offer
+  absolute folders that project creation always rejects, so the two sides
+  cannot be configured into disagreeing.
 - The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on a
   fixed interval, whatever is on screen and whatever a run's status is —
   there is no per-project runs endpoint and no conditional refresh. At this

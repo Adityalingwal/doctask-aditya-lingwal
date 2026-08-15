@@ -9,6 +9,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     wait_until,
     write_script,
@@ -42,61 +43,56 @@ LONGER_THAN_A_QUIET_PERIOD = 3.0
 @contextmanager
 def _watched_project(
     tmp_path: Path,
-    project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str, Path]]:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    waiting_folder = tmp_path / "not-yet-delivered"
-    waiting_folder.mkdir()
+    with temporary_project_folder("watched") as (source_folder, source_folder_path):
+        waiting_folder = tmp_path / "not-yet-delivered"
+        waiting_folder.mkdir()
 
-    first_quote = write_meeting_note(source_folder, ALREADY_THERE, FIRST_REQUIREMENT)
-    second_quote = write_meeting_note(waiting_folder, ARRIVING, SECOND_REQUIREMENT)
-    third_quote = write_meeting_note(waiting_folder, ARRIVING_LATER, THIRD_REQUIREMENT)
+        first_quote = write_meeting_note(source_folder, ALREADY_THERE, FIRST_REQUIREMENT)
+        second_quote = write_meeting_note(waiting_folder, ARRIVING, SECOND_REQUIREMENT)
+        third_quote = write_meeting_note(waiting_folder, ARRIVING_LATER, THIRD_REQUIREMENT)
 
-    watcher_config_path = tmp_path / "watcher.yaml"
-    watcher_config_path.write_text(
-        f"poll_seconds: {POLL_SECONDS}\nquiet_seconds: {QUIET_SECONDS}\n",
-        encoding="utf-8",
-    )
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(ALREADY_THERE): extraction_answer(
-                FIRST_REQUIREMENT, first_quote
-            ),
-            extract_marker(ARRIVING): extraction_answer(
-                SECOND_REQUIREMENT, second_quote
-            ),
-            extract_marker(ARRIVING_LATER): extraction_answer(
-                THIRD_REQUIREMENT, third_quote
-            ),
-            match_marker_against_an_empty_register(): match_answer(2),
-            match_marker(): match_answer_of([None]),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-            watcher_config_path=watcher_config_path,
+        watcher_config_path = tmp_path / "watcher.yaml"
+        watcher_config_path.write_text(
+            f"poll_seconds: {POLL_SECONDS}\nquiet_seconds: {QUIET_SECONDS}\n",
+            encoding="utf-8",
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-            yield application, database_url, project_id, source_folder
-        finally:
-            application.stop()
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(ALREADY_THERE): extraction_answer(
+                    FIRST_REQUIREMENT, first_quote
+                ),
+                extract_marker(ARRIVING): extraction_answer(
+                    SECOND_REQUIREMENT, second_quote
+                ),
+                extract_marker(ARRIVING_LATER): extraction_answer(
+                    THIRD_REQUIREMENT, third_quote
+                ),
+                match_marker_against_an_empty_register(): match_answer(2),
+                match_marker(): match_answer_of([None]),
+                examine_marker(): no_findings_answer(),
+            },
+        )
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+                watcher_config_path=watcher_config_path,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                yield application, database_url, project_id, source_folder
+            finally:
+                application.stop()
 
 
 def _copy_in(source_folder: Path, file_name: str, requirement: str) -> None:
@@ -127,7 +123,7 @@ def _more_than_one_run(
 def test_the_watcher_starts_a_run_once_an_arriving_file_has_settled(
     tmp_path: Path,
 ) -> None:
-    with _watched_project(tmp_path, "Watched intake portal") as (
+    with _watched_project(tmp_path) as (
         application,
         database_url,
         project_id,
@@ -155,7 +151,7 @@ def test_the_watcher_starts_a_run_once_an_arriving_file_has_settled(
 def test_the_watcher_does_not_start_a_second_run_while_one_is_active(
     tmp_path: Path,
 ) -> None:
-    with _watched_project(tmp_path, "Busy watched intake portal") as (
+    with _watched_project(tmp_path) as (
         application,
         database_url,
         project_id,

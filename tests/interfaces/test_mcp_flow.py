@@ -5,6 +5,7 @@ from pathlib import Path
 from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
+    temporary_project_folder,
     wait_until,
     write_script,
 )
@@ -32,75 +33,71 @@ def _status_of(base_url: str, run_id: str, status: str) -> dict | None:
 
 
 def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-            extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("machine-driven") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+                extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
+            },
         )
-        application.start()
-        try:
-            base_url = application.base_url
-            created = call_tool(
-                base_url,
-                "create_project",
-                {
-                    "name": "Machine-driven intake portal",
-                    "source_folder_path": str(source_folder),
-                },
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
             )
-            started = call_tool(
-                base_url, "start_run", {"project_id": created.payload["project_id"]}
-            )
-            run_id = started.payload["run_id"]
-            at_review = wait_until(
-                lambda: _status_of(base_url, run_id, WAITING_FOR_REVIEW),
-                "the run reports its status as needs review",
-            )
-            export_decision = next(
-                decision
-                for decision in at_review["decisions"]
-                if decision["kind"] == "export"
-            )
-            answered = call_tool(
-                base_url,
-                "submit_decision",
-                {
-                    "run_id": run_id,
-                    "decision_id": export_decision["decision_id"],
-                    "outcome": "approved",
-                },
-            )
-            finished = call_tool(base_url, "finish_review", {"run_id": run_id})
-            committed = wait_until(
-                lambda: _status_of(base_url, run_id, DONE),
-                "the run reports it is done",
-            )
-            exported = call_tool(
-                base_url,
-                "get_export",
-                {"run_id": run_id, "export_format": "json"},
-            )
-            as_markdown = call_tool(
-                base_url,
-                "get_export",
-                {"run_id": run_id, "export_format": "markdown"},
-            )
-        finally:
-            application.stop()
+            application.start()
+            try:
+                base_url = application.base_url
+                created = call_tool(
+                    base_url,
+                    "create_project",
+                    {"source_folder_path": source_folder_path},
+                )
+                started = call_tool(
+                    base_url, "start_run", {"project_id": created.payload["project_id"]}
+                )
+                run_id = started.payload["run_id"]
+                at_review = wait_until(
+                    lambda: _status_of(base_url, run_id, WAITING_FOR_REVIEW),
+                    "the run reports its status as needs review",
+                )
+                export_decision = next(
+                    decision
+                    for decision in at_review["decisions"]
+                    if decision["kind"] == "export"
+                )
+                answered = call_tool(
+                    base_url,
+                    "submit_decision",
+                    {
+                        "run_id": run_id,
+                        "decision_id": export_decision["decision_id"],
+                        "outcome": "approved",
+                    },
+                )
+                finished = call_tool(base_url, "finish_review", {"run_id": run_id})
+                committed = wait_until(
+                    lambda: _status_of(base_url, run_id, DONE),
+                    "the run reports it is done",
+                )
+                exported = call_tool(
+                    base_url,
+                    "get_export",
+                    {"run_id": run_id, "export_format": "json"},
+                )
+                as_markdown = call_tool(
+                    base_url,
+                    "get_export",
+                    {"run_id": run_id, "export_format": "markdown"},
+                )
+            finally:
+                application.stop()
 
     assert started.payload["status"] == "running"
     assert at_review["examine"]["rows_examined"] == 1

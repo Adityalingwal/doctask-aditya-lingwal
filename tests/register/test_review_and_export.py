@@ -9,6 +9,7 @@ from sqlalchemy import create_engine, text
 from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
+    temporary_project_folder,
     wait_until,
     write_script,
 )
@@ -30,53 +31,48 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 @contextmanager
 def _application_at_review(
     tmp_path: Path,
-    project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
     """One run driven through the API until it is parked at Review."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-            extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("review-export") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+                extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
+            },
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": project_name,
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_until(
-                    lambda: client.get(f"/runs/{run_id}").json()["status"]
-                    == "needs review",
-                    "the run reaches Review",
-                )
-            yield application, database_url, run_id
-        finally:
-            application.stop()
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_until(
+                        lambda: client.get(f"/runs/{run_id}").json()["status"]
+                        == "needs review",
+                        "the run reaches Review",
+                    )
+                yield application, database_url, run_id
+            finally:
+                application.stop()
 
 
 def test_approved_run_exports_the_register(tmp_path: Path) -> None:
-    with _application_at_review(tmp_path, "Approved intake portal") as (
+    with _application_at_review(tmp_path) as (
         application,
         database_url,
         run_id,
@@ -151,7 +147,7 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
 
 
 def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> None:
-    with _application_at_review(tmp_path, "Pending intake portal") as (
+    with _application_at_review(tmp_path) as (
         application,
         _database_url,
         run_id,
@@ -181,69 +177,65 @@ def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> No
 def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    paraphrased = "the client wants search on old records"
-    answer = extraction_answer(REQUIREMENT, quote)
-    answer["requirements"].append(
-        {"summary": "Search over old intake records", "quote": paraphrased}
-    )
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-            extract_marker(SOURCE_FILE): answer,
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("paraphrased") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        paraphrased = "the client wants search on old records"
+        answer = extraction_answer(REQUIREMENT, quote)
+        answer["requirements"].append(
+            {"summary": "Search over old intake records", "quote": paraphrased}
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Paraphrased intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                status = wait_until(
-                    lambda: (
-                        client.get(f"/runs/{run_id}").json()
-                        if client.get(f"/runs/{run_id}").json()["status"]
-                        == "needs review"
-                        else None
-                    ),
-                    "the run reaches Review",
-                )
-        finally:
-            application.stop()
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+                extract_marker(SOURCE_FILE): answer,
+            },
+        )
 
-        engine = create_engine(database_url)
-        with engine.connect() as connection:
-            proposed = (
-                connection.execute(
-                    text(
-                        "SELECT what_was_asked FROM register_rows "
-                        "WHERE proposed_by_run_id = :run_id"
-                    ),
-                    {"run_id": run_id},
-                )
-                .scalars()
-                .all()
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
             )
-        engine.dispose()
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    status = wait_until(
+                        lambda: (
+                            client.get(f"/runs/{run_id}").json()
+                            if client.get(f"/runs/{run_id}").json()["status"]
+                            == "needs review"
+                            else None
+                        ),
+                        "the run reaches Review",
+                    )
+            finally:
+                application.stop()
+
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                proposed = (
+                    connection.execute(
+                        text(
+                            "SELECT what_was_asked FROM register_rows "
+                            "WHERE proposed_by_run_id = :run_id"
+                        ),
+                        {"run_id": run_id},
+                    )
+                    .scalars()
+                    .all()
+                )
+            engine.dispose()
 
     # The paraphrase cannot be verified against the source, so no row carries it.
     assert list(proposed) == [REQUIREMENT]

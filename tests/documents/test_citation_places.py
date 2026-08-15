@@ -6,6 +6,7 @@ from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -46,79 +47,75 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
 ) -> None:
     """Every quote sits late in its document, so page 1 or the first heading is
     not an answer any of these citations may give."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    write_pdf(
-        source_folder / PDF_FILE,
-        [
-            ["Testing feedback", "The intake form submits correctly."],
-            ["The email notification reaches the operations team."],
-            ["Records", PDF_QUOTE],
-        ],
-    )
-    write_docx(
-        source_folder / DOCX_FILE,
-        [
-            ("Scope", ["The provider will build the intake portal."]),
-            (LAST_HEADING, [DOCX_QUOTE]),
-        ],
-    )
-    write_text_file(
-        source_folder / TEXT_FILE,
-        [
-            "Call with the operations lead.",
-            "",
-            "Nothing was settled in the first half of the call.",
-            "",
-            TEXT_QUOTE,
-        ],
-    )
-
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            extract_marker(PDF_FILE): requirement_extraction_answer(
-                PDF_REQUIREMENT, PDF_QUOTE, document_type="testing feedback"
-            ),
-            extract_marker(DOCX_FILE): requirement_extraction_answer(
-                DOCX_REQUIREMENT,
-                DOCX_QUOTE,
-                document_type="client requirements document",
-            ),
-            extract_marker(TEXT_FILE): requirement_extraction_answer(
-                TEXT_REQUIREMENT, TEXT_QUOTE
-            ),
-            match_marker(): match_answer(3),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("citation-places") as (source_folder, source_folder_path):
+        write_pdf(
+            source_folder / PDF_FILE,
+            [
+                ["Testing feedback", "The intake form submits correctly."],
+                ["The email notification reaches the operations team."],
+                ["Records", PDF_QUOTE],
+            ],
         )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Intake portal citation places",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                wait_for_run_status(client, run_id, "needs review")
-                approve_every_decision_and_finish_review(client, run_id)
-                wait_for_run_status(client, run_id, "done")
-                export = client.get(f"/runs/{run_id}/export").json()
-        finally:
-            application.stop()
+        write_docx(
+            source_folder / DOCX_FILE,
+            [
+                ("Scope", ["The provider will build the intake portal."]),
+                (LAST_HEADING, [DOCX_QUOTE]),
+            ],
+        )
+        write_text_file(
+            source_folder / TEXT_FILE,
+            [
+                "Call with the operations lead.",
+                "",
+                "Nothing was settled in the first half of the call.",
+                "",
+                TEXT_QUOTE,
+            ],
+        )
+
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(PDF_FILE): requirement_extraction_answer(
+                    PDF_REQUIREMENT, PDF_QUOTE, document_type="testing feedback"
+                ),
+                extract_marker(DOCX_FILE): requirement_extraction_answer(
+                    DOCX_REQUIREMENT,
+                    DOCX_QUOTE,
+                    document_type="client requirements document",
+                ),
+                extract_marker(TEXT_FILE): requirement_extraction_answer(
+                    TEXT_REQUIREMENT, TEXT_QUOTE
+                ),
+                match_marker(): match_answer(3),
+                examine_marker(): no_findings_answer(),
+            },
+        )
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, run_id, "needs review")
+                    approve_every_decision_and_finish_review(client, run_id)
+                    wait_for_run_status(client, run_id, "done")
+                    export = client.get(f"/runs/{run_id}/export").json()
+            finally:
+                application.stop()
 
     place_by_file = {
         citation["source_file"]: citation["place"]

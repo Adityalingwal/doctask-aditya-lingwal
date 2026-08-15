@@ -19,7 +19,7 @@ const answered = decisionReply({ outcome: "approved" });
 const unanswered = decisionReply({
   decision_id: "5f7b9d13-4444-4e55-8666-777788889999",
   kind: "export",
-  question: "Export the register for this run?",
+  question: "Add this run's changes to the register?",
 });
 
 test("finishing the review is not offered while one decision is still unanswered", async () => {

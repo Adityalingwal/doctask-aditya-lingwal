@@ -3,51 +3,45 @@ import { useState } from "react";
 import Refusal from "./Refusal.jsx";
 import { createProject, startRun } from "./run_requests.js";
 
-const EMPTY_NAME_CHECK = "Give this project a name.";
 const NO_FOLDER_CHECK = "Choose the folder to watch.";
+const NO_FOLDER_LEFT = "No folder left to add.";
 
-// The box L8's button opens: folder first, then name (screen 2), and nothing
-// else. It checks only that both are non-empty (L9) — every other rule,
-// including whether the folder actually exists, stays the server's, and is
-// shown exactly as it answered, under "Could not create this project" rather
-// than "the server refused" (screen 2). What it tells its parent is one
-// thing, the id of the run the server started; the parent decides what
-// happens next (L5), the same as the start-a-run form it replaces.
+// The box L8's button opens: folder, and nothing else — there is no name
+// field, because a project's name is derived from its folder, in core, never
+// supplied here (D-family for folder-is-a-project). It checks only that a
+// folder is chosen (L9) — every other rule, including whether the folder
+// actually exists, stays the server's, and is shown exactly as it answered,
+// under "Could not create this project" rather than "the server refused"
+// (screen 2). What it tells its parent is one thing, the id of the run the
+// server started; the parent decides what happens next (L5), the same as the
+// start-a-run form it replaces.
 export default function AddProject({
   projectsRoot,
   availableFolders,
+  projects,
   onStarted,
   onClose,
   onUnreachable,
 }) {
   const [sourceFolderPath, setSourceFolderPath] = useState("");
-  const [name, setName] = useState("");
-  const [nameEditedByUser, setNameEditedByUser] = useState(false);
   const [ownCheck, setOwnCheck] = useState(null);
-  // Held so a retry after a failed `POST /runs` skips `POST /projects` (L4)
-  // — `projects.name` carries no unique constraint, so creating a second
-  // project over the same folder would leave the watcher polling it twice.
+  // Held so a retry after a failed `POST /runs` skips `POST /projects` (L4).
   // Set only once `POST /projects` has actually succeeded, and never cleared
   // by a run-start failure — only a fresh box carries a fresh attempt.
   const [projectId, setProjectId] = useState(null);
   const [refusal, setRefusal] = useState(null);
   const [starting, setStarting] = useState(false);
 
-  const chooseFolder = (chosen) => {
-    setSourceFolderPath(chosen);
-    if (!nameEditedByUser) {
-      setName(nameDerivedFromFolder(chosen));
-    }
-  };
+  // The dropdown lists only folders that do not already carry a project
+  // (section 1.5): the difference between every folder the projects root
+  // holds and every project's own `source_folder_path`.
+  const takenFolders = new Set(projects.map((project) => project.source_folder_path));
+  const openFolders = availableFolders.filter((folder) => !takenFolders.has(folder));
 
   const start = async (submitted) => {
     submitted.preventDefault();
     if (sourceFolderPath === "") {
       setOwnCheck(NO_FOLDER_CHECK);
-      return;
-    }
-    if (name.trim() === "") {
-      setOwnCheck(EMPTY_NAME_CHECK);
       return;
     }
     setOwnCheck(null);
@@ -69,7 +63,7 @@ export default function AddProject({
 
     let usableProjectId = projectId;
     if (usableProjectId === null) {
-      const created = await createProject(name, sourceFolderPath);
+      const created = await createProject(sourceFolderPath);
       if (!created.ok) {
         stopOn(created);
         return;
@@ -128,35 +122,28 @@ export default function AddProject({
             <span className="eyebrow mb-1 block">Folder</span>
             <select
               value={sourceFolderPath}
-              onChange={(changed) => chooseFolder(changed.target.value)}
+              onChange={(changed) => setSourceFolderPath(changed.target.value)}
+              disabled={openFolders.length === 0}
               className="w-full border border-line-strong bg-card px-3 py-2 font-mono text-sm"
             >
-              <option value="">Choose a folder</option>
-              {availableFolders.map((folder) => (
-                <option key={folder} value={folder}>
-                  {folder}
-                </option>
-              ))}
+              {openFolders.length === 0 ? (
+                <option value="">{NO_FOLDER_LEFT}</option>
+              ) : (
+                <>
+                  <option value="">Choose a folder</option>
+                  {openFolders.map((folder) => (
+                    <option key={folder} value={folder}>
+                      {folder}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
             <span className="mt-1 block text-xs text-ink-soft">
               {projectsRoot === null
                 ? "The folders shown here come from the application."
                 : `New folders go inside ${projectsRoot}/ — a person puts one there; this screen never creates one by itself.`}
             </span>
-          </label>
-
-          <label className="mt-5 block">
-            <span className="eyebrow mb-1 block">Project name</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(changed) => {
-                setNameEditedByUser(true);
-                setName(changed.target.value);
-              }}
-              placeholder="Northside Dental"
-              className="w-full border border-line-strong bg-card px-3 py-2 text-[15px]"
-            />
           </label>
 
           <button
@@ -170,13 +157,4 @@ export default function AddProject({
       </div>
     </div>
   );
-}
-
-function nameDerivedFromFolder(folderPath) {
-  const segment = folderPath.split("/").pop() ?? "";
-  return segment
-    .split(/[-_]+/)
-    .filter((word) => word !== "")
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(" ");
 }

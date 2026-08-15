@@ -3548,3 +3548,170 @@ had. The status rename exists only because of the new lock it enables: the
 screen shows the stored value verbatim, with no label map and no branch on
 status to decide what to print, so a stored word that used to read badly for
 a person is the word that changes instead of the code that displays it.
+
+### A folder is a project, and the register moves to the project (2026-08-16, superseding D14's endpoint table and demo-seed sentence, and D15's Add-project paragraph, section tabs, register limitation, and source-folder limitation)
+
+**Superseded wording**, from root `DECISIONS.md` D14's endpoint table:
+"| `POST /projects` | Create project from name + source folder |". D14's
+demo-seed sentence: "Startup seeds the demo project only when `projects` is
+empty, using the same core creation function as the endpoint." D15's
+Add-project paragraph: "A project is created, and its first run started,
+from `AddProject.jsx`... Folder first, then name: the folder is a dropdown
+of what `config/projects.yaml`'s configured root holds on disk, never
+invented and never created by the system; choosing one derives the name
+(`northside-dental` → `Northside Dental`), still editable. The box may
+refuse to send an empty name or an unchosen folder, in its own words — the
+one client-side check this screen makes... The two retry/disable behaviours
+the old form had are unchanged: a retry after a failed `POST /runs` never
+repeats `POST /projects` — `projects.name` carries no unique constraint
+(`migrations/versions/20260812_0001_create_slice_1_tables.py` declares only
+a primary key on `id`), so retrying the create would leave a second project
+over the same folder and the watcher polling it twice — and the button stays
+disabled through the parent's re-read." D15's section-tabs sentence: "the
+open run's detail — stages, skipped, needs your decision, register, read one
+at a time behind tabs". D15's register limitation: "`GET /runs/{id}` carries
+no register rows, so the register section is empty until the run has
+exported." D15's source-folder limitation: "the source folder a project
+names is read inside the application's container, whose only mount is
+`.:/workspace`, so only a path inside the repository exists as far as it is
+concerned; a path like `/Users/name/Downloads/client-docs` is refused,
+correctly, by `create_project`."
+
+**Replacement:** `source_folder_path` is now the project's identity.
+`create_project` (`app/projects/create_project.py`) is get-or-create: two
+calls for the same folder return the same project id, the second creating
+nothing, and `POST /projects` / the `create_project` MCP tool answer
+`{"project_id": ..., "created": true|false}` so a caller is never misled
+about which happened. Concurrent callers are handled by catching the real
+database `UniqueViolation` and re-reading rather than failing — the HTTP
+endpoint, the MCP tool and the startup demo seed all reach this function
+independently, so two of them can race over one folder. A
+project's name is derived from its folder (dashes/underscores become spaces,
+each word capitalised) and is **never accepted from a caller**: `name` is
+gone from `create_project`'s signature, the `POST /projects` body, and the
+`create_project` MCP tool. `source_folder_path` is confined to
+`config/projects.yaml`'s configured root: an absolute path is refused
+outright (nothing legitimate ever sends one), `..` is refused, and what
+remains must resolve (`Path.resolve()`, which also collapses a symlink)
+directly inside the resolved root — not the root itself, not nested two
+levels down. This closes a real hole, not a hardening exercise: pointed at
+the repository root, a run would have read `README.md`, `TASK.md` and
+`DECISIONS.md` and paid to extract requirements from them, reachable from
+curl and from MCP before this change. Migration `20260815_0013` adds
+`uq_projects_source_folder_path`, a real unique constraint (superseding the
+demo-seed sentence and the Add-project paragraph's claim that none existed);
+its upgrade refuses, naming the folder and the project ids involved, if the
+database already holds two projects over one folder, the same shape
+`20260814_0011`'s upgrade used for a `Withdrawn` row it could not narrow
+away; downgrade only drops the constraint, which never violates existing
+data. The demo seed (`ensure_demo_project`) is now nothing more than one
+`create_project` call for `sample-projects/intake-portal` — get-or-create
+already makes a restart safe, so the project-specific "does a row named
+'Acme intake portal' exist" check it used to run is gone along with
+`DEMO_PROJECT_NAME`. The Add-project box (`ui/src/AddProject.jsx`) loses its
+name field and its auto-fill-from-folder derivation entirely (name
+derivation happens once, in core); its own check is only that a folder is
+chosen ("Choose the folder to watch.") — the empty-name check is gone with
+the field. Its folder dropdown now shows only folders that do not already
+carry a project (the difference between `available_folders` and every
+project's own `source_folder_path`, computed client-side, no backend
+change); when nothing is left the dropdown stays where it is, disabled, and
+its one option reads "No folder left to add." instead of "Choose a folder."
+`ui/src/run_requests.js`'s `ask()` gained a net for a refusal body it cannot
+read: FastAPI's own 422 validation error sends `detail` as a list of
+objects, and a string check now turns that into "The application did not
+accept this request." (with the whole body still reaching the console)
+before it ever reaches a component, rather than crashing on an attempt to
+render an object as text.
+
+The register stops being a run's own tab and becomes the project's own
+panel — one thing the project holds, not one more run. `register_rows` was
+always keyed by `project_id` with `is_committed`, already one register per
+project accumulating across runs; only the screen's presentation
+contradicted that. A run panel now has three tabs — Stages, Skipped,
+Decisions — and a `Register` entry sits above a project's runs in the middle
+column (`ui/src/RunColumn.jsx`), showing the row count of the newest run
+that has exported, if any. Opening it shows the register in the right
+panel, the same panel a run opens into, reusing `ui/src/Register.jsx`
+unchanged rather than duplicating it; opening it also clears whatever run
+was open, its export and both refusals, mirroring the fix already made to
+`openRun` on `front-end-projects-and-runs` — a previous run's decisions must
+never sit beside the register. No new endpoint and no new core function: the
+register a project's panel shows comes from the two calls that already
+exist — `GET /projects` (runs newest first, each carrying `row_count`,
+non-null only once it has exported) to find the most recent exported run,
+then `GET /runs/{id}/export` for that run's register. Endpoints and MCP
+tools both stay at seven. Before any run has ever exported, the panel shows
+exactly "Nothing has been added to this register yet." — never an empty
+table (superseding the run-tab's old "Nothing exported yet. The register
+appears here once the export is approved."). `runs.export_json`,
+`GET /runs/{id}/export`, and the export gate itself are unchanged in
+behaviour — only the gate's own question changed, from "Export the
+Requirements-to-Delivery Register for {name}, with {n} row(s) proposed by
+this run?" to "Add this run's changes to the register?"
+(`app/graph/register_graph.py`). "Export" read as "download"; the gate is
+really the permission to commit, still raised for every run reaching
+Review, still the one place a human approves the whole run's work, and
+`runs.status` keeps `export rejected` — no status rename, no migration for
+this word change. No row count in the new wording: a rules-only run (no new
+document, only a changed rule re-examining the whole register) reaches
+Review with zero proposed rows and still commits merges and findings, so a
+wording naming a count would read wrongly there.
+
+**Why now:** a project was anything a caller said it was — a name plus any
+folder path the container could read, with nothing stopping two projects
+over one folder and nothing stopping a folder outside the intended root.
+Making the folder the identity closes both holes at once and matches how a
+Delivery Owner actually thinks about a project: one client folder is one
+engagement, not a name someone typed that could drift from what the folder
+actually is. The register move fixes a screen that contradicted its own
+database: the register was already one continuing thing per project in
+`register_rows`, and showing it as a per-run tab implied — wrongly — that
+each run had its own separate register.
+
+## 2026-08-16 — review repairs to "a folder is a project"
+
+Codex reviewed the branch read-only and returned seven findings; each was
+re-checked against the code in the foreground and all seven were real. Aditya
+decided each one. Five were fixed and two were deliberately left.
+
+**Superseded — the folder is stored as the caller spelled it.** The first
+implementation resolved the path to check it, then wrote the caller's original
+string to `projects.source_folder_path`. `sample-projects/x`,
+`sample-projects/./x` and `sample-projects/x/` are therefore three distinct
+rows over one directory, each with its own register, its own project lock and
+its own watcher run — the exact failure the unique constraint was added to
+prevent, reachable from curl or MCP though not from the screen, whose dropdown
+sends one spelling. Replaced by storing `<root>/<resolved folder name>`, and
+looking up, inserting and deriving the name from that.
+
+**Superseded — `projects_root` may be absolute.** `read_projects_root`
+deliberately accepted an absolute configured root, and a test asserted it.
+`create_project` refuses every absolute path, so with an absolute root the
+Add-project dropdown would list folders that creation always rejects. The
+alternative was to teach `create_project` to accept an absolute path that
+resolves inside the root; it was rejected because it adds a second accepted
+shape to a system being made smaller. The root must now be relative, refused
+where the file is read so the dropdown and the confinement check cannot be
+configured into disagreeing.
+
+**Superseded — `POST /projects` always answers `201 Created`.** The route
+declared 201 statically even when the body said `"created": false`. A machine
+caller reading the status code alone was told a project had been created when
+none had. Now `200` when nothing was created.
+
+**Superseded — the register panel treats "not read yet" as "empty".** Opening
+the register set `exported` to `null`, and `null` rendered "Nothing has been
+added to this register yet." A project whose latest `GET /projects` answer
+already reported `row_count: 7` therefore showed an empty register until
+`GET /runs/{id}/export` answered, and during polling could hold that empty line
+for a further interval because the register read used the previous poll's
+project snapshot. Three states now: reading, read-and-empty, read-and-holding
+rows; and the poll awaits the project list before reading the register.
+
+**Left, with reasons.** Folder confinement is still checked only when a project
+is created: nothing but `create_project` writes that column, so no unconfined
+path can reach the database, and re-checking on every run would spend a check
+on a path that cannot exist. A folder named only with dashes still derives an
+empty project name; no client folder is named `---`, and building for it would
+be the speculative edge case `TASK.md` forbids.

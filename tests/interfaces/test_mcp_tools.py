@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, text
 from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
+    temporary_project_folder,
     wait_until,
     write_script,
 )
@@ -39,43 +40,43 @@ LOCKED_TOOLS = [
 
 
 @contextmanager
-def _application(tmp_path: Path) -> Iterator[tuple[ApplicationProcess, str, Path]]:
+def _application(
+    tmp_path: Path,
+) -> Iterator[tuple[ApplicationProcess, str, Path, str]]:
     """One application process on a database of its own, and nothing run yet."""
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
-    script_path = tmp_path / "script.json"
-    write_script(
-        script_path,
-        {
-            match_marker(): match_answer(1),
-            examine_marker(): no_findings_answer(),
-            extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
-        },
-    )
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
+    with temporary_project_folder("intake-portal") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+                extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
+            },
         )
-        application.start()
-        try:
-            yield application, database_url, source_folder
-        finally:
-            application.stop()
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                yield application, database_url, source_folder, source_folder_path
+            finally:
+                application.stop()
 
 
 def _run_at_review(
     application: ApplicationProcess,
-    project_name: str,
-    source_folder: Path,
+    source_folder_path: str,
 ) -> str:
     """One run driven through the API until it is parked at Review."""
     with application.client() as client:
         project_id = client.post(
             "/projects",
-            json={"name": project_name, "source_folder_path": str(source_folder)},
+            json={"source_folder_path": source_folder_path},
         ).json()["project_id"]
         run_id = client.post("/runs", json={"project_id": project_id}).json()["run_id"]
         wait_until(
@@ -89,17 +90,18 @@ def _run_at_review(
 def test_a_tool_and_its_endpoint_answer_one_operation_identically(
     tmp_path: Path,
 ) -> None:
-    with _application(tmp_path) as (application, _database_url, source_folder):
-        run_id = _run_at_review(
-            application, "Both doors intake portal", source_folder
-        )
-        missing_folder = str(tmp_path / "not-a-folder")
+    with _application(tmp_path) as (application, _database_url, _source_folder, source_folder_path):
+        run_id = _run_at_review(application, source_folder_path)
+        # Relative and directly inside the projects root, so this genuinely
+        # exercises the missing-folder refusal rather than the confinement
+        # refusal an absolute `tmp_path`-based path would trigger instead.
+        missing_folder = "sample-projects/not-a-folder"
 
         with application.client() as client:
             over_http = client.get(f"/runs/{run_id}").json()
             refused_over_http = client.post(
                 "/projects",
-                json={"name": "Missing folder", "source_folder_path": missing_folder},
+                json={"source_folder_path": missing_folder},
             )
 
         through_mcp = call_tool(
@@ -108,7 +110,7 @@ def test_a_tool_and_its_endpoint_answer_one_operation_identically(
         refused_through_mcp = call_tool(
             application.base_url,
             "create_project",
-            {"name": "Missing folder", "source_folder_path": missing_folder},
+            {"source_folder_path": missing_folder},
         )
 
     assert through_mcp.refused is False
@@ -118,25 +120,26 @@ def test_a_tool_and_its_endpoint_answer_one_operation_identically(
     assert refused_over_http.json()["detail"] in refused_through_mcp.text
 
 
-def test_neither_door_creates_a_project_with_an_empty_name_or_folder(
+def test_neither_door_creates_a_project_with_an_empty_folder(
     tmp_path: Path,
 ) -> None:
-    """An empty path is the one the folder check cannot catch.
+    """An empty path is the one the confinement check alone would not catch.
 
-    `Path("")` resolves to the project root, which is a real directory, so the
-    call succeeds and the project watches the whole repository — every
-    supported file in it read as a client document on the next run.
+    `Path("")` resolves to the project root itself, which the explicit
+    empty-string check refuses before the confinement check is ever reached
+    — otherwise the project would end up watching the whole repository,
+    every supported file in it read as a client document on the next run.
     """
-    with _application(tmp_path) as (application, database_url, _source_folder):
+    with _application(tmp_path) as (application, database_url, _source_folder, _source_folder_path):
         with application.client() as client:
             refused_over_http = client.post(
-                "/projects", json={"name": "", "source_folder_path": ""}
+                "/projects", json={"source_folder_path": ""}
             )
 
         refused_through_mcp = call_tool(
             application.base_url,
             "create_project",
-            {"name": "", "source_folder_path": ""},
+            {"source_folder_path": ""},
         )
 
         engine = create_engine(database_url)
@@ -158,10 +161,8 @@ def test_neither_door_creates_a_project_with_an_empty_name_or_folder(
 def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
     tmp_path: Path,
 ) -> None:
-    with _application(tmp_path) as (application, database_url, source_folder):
-        run_id = _run_at_review(
-            application, "Ungated intake portal", source_folder
-        )
+    with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
+        run_id = _run_at_review(application, source_folder_path)
 
         finishing = call_tool(application.base_url, "finish_review", {"run_id": run_id})
         exporting = call_tool(
@@ -187,10 +188,8 @@ def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
 
 
 def test_a_tool_reports_only_the_run_state_the_database_holds(tmp_path: Path) -> None:
-    with _application(tmp_path) as (application, database_url, source_folder):
-        run_id = _run_at_review(
-            application, "Read-back intake portal", source_folder
-        )
+    with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
+        run_id = _run_at_review(application, source_folder_path)
         waiting = call_tool(application.base_url, "get_run_status", {"run_id": run_id})
         export_decision = next(
             decision
@@ -242,7 +241,7 @@ def test_a_core_refusal_reaches_a_tool_caller_with_its_cause_and_its_fix(
 ) -> None:
     unknown_project_id = str(uuid4())
     unknown_run_id = str(uuid4())
-    with _application(tmp_path) as (application, _database_url, _source_folder):
+    with _application(tmp_path) as (application, _database_url, _source_folder, _source_folder_path):
         unknown_project = call_tool(
             application.base_url, "start_run", {"project_id": unknown_project_id}
         )
@@ -269,7 +268,7 @@ def test_a_core_refusal_reaches_a_tool_caller_with_its_cause_and_its_fix(
 
 
 def test_the_server_offers_only_the_seven_locked_tools(tmp_path: Path) -> None:
-    with _application(tmp_path) as (application, _database_url, _source_folder):
+    with _application(tmp_path) as (application, _database_url, _source_folder, _source_folder_path):
         offered = tool_names(application.base_url)
 
     assert offered == LOCKED_TOOLS
@@ -278,8 +277,8 @@ def test_the_server_offers_only_the_seven_locked_tools(tmp_path: Path) -> None:
 def test_the_project_list_and_the_list_projects_tool_return_identical_payloads(
     tmp_path: Path,
 ) -> None:
-    with _application(tmp_path) as (application, _database_url, source_folder):
-        _run_at_review(application, "List tools intake portal", source_folder)
+    with _application(tmp_path) as (application, _database_url, _source_folder, source_folder_path):
+        _run_at_review(application, source_folder_path)
 
         with application.client() as client:
             over_http = client.get("/projects").json()
@@ -293,6 +292,6 @@ def test_the_project_list_and_the_list_projects_tool_return_identical_payloads(
     listed = next(
         project
         for project in over_http["projects"]
-        if project["name"] == "List tools intake portal"
+        if project["source_folder_path"] == source_folder_path
     )
     assert len(listed["runs"]) == 1

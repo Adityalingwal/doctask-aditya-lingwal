@@ -18,6 +18,7 @@ from tests.runs.application import (
     ApplicationProcess,
     PROJECT_ROOT,
     temporary_database,
+    temporary_project_folder,
     wait_for_run_status,
     write_script,
 )
@@ -105,68 +106,64 @@ def test_an_existing_row_answered_without_a_row_number_is_refused(
 def test_an_incomplete_match_answer_fails_the_run_and_proposes_nothing(
     tmp_path: Path,
 ) -> None:
-    source_folder = tmp_path / "intake-portal"
-    source_folder.mkdir()
-    script_path = tmp_path / "script.json"
-    # The answer leaves out requirement 0, which today would have become a
-    # confident new row nobody asked about.
-    answers: dict[str, Any] = {
-        match_marker(): {
-            "outcomes": [
-                {"requirement_index": 1, "outcome": "new row", "row_number": None},
-                {"requirement_index": 2, "outcome": "new row", "row_number": None},
-            ]
+    with temporary_project_folder("incomplete-match") as (source_folder, source_folder_path):
+        script_path = tmp_path / "script.json"
+        # The answer leaves out requirement 0, which today would have become a
+        # confident new row nobody asked about.
+        answers: dict[str, Any] = {
+            match_marker(): {
+                "outcomes": [
+                    {"requirement_index": 1, "outcome": "new row", "row_number": None},
+                    {"requirement_index": 2, "outcome": "new row", "row_number": None},
+                ]
+            }
         }
-    }
-    for source_file, requirement in DOCUMENTS.items():
-        quote = write_meeting_note(source_folder, source_file, requirement)
-        answers[extract_marker(source_file)] = extraction_answer(requirement, quote)
-    write_script(script_path, answers)
+        for source_file, requirement in DOCUMENTS.items():
+            quote = write_meeting_note(source_folder, source_file, requirement)
+            answers[extract_marker(source_file)] = extraction_answer(requirement, quote)
+        write_script(script_path, answers)
 
-    with temporary_database() as database_url:
-        application = ApplicationProcess(
-            database_url=database_url,
-            script_path=script_path,
-            call_log_path=tmp_path / "model-calls.jsonl",
-        )
-        application.start()
-        try:
-            with application.client() as client:
-                project_id = client.post(
-                    "/projects",
-                    json={
-                        "name": "Incomplete match intake portal",
-                        "source_folder_path": str(source_folder),
-                    },
-                ).json()["project_id"]
-                run_id = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()["run_id"]
-                failed = wait_for_run_status(client, run_id, "failed")
-                # A failed run holds nothing, so the project takes another run.
-                after_failure = client.post(
-                    "/runs", json={"project_id": project_id}
-                ).json()
-
-            # The same input would fail the same way, so startup resume must
-            # leave this run alone — only a killed 'running' run is taken over.
-            application.stop()
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
             application.start()
-            with application.client() as client:
-                after_restart = client.get(f"/runs/{run_id}").json()
-        finally:
-            application.stop()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    failed = wait_for_run_status(client, run_id, "failed")
+                    # A failed run holds nothing, so the project takes another run.
+                    after_failure = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()
 
-        engine = create_engine(database_url)
-        with engine.connect() as connection:
-            proposed = connection.execute(
-                text(
-                    "SELECT count(*) FROM register_rows "
-                    "WHERE proposed_by_run_id = :run_id"
-                ),
-                {"run_id": run_id},
-            ).scalar_one()
-        engine.dispose()
+                # The same input would fail the same way, so startup resume must
+                # leave this run alone — only a killed 'running' run is taken over.
+                application.stop()
+                application.start()
+                with application.client() as client:
+                    after_restart = client.get(f"/runs/{run_id}").json()
+            finally:
+                application.stop()
+
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                proposed = connection.execute(
+                    text(
+                        "SELECT count(*) FROM register_rows "
+                        "WHERE proposed_by_run_id = :run_id"
+                    ),
+                    {"run_id": run_id},
+                ).scalar_one()
+            engine.dispose()
 
     assert proposed == 0
     assert failed["exported"] is False
