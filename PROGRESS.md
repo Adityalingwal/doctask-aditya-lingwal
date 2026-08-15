@@ -87,7 +87,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 - [x] `.md` batch collection, exact quote location, extraction, matching.
 - [x] Possible-match review, atomic finish-review claim, commit, export.
 - [x] Six API endpoints and startup project seeding.
-- [x] `failed`, `ended without changes`, `closed without export` semantics.
+- [x] `failed`, `no changes`, `export rejected` semantics.
 - [x] Configuration-vs-transient model failure classification.
 - [x] Already-read correction for failed, unrelated, and no-requirement docs.
 - [x] Ingest/Match node re-entry idempotency and merged-proposal marker.
@@ -236,7 +236,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       `created_at` for a run that has not started.
 - [x] `ui/src/Stages.jsx`'s precedence bug fixed: the run's own stage now wins
       over a reported "done" only while the run is active (`running` or
-      `waiting for review`), so a `done` run no longer shows its last stage as
+      `needs review`), so a `done` run no longer shows its last stage as
       permanently "working".
 - [x] `ui/src/RunList.jsx` gets an explicit `started_at === null` check ahead
       of `new Date(...)`, because `new Date(null)` is the 1970 epoch in
@@ -343,8 +343,8 @@ working claim only after its own implementation and proof land.
   workflow answer (save an edited document under a new name to have the
   revision read).
 - `GET /runs/{id}` returns no register rows, so the screen's register section
-  is empty until that run has exported; a run closed without export never shows
-  a register at all.
+  is empty until that run has exported; a run whose export was rejected never
+  shows a register at all.
 - The screen is built by Node, which the application image does not carry, and
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.

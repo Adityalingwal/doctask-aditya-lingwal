@@ -112,7 +112,7 @@ def _run_at_review(
                 ).json()["run_id"]
                 wait_until(
                     lambda: client.get(f"/runs/{run_id}").json()["status"]
-                    == "waiting for review",
+                    == "needs review",
                     "the run reaches Review",
                 )
             yield application, database_url, run_id
@@ -398,7 +398,7 @@ def test_editing_the_rules_file_after_a_run_started_leaves_that_run_examining(
                     lambda: (
                         client.get(f"/runs/{run_id}").json()
                         if client.get(f"/runs/{run_id}").json()["status"]
-                        == "waiting for review"
+                        == "needs review"
                         else None
                     ),
                     "the run reaches Review",

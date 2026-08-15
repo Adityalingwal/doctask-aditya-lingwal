@@ -89,7 +89,7 @@ def test_a_rules_only_run_never_reports_extract_or_match_as_finished(
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
 
@@ -104,7 +104,7 @@ def test_a_rules_only_run_never_reports_extract_or_match_as_finished(
                 rules_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, rules_run, "waiting for review")
+                wait_for_run_status(client, rules_run, "needs review")
                 rules_run_at_review = client.get(f"/runs/{rules_run}").json()
                 approve_every_decision_and_finish_review(client, rules_run)
                 wait_for_run_status(client, rules_run, "done")
@@ -187,7 +187,7 @@ def test_a_review_still_waiting_is_never_reported_as_finished(tmp_path: Path) ->
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                waiting = wait_for_run_status(client, run_id, "waiting for review")
+                waiting = wait_for_run_status(client, run_id, "needs review")
         finally:
             application.stop()
 

@@ -79,7 +79,7 @@ def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continu
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, run_id, "waiting for review")
+                wait_for_run_status(client, run_id, "needs review")
                 approve_every_decision_and_finish_review(client, run_id)
                 finished = wait_for_run_status(client, run_id, "done")
                 export = client.get(f"/runs/{run_id}/export").json()
@@ -137,7 +137,7 @@ def test_a_related_additional_document_is_labelled_but_never_creates_a_row_alone
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                ended = wait_for_run_status(client, run_id, "ended without changes")
+                ended = wait_for_run_status(client, run_id, "no changes")
         finally:
             application.stop()
 

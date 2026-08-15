@@ -9,7 +9,7 @@ const FAILED = "failed";
 // not just the last one. Its own stage wins over "done" only while the run
 // is genuinely still working, i.e. one of these two statuses; otherwise a
 // `done` run would show `commit` as forever "working".
-const ACTIVE_STATUSES = ["running", "waiting for review"];
+const ACTIVE_STATUSES = ["running", "needs review"];
 
 /**
  * What the server has confirmed about each stage — never more than that: the

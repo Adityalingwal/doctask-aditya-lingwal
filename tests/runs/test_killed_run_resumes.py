@@ -80,7 +80,7 @@ def test_killed_run_resumes_without_repeating_extraction(tmp_path: Path) -> None
             with application.client() as client:
                 wait_until(
                     lambda: client.get(f"/runs/{run_id}").json()["status"]
-                    == "waiting for review",
+                    == "needs review",
                     "the resumed run reaches Review",
                 )
         finally:

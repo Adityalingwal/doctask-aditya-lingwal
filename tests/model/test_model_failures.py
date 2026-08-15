@@ -124,7 +124,7 @@ def test_a_timed_out_document_is_skipped_while_the_batch_continues(
             examine_marker(): no_findings_answer(),
         },
         "Timed out intake portal",
-        "waiting for review",
+        "needs review",
     )
 
     assert proposed == [SECOND_REQUIREMENT]

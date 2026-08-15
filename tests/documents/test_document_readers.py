@@ -84,7 +84,7 @@ def test_a_pdf_longer_than_the_page_limit_is_never_read(tmp_path: Path) -> None:
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                ended = wait_for_run_status(client, run_id, "ended without changes")
+                ended = wait_for_run_status(client, run_id, "no changes")
         finally:
             application.stop()
 
@@ -137,7 +137,7 @@ def test_an_encrypted_pdf_is_skipped_with_the_reason_and_the_batch_continues(
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, run_id, "waiting for review")
+                wait_for_run_status(client, run_id, "needs review")
                 approve_every_decision_and_finish_review(client, run_id)
                 finished = wait_for_run_status(client, run_id, "done")
                 export = client.get(f"/runs/{run_id}/export").json()
@@ -185,7 +185,7 @@ def test_a_scanned_pdf_is_skipped_with_its_own_reason_rather_than_read_as_empty(
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                ended = wait_for_run_status(client, run_id, "ended without changes")
+                ended = wait_for_run_status(client, run_id, "no changes")
         finally:
             application.stop()
 
@@ -263,7 +263,7 @@ def test_only_the_extensions_the_config_accepts_reach_a_reader(
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, run_id, "waiting for review")
+                wait_for_run_status(client, run_id, "needs review")
                 approve_every_decision_and_finish_review(client, run_id)
                 finished = wait_for_run_status(client, run_id, "done")
                 export = client.get(f"/runs/{run_id}/export").json()
@@ -356,7 +356,7 @@ def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
                 run_id = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, run_id, "waiting for review")
+                wait_for_run_status(client, run_id, "needs review")
                 approve_every_decision_and_finish_review(client, run_id)
                 finished = wait_for_run_status(client, run_id, "done")
                 export = client.get(f"/runs/{run_id}/export").json()

@@ -11,7 +11,7 @@ export function runReply(overrides = {}) {
   return {
     run_id: runId,
     project_id: projectId,
-    status: "waiting for review",
+    status: "needs review",
     stage: "review",
     skipped: [],
     ended_early_reason: null,

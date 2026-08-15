@@ -142,7 +142,7 @@ def test_the_watcher_starts_a_run_once_an_arriving_file_has_settled(
         )
         with application.client() as client:
             at_review = wait_for_run_status(
-                client, started[0][0], "waiting for review"
+                client, started[0][0], "needs review"
             )
 
     # A folder that was simply already there is not an arrival: only the file
@@ -169,7 +169,7 @@ def test_the_watcher_does_not_start_a_second_run_while_one_is_active(
         )
         first_run = started[0][0]
         with application.client() as client:
-            wait_for_run_status(client, first_run, "waiting for review")
+            wait_for_run_status(client, first_run, "needs review")
             _copy_in(source_folder, ARRIVING_LATER, THIRD_REQUIREMENT)
             # Several quiet periods pass with that run still holding the
             # project, and the watcher must start nothing behind it.
@@ -183,7 +183,7 @@ def test_the_watcher_does_not_start_a_second_run_while_one_is_active(
                 "the watcher starts the run the file that arrived during review "
                 "was waiting for",
             )
-            wait_for_run_status(client, after_release[1][0], "waiting for review")
+            wait_for_run_status(client, after_release[1][0], "needs review")
 
-    assert [status for _, status in while_active] == ["waiting for review"]
+    assert [status for _, status in while_active] == ["needs review"]
     assert len(after_release) == 2

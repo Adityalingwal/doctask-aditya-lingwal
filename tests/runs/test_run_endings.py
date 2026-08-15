@@ -58,7 +58,7 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
                 exporting_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, exporting_run, "waiting for review")
+                wait_for_run_status(client, exporting_run, "needs review")
                 approve_every_decision_and_finish_review(client, exporting_run)
                 wait_for_run_status(client, exporting_run, "done")
 
@@ -66,10 +66,10 @@ def test_a_run_with_nothing_new_ends_without_changes(tmp_path: Path) -> None:
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, unchanged_run, "ended without changes"
+                    client, unchanged_run, "no changes"
                 )
                 # The lock is a run in an active status, so a project whose run
-                # ended without changes must take another run straight away.
+                # no changes must take another run straight away.
                 after_ending = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()

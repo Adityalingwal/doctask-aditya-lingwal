@@ -32,7 +32,7 @@ test("a refusal about one run is gone once another run is read successfully", as
               {
                 run_id: runId,
                 project_name: "Acme intake portal",
-                status: "waiting for review",
+                status: "needs review",
                 started_at: "2026-03-26T10:00:00+00:00",
                 waiting_decisions: 0,
                 finished_stages: ["ingest"],

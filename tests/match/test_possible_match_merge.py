@@ -81,7 +81,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
 
@@ -90,7 +90,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 at_review = wait_for_run_status(
-                    client, second_run, "waiting for review"
+                    client, second_run, "needs review"
                 )
                 merge_decisions = [
                     decision
@@ -189,7 +189,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
 
@@ -198,7 +198,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 at_review = wait_for_run_status(
-                    client, second_run, "waiting for review"
+                    client, second_run, "needs review"
                 )
                 match_decision = next(
                     decision
@@ -301,7 +301,7 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
 
@@ -309,7 +309,7 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
                 second_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, second_run, "waiting for review")
+                wait_for_run_status(client, second_run, "needs review")
                 approve_every_decision_and_finish_review(client, second_run)
                 wait_for_run_status(client, second_run, "done")
                 export = client.get(f"/runs/{second_run}/export").json()

@@ -19,7 +19,7 @@ import {
 } from "./run_requests.js";
 
 // The one status in which the server accepts an answer or a finished review.
-const WAITING_FOR_REVIEW = "waiting for review";
+const WAITING_FOR_REVIEW = "needs review";
 
 // The screen's own name. The register it shows keeps the name the decisions and
 // the exports give it; this is only what the person looking at it calls the

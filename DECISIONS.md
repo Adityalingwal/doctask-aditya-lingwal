@@ -133,7 +133,7 @@ export is always gated.
 - **Decision:** Every gated proposal has only **Approve** or **Reject**. The
   buttons act on the stated proposal, never resolve the underlying truth.
 - **Reject:** Exclude the proposal from the register but retain it permanently
-  in the run record. Only rejecting final export ends `closed without export`.
+  in the run record. Only rejecting final export ends `export rejected`.
 - **Known limitation:** A rejected finding does not automatically return when
   later evidence makes it stronger. Evidence that resolves it naturally stops
   the rule firing.
@@ -357,7 +357,7 @@ a per-document checkpoint. All six stages are built: Match routes to Examine
 when it proposed a row and to the early exit when it did not, and Examine
 always continues to Review.
 
-Early exits are honest terminal `ended without changes` states with reasons:
+Early exits are honest terminal `no changes` states with reasons:
 no readable file this project has never read before; or the batch read one or
 more files but traced no requirement to its own words, so nothing reached
 Match. Ingest routes straight to Examine instead when no document is new but
@@ -519,15 +519,16 @@ false-success `done` run.
 
 - Run UUID is also LangGraph `thread_id`.
 - One active run per project is enforced durably in PostgreSQL. A second run
-  returns one `waiting` run; its batch is formed only when it starts. Different
+  returns one `queued` run; its batch is formed only when it starts. Different
   projects may run concurrently.
 - Slice 1 executes background work inside one FastAPI process. A separate
   worker is a legitimate later change; database locks preserve correctness.
-- Run statuses: `waiting`, `running`, `waiting for review`, `done`, `closed
-  without export`, `failed`, `ended without changes`.
-- `done` means export exists. `closed without export` means export was rejected.
-  `failed` is deliberate unrecoverable stop. Early exits use `ended without
-  changes` plus a reason.
+- **Run statuses, renamed 2026-08-15 so the screen can print the stored value
+  verbatim:** `queued`, `running`, `needs review`, `done`,
+  `export rejected`, `failed`, `no changes`.
+- `done` means export exists. `export rejected` means export was rejected.
+  `failed` is deliberate unrecoverable stop. Early exits use `no changes`
+  plus a reason.
 - **Implemented and verified** — 2026-08-14, by
   `tests/runs/test_two_projects_at_once.py` and
   `tests/runs/test_same_project_queue.py`,
@@ -538,7 +539,7 @@ false-success `done` run.
     over: both reported `running` with a stage set at one polled moment, and
     two of their model calls started less than the scripted call delay apart,
     so those calls were in flight together.
-  - A second run on one project is `waiting`, however often it is asked for,
+  - A second run on one project is `queued`, however often it is asked for,
     while the first holds the lock in either active status.
   - A waiting run's batch is formed when it starts: a file that arrived while
     it waited belongs to it, and to the run ahead of it never.
@@ -596,7 +597,7 @@ slice-1 scope.
   read is navigation — the only actions on a run stay Approve, Reject and
   Finish review.
 - **The stage strip's own stage wins over "done" only while the run is active**
-  (`running` or `waiting for review`). Extract writes its finished mark after
+  (`running` or `needs review`). Extract writes its finished mark after
   every document, not just the last one, so a batch's own stage can read
   "finished" before the batch is done; the run's current stage overrides that
   reading while the run is still working, but a `done`, `failed`, or otherwise
@@ -840,7 +841,7 @@ ideas from resurfacing without duplicating their full prose here.
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
 | Five/six API endpoints | D14 seven endpoints including `GET /runs` |
-| `done` as generic terminal state | D13 honest `failed`/`ended without changes`/`closed without export` |
+| `done` as generic terminal state | D13 honest `failed`/`no changes`/`export rejected` |
 | Status-only already-read check | D03 extraction + export/unrelated/no-requirement rule |
 | Already-read matched by name AND content; requirement withdrawal | D03 read-once rule matched by name OR content; withdrawal removed |
 | Unmarked emptied merge proposal | D09 `merged_into_register_row_id` |

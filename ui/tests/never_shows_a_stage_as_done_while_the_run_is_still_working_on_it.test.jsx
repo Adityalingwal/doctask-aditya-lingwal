@@ -18,7 +18,7 @@ test("a running run's own stage always reads working, whether or not it has alre
 });
 
 test("a review still waiting reads working, never done, even once it has a review mark", () => {
-  const states = stageStates("review", "waiting for review", ["ingest"]);
+  const states = stageStates("review", "needs review", ["ingest"]);
 
   expect(states.find((stage) => stage.name === "review").state).toBe("working");
 });
@@ -35,14 +35,14 @@ test("a done run's current stage reads done once the run is no longer active", (
   expect(states.find((stage) => stage.name === "commit").state).toBe("done");
 });
 
-test("a run that ended without changes still shows its early stage done", () => {
-  const states = stageStates("ingest", "ended without changes", ["ingest"]);
+test("a run with no changes still shows its early stage done", () => {
+  const states = stageStates("ingest", "no changes", ["ingest"]);
 
   expect(states.find((stage) => stage.name === "ingest").state).toBe("done");
 });
 
-test("a run closed without export shows review done, not working", () => {
-  const states = stageStates("review", "closed without export", ["ingest", "review"]);
+test("a run whose export was rejected shows review done, not working", () => {
+  const states = stageStates("review", "export rejected", ["ingest", "review"]);
 
   expect(states.find((stage) => stage.name === "review").state).toBe("done");
 });

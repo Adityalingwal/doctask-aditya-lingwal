@@ -92,7 +92,7 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
                 exporting_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, exporting_run, "waiting for review")
+                wait_for_run_status(client, exporting_run, "needs review")
                 approve_every_decision_and_finish_review(client, exporting_run)
                 exported = wait_for_run_status(client, exporting_run, "done")
 
@@ -100,7 +100,7 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, second_run, "ended without changes"
+                    client, second_run, "no changes"
                 )
         finally:
             application.stop()
@@ -164,7 +164,7 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
 
@@ -177,7 +177,7 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, second_run, "ended without changes"
+                    client, second_run, "no changes"
                 )
         finally:
             application.stop()
@@ -226,7 +226,7 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
                 after_first_run = stored_rows(database_url, project_id)
@@ -239,7 +239,7 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
                 ended = wait_for_run_status(
-                    client, second_run, "ended without changes"
+                    client, second_run, "no changes"
                 )
                 after_second_run = stored_rows(database_url, project_id)
         finally:
@@ -287,7 +287,7 @@ def test_a_deleted_document_never_removes_a_row(tmp_path: Path) -> None:
                 first_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, first_run, "waiting for review")
+                wait_for_run_status(client, first_run, "needs review")
                 approve_every_decision_and_finish_review(client, first_run)
                 wait_for_run_status(client, first_run, "done")
                 after_first_run = stored_rows(database_url, project_id)
@@ -296,7 +296,7 @@ def test_a_deleted_document_never_removes_a_row(tmp_path: Path) -> None:
                 second_run = client.post(
                     "/runs", json={"project_id": project_id}
                 ).json()["run_id"]
-                wait_for_run_status(client, second_run, "ended without changes")
+                wait_for_run_status(client, second_run, "no changes")
                 after_second_run = stored_rows(database_url, project_id)
         finally:
             application.stop()
@@ -377,7 +377,7 @@ def _markers_from_two_runs_over(
                     run_id = client.post(
                         "/runs", json={"project_id": project_id}
                     ).json()["run_id"]
-                    wait_for_run_status(client, run_id, "ended without changes")
+                    wait_for_run_status(client, run_id, "no changes")
         finally:
             application.stop()
 

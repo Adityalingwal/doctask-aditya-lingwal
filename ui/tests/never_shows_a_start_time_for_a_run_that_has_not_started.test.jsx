@@ -13,7 +13,7 @@ test("a run with no started_at reads 'waiting to start', never an epoch date", a
         {
           run_id: "11111111-2222-4333-8444-555566667777",
           project_name: "Queued intake portal",
-          status: "waiting",
+          status: "queued",
           started_at: null,
           waiting_decisions: 0,
           finished_stages: [],

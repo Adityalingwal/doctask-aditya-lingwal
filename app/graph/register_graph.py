@@ -371,7 +371,7 @@ def build_register_graph(
         # resume, so this node cannot otherwise tell a first entry from a
         # post-review replay. review_finished_at is the durable fact that
         # tells them apart: once it is set, raising the export decision,
-        # entering the stage, reporting 'waiting for review', and the
+        # entering the stage, reporting 'needs review', and the
         # interrupt itself must not happen again.
         if run["review_finished_at"] is None:
             async with pool.connection() as connection:

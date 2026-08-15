@@ -80,7 +80,7 @@ def _run_at_review(
         run_id = client.post("/runs", json={"project_id": project_id}).json()["run_id"]
         wait_until(
             lambda: client.get(f"/runs/{run_id}").json()["status"]
-            == "waiting for review",
+            == "needs review",
             "the run reaches Review",
         )
     return run_id
@@ -181,7 +181,7 @@ def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
 
     assert finishing.refused is True
     assert exporting.refused is True
-    assert run.status == "waiting for review"
+    assert run.status == "needs review"
     assert run.export_json is None
     assert run.review_finished_at is None
 

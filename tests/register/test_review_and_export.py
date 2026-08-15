@@ -67,7 +67,7 @@ def _application_at_review(
                 ).json()["run_id"]
                 wait_until(
                     lambda: client.get(f"/runs/{run_id}").json()["status"]
-                    == "waiting for review",
+                    == "needs review",
                     "the run reaches Review",
                 )
             yield application, database_url, run_id
@@ -173,7 +173,7 @@ def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> No
     for decision in unanswered:
         assert decision["decision_id"] in refusal.json()["detail"]
         assert decision["question"] in refusal.json()["detail"]
-    assert after_refusal["status"] == "waiting for review"
+    assert after_refusal["status"] == "needs review"
     assert after_refusal["exported"] is False
     assert export_attempt.status_code == 409
 
@@ -222,7 +222,7 @@ def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
                     lambda: (
                         client.get(f"/runs/{run_id}").json()
                         if client.get(f"/runs/{run_id}").json()["status"]
-                        == "waiting for review"
+                        == "needs review"
                         else None
                     ),
                     "the run reaches Review",
