@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 
@@ -57,6 +57,11 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const [unreachable, setUnreachable] = useState(false);
 
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  // Whether the right panel shows the project's own register rather than a
+  // run. Mutually exclusive with `runId` being set — opening one always
+  // clears the other, so the panel never mixes a run's decisions with the
+  // project's register (section 2.3).
+  const [registerOpen, setRegisterOpen] = useState(false);
   const [runsCollapsed, setRunsCollapsed] = useState(false);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [openSection, setOpenSection] = useState("stages");
@@ -85,8 +90,10 @@ export default function ReviewScreen({ runId: openedRunId }) {
   // a column writes it into the address without adding a history entry.
   // What the last run said goes with it: until the new read answers, the
   // screen shows nothing rather than the previous run's decisions beside
-  // buttons that already act on this one.
+  // buttons that already act on this one. Opening a run also closes the
+  // register, the same clearing rule in the other direction.
   const openRun = useCallback((chosen) => {
+    setRegisterOpen(false);
     setRunId(chosen);
     setRun(null);
     setExported(null);
@@ -95,11 +102,28 @@ export default function ReviewScreen({ runId: openedRunId }) {
     window.history.replaceState(null, "", `/ui/?run=${encodeURIComponent(chosen)}`);
   }, []);
 
+  // The Register entry above a project's runs (section 2.3) opens that
+  // project's register in the right panel — the same panel a run opens
+  // into. It must clear whatever run was open, its export and both
+  // refusals, the same way openRun clears the previous run: a previous
+  // run's decisions must never sit beside the register.
+  const openRegister = useCallback((projectId) => {
+    setSelectedProjectId(projectId);
+    setRegisterOpen(true);
+    setRunId("");
+    setRun(null);
+    setExported(null);
+    setReadRefusal(null);
+    setAnswerRefusal(null);
+    window.history.replaceState(null, "", "/ui/");
+  }, []);
+
   // Choosing a project from the left column shows its runs in the middle one;
-  // it does not itself open any run, so nothing is shown that a click on a
-  // run row has not actually asked for.
+  // it does not itself open any run or the register, so nothing is shown that
+  // a click has not actually asked for.
   const selectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
+    setRegisterOpen(false);
     setRunId("");
     setRun(null);
     setExported(null);
@@ -143,15 +167,63 @@ export default function ReviewScreen({ runId: openedRunId }) {
     }
   }, [runId]);
 
+  // No new endpoint and no new core function (section 2.2): the register a
+  // project's panel shows is read the same two ways the screen already
+  // reads everything else — GET /projects (already loaded, runs newest
+  // first, each carrying row_count once it has exported) to find the most
+  // recent run that has exported, then GET /runs/{id}/export for that run's
+  // register.
+  //
+  // `projects` is read through a ref, updated on every render, rather than
+  // closed over directly: `GET /projects` answers with a new array every
+  // poll, and if this callback depended on `projects` itself it would be
+  // rebuilt every poll too — the polling effect below depends on this
+  // callback, so tearing it down and setting it up again would immediately
+  // call `readProjectsFromServer()` again, which answers with yet another
+  // new array, rebuilding the callback again. `registerOpen` and
+  // `selectedProjectId` stay real dependencies: they are cheap primitives
+  // that only change when a person navigates, so depending on them directly
+  // is what makes opening the register (or switching project while it is
+  // open) read it immediately, the same way `readFromServer` depending on
+  // `runId` makes opening a run read immediately — without waiting for the
+  // next poll tick.
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
+
+  const readRegisterFromServer = useCallback(async () => {
+    if (!registerOpen) {
+      return;
+    }
+    const project = projectsRef.current.find(
+      (candidate) => candidate.project_id === selectedProjectId,
+    );
+    const latestExportedRun = project?.runs.find((run) => run.row_count !== null) ?? null;
+    if (latestExportedRun === null) {
+      setExported(null);
+      setReadRefusal(null);
+      return;
+    }
+    const register = await readExport(latestExportedRun.run_id);
+    if (register.unreachable) {
+      setUnreachable(true);
+      return;
+    }
+    setUnreachable(false);
+    setExported(register.ok ? register.body : null);
+    setReadRefusal(register.ok ? null : register.refusal);
+  }, [registerOpen, selectedProjectId]);
+
   useEffect(() => {
     readProjectsFromServer();
     readFromServer();
+    readRegisterFromServer();
     const polling = setInterval(() => {
       readProjectsFromServer();
       readFromServer();
+      readRegisterFromServer();
     }, screenConfig.poll_interval_ms);
     return () => clearInterval(polling);
-  }, [readProjectsFromServer, readFromServer]);
+  }, [readProjectsFromServer, readFromServer, readRegisterFromServer]);
 
   // Nothing the person clicked reaches the screen: the answer is sent, and what
   // is shown next is read back from the server that recorded it.
@@ -216,9 +288,9 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const selectedProject =
     projects.find((project) => project.project_id === selectedProjectId) ?? null;
 
-  // The five sections and their order are fixed; what changes here is that one
-  // is read at a time, so a register of forty rows never buries the timings
-  // under it.
+  // A run panel now has three tabs — Stages, Skipped, Decisions. The register
+  // is no longer one of them: it is the project's own panel, opened from the
+  // Register entry in the runs column, never from here (section 2.3).
   const sections =
     run === null
       ? []
@@ -257,15 +329,6 @@ export default function ReviewScreen({ runId: openedRunId }) {
                 onFinish={finish}
               />
             ),
-          },
-          {
-            id: "register",
-            number: "04",
-            name: "Register",
-            tab: "Register",
-            tabCount: exported === null ? null : String(exported.rows.length),
-            count: exported === null ? null : `${exported.rows.length} rows`,
-            body: <RegisterSection exported={exported} />,
           },
         ];
 
@@ -316,7 +379,9 @@ export default function ReviewScreen({ runId: openedRunId }) {
             <RunColumn
               project={selectedProject}
               selectedRunId={runId}
+              registerOpen={registerOpen}
               onOpenRun={openRun}
+              onOpenRegister={openRegister}
               collapsed={runsCollapsed}
               onToggleCollapse={() => setRunsCollapsed((was) => !was)}
             />
@@ -327,19 +392,25 @@ export default function ReviewScreen({ runId: openedRunId }) {
                 <p className="m-0 mt-1 text-2xl leading-tight font-semibold">
                   {selectedProject?.name ?? "This run"}
                 </p>
-                <SectionTabs
-                  sections={sections}
-                  openSection={openSection}
-                  onOpenSection={setOpenSection}
-                  disabled={run === null}
-                />
+                {!registerOpen && (
+                  <SectionTabs
+                    sections={sections}
+                    openSection={openSection}
+                    onOpenSection={setOpenSection}
+                    disabled={run === null}
+                  />
+                )}
               </div>
 
               <main ref={readingPane} className="pane min-w-0 px-6 pt-8 pb-24 sm:px-10">
                 {answerRefusal !== null && <Refusal text={answerRefusal} />}
                 {readRefusal !== null && <Refusal text={readRefusal} />}
 
-                {run === null ? (
+                {registerOpen ? (
+                  <div className="max-w-5xl">
+                    <ProjectRegisterSection exported={exported} />
+                  </div>
+                ) : run === null ? (
                   <p className="max-w-prose text-ink-soft">
                     {projects.length === 0 && projectsRefusal === null
                       ? // Screen 1: no project exists yet anywhere.
@@ -374,6 +445,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
         <AddProject
           projectsRoot={projectsRoot}
           availableFolders={availableFolders}
+          projects={projects}
           onStarted={startedRun}
           onClose={() => setAddProjectOpen(false)}
           onUnreachable={() => setUnreachable(true)}
@@ -541,14 +613,27 @@ function FinishReview({ reviewing, unanswered, answering, onFinish }) {
   );
 }
 
-function RegisterSection({ exported }) {
-  if (exported === null) {
-    return (
-      <p className="m-0 max-w-prose text-sm text-ink-soft">
-        Nothing exported yet. The register appears here once the export is
-        approved.
-      </p>
-    );
-  }
-  return <Register exported={exported} />;
+// The project's own panel (section 2.3): the same register component a run
+// used to show under its own Register tab, reused here rather than
+// duplicated. The empty state (section 2.4) covers a new project, a first
+// run still working, and a run whose export was rejected — every case in
+// which this project has never exported — with one line, never an empty
+// table.
+function ProjectRegisterSection({ exported }) {
+  return (
+    <Section
+      number=""
+      name="Register"
+      headingId="project-register-heading"
+      count={exported === null ? null : `${exported.rows.length} rows`}
+    >
+      {exported === null ? (
+        <p className="m-0 max-w-prose text-sm text-ink-soft">
+          Nothing has been added to this register yet.
+        </p>
+      ) : (
+        <Register exported={exported} />
+      )}
+    </Section>
+  );
 }
