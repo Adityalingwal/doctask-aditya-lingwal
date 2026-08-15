@@ -30,6 +30,7 @@ from tests.documents.register_documents import (
     write_encrypted_pdf,
     write_meeting_note,
     write_pdf,
+    write_pdf_with_unparseable_content,
     write_pdf_without_a_text_layer,
     write_text_file,
 )
@@ -349,6 +350,62 @@ def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
     skipped = _skipped_entry(finished, PDF_FILE)
     assert skipped["reason"] == "This PDF could not be opened — it is damaged, or not a PDF."
     # One damaged file loses its own document, never the rest of the batch.
+    assert read_files == [MARKDOWN_FILE]
+    assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
+        MARKDOWN_REQUIREMENT
+    ]
+
+
+def test_a_pdf_that_cannot_be_parsed_is_skipped_and_the_batch_continues(
+    tmp_path: Path,
+) -> None:
+    """A PDF sound enough for pypdf to count its pages, but whose content
+    stream pdfplumber cannot parse — the gap `read_pdf` left unguarded."""
+    with temporary_project_folder("unparseable-pdf") as (source_folder, source_folder_path):
+        quote = write_meeting_note(source_folder, MARKDOWN_FILE, MARKDOWN_REQUIREMENT)
+        write_pdf_with_unparseable_content(source_folder / PDF_FILE)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(MARKDOWN_FILE): requirement_extraction_answer(
+                    MARKDOWN_REQUIREMENT, quote
+                ),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
+        )
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects",
+                        json={"source_folder_path": source_folder_path},
+                    ).json()["project_id"]
+                    run_id = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    wait_for_run_status(client, run_id, "needs review")
+                    approve_every_decision_and_finish_review(client, run_id)
+                    finished = wait_for_run_status(client, run_id, "done")
+                    export = client.get(f"/runs/{run_id}/export").json()
+            finally:
+                application.stop()
+
+            read_files = _documents_in(database_url)
+
+    skipped = _skipped_entry(finished, PDF_FILE)
+    assert skipped["reason"] == (
+        "This PDF's content could not be read — it is damaged. Supply a working copy."
+    )
+    # One unparseable file loses its own document, never the rest of the batch.
     assert read_files == [MARKDOWN_FILE]
     assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
         MARKDOWN_REQUIREMENT
