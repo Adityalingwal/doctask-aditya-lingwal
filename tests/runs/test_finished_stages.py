@@ -8,11 +8,12 @@ from uuid import UUID, uuid4
 from psycopg import AsyncConnection
 
 from app.database import build_connection_pool
+from app.projects.list_projects import read_project_list
 from app.runs.finished_stages import ordered_finished_stages, record_stage_finished
-from app.runs.list_runs import read_run_list
 from app.runs.run_status import read_run_status
 from app.runs.statuses import EXTRACT_STAGE, RUNNING, WAITING
 from tests.runs.application import (
+    PROJECT_ROOT,
     ApplicationProcess,
     approve_every_decision_and_finish_review,
     temporary_database,
@@ -195,7 +196,7 @@ def test_a_review_still_waiting_is_never_reported_as_finished(tmp_path: Path) ->
     assert waiting["finished_stages"] == ["ingest", "extract", "match", "examine"]
 
 
-def test_a_run_that_has_not_started_never_reports_a_time_it_started() -> None:
+def test_a_run_that_has_not_started_reports_no_start_time_rather_than_its_creation_time() -> None:
     entry = asyncio.run(_waiting_run_list_entry())
 
     assert entry["started_at"] is None
@@ -208,9 +209,18 @@ async def _waiting_run_list_entry() -> dict[str, Any]:
         try:
             async with pool.connection() as connection:
                 project_id, run_id = await _project_with_a_waiting_run(connection)
-                listed = await read_run_list(connection)
+                listed = await read_project_list(
+                    connection,
+                    PROJECT_ROOT,
+                    PROJECT_ROOT / "config" / "projects.yaml",
+                )
+                project = next(
+                    project
+                    for project in listed["projects"]
+                    if project["project_id"] == str(project_id)
+                )
                 return next(
-                    run for run in listed["runs"] if run["run_id"] == str(run_id)
+                    run for run in project["runs"] if run["run_id"] == str(run_id)
                 )
         finally:
             await pool.close()

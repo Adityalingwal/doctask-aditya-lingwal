@@ -32,7 +32,7 @@ LOCKED_TOOLS = [
     "finish_review",
     "get_export",
     "get_run_status",
-    "list_runs",
+    "list_projects",
     "start_run",
     "submit_decision",
 ]
@@ -275,17 +275,24 @@ def test_the_server_offers_only_the_seven_locked_tools(tmp_path: Path) -> None:
     assert offered == LOCKED_TOOLS
 
 
-def test_the_list_tool_reports_the_same_runs_as_the_endpoint(
+def test_the_project_list_and_the_list_projects_tool_return_identical_payloads(
     tmp_path: Path,
 ) -> None:
     with _application(tmp_path) as (application, _database_url, source_folder):
         _run_at_review(application, "List tools intake portal", source_folder)
 
         with application.client() as client:
-            over_http = client.get("/runs").json()
+            over_http = client.get("/projects").json()
 
-        through_mcp = call_tool(application.base_url, "list_runs", {})
+        through_mcp = call_tool(application.base_url, "list_projects", {})
 
     assert through_mcp.refused is False
     assert through_mcp.payload == over_http
-    assert len(over_http["runs"]) == 1
+    # Startup also seeds the demo project (D14), so more than this one project
+    # may be present; only this run's own project is asserted on.
+    listed = next(
+        project
+        for project in over_http["projects"]
+        if project["name"] == "List tools intake portal"
+    )
+    assert len(listed["runs"]) == 1

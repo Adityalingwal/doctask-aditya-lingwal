@@ -9,13 +9,19 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from app.projects.create_project import create_project
-from app.refusal import NotPossibleNow, RunsUnavailable, UnknownId, UnusableRequest
+from app.projects.list_projects import read_project_list
+from app.refusal import (
+    NotPossibleNow,
+    ProjectsUnavailable,
+    RunsUnavailable,
+    UnknownId,
+    UnusableRequest,
+)
 from app.register.export_register import JSON_FORMAT, MARKDOWN_FORMAT
 from app.register.read_export import read_export
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
-from app.runs.list_runs import read_run_list
 from app.runs.run_lifecycle import RunEngine, require_run_engine, start_run
 from app.runs.run_status import read_run_status
 
@@ -29,6 +35,7 @@ REFUSAL_STATUS_CODES = (
     (UnknownId, status.HTTP_404_NOT_FOUND),
     (NotPossibleNow, status.HTTP_409_CONFLICT),
     (RunsUnavailable, status.HTTP_503_SERVICE_UNAVAILABLE),
+    (ProjectsUnavailable, status.HTTP_503_SERVICE_UNAVAILABLE),
 )
 
 
@@ -69,15 +76,19 @@ async def create_one_project(
     return {"project_id": str(project_id)}
 
 
+@router.get("/projects")
+async def read_all_projects(request: Request) -> dict[str, Any]:
+    async with request.app.state.pool.connection() as connection:
+        return await read_project_list(
+            connection,
+            request.app.state.project_root,
+            request.app.state.projects_config_path,
+        )
+
+
 @router.post("/runs", status_code=status.HTTP_202_ACCEPTED)
 async def start_one_run(request: Request, payload: StartRun) -> dict[str, str]:
     return await start_run(_run_engine(request), payload.project_id)
-
-
-@router.get("/runs")
-async def read_all_runs(request: Request) -> dict[str, Any]:
-    async with request.app.state.pool.connection() as connection:
-        return await read_run_list(connection)
 
 
 @router.get("/runs/{run_id}")

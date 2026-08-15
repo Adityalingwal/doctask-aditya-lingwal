@@ -7,12 +7,12 @@ from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 
 from app.projects.create_project import create_project
+from app.projects.list_projects import read_project_list
 from app.register.export_register import JSON_FORMAT
 from app.register.read_export import read_export
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
-from app.runs.list_runs import read_run_list
 from app.runs.run_lifecycle import RunEngine, require_run_engine, start_run
 from app.runs.run_status import read_run_status
 
@@ -63,11 +63,15 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
         async with application.state.pool.connection() as connection:
             return await read_run_status(connection, run_id)
 
-    @server.tool(name="list_runs")
-    async def list_runs_tool() -> dict[str, Any]:
-        """List every run: its project, status, start time and finished stages."""
+    @server.tool(name="list_projects")
+    async def list_projects_tool() -> dict[str, Any]:
+        """List every project, each with its runs nested, and the folders a new one may watch."""
         async with application.state.pool.connection() as connection:
-            return await read_run_list(connection)
+            return await read_project_list(
+                connection,
+                application.state.project_root,
+                application.state.projects_config_path,
+            )
 
     @server.tool(name="submit_decision")
     async def submit_decision_tool(
