@@ -306,7 +306,6 @@ def test_an_unchanged_unrelated_document_is_not_sent_to_the_model_twice(
             source_folder_path,
             UNRELATED_FILE,
             unrelated_extraction_answer(UNRELATED_REQUIREMENT, quote),
-            "Intake portal with a stray file",
         )
 
     # A run holding only an unrelated document never exports, so an export can
@@ -326,7 +325,6 @@ def test_an_unchanged_document_that_asked_for_nothing_is_not_sent_twice(
             source_folder_path,
             SILENT_FILE,
             extraction_answer_without_requirements(),
-            "Intake portal with a note asking for nothing",
         )
 
     assert markers.count(extract_marker(SILENT_FILE)) == 1
@@ -337,7 +335,6 @@ def _markers_from_two_runs_over(
     source_folder_path: str,
     source_file: str,
     extraction: dict[str, Any],
-    project_name: str,
 ) -> list[str]:
     """Run twice over one file nobody touched, and report every model call."""
     script_path = tmp_path / "script.json"

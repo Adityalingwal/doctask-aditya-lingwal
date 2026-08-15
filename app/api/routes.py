@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, FastAPI, Query, Request, status
+from fastapi import APIRouter, FastAPI, Query, Request, Response, status
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
@@ -65,6 +65,7 @@ def add_refusal_responses(application: FastAPI) -> None:
 @router.post("/projects", status_code=status.HTTP_201_CREATED)
 async def create_one_project(
     request: Request,
+    response: Response,
     payload: CreateProject,
 ) -> dict[str, Any]:
     async with request.app.state.pool.connection() as connection:
@@ -74,6 +75,10 @@ async def create_one_project(
             request.app.state.project_root,
             request.app.state.projects_config_path,
         )
+    if not created.created:
+        # This folder already had a project, so nothing was created — a caller
+        # reading only the status code must not be told one was.
+        response.status_code = status.HTTP_200_OK
     return {"project_id": str(created.project_id), "created": created.created}
 
 

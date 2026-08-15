@@ -70,7 +70,6 @@ def _application(
 
 def _run_at_review(
     application: ApplicationProcess,
-    project_name: str,
     source_folder_path: str,
 ) -> str:
     """One run driven through the API until it is parked at Review."""
@@ -92,9 +91,7 @@ def test_a_tool_and_its_endpoint_answer_one_operation_identically(
     tmp_path: Path,
 ) -> None:
     with _application(tmp_path) as (application, _database_url, _source_folder, source_folder_path):
-        run_id = _run_at_review(
-            application, "Both doors intake portal", source_folder_path
-        )
+        run_id = _run_at_review(application, source_folder_path)
         # Relative and directly inside the projects root, so this genuinely
         # exercises the missing-folder refusal rather than the confinement
         # refusal an absolute `tmp_path`-based path would trigger instead.
@@ -165,9 +162,7 @@ def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
     tmp_path: Path,
 ) -> None:
     with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
-        run_id = _run_at_review(
-            application, "Ungated intake portal", source_folder_path
-        )
+        run_id = _run_at_review(application, source_folder_path)
 
         finishing = call_tool(application.base_url, "finish_review", {"run_id": run_id})
         exporting = call_tool(
@@ -194,9 +189,7 @@ def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
 
 def test_a_tool_reports_only_the_run_state_the_database_holds(tmp_path: Path) -> None:
     with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
-        run_id = _run_at_review(
-            application, "Read-back intake portal", source_folder_path
-        )
+        run_id = _run_at_review(application, source_folder_path)
         waiting = call_tool(application.base_url, "get_run_status", {"run_id": run_id})
         export_decision = next(
             decision
@@ -285,7 +278,7 @@ def test_the_project_list_and_the_list_projects_tool_return_identical_payloads(
     tmp_path: Path,
 ) -> None:
     with _application(tmp_path) as (application, _database_url, _source_folder, source_folder_path):
-        _run_at_review(application, "List tools intake portal", source_folder_path)
+        _run_at_review(application, source_folder_path)
 
         with application.client() as client:
             over_http = client.get("/projects").json()

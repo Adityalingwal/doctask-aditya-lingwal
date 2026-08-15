@@ -592,9 +592,21 @@ outright, and what remains must resolve directly inside the root, not the
 root itself and not nested two levels down — closing a real hole (a folder
 pointed at the repository root would have read `README.md`/`TASK.md`/
 `DECISIONS.md` as client documents, reachable from curl and MCP before this
-change). Startup seeds the demo project with one `create_project` call for
-`sample-projects/intake-portal`; get-or-create alone makes a restart safe.
-**Implemented and verified** in slice-1 scope.
+change). The folder is stored as the one path it resolves to, never as the string a
+caller typed: `sample-projects/x`, `sample-projects/./x` and
+`sample-projects/x/` name one directory, and stored raw they would be three
+projects over it, each with its own register, lock and watcher. For the same
+reason `projects_root` itself must be a relative folder inside the repository
+— an absolute root is refused where the file is read, because the dropdown
+offers `<root>/<folder>` while creation refuses every absolute path, and the
+two must not be configurable into disagreeing. Startup seeds the demo project
+with one `create_project` call for `sample-projects/intake-portal`;
+get-or-create alone makes a restart safe. A `POST /projects` that created
+nothing answers `200`, not `201`. **Implemented and verified** in slice-1
+scope. **Limitation:** confinement is checked when a project is created, not
+again when its folder is later read; nothing but `create_project` writes that
+column, so no unconfined path can reach the database, but a folder replaced by
+a symlink after creation is not re-checked.
 
 ### D15 — MCP and React
 

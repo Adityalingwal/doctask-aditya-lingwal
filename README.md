@@ -368,7 +368,15 @@ the next run and never to one already under way or already finished. Point
   nested inside a sub-folder, and never given as an absolute path or with
   `..`; `POST /projects` refuses anything else, naming the cause and the
   fix. The Add-project box's dropdown only ever lists what that root
-  actually holds on disk.
+  actually holds on disk. Two spellings of one folder — `sample-projects/x`,
+  `sample-projects/./x`, `sample-projects/x/` — reach the same project, because
+  the folder is stored as the one path it resolves to rather than as the
+  string a caller typed.
+- `config/projects.yaml`'s `projects_root` must itself be a folder inside the
+  repository, given as a relative path such as `sample-projects`. An absolute
+  root is refused where the file is read: the dropdown would then offer
+  absolute folders that project creation always rejects, so the two sides
+  cannot be configured into disagreeing.
 - The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on a
   fixed interval, whatever is on screen and whatever a run's status is —
   there is no per-project runs endpoint and no conditional refresh. At this

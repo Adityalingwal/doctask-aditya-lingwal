@@ -31,7 +31,6 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 @contextmanager
 def _application_at_review(
     tmp_path: Path,
-    project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
     """One run driven through the API until it is parked at Review."""
     with temporary_project_folder("review-export") as (source_folder, source_folder_path):
@@ -73,7 +72,7 @@ def _application_at_review(
 
 
 def test_approved_run_exports_the_register(tmp_path: Path) -> None:
-    with _application_at_review(tmp_path, "Approved intake portal") as (
+    with _application_at_review(tmp_path) as (
         application,
         database_url,
         run_id,
@@ -148,7 +147,7 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
 
 
 def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> None:
-    with _application_at_review(tmp_path, "Pending intake portal") as (
+    with _application_at_review(tmp_path) as (
         application,
         _database_url,
         run_id,

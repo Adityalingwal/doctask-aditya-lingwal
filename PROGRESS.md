@@ -85,8 +85,10 @@ Decision rationale belongs in `DECISIONS.md`, not here.
   branch's own entry under Completed for the full detail. Migration
   `20260815_0013` adds the unique constraint, proven forward and backward by
   hand, including the duplicate-refusal path. Endpoint and MCP tool counts
-  stay at seven; no new door was added for the register. 138 Python tests
-  (was 131) and 40 front-end tests (was 32) pass without a live key.
+  stay at seven; no new door was added for the register. Codex reviewed it
+  read-only and returned seven findings; all seven were re-checked in the
+  foreground, five were repaired and two deliberately left. 141 Python tests
+  (was 131) and 41 front-end tests (was 32) pass without a live key.
 
 ## Completed
 
@@ -460,9 +462,40 @@ Decision rationale belongs in `DECISIONS.md`, not here.
       decisions or its Approve/Reject buttons; and the review question
       reading exactly "Add this run's changes to the register?" No
       screenshot or log captured a secret.
-- [x] 138 Python tests (was 131) and 40 front-end tests (was 32) pass
+- [x] 141 Python tests (was 131) and 41 front-end tests (was 32) pass
       without a live API key — both counts read from the suites' own
       printed summary lines, not claimed from memory.
+- [x] Reviewed by Codex (`-s read-only`, `handoff/review-report-folder-is-a-
+      project.md`): **not merge-ready**, 7 findings (2 high, 2 medium, 3
+      low). Every one was independently re-checked against the code in the
+      foreground and all 7 were real; both suites were re-run in the
+      foreground as well, because Codex's sandbox has no Docker socket and
+      its verdict is code-level only.
+- [x] Review findings repaired in the foreground, on the same branch, after
+      Aditya decided each one, tests first. Fixed: the folder is now stored
+      as the single path it resolves to, so `sample-projects/x`,
+      `sample-projects/./x` and `sample-projects/x/` reach one project
+      instead of three; `config/projects.yaml`'s `projects_root` must be
+      relative and an absolute one is refused where the file is read, because
+      the dropdown would otherwise advertise absolute folders that creation
+      always rejects; the register panel distinguishes "not read yet" from
+      "read, and there is nothing", so a project the server already reported
+      as holding rows no longer shows an empty register while
+      `GET /runs/{id}/export` is in flight, and the poll reads the project
+      list before the register that depends on it rather than a snapshot one
+      interval old; a `POST /projects` that created nothing answers `200`
+      rather than `201`; eleven test helpers lost their dead `project_name`
+      parameter along with every argument passed to it, and
+      `ui/src/Section.jsx`'s comment no longer claims five fixed sections.
+      Deliberately not fixed, each decided by Aditya: folder confinement is
+      still checked only at creation (nothing but `create_project` writes
+      that column, so no unconfined path can reach the database), and a
+      folder named only with dashes still derives an empty project name.
+- [x] Three tests written before those fixes and run against the branch as
+      it stood: `test_two_spellings_of_one_folder_reach_the_same_project`,
+      `test_a_call_that_created_nothing_answers_200_not_201`,
+      `test_an_absolute_projects_root_is_refused_naming_the_fix`, plus the
+      front-end `never_calls_a_register_empty_before_it_has_been_read`.
 
 ### Reliability slice (branch `reliability-proof`)
 
@@ -756,6 +789,8 @@ working claim only after its own implementation and proof land.
 | Demo runs after this change | 2026-08-15, `start-a-run-from-the-screen` branch | `npm --prefix ui run dev`, all four demo runs (`demo-review`, `demo-running`, `demo-failed`, `demo-exported`) still listed and opened correctly; `ui/demo/serve_demo_runs.js` was not changed — it has no write path for `POST /projects` or `POST /runs`, but its run list is never empty, so the start-a-run form never renders against it and the gap does not show |
 | `docker compose -p folder-verify run --rm app pytest` | 2026-08-16, `folder-is-a-project-and-register-moves` branch | 138 passed, real PostgreSQL, no live key |
 | `npm --prefix ui test` | 2026-08-16, `folder-is-a-project-and-register-moves` branch | 40 passed, 25 files, no live key |
+| `docker compose -p fixfolder3 run --rm app pytest` | 2026-08-16, same branch, after the review repairs | 141 passed, real PostgreSQL, no live key. Re-run in the foreground, independently of the implementing agent, because Codex cannot reach a Docker socket |
+| `npm --prefix ui test` | 2026-08-16, same branch, after the review repairs | 41 passed, 26 files, no live key |
 | Migration `20260815_0013` forward and backward on real data | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Seeded two projects over one folder at revision `20260815_0012`; `alembic upgrade head` refused, naming both project ids and the folder, transaction rolled back (`alembic current` still `20260815_0012`, constraint absent via `pg_constraint`); duplicate resolved by hand; `alembic upgrade head` then succeeded and the constraint was confirmed present; `alembic downgrade -1` dropped it (confirmed absent); `alembic upgrade head` re-applied cleanly |
 | Folder-is-a-project hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Real application, scripted model, browser: Add-project dropdown listed all three unclaimed folders, then two, then showed "No folder left to add." once all three had projects; the demo project's derived name read "Intake Portal"; a new project's derived name read "Hand Drive Check" from `sample-projects/hand-drive-check`; `POST /projects` twice for one folder returned the same `project_id` with `"created": false` the second time and `projects` held exactly one row per folder (confirmed by direct query); `..`, `/` and `/workspace` were each refused by name over HTTP, no row added by any of the three |
 | Register-moves hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Same session: a project that had never run read "Nothing has been added to this register yet."; a run driven to Review showed the question "Add this run's changes to the register?" verbatim; after approving and finishing, its project's Register entry read "1 row" and opening it showed the full table with citations and rules; opening the run's own Decisions tab (showing the answered export decision) and then clicking Register left no trace of the run's decision or its Approve/Reject buttons on screen |

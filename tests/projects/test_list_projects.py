@@ -146,23 +146,38 @@ def test_the_project_list_never_names_a_folder_the_projects_root_does_not_hold(
     (projects_root / "northside-dental" / "not-a-top-level-folder").mkdir()
 
     config_path = tmp_path / "projects.yaml"
-    config_path.write_text(f"projects_root: {projects_root}\n")
+    config_path.write_text("projects_root: clients\n")
 
-    folders = asyncio.run(_available_folders(config_path))
+    folders = asyncio.run(_available_folders(config_path, project_root=tmp_path))
 
-    assert folders == [
-        f"{projects_root}/acme-intake",
-        f"{projects_root}/northside-dental",
-    ]
+    assert folders == ["clients/acme-intake", "clients/northside-dental"]
 
 
-async def _available_folders(config_path: Path) -> list[str]:
+def test_an_absolute_projects_root_is_refused_naming_the_fix(tmp_path: Path) -> None:
+    # The dropdown offers `<projects_root>/<folder>` and `create_project`
+    # refuses every absolute path, so an absolute root would advertise folders
+    # that creation always rejects. Refused where the root is read, once, so
+    # neither side can be configured into disagreeing with the other.
+    (tmp_path / "clients").mkdir()
+    config_path = tmp_path / "projects.yaml"
+    config_path.write_text(f"projects_root: {tmp_path / 'clients'}\n")
+
+    with pytest.raises(ProjectsUnavailable) as refused:
+        asyncio.run(_available_folders(config_path, project_root=tmp_path))
+
+    assert "absolute" in str(refused.value)
+    assert "projects_root" in str(refused.value)
+
+
+async def _available_folders(
+    config_path: Path, project_root: Path = PROJECT_ROOT
+) -> list[str]:
     with temporary_database() as database_url:
         pool = build_connection_pool(database_url)
         await pool.open(wait=True)
         try:
             async with pool.connection() as connection:
-                listed = await read_project_list(connection, PROJECT_ROOT, config_path)
+                listed = await read_project_list(connection, project_root, config_path)
                 return listed["available_folders"]
         finally:
             await pool.close()

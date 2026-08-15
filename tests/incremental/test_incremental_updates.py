@@ -40,7 +40,6 @@ NEW_ROW_NUMBER = 2
 @contextmanager
 def _project_of_two_documents(
     tmp_path: Path,
-    project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str, Path, Path, Path]]:
     """One project whose second document is written but not yet in its folder.
 
@@ -108,7 +107,7 @@ def _exported_run(client: httpx.Client, project_id: str) -> str:
 def test_a_second_run_leaves_a_row_the_new_document_did_not_touch_byte_identical(
     tmp_path: Path,
 ) -> None:
-    with _project_of_two_documents(tmp_path, "Focused intake portal") as (
+    with _project_of_two_documents(tmp_path) as (
         application,
         database_url,
         project_id,
@@ -134,7 +133,7 @@ def test_a_second_run_leaves_a_row_the_new_document_did_not_touch_byte_identical
 def test_a_file_that_did_not_change_is_not_read_or_paid_for_again(
     tmp_path: Path,
 ) -> None:
-    with _project_of_two_documents(tmp_path, "Unchanged intake portal") as (
+    with _project_of_two_documents(tmp_path) as (
         application,
         database_url,
         project_id,
@@ -157,7 +156,7 @@ def test_a_file_that_did_not_change_is_not_read_or_paid_for_again(
 def test_removing_a_watched_file_does_not_delete_the_rows_it_produced(
     tmp_path: Path,
 ) -> None:
-    with _project_of_two_documents(tmp_path, "Emptied intake portal") as (
+    with _project_of_two_documents(tmp_path) as (
         application,
         database_url,
         project_id,
@@ -185,7 +184,7 @@ def test_removing_a_watched_file_does_not_delete_the_rows_it_produced(
 def test_a_second_run_proposal_reaches_the_register_only_after_the_export_gate(
     tmp_path: Path,
 ) -> None:
-    with _project_of_two_documents(tmp_path, "Gated intake portal") as (
+    with _project_of_two_documents(tmp_path) as (
         application,
         database_url,
         project_id,

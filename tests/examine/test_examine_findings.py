@@ -75,7 +75,6 @@ rules:
 @contextmanager
 def _run_at_review(
     tmp_path: Path,
-    project_name: str,
     examine: dict[str, Any],
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
     """One run driven through the API, with Examine scripted, parked at Review."""
@@ -136,7 +135,6 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
 ) -> None:
     with _run_at_review(
         tmp_path,
-        "Clean intake portal",
         examine_answer([]),
     ) as (application, database_url, run_id):
         with application.client() as client:
@@ -191,7 +189,6 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
 ) -> None:
     with _run_at_review(
         tmp_path,
-        "Gated intake portal",
         examine_answer([one_finding()]),
     ) as (application, database_url, run_id):
         with application.client() as client:
@@ -271,7 +268,6 @@ def test_a_rejected_finding_stays_in_the_run_and_never_reaches_the_export(
 ) -> None:
     with _run_at_review(
         tmp_path,
-        "Rejecting intake portal",
         examine_answer([one_finding()]),
     ) as (application, database_url, run_id):
         with application.client() as client:

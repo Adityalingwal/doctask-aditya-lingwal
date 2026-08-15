@@ -3668,3 +3668,50 @@ actually is. The register move fixes a screen that contradicted its own
 database: the register was already one continuing thing per project in
 `register_rows`, and showing it as a per-run tab implied — wrongly — that
 each run had its own separate register.
+
+## 2026-08-16 — review repairs to "a folder is a project"
+
+Codex reviewed the branch read-only and returned seven findings; each was
+re-checked against the code in the foreground and all seven were real. Aditya
+decided each one. Five were fixed and two were deliberately left.
+
+**Superseded — the folder is stored as the caller spelled it.** The first
+implementation resolved the path to check it, then wrote the caller's original
+string to `projects.source_folder_path`. `sample-projects/x`,
+`sample-projects/./x` and `sample-projects/x/` are therefore three distinct
+rows over one directory, each with its own register, its own project lock and
+its own watcher run — the exact failure the unique constraint was added to
+prevent, reachable from curl or MCP though not from the screen, whose dropdown
+sends one spelling. Replaced by storing `<root>/<resolved folder name>`, and
+looking up, inserting and deriving the name from that.
+
+**Superseded — `projects_root` may be absolute.** `read_projects_root`
+deliberately accepted an absolute configured root, and a test asserted it.
+`create_project` refuses every absolute path, so with an absolute root the
+Add-project dropdown would list folders that creation always rejects. The
+alternative was to teach `create_project` to accept an absolute path that
+resolves inside the root; it was rejected because it adds a second accepted
+shape to a system being made smaller. The root must now be relative, refused
+where the file is read so the dropdown and the confinement check cannot be
+configured into disagreeing.
+
+**Superseded — `POST /projects` always answers `201 Created`.** The route
+declared 201 statically even when the body said `"created": false`. A machine
+caller reading the status code alone was told a project had been created when
+none had. Now `200` when nothing was created.
+
+**Superseded — the register panel treats "not read yet" as "empty".** Opening
+the register set `exported` to `null`, and `null` rendered "Nothing has been
+added to this register yet." A project whose latest `GET /projects` answer
+already reported `row_count: 7` therefore showed an empty register until
+`GET /runs/{id}/export` answered, and during polling could hold that empty line
+for a further interval because the register read used the previous poll's
+project snapshot. Three states now: reading, read-and-empty, read-and-holding
+rows; and the poll awaits the project list before reading the register.
+
+**Left, with reasons.** Folder confinement is still checked only when a project
+is created: nothing but `create_project` writes that column, so no unconfined
+path can reach the database, and re-checking on every run would spend a check
+on a path that cannot exist. A folder named only with dashes still derives an
+empty project name; no client folder is named `---`, and building for it would
+be the speculative edge case `TASK.md` forbids.

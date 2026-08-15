@@ -57,25 +57,31 @@ async def create_project(
             "documents arrive in, then create the project again."
         )
 
-    resolved = _confined_folder(source_folder_path, project_root, projects_config_path)
+    resolved, folder = _confined_folder(
+        source_folder_path, project_root, projects_config_path
+    )
     if not resolved.is_dir():
         raise SourceFolderMissing(
             f"the folder '{source_folder_path}' is not there — put it there, "
             "or use one that exists, then try again."
         )
 
-    existing = await _project_over(connection, source_folder_path)
+    # From here on the resolved folder is the identity, never the string the
+    # caller typed: `sample-projects/x`, `sample-projects/./x` and
+    # `sample-projects/x/` name one directory, and stored raw they would be
+    # three projects over it, each with its own register, lock and watcher.
+    existing = await _project_over(connection, folder)
     if existing is not None:
         return CreatedProject(existing, created=False)
 
     project_id = uuid4()
-    name = _name_derived_from_folder(source_folder_path)
+    name = _name_derived_from_folder(folder)
     try:
         async with connection.transaction():
             await connection.execute(
                 "INSERT INTO projects (id, name, source_folder_path) "
                 "VALUES (%s, %s, %s)",
-                (project_id, name, source_folder_path),
+                (project_id, name, folder),
             )
     except UniqueViolation:
         # Another caller's create_project() won the race between the read
@@ -84,7 +90,7 @@ async def create_project(
         # This is not speculative: the HTTP endpoint, the MCP tool and the
         # startup demo seed all reach this function independently, so two of
         # them can race over one folder without either being a bug on its own.
-        existing = await _project_over(connection, source_folder_path)
+        existing = await _project_over(connection, folder)
         return CreatedProject(existing, created=False)
     return CreatedProject(project_id, created=True)
 
@@ -132,8 +138,8 @@ def _confined_folder(
     source_folder_path: str,
     project_root: Path,
     projects_config_path: Path,
-) -> Path:
-    """The real folder a caller named, or a refusal naming why it is refused.
+) -> tuple[Path, str]:
+    """The real folder a caller named, and the one spelling this system stores.
 
     Nothing legitimate ever sends an absolute path — the dropdown and the
     demo seed both send `sample-projects/<folder>` — so an absolute path is
@@ -141,7 +147,9 @@ def _confined_folder(
     and `/workspace` naming something real but outside the root. `..` is
     refused the same way. What is left is resolved with `Path.resolve()`
     (which also collapses a symlink) and must sit directly inside the
-    projects root — not the root itself, and not two levels down.
+    projects root — not the root itself, and not two levels down. What comes
+    back beside it is that folder written one way, `<root>/<folder>`, which is
+    what every later reader stores and compares.
     """
     projects_root_name, resolved_root = read_projects_root(
         project_root, projects_config_path
@@ -165,7 +173,7 @@ def _confined_folder(
             f"{projects_root_name} — put the folder there, or name one that "
             "is already directly inside it, then try again."
         )
-    return resolved_candidate
+    return resolved_candidate, f"{projects_root_name}/{resolved_candidate.name}"
 
 
 def _name_derived_from_folder(source_folder_path: str) -> str:

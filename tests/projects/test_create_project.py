@@ -51,7 +51,7 @@ def test_two_calls_for_one_folder_return_the_same_project_and_create_nothing(
                 application.stop()
 
             assert first.status_code == 201
-            assert second.status_code == 201
+            assert second.status_code == 200
             assert first.json()["project_id"] == second.json()["project_id"]
             assert first.json()["created"] is True
             assert second.json()["created"] is False
@@ -211,3 +211,75 @@ def test_the_create_project_tool_and_endpoint_accept_no_name(tmp_path: Path) -> 
                 assert "project_id" in over_http.json()
                 assert through_mcp.refused is False
                 assert "project_id" in through_mcp.payload
+
+
+# Review repairs, 2026-08-16. Codex findings 2 and 5, decided with Aditya:
+# one folder must reach one project however its path is spelled, and a call
+# that created nothing must not answer 201.
+
+
+def test_two_spellings_of_one_folder_reach_the_same_project(
+    tmp_path: Path,
+) -> None:
+    with temporary_project_folder("one-folder-two-spellings") as (_folder, folder_path):
+        # Both name the same directory. Stored raw, they are two different
+        # rows: two registers, two locks, and a watcher starting a run for
+        # each — the exact thing "a folder is a project" exists to prevent.
+        spellings = (
+            folder_path,
+            folder_path.replace("sample-projects/", "sample-projects/./"),
+            f"{folder_path}/",
+        )
+        with temporary_database() as database_url:
+            application = _application(database_url, tmp_path)
+            application.start()
+            try:
+                with application.client() as client:
+                    answers = [
+                        client.post("/projects", json={"source_folder_path": spelling})
+                        for spelling in spellings
+                    ]
+            finally:
+                application.stop()
+
+            project_ids = {answer.json()["project_id"] for answer in answers}
+            assert len(project_ids) == 1, [answer.json() for answer in answers]
+            assert [answer.json()["created"] for answer in answers] == [
+                True,
+                False,
+                False,
+            ]
+
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                # Startup seeds the demo project, so this counts only the rows
+                # these three spellings could have made.
+                rows = connection.execute(
+                    text(
+                        "SELECT count(*) FROM projects "
+                        "WHERE source_folder_path LIKE :like"
+                    ),
+                    {"like": f"%{folder_path.rsplit('/', 1)[-1]}%"},
+                ).scalar_one()
+            engine.dispose()
+            assert rows == 1
+
+
+def test_a_call_that_created_nothing_answers_200_not_201(tmp_path: Path) -> None:
+    with temporary_project_folder("created-nothing") as (_folder, folder_path):
+        with temporary_database() as database_url:
+            application = _application(database_url, tmp_path)
+            application.start()
+            try:
+                with application.client() as client:
+                    first = client.post(
+                        "/projects", json={"source_folder_path": folder_path}
+                    )
+                    second = client.post(
+                        "/projects", json={"source_folder_path": folder_path}
+                    )
+            finally:
+                application.stop()
+
+            assert (first.status_code, first.json()["created"]) == (201, True)
+            assert (second.status_code, second.json()["created"]) == (200, False)

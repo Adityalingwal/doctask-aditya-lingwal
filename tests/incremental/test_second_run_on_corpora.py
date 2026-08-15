@@ -41,7 +41,6 @@ def _copy_corpus_file(corpus: Path, source_folder: Path, file_name: str) -> None
 
 def _two_runs_over(
     tmp_path: Path,
-    project_name: str,
     corpus: Path,
     first_batch: list[str],
     second_batch: list[str],
@@ -96,7 +95,6 @@ def test_a_second_run_over_the_intake_portal_corpus_touches_only_what_arrived(
     requirements = "client-requirements-v1.md"
     after_first_run, after_second_run, read_again = _two_runs_over(
         tmp_path,
-        "Intake portal corpus",
         INTAKE_PORTAL,
         [meeting_notes],
         [requirements],
@@ -131,7 +129,6 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
     testing_feedback = "testing-feedback-15-jul.pdf"
     after_first_run, after_second_run, read_again = _two_runs_over(
         tmp_path,
-        "Northside Dental corpus",
         NORTHSIDE_DENTAL,
         [meeting_notes],
         [requirements, testing_feedback],

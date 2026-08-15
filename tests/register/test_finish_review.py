@@ -48,7 +48,6 @@ RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
 @contextmanager
 def _run_ready_to_finish(
     tmp_path: Path,
-    project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
     """One run at Review with every decision already approved."""
     with temporary_project_folder("ready-to-finish") as (source_folder, source_folder_path):
@@ -87,7 +86,7 @@ def _run_ready_to_finish(
 
 
 def test_finish_review_is_accepted_once(tmp_path: Path) -> None:
-    with _run_ready_to_finish(tmp_path, "Twice finished intake portal") as (
+    with _run_ready_to_finish(tmp_path) as (
         application,
         database_url,
         run_id,
@@ -127,7 +126,7 @@ def test_finish_review_is_accepted_once(tmp_path: Path) -> None:
 
 
 def test_a_decision_cannot_change_after_finish_review(tmp_path: Path) -> None:
-    with _run_ready_to_finish(tmp_path, "Late change intake portal") as (
+    with _run_ready_to_finish(tmp_path) as (
         application,
         _database_url,
         run_id,
@@ -167,7 +166,7 @@ def test_decision_refused_after_review_finished_even_if_status_regresses(
     genuinely finished, proves the durable review_finished_at guard is what
     refuses it — not a status value that a bug could put back.
     """
-    with _run_ready_to_finish(tmp_path, "Regressed status intake portal") as (
+    with _run_ready_to_finish(tmp_path) as (
         application,
         database_url,
         run_id,

@@ -43,7 +43,6 @@ LONGER_THAN_A_QUIET_PERIOD = 3.0
 @contextmanager
 def _watched_project(
     tmp_path: Path,
-    project_name: str,
 ) -> Iterator[tuple[ApplicationProcess, str, str, Path]]:
     with temporary_project_folder("watched") as (source_folder, source_folder_path):
         waiting_folder = tmp_path / "not-yet-delivered"
@@ -124,7 +123,7 @@ def _more_than_one_run(
 def test_the_watcher_starts_a_run_once_an_arriving_file_has_settled(
     tmp_path: Path,
 ) -> None:
-    with _watched_project(tmp_path, "Watched intake portal") as (
+    with _watched_project(tmp_path) as (
         application,
         database_url,
         project_id,
@@ -152,7 +151,7 @@ def test_the_watcher_starts_a_run_once_an_arriving_file_has_settled(
 def test_the_watcher_does_not_start_a_second_run_while_one_is_active(
     tmp_path: Path,
 ) -> None:
-    with _watched_project(tmp_path, "Busy watched intake portal") as (
+    with _watched_project(tmp_path) as (
         application,
         database_url,
         project_id,

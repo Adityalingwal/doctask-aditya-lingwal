@@ -8,7 +8,7 @@ Everything that should be changeable without touching code lives here.
 | `formats.yaml` | The accepted file-format extensions (`.pdf`, `.docx`, `.md`, `.txt`) and the document page limit. Removing a format disables it; adding one only works if a reader for it exists in `app/ingest/` — a startup check says so if not. |
 | `model.yaml` | The OpenRouter model name and base URL. Its `call:` block holds the model-call attempt count and per-call timeout. A working default ships with the repo; the API key is not stored here and comes from the environment. |
 | `watcher.yaml` | `poll_seconds`, how often each project's source folder is looked at, and `quiet_seconds`, how long that folder must stop changing before the run reading it starts by itself. Set `WATCHER_CONFIG_PATH` to point at your own file instead. |
-| `projects.yaml` | `projects_root`, the folder the Add-project box's dropdown lists the contents of. Ships as `sample-projects`. The system never creates a folder inside it or discovers a project by itself — a person puts a new client's folder there. |
+| `projects.yaml` | `projects_root`, the folder the Add-project box's dropdown lists the contents of. Ships as `sample-projects`, and must stay a relative path inside the repository — an absolute root is refused, because project creation refuses absolute folders and the dropdown would otherwise offer some. The system never creates a folder inside it or discovers a project by itself — a person puts a new client's folder there. |
 
 Adding a rule, changing which formats are accepted, or changing how quickly the
 watcher reacts, is an edit here, never a code change.

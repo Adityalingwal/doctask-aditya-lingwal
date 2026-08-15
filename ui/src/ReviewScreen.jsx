@@ -62,6 +62,10 @@ export default function ReviewScreen({ runId: openedRunId }) {
   // clears the other, so the panel never mixes a run's decisions with the
   // project's register (section 2.3).
   const [registerOpen, setRegisterOpen] = useState(false);
+  // "not read yet" and "read, and there is nothing" are two different
+  // states: collapsing them made a project the server had already reported
+  // as holding rows show an empty register until GET /export answered.
+  const [registerRead, setRegisterRead] = useState(false);
   const [runsCollapsed, setRunsCollapsed] = useState(false);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [openSection, setOpenSection] = useState("stages");
@@ -80,6 +84,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
       setProjectsRefusal(answered.refusal);
       return;
     }
+    projectsRef.current = answered.body.projects;
     setProjects(answered.body.projects);
     setProjectsRoot(answered.body.projects_root);
     setAvailableFolders(answered.body.available_folders);
@@ -110,6 +115,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const openRegister = useCallback((projectId) => {
     setSelectedProjectId(projectId);
     setRegisterOpen(true);
+    setRegisterRead(false);
     setRunId("");
     setRun(null);
     setExported(null);
@@ -201,6 +207,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
     if (latestExportedRun === null) {
       setExported(null);
       setReadRefusal(null);
+      setRegisterRead(true);
       return;
     }
     const register = await readExport(latestExportedRun.run_id);
@@ -211,17 +218,20 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setUnreachable(false);
     setExported(register.ok ? register.body : null);
     setReadRefusal(register.ok ? null : register.refusal);
+    setRegisterRead(true);
   }, [registerOpen, selectedProjectId]);
 
   useEffect(() => {
-    readProjectsFromServer();
-    readFromServer();
-    readRegisterFromServer();
-    const polling = setInterval(() => {
-      readProjectsFromServer();
+    // The register read depends on what GET /projects just said, so it waits
+    // for that answer rather than reading the previous poll's snapshot and
+    // showing a register one interval out of date.
+    const readEverything = async () => {
+      await readProjectsFromServer();
       readFromServer();
       readRegisterFromServer();
-    }, screenConfig.poll_interval_ms);
+    };
+    readEverything();
+    const polling = setInterval(readEverything, screenConfig.poll_interval_ms);
     return () => clearInterval(polling);
   }, [readProjectsFromServer, readFromServer, readRegisterFromServer]);
 
@@ -408,7 +418,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
 
                 {registerOpen ? (
                   <div className="max-w-5xl">
-                    <ProjectRegisterSection exported={exported} />
+                    <ProjectRegisterSection exported={exported} read={registerRead} />
                   </div>
                 ) : run === null ? (
                   <p className="max-w-prose text-ink-soft">
@@ -619,15 +629,22 @@ function FinishReview({ reviewing, unanswered, answering, onFinish }) {
 // run still working, and a run whose export was rejected — every case in
 // which this project has never exported — with one line, never an empty
 // table.
-function ProjectRegisterSection({ exported }) {
+function ProjectRegisterSection({ exported, read }) {
   return (
     <Section
       number=""
       name="Register"
       headingId="project-register-heading"
-      count={exported === null ? null : `${exported.rows.length} rows`}
+      count={read && exported !== null ? `${exported.rows.length} rows` : null}
     >
-      {exported === null ? (
+      {!read ? (
+        // Until the read answers this screen knows nothing about this
+        // register, and saying it is empty would be a claim the server has
+        // not made.
+        <p className="m-0 max-w-prose text-sm text-ink-soft">
+          Reading this register…
+        </p>
+      ) : exported === null ? (
         <p className="m-0 max-w-prose text-sm text-ink-soft">
           Nothing has been added to this register yet.
         </p>

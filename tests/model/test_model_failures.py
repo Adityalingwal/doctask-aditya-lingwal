@@ -35,7 +35,6 @@ REFUSED_KEY_STATUS = 401
 def _run_over_two_documents(
     tmp_path: Path,
     answers: dict[str, Any],
-    project_name: str,
     reached_status: str,
 ) -> tuple[dict[str, Any], list[str]]:
     with temporary_project_folder("model-failures") as (source_folder, source_folder_path):
@@ -91,7 +90,6 @@ def test_a_refused_key_fails_the_run_instead_of_skipping_every_document(
                 "Incorrect API key provided", REFUSED_KEY_STATUS
             )
         },
-        "Refused key intake portal",
         "failed",
     )
 
@@ -123,7 +121,6 @@ def test_a_timed_out_document_is_skipped_while_the_batch_continues(
             match_marker(): match_answer(1),
             examine_marker(): no_findings_answer(),
         },
-        "Timed out intake portal",
         "needs review",
     )
 

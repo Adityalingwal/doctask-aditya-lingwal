@@ -117,9 +117,18 @@ def read_projects_root(
     """
     parsed = _read_projects_config(projects_config_path)
     projects_root = Path(parsed[PROJECTS_ROOT_KEY])
-    resolved_root = (
-        projects_root if projects_root.is_absolute() else project_root / projects_root
-    ).resolve()
+    if projects_root.is_absolute():
+        # The dropdown offers `<projects_root>/<folder>` and `create_project`
+        # refuses every absolute path, so an absolute root would advertise
+        # folders creation always rejects. Refused here, once, rather than
+        # letting the two sides be configured into disagreeing.
+        raise ProjectsUnavailable(
+            f"{projects_config_path} names '{projects_root}' as the projects "
+            f"root, but {PROJECTS_ROOT_KEY} must be a folder inside the "
+            "repository, such as 'sample-projects' — change it to a relative "
+            "path, then try again."
+        )
+    resolved_root = (project_root / projects_root).resolve()
     if not resolved_root.is_dir():
         raise ProjectsUnavailable(
             f"{projects_config_path} names '{projects_root}' as the projects "
