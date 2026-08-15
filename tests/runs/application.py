@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -69,6 +70,24 @@ def temporary_database() -> Iterator[str]:
                 f'DROP DATABASE IF EXISTS "{database_name}" WITH (FORCE)'
             )
         maintenance_engine.dispose()
+
+
+@contextmanager
+def temporary_project_folder(name_hint: str = "project") -> Iterator[tuple[Path, str]]:
+    """A real folder directly inside the real projects root, cleaned up after.
+
+    A project's `source_folder_path` must sit directly inside `sample-projects`
+    (D-family for folder-is-a-project), so a test's document folder can no
+    longer live under pytest's own `tmp_path` — that is never inside the
+    repository's `sample-projects`. `name_hint` plus a random suffix keeps
+    concurrent tests from colliding on one folder name.
+    """
+    folder = PROJECT_ROOT / "sample-projects" / f"{name_hint}-{uuid4().hex[:8]}"
+    folder.mkdir()
+    try:
+        yield folder, f"sample-projects/{folder.name}"
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 @dataclass
