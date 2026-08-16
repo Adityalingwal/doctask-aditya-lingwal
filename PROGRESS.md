@@ -265,6 +265,37 @@ into D05 and can be reversed with one line if it is wrong.
 - [x] Real child-process kill/startup-resume proof.
 - [x] `review_finished_at` replay guard and loopback-only network bind.
 
+### One ask stated in two documents becomes one row (branch `match-within-batch-duplicates`)
+
+- [x] Match may match a requirement against an earlier requirement of the same
+      batch, answered as `same_as_requirement_index`. A confident within-batch
+      match creates no second row and raises no separate question; an uncertain
+      one raises a possible-match decision between the two proposed rows.
+- [x] `_settle_against_the_register` downgrades a confident `existing row` only
+      when the candidate is a **committed** row, so the Delivery Owner is still
+      asked before this batch's evidence reaches the register.
+- [x] Five refusals on the requirement path: `new row` naming either candidate,
+      a match naming both, a match naming neither, a batch index that points
+      forward, and a batch index outside the batch. They live on the requirement
+      path, not in the helper the observation path shares.
+- [x] A match may name a requirement that created no row of its own; the chain
+      is followed to the row at its end rather than the answer being refused.
+- [x] The merged row keeps the earlier requirement's `What was asked`, cites
+      every requirement on it, recomputes `In writing?` across them, and takes
+      the **earliest** document date as `First seen`
+      (`app/register/document_dates.py`).
+- [x] `In writing?` reads `Not found in <file>.` once the **project** has read a
+      client requirements document that does not mention the ask; the query
+      joins `documents` to `runs`, so an earlier run's document is visible.
+- [x] The three outcome words are a `Literal` on both `MatchOutcome` and
+      `ObservationOutcome`; the outcome-membership branch they shared is gone,
+      and a test holds the `Literal` and the three constants in step.
+- [x] `_merge_approved_matches` resolves its candidate through
+      `merged_into_register_row_id` first, so two merges of one batch settling
+      in either order cannot strand evidence on a row Commit never commits.
+- [x] The Match prompt locked with Aditya on 2026-08-16, pasted word for word.
+- [x] No migration was needed.
+
 ### Rules and findings slice (branch `rules-and-findings`)
 
 - [x] `audit.event_kind`, nullable `cell_name`, and the conditional cell check.
@@ -874,6 +905,19 @@ working claim only after its own implementation and proof land.
   fact that a handover once claimed delivery — so a handover read in an earlier
   run leaves a later "not there" verdict landing on `Not delivered` instead.
   Closing it needs a stored claim on the row, not a wider read.
+- `First seen` is the earliest document date among the requirements on a row,
+  and Extract copies a date as the document wrote it, so the dates are free
+  text. `app/register/document_dates.py` can place `10 March 2026`,
+  `10 Mar 2026` and `2026-03-10`; a date written any other way still reaches the
+  cell unchanged and the row keeps read order instead. Ambiguous all-numeric
+  forms such as `03/10/2026` are deliberately absent, because placing one would
+  mean guessing which half is the month.
+- A committed row keeps the `In writing?` sentence it was committed with, so a
+  row committed before any client requirements document was read still says
+  "no client requirements document has been read for this project" after one
+  arrives. Rewriting rows a new document did not affect is exactly what the
+  system must not do; closing this needs a decided rule about which cells a
+  later document may re-answer.
 - The 20-page limit binds `.pdf` only; Markdown, plain text and Word report no
   page count and none is invented for them.
 - A `.docx` citation names a line of the extracted text, not a line Word
@@ -973,6 +1017,10 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
+| `docker compose -p batchfinal run --rm app pytest` | 2026-08-16, `match-within-batch-duplicates` branch | 188 passed, real PostgreSQL, no live key. The baseline at `2fdff45` printed 170; the 18 new tests are the eight refusal and outcome-schema tests in `tests/match/test_match_answer.py` and the ten in `tests/match/test_within_batch_duplicates.py`. Fourteen of the sixteen never-do tests were written and run at `2fdff45` first and failed there; the two that passed there are regression guards — the invented-outcome refusals and the separate-runs committed-row gate |
+| `npm --prefix ui test` | 2026-08-16, `match-within-batch-duplicates` branch | 44 passed, 29 files, no live key — byte-for-byte the baseline count. No front-end file changed: a decision between two proposed rows renders through the same question the screen already shows |
+| Intake-portal corpus, first run, all four documents | 2026-08-16, `match-within-batch-duplicates` branch | Five rows, not six. The email-notification ask is one row saying `Yes — written in client-requirements-v1.md.`, citing both `client-requirements-v1.md` and `meeting-notes-10-mar.md`, with `First seen` `10 March 2026` — the meeting note's date, though the requirements document was the file read first. The WhatsApp and search rows read `Not found in client-requirements-v1.md.`, and the only question raised was the export gate. Driven by a throwaway test, deleted after the run |
+| Northside Dental corpus, first run, all six documents | 2026-08-16, `match-within-batch-duplicates` branch | Five rows: the meeting note's booking and daily-schedule asks landed on the requirements document's rows rather than becoming rows of their own, both with `First seen` `5 June 2026` and both files cited; the SMS reminder stayed its own row reading `Not found in client-requirements-v1.docx.`; nothing that was one row became two. Driven by a throwaway test, deleted after the run |
 | `docker compose -p finished-stages run --rm app pytest` | 2026-08-14, `finished-stages-and-list-runs` branch | 129 passed, no live key |
 | `docker compose -p start-a-run run --rm app pytest` | 2026-08-15, `start-a-run-from-the-screen` branch | 129 passed, no live key — no Python changed, run to confirm nothing broke |
 | `npm --prefix ui test` | 2026-08-14, `finished-stages-and-list-runs` branch | 20 passed, 8 files, no live key. Two new files cover the stage-strip precedence fix and the null-`started_at` fix |

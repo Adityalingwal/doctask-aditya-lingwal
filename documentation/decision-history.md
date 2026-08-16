@@ -3778,3 +3778,72 @@ Moves are stored on the run (`runs.pending_moves`, migration `20260816_0015`),
 overlaid for Examine so a rule judges the register as this run leaves it, and
 applied inside Commit's own transaction after merges have settled their
 targets.
+
+## 2026-08-16 — one ask stated in two documents becomes one row
+
+**Superseded — D09's downgrade sentence.** It read: "Outcomes: new row,
+existing row, possible match. In slice 1 a confident existing-row answer is
+deliberately downgraded to human-reviewed possible match before evidence
+reaches a committed row." The words were already about a committed row, but
+the code applied the downgrade to every confident answer, so once Match could
+also name a requirement of the same batch the sentence and the code no longer
+said the same thing. The downgrade is now stated as being about a **committed**
+row only, and the code applies it only there. The three outcomes are unchanged:
+a fourth value was considered for a within-batch match and rejected, because
+the two candidate fields already carry the distinction and a fourth value would
+reopen a lock for nothing.
+
+**New — Match may match a requirement against an earlier requirement of the
+same batch.** A client states one ask and two documents record it — the meeting
+note where it was raised and the requirements document where it was written
+down. Both mentions are real evidence, and the second is what proves the ask is
+in writing, so suppressing one in Extract was rejected: it would delete
+evidence to hide a symptom. Match instead answers
+`same_as_requirement_index`, and the two mentions land on one row carrying both
+citations. Before this, whether the register held one row or two depended on
+whether the two documents arrived in one batch or in two runs — an accident of
+timing decided the register's shape.
+
+**New — a confident within-batch match raises no separate question, while a
+confident committed match still does.** A committed row is approved and in the
+register, so changing it needs a person. Nothing in the batch is committed, and
+the whole run still faces the export gate, where the merged row and both its
+citations are visible. Asking separately about every obvious pair trains a
+reviewer to approve without reading, which costs more than it saves. An
+uncertain within-batch match is still asked about, between the two proposed
+rows.
+
+**New — a match may only point backwards, and a chain is followed.** Without
+the backwards rule requirement 0 can name 1 while 1 names 0 and nothing
+resolves; pointing forward is refused rather than quietly reordered. A
+requirement may name one that created no row of its own, and the evidence then
+goes to the row at the end of that chain: naming any link reaches the same row,
+and refusing the answer would fail the whole run over an answer that was
+correct.
+
+**New — `In writing?` is answered against every client requirements document
+the project has read, not this run's batch.** A document is read once for a
+project's whole life, so scoping the sentence to the run would put "no client
+requirements document has been read for this project" back on every row a later
+run proposes — the same falsehood the new sentence exists to remove. The cell
+now reads `Not found in <file>.` once one has been read and does not mention
+the ask. It must not read "No": one requirements document not mentioning an ask
+does not prove the client never put it in writing.
+
+**New — an approved merge follows a merge already approved.** One batch can
+propose a row, ask about merging a second into it, and ask about merging that
+first row into a committed one. Commit settles the answers in no fixed order,
+so a candidate can itself have been merged away a moment earlier, and evidence
+left on a row Commit never commits is evidence lost. `_merge_approved_matches`
+now resolves the candidate through `merged_into_register_row_id` before moving
+citations onto it. The case was unreachable before this work, because every
+possible-match candidate was a committed row.
+
+**Limitation — document dates are ordered only in the wordings the code can
+place.** `First seen` is the earliest document date among the requirements on
+one row, and Extract copies a date as the document wrote it, so the dates are
+free text. `app/register/document_dates.py` places `10 March 2026`,
+`10 Mar 2026` and `2026-03-10`; a date written any other way still reaches the
+cell unchanged, and the row keeps read order rather than claiming an order
+nobody could check. Ambiguous all-numeric forms such as `03/10/2026` are
+deliberately absent — placing one would mean guessing which half is the month.

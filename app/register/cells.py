@@ -37,6 +37,10 @@ IN_WRITING_NOT_KNOWN_YET = (
     "Not known yet — no client requirements document has been read for this "
     "project."
 )
+# Said instead once the project has read one and it does not mention this ask.
+# The sentence above would be a plain falsehood there, and "No" would claim
+# more than a document saying nothing about an ask can support.
+IN_WRITING_NOT_FOUND_IN = "Not found in {documents}."
 TESTING_NOT_KNOWN_YET = (
     "Not known yet — no testing outcome has been read for this requirement."
 )

@@ -111,25 +111,46 @@ async def _merge_approved_matches(
             continue
         if decision["outcome"] != APPROVED:
             continue
+        lands_on = await _the_row_a_merge_lands_on(
+            connection, decision["candidate_register_row_id"]
+        )
         await connection.execute(
             "UPDATE citations SET register_row_id = %s WHERE register_row_id = %s",
-            (
-                decision["candidate_register_row_id"],
-                decision["proposed_register_row_id"],
-            ),
+            (lands_on, decision["proposed_register_row_id"]),
         )
         merged = await connection.execute(
             "UPDATE register_rows SET merged_into_register_row_id = %s "
             "WHERE id = %s RETURNING row_number",
-            (
-                decision["candidate_register_row_id"],
-                decision["proposed_register_row_id"],
-            ),
+            (lands_on, decision["proposed_register_row_id"]),
         )
         merged_row = await merged.fetchone()
         if merged_row is not None:
             merged_row_numbers.append(merged_row["row_number"])
     return merged_row_numbers
+
+
+async def _the_row_a_merge_lands_on(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+) -> UUID:
+    """The row this evidence ends up on, following a merge already approved.
+
+    One batch can propose a row, ask about merging a second row into it, and
+    ask about merging that first row into a committed one. The two answers are
+    settled in no fixed order, so the candidate may itself have been merged
+    away a moment ago — and evidence left on a row Commit never commits is
+    evidence lost.
+    """
+    result = await connection.execute(
+        "SELECT merged_into_register_row_id FROM register_rows WHERE id = %s",
+        (register_row_id,),
+    )
+    row = await result.fetchone()
+    if row is None or row["merged_into_register_row_id"] is None:
+        return register_row_id
+    return await _the_row_a_merge_lands_on(
+        connection, row["merged_into_register_row_id"]
+    )
 
 
 async def _write_attachment_audit(

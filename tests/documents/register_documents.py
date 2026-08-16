@@ -48,6 +48,27 @@ def write_meeting_note(folder: Path, source_file: str, requirement: str) -> str:
     return quote
 
 
+def write_document_stating(
+    folder: Path,
+    source_file: str,
+    date: str,
+    statements: list[str],
+) -> None:
+    """One fabricated document that states its own date and a few asks.
+
+    The scripted answer decides what Extract reports; this only has to hold the
+    words that answer quotes, because a quote the code cannot find is dropped.
+    """
+    body = "\n\n".join(statements)
+    (folder / source_file).write_text(
+        f"# Intake portal — {source_file}\n\n"
+        f"**Date:** {date}\n\n"
+        "## Discussion\n\n"
+        f"{body}\n",
+        encoding="utf-8",
+    )
+
+
 def write_pdf(path: Path, pages: list[list[str]]) -> None:
     """One fabricated PDF with a real text layer — one list of lines per page."""
     pdf = canvas.Canvas(str(path))
@@ -272,6 +293,30 @@ def match_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
                 "row_number": row_number,
             }
             for index, row_number in enumerate(matched_row_numbers)
+        ]
+    }
+
+
+def match_answer_within_batch(
+    answered: list[tuple[str, int | None, int | None]],
+) -> dict[str, Any]:
+    """Match's answer per requirement: outcome, register row, batch requirement.
+
+    A requirement may be matched against a register row by its row_number or
+    against an earlier requirement in the same batch by its index, so a test
+    that fixes only one of the two cannot say what Match answered.
+    """
+    return {
+        "outcomes": [
+            {
+                "requirement_index": index,
+                "outcome": outcome,
+                "row_number": row_number,
+                "same_as_requirement_index": same_as_requirement_index,
+            }
+            for index, (outcome, row_number, same_as_requirement_index) in enumerate(
+                answered
+            )
         ]
     }
 

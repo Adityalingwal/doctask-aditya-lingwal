@@ -322,6 +322,13 @@ cannot each assume a different one:
   found` with no handover behind it is `Not delivered`, because silence
   contradicts nothing. Without this label neither status could ever be written.
 - Unknown cells say why they are unknown; they are never blank or guessed.
+- **`In writing?` is answered against every client requirements document the
+  *project* has read**, not this run's batch. A document is read once for a
+  project's whole life, so a run-scoped answer would put "no client
+  requirements document has been read" back on every row a later run proposes.
+  Once one has been read and does not mention the ask the cell reads
+  `Not found in <file>.`, never "No" — a document saying nothing about an ask
+  cannot support that claim.
 - Dates come from documents, not run time. Unknown date stays unknown and R3
   does not run on it.
 - Conflicts, findings, and possible-match questions attach to rows but are not
@@ -401,10 +408,11 @@ no readable file this project has never read before; or the batch read one or
 more files but traced no requirement to its own words, so nothing reached
 Match. Ingest routes straight to Examine instead when no document is new but
 the rules the run froze are not the ones the register was last judged
-against. Every requirement Match sees becomes a proposed row (`app/register/
-propose_rows.py` inserts one per requirement, none dropped), so once Match has
-run at all it always has something to propose; Match makes no model call, and
-Extract never routes on to it, when the batch found nothing to match.
+against. A batch that stated a requirement always proposes at least one row —
+several requirements stating one ask land on one row, and none is dropped — so
+once Match has run at all it always has something to propose; Match makes no
+model call, and Extract never routes on to it, when the batch found nothing to
+match.
 
 ## Extract
 
@@ -452,17 +460,40 @@ Extract never routes on to it, when the batch found nothing to match.
   size assumption is about 15 rows/~250 tokens and remains unmeasured.
 - One source item becomes one row. The system does not re-cut a client's
   bundled item; optional bundle flagging is deferred.
-- Outcomes: new row, existing row, possible match. In slice 1 a confident
-  existing-row answer is deliberately downgraded to human-reviewed possible
-  match before evidence reaches a committed row.
-- Every requirement index must return exactly once with a valid outcome and
-  correct `row_number` presence. An incomplete answer fails the run; it never
-  defaults to a guess.
-- Approved merge moves citations to the candidate and marks the proposal with
-  `merged_into_register_row_id`; it is retained and skipped by Commit. Reject
-  keeps it as a separate proposed row. Row-number gaps are accepted.
+- Outcomes: new row, existing row, possible match — three, and a within-batch
+  match did not add a fourth.
+- **Two kinds of candidate.** A requirement matches a committed register row by
+  `row_number`, or an earlier requirement of this same batch by
+  `same_as_requirement_index`. One ask stated in a meeting note and again in
+  the client's requirements document becomes one row carrying both citations,
+  instead of two rows one of which claims the ask was never written down.
+- A confident existing-row answer against a **committed** row is deliberately
+  downgraded to human-reviewed possible match before evidence reaches it. A
+  confident within-batch match is not: nothing in the batch is committed, and
+  the export gate already shows the merged row and both its citations. An
+  uncertain within-batch match is still asked about, between the two proposed
+  rows.
+- **A match may only point backwards**, and a chain is followed: a requirement
+  may name one that created no row of its own, and the evidence lands on the
+  row at the end of that chain. Pointing forward is refused, never reordered.
+- The row a within-batch match lands on keeps the **earlier** requirement's
+  `What was asked`, recomputes `In writing?` across every requirement on it,
+  and takes the **earliest** document date as `First seen` — the batch is read
+  in file-name order, which is not date order.
+- Every requirement index must return exactly once with a valid outcome, and
+  with exactly one candidate named wherever the outcome names one. An
+  incomplete answer fails the run; it never defaults to a guess.
+- The three outcome words are a `Literal` on both answer models, so the
+  generated schema refuses an invented outcome before the reply is read.
+- Approved merge moves citations to the candidate — following a merge already
+  approved, since two proposals of one batch can settle in either order — and
+  marks the proposal with `merged_into_register_row_id`; it is retained and
+  skipped by Commit. Reject keeps it as a separate proposed row. Row-number
+  gaps are accepted.
 - **Evidence/status:** Implemented and verified by coverage, duplicate-index,
-  missing-row-number, merge, rejection, and node-rerun tests.
+  missing-candidate, merge, rejection, and node-rerun tests, by ten
+  within-batch tests in `tests/match/test_within_batch_duplicates.py`, and by
+  both corpora driven first-run end to end.
 - **Open:** pgvector retrieval is unnecessary for current short documents; if
   still unused at submission, disclose the defended stack choice.
 

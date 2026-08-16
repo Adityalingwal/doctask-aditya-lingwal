@@ -36,12 +36,13 @@ from app.match.match_requirements import (
     EXISTING_ROW,
     POSSIBLE_MATCH,
     IncompleteMatchAnswer,
+    MatchOutcome,
     match_requirements,
 )
 from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
 from app.register.commit_register import commit_register
 from app.register.move_rows import propose_moves
-from app.register.propose_rows import committed_rows, propose_rows
+from app.register.propose_rows import MatchSettlement, committed_rows, propose_rows
 from app.review.review_queue import ensure_export_decision, export_was_approved
 from app.run_logging import log_run_event
 from app.runs.finished_stages import record_stage_finished
@@ -616,7 +617,7 @@ async def _settle_against_the_register(
     model_client: BaseChatModel,
     register: list[dict[str, Any]],
     requirements: list[dict[str, Any]],
-) -> dict[int, tuple[str, int | None]]:
+) -> dict[int, MatchSettlement]:
     """What Match says about each requirement this batch found.
 
     A batch that found none never reaches this stage: Extract routes on to
@@ -637,15 +638,27 @@ async def _settle_against_the_register(
             f"({describe_unreadable_answer(error)}) — no register row was "
             "proposed. Start another run once the model is answering."
         ) from error
-    # A confident match still goes to the Delivery Owner: attaching this
-    # batch's evidence to a committed row is not the system's to decide.
     return {
-        outcome.requirement_index: (
-            POSSIBLE_MATCH if outcome.outcome == EXISTING_ROW else outcome.outcome,
+        outcome.requirement_index: MatchSettlement(
+            _outcome_the_candidate_allows(outcome),
             outcome.row_number,
+            outcome.same_as_requirement_index,
         )
         for outcome in answer.outcomes
     }
+
+
+def _outcome_the_candidate_allows(outcome: MatchOutcome) -> str:
+    """Downgrade a confident match against a committed row, and only that one.
+
+    Attaching this batch's evidence to a row already in the register is not the
+    system's to decide. A requirement of this same batch is not that: nothing
+    in the batch is committed, and the run still faces the export gate, where
+    the one row and both its citations are there to be read.
+    """
+    if outcome.outcome == EXISTING_ROW and outcome.row_number is not None:
+        return POSSIBLE_MATCH
+    return outcome.outcome
 
 
 def _route_after_ingest(state: RunState) -> str:
@@ -677,9 +690,10 @@ def _route_after_review(state: RunState) -> str:
 
 
 def _early_reason(state: RunState) -> str:
-    # Every requirement Match sees becomes a proposed row, so a batch that
-    # stated one never ends here. What can is a batch whose observations were
-    # about no row the register traces, and a batch that said nothing at all.
+    # A batch that stated a requirement always proposes at least one row, even
+    # where several of its requirements state one ask, so it never ends here.
+    # What can is a batch whose observations were about no row the register
+    # traces, and a batch that said nothing at all.
     if state.get("document_ids"):
         if state.get("observations_found") and not state.get("requirements_found"):
             return NOTHING_MOVED
