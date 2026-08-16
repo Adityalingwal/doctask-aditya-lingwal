@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine, text
 
 from app.match.match_requirements import (
+    EXISTING_ROW,
+    NEW_ROW,
+    POSSIBLE_MATCH,
     IncompleteMatchAnswer,
     ObservationAnswer,
+    Outcome,
     _refuse_an_incomplete_observation_answer,
+    match_observations,
     match_requirements,
 )
 from app.model.client import (
@@ -31,6 +37,7 @@ from tests.documents.register_documents import (
     extract_marker,
     extraction_answer,
     match_marker,
+    observation_marker,
     write_meeting_note,
 )
 
@@ -198,3 +205,191 @@ def test_an_incomplete_observation_answer_is_refused(tmp_path: Path) -> None:
 
     assert "2 observation(s)" in str(refusal.value)
     assert "observation" in str(refusal.value)
+
+
+def _observations_answered_by_the_model(
+    tmp_path: Path,
+    answer: dict[str, Any],
+    observation_count: int,
+) -> None:
+    """Send a batch of observations to Match and take back the scripted answer."""
+    script_path = tmp_path / "script.json"
+    write_script(script_path, {observation_marker(): answer})
+    model_client = build_model_client(
+        MODEL_CONFIG_PATH,
+        {
+            MODEL_CLIENT_ENVIRONMENT_VARIABLE: SCRIPTED_CLIENT,
+            SCRIPT_PATH_ENVIRONMENT_VARIABLE: str(script_path),
+        },
+    )
+    observations = [
+        {
+            "kind": "testing observation",
+            "summary": f"observation {index}",
+            "source_file": "testing-feedback.md",
+            "source_words": f"Testing reported observation {index}.",
+        }
+        for index in range(observation_count)
+    ]
+    rows = [{"row_number": 1, "what_was_asked": "an email notification"}]
+    asyncio.run(match_observations(model_client, rows, observations))
+
+
+def test_the_outcome_words_are_the_same_in_the_type_and_in_the_constants() -> None:
+    # A Literal cannot be built out of the constants, so the three words are
+    # written twice. This is what stops the two copies drifting apart.
+    assert get_args(Outcome) == (NEW_ROW, EXISTING_ROW, POSSIBLE_MATCH)
+
+
+def test_an_invented_outcome_is_refused_without_a_live_key(tmp_path: Path) -> None:
+    # Refused either by the answer's own schema or by our content check —
+    # which of the two catches it is an implementation detail, and no live key
+    # is needed for either.
+    answer = {
+        "outcomes": [
+            {
+                "requirement_index": 0,
+                "outcome": "merged it into row 1",
+                "row_number": 1,
+            }
+        ]
+    }
+
+    with pytest.raises((IncompleteMatchAnswer, ValidationError)) as refusal:
+        _answered_by_the_model(tmp_path, answer, 1)
+
+    assert "merged it into row 1" in str(refusal.value)
+
+
+def test_an_invented_observation_outcome_is_refused_without_a_live_key(
+    tmp_path: Path,
+) -> None:
+    """The observation answer carries the three outcomes too, and only them.
+
+    The two answer models are separate, so an outcome check applied to one of
+    them says nothing about the other; this is the test that would still pass
+    on a half-applied change only because nothing else looks at observations.
+    """
+    answer = {
+        "outcomes": [
+            {
+                "observation_index": 0,
+                "outcome": "attached it to row 1",
+                "row_number": 1,
+            }
+        ]
+    }
+
+    with pytest.raises((IncompleteMatchAnswer, ValidationError)) as refusal:
+        _observations_answered_by_the_model(tmp_path, answer, 1)
+
+    assert "attached it to row 1" in str(refusal.value)
+
+
+def test_new_row_naming_a_batch_index_is_refused(tmp_path: Path) -> None:
+    # "new row" and "this is the same as requirement 0" are two different
+    # answers, and an answer that gives both says neither.
+    answer = {
+        "outcomes": [
+            {"requirement_index": 0, "outcome": "new row", "row_number": None},
+            {
+                "requirement_index": 1,
+                "outcome": "new row",
+                "row_number": None,
+                "same_as_requirement_index": 0,
+            },
+        ]
+    }
+
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _answered_by_the_model(tmp_path, answer, 2)
+
+    assert "still named requirement 0" in str(refusal.value)
+
+
+def test_an_answer_naming_both_a_row_number_and_a_batch_index_is_refused(
+    tmp_path: Path,
+) -> None:
+    answer = {
+        "outcomes": [
+            {"requirement_index": 0, "outcome": "new row", "row_number": None},
+            {
+                "requirement_index": 1,
+                "outcome": "existing row",
+                "row_number": 3,
+                "same_as_requirement_index": 0,
+            },
+        ]
+    }
+
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _answered_by_the_model(tmp_path, answer, 2)
+
+    assert "named both row #3 and requirement 0" in str(refusal.value)
+
+
+def test_an_answer_naming_neither_for_a_match_outcome_is_refused(
+    tmp_path: Path,
+) -> None:
+    answer = {
+        "outcomes": [
+            {
+                "requirement_index": 0,
+                "outcome": "possible match",
+                "row_number": None,
+                "same_as_requirement_index": None,
+            }
+        ]
+    }
+
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _answered_by_the_model(tmp_path, answer, 1)
+
+    assert "the earlier requirement in this batch it is the same as" in str(
+        refusal.value
+    )
+
+
+def test_a_requirement_may_not_be_matched_against_a_later_requirement(
+    tmp_path: Path,
+) -> None:
+    """Two requirements naming each other resolve to nothing at all.
+
+    Pointing forward is refused rather than quietly reordered: the batch is a
+    list, and a merge that has to be untangled before it can be read is not a
+    merge anybody can check.
+    """
+    answer = {
+        "outcomes": [
+            {
+                "requirement_index": 0,
+                "outcome": "existing row",
+                "row_number": None,
+                "same_as_requirement_index": 1,
+            },
+            {"requirement_index": 1, "outcome": "new row", "row_number": None},
+        ]
+    }
+
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _answered_by_the_model(tmp_path, answer, 2)
+
+    assert "requirement 1, which does not come before it" in str(refusal.value)
+
+
+def test_a_batch_index_outside_this_batch_is_refused(tmp_path: Path) -> None:
+    answer = {
+        "outcomes": [
+            {
+                "requirement_index": 0,
+                "outcome": "existing row",
+                "row_number": None,
+                "same_as_requirement_index": -1,
+            }
+        ]
+    }
+
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _answered_by_the_model(tmp_path, answer, 1)
+
+    assert "requirement -1, which is not in this batch" in str(refusal.value)

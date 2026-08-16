@@ -28,6 +28,10 @@ slice, the incremental update slice, and the review screen are implemented:
 - Meeting notes and a client requirements document create rows; testing
   feedback and a handover summary move rows that already exist, and create
   none.
+- One ask stated in two documents of one batch becomes **one** row citing both
+  — the meeting note that raised it and the requirements document that wrote it
+  down — and that row says the ask is in writing. Where the match is uncertain,
+  two rows are proposed and the reviewer is asked which is right.
 - A line inside a document addressed to the system is reported on the run, in
   both exports and on the screen, and never followed — and that document is
   still read.
@@ -373,6 +377,11 @@ the next run and never to one already under way or already finished. Point
 - The 20-page limit applies to PDFs only; the other formats report no page
   count and none is invented for them.
 - Scanned PDFs are skipped rather than read; there is no OCR.
+- `First seen` is the earliest date stated by the documents behind a row, and a
+  document's date is read as it wrote it. `10 March 2026`, `10 Mar 2026` and
+  `2026-03-10` can be ordered against each other; a date written any other way
+  is still shown in the cell, and the row falls back to the order the files
+  were read in.
 - A related additional document that lists requirements, in a run that never
   exports, is read again by the next run.
 - Text in a document that addresses the system is reported and never acted on,

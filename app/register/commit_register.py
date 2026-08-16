@@ -8,7 +8,14 @@ from psycopg.types.json import Jsonb
 
 from app.examine.read_findings import findings_of_run
 from app.register.audit_entries import write_attachment, write_cell_change
-from app.register.cells import CELL_NAMES, fingerprint_of_cells
+from app.register.cells import (
+    CELL_NAMES,
+    FIRST_SEEN,
+    IN_WRITING,
+    fingerprint_of_cells,
+    in_writing_says_yes,
+)
+from app.register.document_dates import earlier_of
 from app.register.move_rows import apply_moves
 from app.register.export_register import build_export
 from app.review.review_queue import (
@@ -111,25 +118,135 @@ async def _merge_approved_matches(
             continue
         if decision["outcome"] != APPROVED:
             continue
+        lands_on = await _the_row_a_merge_lands_on(
+            connection, decision["candidate_register_row_id"]
+        )
+        proposal_id = decision["proposed_register_row_id"]
+        # Before the citations move, so a cell replaced here drops the citation
+        # that supported its old value while the arriving one is still to come.
+        await _bring_cells_up_to_the_new_evidence(
+            connection, lands_on, proposal_id, run_id
+        )
         await connection.execute(
             "UPDATE citations SET register_row_id = %s WHERE register_row_id = %s",
-            (
-                decision["candidate_register_row_id"],
-                decision["proposed_register_row_id"],
-            ),
+            (lands_on, proposal_id),
         )
         merged = await connection.execute(
             "UPDATE register_rows SET merged_into_register_row_id = %s "
             "WHERE id = %s RETURNING row_number",
-            (
-                decision["candidate_register_row_id"],
-                decision["proposed_register_row_id"],
-            ),
+            (lands_on, proposal_id),
+        )
+        # A row already merged into this proposal is re-pointed at the same
+        # place, so no marker is ever two hops from the row holding the
+        # evidence. Decisions are settled in no fixed order, and every reader
+        # of this column follows it exactly once.
+        await connection.execute(
+            "UPDATE register_rows SET merged_into_register_row_id = %s "
+            "WHERE merged_into_register_row_id = %s",
+            (lands_on, proposal_id),
         )
         merged_row = await merged.fetchone()
         if merged_row is not None:
             merged_row_numbers.append(merged_row["row_number"])
     return merged_row_numbers
+
+
+async def _bring_cells_up_to_the_new_evidence(
+    connection: AsyncConnection,
+    survivor_id: UUID,
+    proposal_id: UUID,
+    run_id: UUID,
+) -> None:
+    """Move the surviving row's cells to what the arriving evidence supports.
+
+    A merge attaches the proposal's citations to the row that survives. A cell
+    saying the ask is not written down in a file the row now cites, or naming a
+    first-seen date later than a document it now cites, is contradicted by the
+    row's own evidence — and nothing else in Commit looks at those two cells
+    again.
+    """
+    survivor = await _cells_of(connection, survivor_id)
+    proposal = await _cells_of(connection, proposal_id)
+    if survivor is None or proposal is None:
+        return
+
+    changed: dict[str, str] = {}
+    if in_writing_says_yes(proposal[IN_WRITING]) and not in_writing_says_yes(
+        survivor[IN_WRITING]
+    ):
+        changed[IN_WRITING] = proposal[IN_WRITING]
+    first_seen = earlier_of(survivor[FIRST_SEEN], proposal[FIRST_SEEN])
+    if first_seen != survivor[FIRST_SEEN]:
+        changed[FIRST_SEEN] = first_seen
+
+    for cell_name, value in changed.items():
+        await connection.execute(
+            f"UPDATE register_rows SET {cell_name} = %s WHERE id = %s",
+            (value, survivor_id),
+        )
+        await connection.execute(
+            "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
+            (survivor_id, cell_name),
+        )
+        if survivor["is_committed"]:
+            # A row this run proposed has its whole first history written when
+            # it is committed; a row already in the register gets its
+            # before-and-after here, the way an approved move does.
+            await write_cell_change(
+                connection,
+                survivor_id,
+                cell_name,
+                survivor[cell_name],
+                value,
+                run_id,
+                None,
+            )
+
+    if changed and survivor["is_committed"]:
+        settled = await _cells_of(connection, survivor_id)
+        await connection.execute(
+            "UPDATE register_rows SET fingerprint = %s WHERE id = %s",
+            (
+                fingerprint_of_cells({name: settled[name] for name in CELL_NAMES}),
+                survivor_id,
+            ),
+        )
+
+
+async def _cells_of(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+) -> dict[str, Any] | None:
+    result = await connection.execute(
+        "SELECT id, is_committed, " + ", ".join(CELL_NAMES) + " FROM register_rows "
+        "WHERE id = %s",
+        (register_row_id,),
+    )
+    return await result.fetchone()
+
+
+async def _the_row_a_merge_lands_on(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+) -> UUID:
+    """The row this evidence ends up on, following a merge already approved.
+
+    One batch can propose a row, ask about merging a second row into it, and
+    ask about merging that first row into a committed one. The two answers are
+    settled in no fixed order, so the candidate may itself have been merged
+    away a moment ago — and evidence left on a row Commit never commits is
+    evidence lost.
+    """
+    result = await connection.execute(
+        "SELECT merged_into_register_row_id FROM register_rows WHERE id = %s",
+        (register_row_id,),
+    )
+    row = await result.fetchone()
+    if row is None or row["merged_into_register_row_id"] is None:
+        return register_row_id
+    return await _the_row_a_merge_lands_on(
+        connection, row["merged_into_register_row_id"]
+    )
 
 
 async def _write_attachment_audit(

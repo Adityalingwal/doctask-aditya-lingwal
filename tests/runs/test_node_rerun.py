@@ -12,7 +12,7 @@ from app.examine.found_issue import finding_on_row
 from app.examine.record_findings import record_findings
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH
-from app.register.propose_rows import propose_rows
+from app.register.propose_rows import MatchSettlement, propose_rows
 from app.runs.run_records import append_skipped, read_run
 from app.runs.statuses import RUNNING
 from tests.runs.application import temporary_database
@@ -251,8 +251,8 @@ async def _propose_rows_twice() -> dict[str, Any]:
                 project_id, run_id = await _project_with_a_running_run(connection)
                 await _insert_committed_row(connection, project_id, run_id)
                 outcomes = {
-                    0: (POSSIBLE_MATCH, COMMITTED_ROW_NUMBER),
-                    1: (NEW_ROW, None),
+                    0: MatchSettlement(POSSIBLE_MATCH, COMMITTED_ROW_NUMBER, None),
+                    1: MatchSettlement(NEW_ROW, None, None),
                 }
                 await propose_rows(
                     connection, run_id, project_id, requirements, outcomes
