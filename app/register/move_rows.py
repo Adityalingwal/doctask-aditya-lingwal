@@ -342,6 +342,11 @@ async def _write_one_rows_moves(
     if row is None:
         return None
 
+    # Read before any move is written, because the moves replace this cell
+    # first and `Status` needs the verdict it is about to supersede, not the
+    # one arriving in the same batch.
+    superseded = await _citations_of_cell(connection, row["id"], WHAT_TESTING_FOUND)
+
     for move in moves:
         old_value = row[move["cell"]]
         if old_value == move["value"]:
@@ -350,7 +355,7 @@ async def _write_one_rows_moves(
             f"UPDATE register_rows SET {move['cell']} = %s WHERE id = %s",
             (move["value"], row["id"]),
         )
-        await _replace_the_citations(connection, row["id"], move)
+        await _settle_the_citations(connection, row["id"], move, superseded)
         if row["is_committed"]:
             # A row this run proposed has its whole first history written when
             # it is committed, so a second entry here would say the same thing
@@ -393,17 +398,32 @@ async def _row_the_move_reaches(
     return await _row_the_move_reaches(connection, row["merged_into_register_row_id"])
 
 
-async def _replace_the_citations(
+async def _settle_the_citations(
     connection: AsyncConnection,
     register_row_id: UUID,
     move: dict[str, Any],
+    superseded_testing: list[dict[str, Any]],
 ) -> None:
-    """The old citation supported a value this cell no longer holds, so it goes."""
-    await connection.execute(
-        "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
-        (register_row_id, move["cell"]),
-    )
+    """Keep every citation that still supports the value, drop the rest.
+
+    Every cell but `Status` holds one claim, so its old citation goes with its
+    old value. `Status` is built out of two: a handover says the work exists
+    and a testing document says it behaves as asked. When a later verdict
+    arrives only the verdict is superseded, so only its citation goes and the
+    handover's stays standing behind the cell it still supports.
+    """
+    if move["cell"] == STATUS:
+        for stale in superseded_testing:
+            await _drop_one_citation(connection, register_row_id, STATUS, stale)
+    else:
+        await connection.execute(
+            "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
+            (register_row_id, move["cell"]),
+        )
     for citation in move["citations"]:
+        # A document already cited on this cell is not cited twice for saying
+        # the same thing again.
+        await _drop_one_citation(connection, register_row_id, move["cell"], citation)
         await connection.execute(
             "INSERT INTO citations (id, register_row_id, cell_name, source_file, "
             "source_place, source_words) VALUES (gen_random_uuid(), %s, %s, %s, %s, %s)",
@@ -415,6 +435,37 @@ async def _replace_the_citations(
                 citation["source_words"],
             ),
         )
+
+
+async def _drop_one_citation(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+    cell_name: str,
+    citation: dict[str, Any],
+) -> None:
+    await connection.execute(
+        "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s "
+        "AND source_file = %s AND source_words = %s",
+        (
+            register_row_id,
+            cell_name,
+            citation["source_file"],
+            citation["source_words"],
+        ),
+    )
+
+
+async def _citations_of_cell(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+    cell_name: str,
+) -> list[dict[str, Any]]:
+    result = await connection.execute(
+        "SELECT source_file, source_words FROM citations "
+        "WHERE register_row_id = %s AND cell_name = %s",
+        (register_row_id, cell_name),
+    )
+    return list(await result.fetchall())
 
 
 def _source_document(

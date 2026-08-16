@@ -178,6 +178,9 @@ async def _bring_cells_up_to_the_new_evidence(
             f"UPDATE register_rows SET {cell_name} = %s WHERE id = %s",
             (value, survivor_id),
         )
+        # `In writing?` holds one claim about one document, so the citation
+        # behind the sentence it no longer says goes with that sentence. Only
+        # `Status` rests on more than one claim, and no merge moves it.
         await connection.execute(
             "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
             (survivor_id, cell_name),

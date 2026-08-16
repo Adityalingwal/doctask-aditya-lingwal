@@ -12,7 +12,11 @@ from tests.documents.register_documents import (
     handover_answer,
     feedback_extraction_answer,
     match_answer,
+    match_answer_existing_row,
+    match_answer_within_batch,
     match_marker,
+    match_marker_against_an_empty_register,
+    match_marker_for_batch_with,
     no_findings_answer,
     observation_answer_of,
     observation_marker,
@@ -30,31 +34,66 @@ from tests.runs.application import (
 
 
 MEETING_NOTE = "meeting-notes-10-mar.md"
+REQUIREMENTS = "client-requirements-12-mar.md"
 HANDOVER = "handover-summary-30-mar.md"
+FIRST_TESTING = "testing-feedback-05-apr.md"
 TESTING_FEEDBACK = "testing-feedback-25-mar.md"
 
 ASK = "an email notification to the operations team on submit"
 ASK_QUOTE = "The client asked for an email notification to the operations team."
+WRITTEN_ASK = "an email to the operations team on every intake form submit"
+WRITTEN_QUOTE = "An email notification to the operations team on every submit."
 HANDOVER_QUOTE = "The email notification was handed over to the client's team."
 TESTING_QUOTE = "The email notification reaches the operations team every time."
+DEFECT_QUOTE = "The email notification goes to the wrong address."
 HANDED_OVER_SUMMARY = "the email notification was handed over"
 TESTING_SUMMARY = "the notification reaches the team"
+DEFECT_SUMMARY = "the notification goes to the wrong address"
 
 DOCUMENT_LINES = {
     MEETING_NOTE: ASK_QUOTE,
+    REQUIREMENTS: WRITTEN_QUOTE,
     HANDOVER: HANDOVER_QUOTE,
+    FIRST_TESTING: DEFECT_QUOTE,
     TESTING_FEEDBACK: TESTING_QUOTE,
 }
-ONE_DOCUMENT_PER_RUN_SCRIPT = {
+EXTRACT_ANSWERS = {
     extract_marker(MEETING_NOTE): several_requirements_answer(
         [(ASK, ASK_QUOTE)], "meeting notes"
     ),
-    extract_marker(HANDOVER): handover_answer([(HANDED_OVER_SUMMARY, HANDOVER_QUOTE)]),
+    extract_marker(REQUIREMENTS): several_requirements_answer(
+        [(WRITTEN_ASK, WRITTEN_QUOTE)], "client requirements document"
+    ),
+    extract_marker(HANDOVER): handover_answer(
+        [(HANDED_OVER_SUMMARY, HANDOVER_QUOTE)]
+    ),
+    extract_marker(FIRST_TESTING): feedback_extraction_answer(
+        [(DEFECT_SUMMARY, "Defect", DEFECT_QUOTE)]
+    ),
     extract_marker(TESTING_FEEDBACK): feedback_extraction_answer(
         [(TESTING_SUMMARY, "Passed", TESTING_QUOTE)]
     ),
+}
+ONE_DOCUMENT_PER_RUN_SCRIPT = EXTRACT_ANSWERS | {
     match_marker(): match_answer(1),
     observation_marker(): observation_answer_of([1]),
+    examine_marker(): no_findings_answer(),
+}
+# The whole workflow, one document per run: the requirements document arrives
+# after the row it restates is already committed, so Match answers it against
+# the register rather than against the batch.
+FOUR_RUNS_SCRIPT = EXTRACT_ANSWERS | {
+    match_marker_against_an_empty_register(): match_answer(1),
+    match_marker_for_batch_with(REQUIREMENTS): match_answer_existing_row(1),
+    observation_marker(): observation_answer_of([1]),
+    examine_marker(): no_findings_answer(),
+}
+# The same four documents arriving in two pairs.
+TWO_PAIRED_RUNS_SCRIPT = EXTRACT_ANSWERS | {
+    match_marker_against_an_empty_register(): match_answer_within_batch(
+        [("new row", None, None), ("existing row", None, 0)]
+    ),
+    observation_marker(): observation_answer_of([1, 1]),
     examine_marker(): no_findings_answer(),
 }
 
@@ -83,6 +122,73 @@ def test_testing_passing_moves_a_handed_over_row_to_done(tmp_path: Path) -> None
     assert handed_over.cells[1]["status"] == "Handed over"
     assert tested.cells[1]["status"] == "Done"
     assert tested.cells[1]["what_testing_found"] == TESTING_SUMMARY
+
+
+def test_the_handover_citation_survives_the_move_to_done(tmp_path: Path) -> None:
+    """`Done` is built out of two claims, and both stay behind the cell.
+
+    The handover says the work exists and testing says it behaves as asked.
+    Replacing the citation would leave the register unable to show that a
+    handover ever arrived.
+    """
+    _, handed_over, tested = drive_batches(
+        tmp_path,
+        "handover-citation",
+        [[MEETING_NOTE], [HANDOVER], [TESTING_FEEDBACK]],
+        ONE_DOCUMENT_PER_RUN_SCRIPT,
+    )
+
+    assert _cited_files(handed_over, 1, "status") == {HANDOVER}
+    assert _cited_files(tested, 1, "status") == {HANDOVER, TESTING_FEEDBACK}
+
+
+def test_a_superseded_testing_verdict_loses_its_citation(tmp_path: Path) -> None:
+    """A verdict the cell no longer holds proves something the cell denies."""
+    _, _, defective, passed = drive_batches(
+        tmp_path,
+        "superseded-verdict",
+        [[MEETING_NOTE], [HANDOVER], [FIRST_TESTING], [TESTING_FEEDBACK]],
+        ONE_DOCUMENT_PER_RUN_SCRIPT,
+    )
+
+    assert defective.cells[1]["status"] == "Partial"
+    assert _cited_files(defective, 1, "status") == {HANDOVER, FIRST_TESTING}
+    assert passed.cells[1]["status"] == "Done"
+    assert _cited_files(passed, 1, "status") == {HANDOVER, TESTING_FEEDBACK}
+    assert _cited_files(passed, 1, "what_testing_found") == {TESTING_FEEDBACK}
+
+
+def test_one_document_per_run_and_the_paired_order_end_with_the_same_citations(
+    tmp_path: Path,
+) -> None:
+    """The register must not depend on how the files were dropped in."""
+    one_per_run = drive_batches(
+        tmp_path,
+        "one-per-run",
+        [[MEETING_NOTE], [REQUIREMENTS], [HANDOVER], [TESTING_FEEDBACK]],
+        FOUR_RUNS_SCRIPT,
+    )[-1]
+    in_pairs = drive_batches(
+        tmp_path,
+        "in-pairs",
+        [[MEETING_NOTE, REQUIREMENTS], [HANDOVER, TESTING_FEEDBACK]],
+        TWO_PAIRED_RUNS_SCRIPT,
+    )[-1]
+
+    assert one_per_run.cells == in_pairs.cells
+    for row_number, cells in one_per_run.cells.items():
+        for cell_name in cells:
+            assert _cited_files(one_per_run, row_number, cell_name) == _cited_files(
+                in_pairs, row_number, cell_name
+            ), cell_name
+    assert _cited_files(one_per_run, 1, "status") == {HANDOVER, TESTING_FEEDBACK}
+
+
+def _cited_files(result: RunResult, row_number: int, cell_name: str) -> set[str]:
+    return {
+        source_file
+        for source_file, _ in result.citations.get(row_number, {}).get(cell_name, [])
+    }
 
 
 def drive_batches(
