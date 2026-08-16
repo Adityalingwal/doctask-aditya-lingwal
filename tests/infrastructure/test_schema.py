@@ -133,7 +133,7 @@ RUN_STATUSES = (
 REGISTER_ROW_STATUSES = (
     "Done",
     "Partial",
-    "Never happened",
+    "Not delivered",
     "Blocked",
     "Disputed",
     "No evidence yet",
