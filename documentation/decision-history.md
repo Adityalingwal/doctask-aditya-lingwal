@@ -3908,3 +3908,117 @@ recorded above, which says the row keeps read order rather than claiming an
 order nobody could check. Where any date on the row cannot be placed, read
 order is now what is kept; a requirement stating no date at all is not an
 unplaceable date and does not block the others.
+
+## 2026-08-17 — the register becomes four cells, and eight other cuts
+
+Locked with Aditya on 2026-08-16 while reading the real intake-portal register
+end to end; the reasoning, the rejected alternatives and what is given up were
+written down before any code moved. Everything below is the wording this work
+replaced.
+
+**Superseded — the seven-cell row shape.** `What was asked` · `In writing?` ·
+`What testing found` · `Status` · `Blocked on` · `First seen` · `Last moved`,
+each with its own citations, and a fingerprint over all seven. Three of the
+seven earned nothing: `First seen` was displayed and read by no rule and no
+code branch, `Last moved` fed exactly one rule (`R3`) that we invented
+ourselves, and `Blocked on` carried a real sentence that Aditya chose to drop
+anyway. **Replaced by** four cells — `What was asked` · `Written down?` ·
+`What testing found` · `Status` — with `In writing?` renamed to the question
+the cell actually asks. The stored column stays `in_writing`; renaming it would
+cost a migration for a word.
+
+The argument against was made before the decision was taken and is recorded
+rather than argued away: row 4 of the real intake-portal register read
+`Blocked` / "waiting on the WhatsApp API credentials, which the client has not
+sent across" — the one line in that register telling the Delivery Owner to go
+and do something today. After this change it reads `No evidence yet`, which is
+true and says nothing. The register is a demonstration of capability for the
+founder rather than a product an end user lives in, and a shape a reader holds
+in one pass is worth more here than a cell that is right but heavy.
+
+**Superseded — the `Blocked` status, and Extract's `blockers` list.** `Blocked`
+had no cell left to explain it once `Blocked on` went, so it leaves the status
+check constraint and `Handed over` takes its place; the count stays at six. The
+`blockers` list leaves the answer model entirely rather than being extracted
+and discarded — asking a model for something nothing can use is how a schema
+starts lying about what the system does. `document_date`, `R3` and
+`app/register/document_dates.py` leave with the two date cells.
+
+**Superseded — "a moved cell's citation is replaced".** `_replace_the_citations`
+deleted a cell's citations before writing the new ones, whichever cell it was.
+For `Status` that discarded evidence the cell still rested on: `Done` is built
+out of two separate claims — the handover says the work exists, testing says it
+behaves as asked — and only the second was left standing behind it. **Replaced
+by:** a cell keeps the citation of every document that still supports the value
+it now holds, and drops any citation supporting a value it no longer holds.
+There is no cap on the number. A superseded testing verdict does go: a row that
+read `Partial` on a `Defect` and later reads `Done` on a `Passed` loses the
+`Defect` citation, which now proves something the cell denies.
+
+**Superseded — delivery evidence alone moves no status.** A handover moved
+`Last moved` and nothing else, so once that cell went, a run that read a
+handover would have changed the register in no visible way at all. **Replaced
+by** `Handed over`, which sits exactly between the two states that already
+existed. `No evidence yet` means nobody has looked and carries no citation;
+`Handed over` means we say we built it and carries the handover's; `Done` means
+testing confirmed it. `Not delivered` is a fourth thing and is routinely
+confused with the first — it means someone looked and the work is not there,
+which is a positive claim and carries a citation.
+
+**Superseded — the batch is read in `source_path` order.** A row's
+`What was asked` was whichever document happened to sort first by file name.
+Row 2 of the real intake-portal register carried the client requirements
+document's wording only because `c` sorts before `m`; renaming that file would
+have changed the row. **Replaced by** workflow order — meeting notes → client
+requirements → handover summary → testing feedback — which is available where
+the ordering happens, because Extract has classified every document by the time
+Match reads the batch. This closes the defect without a rule of its own: the
+meeting note's requirement creates the row and supplies its wording, and the
+requirements document's statement matches backwards onto it, which is the
+direction pull request #25's "a match may only point backwards" rule was
+designed for. Alphabetical order reversed it by accident.
+
+**Superseded — the deliverable checks D1 and D2 live in code.** Every other
+rule lives in `config/rules.yaml` and is judged by the model, and
+`TASK.md`'s own convention asks for configuration over code. **D1 is deleted
+rather than moved:** a row is written with its `what_was_asked` citation in the
+same function that creates it, so a row without one cannot exist, and
+`commit_register` already refuses to commit a row carrying no citation — a
+refusal is stronger than the finding Examine raised while the row still reached
+the register. D1 could never have been a config rule even if it fired, because
+citations live in their own table and the model is shown the row's text.
+**D2 moves into `config/rules.yaml` as `R5`**, keeping its own id rather than
+filling the gap `R3` left, because a finding stores the rule id it was raised
+under. What is given up is real and was accepted: a code check always runs,
+while a model-judged rule depends on the model.
+
+**Superseded — four supported formats.** `.pdf`, `.docx`, `.md` and `.txt`.
+The count was our own choice, not the brief's. `.txt` gives nothing `.md` does
+not — one reader already served both, and the only difference was that `.md`
+names the nearest heading while `.txt` names a line number. `.docx` cost a
+pinned dependency (`python-docx`) and carried two written limitations that
+leave with it: a Word citation named a line of the extracted text rather than a
+line Word displays, and a quote spanning two table cells was never found.
+**Replaced by** `.md` and `.pdf`, the two shapes a citation place can take.
+PDF-only was considered and rejected: PDF carries every failure guard in the
+ingest path, and a heading is a better citation than a page number.
+`sample-projects/northside-dental/client-requirements-v1.docx` becomes `.md`.
+
+**Superseded — the document type `related additional document`.** Before pull
+request #24 the type meant "read this document but never make a row from it",
+and that name said so fairly. Since #24 it is the only type allowed to fill
+`delivery_evidence`, so it carries handed-over work and in practice **is** the
+handover summary. **Renamed to `handover summary`.** The type is not dropped:
+dropping it would drop delivery.
+
+**Not taken — a confident match against a committed row stops being
+downgraded.** Locked on 2026-08-16 as item 9 and deliberately left unbuilt on
+2026-08-17. The decision rests on the export gate showing such a merge, and it
+does not: `GET /runs/{id}` at `needs review` answers with `decisions`,
+`examine`, `skipped`, `reported_instructions`, `finished_stages` and
+`exported`, and carries no proposed row, no cell and no citation;
+`GET /runs/{id}/export` answers `409` until the run has committed. Removing the
+downgrade would also leave nothing to perform the merge, because
+`_merge_approved_matches` is driven only by an approved possible-match
+decision. The gate as it stands is not a guard over this, so the decision goes
+back to Aditya rather than being built around.
