@@ -14,6 +14,7 @@ from app.register.cells import shorten_quote
 
 REQUIREMENT_KIND = "requirement"
 TESTING_OBSERVATION_KIND = "testing observation"
+DELIVERY_EVIDENCE_KIND = "delivery evidence"
 BLOCKER_KIND = "blocker"
 EMBEDDED_INSTRUCTION_KIND = "embedded instruction"
 DOCUMENT_DATE_KIND = "document date"
@@ -30,7 +31,7 @@ async def read_one_document(
     document_text: str,
 ) -> ExtractionAnswer:
     answered = await call_the_model(
-        model_client, extraction_prompt(source_file, document_text)
+        model_client, extraction_prompt(source_file, document_text), ExtractionAnswer
     )
     return parse_extraction_answer(answered)
 
@@ -78,6 +79,7 @@ def locate_extraction(
         "document_date": None,
         "requirements": [],
         "testing_observations": [],
+        "delivery_evidence": [],
         "blockers": [],
         "embedded_instructions": [],
     }
@@ -102,8 +104,13 @@ def locate_extraction(
         )
         if found is not None:
             extraction["testing_observations"].append(
-                {**found, "label": observation.label}
+                {**found, "label": observation.label.value}
             )
+
+    for delivered in answer.delivery_evidence:
+        found = located(delivered.summary, delivered.quote, DELIVERY_EVIDENCE_KIND)
+        if found is not None:
+            extraction["delivery_evidence"].append(found)
 
     for blocker in answer.blockers:
         found = located(blocker.summary, blocker.quote, BLOCKER_KIND)

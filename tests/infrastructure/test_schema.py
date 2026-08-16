@@ -45,6 +45,8 @@ EXPECTED_COLUMNS = {
         "ended_early_reason",
         "failure_reason",
         "export_json",
+        "pending_moves",
+        "reported_instructions",
         "review_finished_at",
         "rules_snapshot",
         "rules_fingerprint",
@@ -133,7 +135,7 @@ RUN_STATUSES = (
 REGISTER_ROW_STATUSES = (
     "Done",
     "Partial",
-    "Never happened",
+    "Not delivered",
     "Blocked",
     "Disputed",
     "No evidence yet",

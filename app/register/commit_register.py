@@ -9,6 +9,7 @@ from psycopg.types.json import Jsonb
 from app.examine.read_findings import findings_of_run
 from app.register.audit_entries import write_attachment, write_cell_change
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
+from app.register.move_rows import apply_moves
 from app.register.export_register import build_export
 from app.review.review_queue import (
     APPROVED,
@@ -20,6 +21,7 @@ from app.review.review_queue import (
 class CommitResult(NamedTuple):
     committed_row_numbers: list[int]
     merged_row_numbers: list[int]
+    moved_row_numbers: list[int]
     export: dict[str, Any]
 
 
@@ -37,6 +39,10 @@ async def commit_register(
     """
     merged_row_numbers = await _merge_approved_matches(connection, run_id)
     document_id_by_file = await _documents_of_run(connection, run_id)
+    # After the merges, so a move lands on the row an approved merge sent its
+    # evidence to; before the proposals below, so a row created and moved in
+    # one batch is committed with the cells the move left it holding.
+    moved_row_numbers = await apply_moves(connection, run_id, document_id_by_file)
 
     proposals = await connection.execute(
         "SELECT id, row_number, " + ", ".join(CELL_NAMES) + " FROM register_rows "
@@ -83,6 +89,7 @@ async def commit_register(
     return CommitResult(
         committed_row_numbers=committed_row_numbers,
         merged_row_numbers=merged_row_numbers,
+        moved_row_numbers=moved_row_numbers,
         export=export,
     )
 

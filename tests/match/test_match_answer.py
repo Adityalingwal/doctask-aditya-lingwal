@@ -7,7 +7,12 @@ from typing import Any
 import pytest
 from sqlalchemy import create_engine, text
 
-from app.match.match_requirements import IncompleteMatchAnswer, match_requirements
+from app.match.match_requirements import (
+    IncompleteMatchAnswer,
+    ObservationAnswer,
+    _refuse_an_incomplete_observation_answer,
+    match_requirements,
+)
 from app.model.client import (
     MODEL_CLIENT_ENVIRONMENT_VARIABLE,
     SCRIPTED_CLIENT,
@@ -171,3 +176,25 @@ def test_an_incomplete_match_answer_fails_the_run_and_proposes_nothing(
     assert "This run will not restart by itself." in failed["failure_reason"]
     assert after_failure["status"] == "running"
     assert after_restart["status"] == "failed"
+
+
+def test_an_incomplete_observation_answer_is_refused(tmp_path: Path) -> None:
+    # Observations are answered under their own index, and an observation left
+    # unanswered is not "no row is about it" — it is an answer never received.
+    answer = ObservationAnswer.model_validate(
+        {
+            "outcomes": [
+                {
+                    "observation_index": 0,
+                    "outcome": "new row",
+                    "row_number": None,
+                }
+            ]
+        }
+    )
+
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _refuse_an_incomplete_observation_answer(answer, 2)
+
+    assert "2 observation(s)" in str(refusal.value)
+    assert "observation" in str(refusal.value)

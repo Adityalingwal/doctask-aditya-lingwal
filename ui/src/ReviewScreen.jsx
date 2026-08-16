@@ -298,9 +298,9 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const selectedProject =
     projects.find((project) => project.project_id === selectedProjectId) ?? null;
 
-  // A run panel now has three tabs — Stages, Skipped, Decisions. The register
-  // is no longer one of them: it is the project's own panel, opened from the
-  // Register entry in the runs column, never from here (section 2.3).
+  // A run panel has four tabs — Stages, Skipped, Decisions, Reported. The
+  // register is not one of them: it is the project's own panel, opened from
+  // the Register entry in the runs column, never from here (section 2.3).
   const sections =
     run === null
       ? []
@@ -339,6 +339,18 @@ export default function ReviewScreen({ runId: openedRunId }) {
                 onFinish={finish}
               />
             ),
+          },
+          {
+            id: "reported",
+            number: "04",
+            name: "Reported, not followed",
+            tab: "Reported",
+            tabCount:
+              run.reported_instructions.length === 0
+                ? null
+                : String(run.reported_instructions.length),
+            count: `${run.reported_instructions.length} reported`,
+            body: <Reported reported={run.reported_instructions} />,
           },
         ];
 
@@ -556,6 +568,37 @@ function Skipped({ skipped }) {
           ) : (
             <p className="m-0">{entry.reason}</p>
           )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Reported({ reported }) {
+  if (reported.length === 0) {
+    return (
+      <p className="m-0 text-ink-soft">
+        No document in this run addressed the system.
+      </p>
+    );
+  }
+  return (
+    <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
+      {reported.map((entry, place) => (
+        <li key={place} className="border border-line bg-card px-4 py-3 text-sm">
+          <p className="m-0">
+            <span className="font-mono font-semibold">{entry.file}</span>
+            <br />
+            {entry.place}
+          </p>
+          <p className="m-0 mt-2 italic">{`"${entry.quote}"`}</p>
+          {/* Required, not decoration: without it a reader assumes the
+              document was discarded rather than read. It stops there because
+              an embedded instruction can appear on any document type,
+              including one that states no requirement at all. */}
+          <p className="m-0 mt-2 text-ink-soft">
+            Reported, not followed. This document was still read.
+          </p>
         </li>
       ))}
     </ul>

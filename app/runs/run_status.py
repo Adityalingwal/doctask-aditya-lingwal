@@ -24,6 +24,7 @@ async def read_run_status(
         "status": run["status"],
         "stage": run["current_stage"],
         "skipped": run["skipped"],
+        "reported_instructions": run["reported_instructions"],
         "ended_early_reason": run["ended_early_reason"],
         "failure_reason": run["failure_reason"],
         "decisions": [

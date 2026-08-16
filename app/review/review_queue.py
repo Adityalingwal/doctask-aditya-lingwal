@@ -7,6 +7,7 @@ from psycopg import AsyncConnection
 
 
 POSSIBLE_MATCH_DECISION = "possible match"
+OBSERVATION_MATCH_DECISION = "observation match"
 EXPORT_DECISION = "export"
 FINDING_DECISION = "finding"
 APPROVED = "approved"
@@ -45,6 +46,28 @@ async def raise_possible_match_decision(
             POSSIBLE_MATCH_DECISION,
             question,
             proposed_register_row_id,
+            candidate_register_row_id,
+        ),
+    )
+    return decision_id
+
+
+async def raise_observation_match_decision(
+    connection: AsyncConnection,
+    run_id: UUID,
+    question: str,
+    candidate_register_row_id: UUID,
+) -> UUID:
+    """Ask before this batch's evidence changes what a committed row says."""
+    decision_id = uuid4()
+    await connection.execute(
+        "INSERT INTO decisions (id, run_id, kind, question, "
+        "candidate_register_row_id) VALUES (%s, %s, %s, %s, %s)",
+        (
+            decision_id,
+            run_id,
+            OBSERVATION_MATCH_DECISION,
+            question,
             candidate_register_row_id,
         ),
     )

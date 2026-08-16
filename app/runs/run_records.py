@@ -31,7 +31,8 @@ async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] 
     result = await connection.execute(
         "SELECT id, project_id, status, current_stage, started_at, finished_at, "
         "skipped, ended_early_reason, failure_reason, export_json, "
-        "review_finished_at, examined_row_count, finished_stages "
+        "review_finished_at, examined_row_count, finished_stages, "
+        "reported_instructions "
         "FROM runs WHERE id = %s",
         (run_id,),
     )
@@ -114,6 +115,37 @@ async def record_run_failure(
         "WHERE id = %s AND status = ANY(%s)",
         (FAILED, failure_reason, run_id, list(ACTIVE_STATUSES)),
     )
+
+
+async def append_reported_instructions(
+    connection: AsyncConnection,
+    run_id: UUID,
+    entries: list[dict[str, str]],
+) -> None:
+    """Add only the instructions this run has not already reported.
+
+    Extract is replayed from the start of its node on resume, so a blind
+    append records the same instruction twice. The whole entry is compared,
+    every key, for the reason `append_skipped` compares whole entries: two
+    instructions from one file differ only in their words.
+    """
+    if not entries:
+        return
+    async with connection.transaction():
+        result = await connection.execute(
+            "SELECT reported_instructions FROM runs WHERE id = %s FOR UPDATE",
+            (run_id,),
+        )
+        row = await result.fetchone()
+        already_stored = row["reported_instructions"] if row else []
+        new_entries = [entry for entry in entries if entry not in already_stored]
+        if not new_entries:
+            return
+        await connection.execute(
+            "UPDATE runs SET reported_instructions = reported_instructions || %s "
+            "WHERE id = %s",
+            (Jsonb(new_entries), run_id),
+        )
 
 
 async def append_skipped(

@@ -16,8 +16,8 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from app.extract.answer import (
-    PRIMARY_DOCUMENT_TYPES,
     UNRELATED_DOCUMENT,
+    ListTheDocumentTypeMayNotFill,
     UnrecognisedDocumentType,
     describe_unreadable_answer,
 )
@@ -40,11 +40,13 @@ from app.match.match_requirements import (
 )
 from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
 from app.register.commit_register import commit_register
+from app.register.move_rows import propose_moves
 from app.register.propose_rows import committed_rows, propose_rows
 from app.review.review_queue import ensure_export_decision, export_was_approved
 from app.run_logging import log_run_event
 from app.runs.finished_stages import record_stage_finished
 from app.runs.run_records import (
+    append_reported_instructions,
     append_skipped,
     enter_stage,
     read_project,
@@ -77,6 +79,10 @@ CLOSE_WITHOUT_EXPORT_NODE = "close_without_export"
 SKIPPED_DOCUMENT_KIND = "document"
 NO_FILES_FOUND = "No files were found in this folder."
 NOTHING_FOUND = "The documents were read, but none of them stated a requirement."
+NOTHING_MOVED = (
+    "The documents were read, but nothing in them was about a requirement the "
+    "register traces."
+)
 
 
 def _nothing_read_reason(skipped_count: int) -> str:
@@ -94,6 +100,8 @@ class RunState(TypedDict, total=False):
     skipped_count: int
     next_document_index: int
     requirements_found: int
+    observations_found: int
+    moved_rows: int
     examine_changed_rules: bool
     proposed_rows: int
     findings_raised: int
@@ -163,6 +171,7 @@ def build_register_graph(
             "skipped_count": len(batch.skipped),
             "next_document_index": 0,
             "requirements_found": 0,
+            "observations_found": 0,
             "examine_changed_rules": examine_changed_rules,
         }
 
@@ -209,6 +218,43 @@ def build_register_graph(
                 )
                 await _finish_stage(connection, run_id, EXTRACT_STAGE)
             return {"next_document_index": index + 1}
+        except ListTheDocumentTypeMayNotFill as not_allowed:
+            # The prompt and the schema both state which lists a type may
+            # fill, so this is a wrong answer rather than something to correct
+            # quietly. One document is skipped; the batch carries on.
+            # The stored reason names what came back: "something it may not
+            # report" leaves the Delivery Owner nothing to act on, and the
+            # detail lived only in the log line, which never reaches a screen.
+            skip_reason = (
+                f"The model read this as {not_allowed.reported_type} and "
+                f"reported {not_allowed.list_name}, which that kind of "
+                "document may not report."
+            )
+            log_reason = (
+                f"{source_file} was skipped: {not_allowed}. The other "
+                "documents in the batch continue and the next run reads this "
+                "one again."
+            )
+            _log(
+                logging.WARNING,
+                "extract_list_not_allowed_for_document_type",
+                log_reason,
+                run_id,
+            )
+            async with pool.connection() as connection:
+                await append_skipped(
+                    connection,
+                    run_id,
+                    [
+                        {
+                            "kind": SKIPPED_DOCUMENT_KIND,
+                            "file": source_file,
+                            "reason": skip_reason,
+                        }
+                    ],
+                )
+                await _finish_stage(connection, run_id, EXTRACT_STAGE)
+            return {"next_document_index": index + 1}
         except Exception as error:
             # One document degrades the run; a broken setup stops it, because
             # skipping every document would export an empty register instead
@@ -240,11 +286,6 @@ def build_register_graph(
         located = locate_extraction(answer, document["extracted_text"], source_file)
         skipped = list(located.dropped)
         requirements_found = len(located.extraction["requirements"])
-        if answer.document_type not in PRIMARY_DOCUMENT_TYPES:
-            # A related additional document is still read, labelled and stored
-            # for what it adds to a row; what it may not do is put a row in the
-            # register by itself.
-            requirements_found = 0
         if answer.document_type == UNRELATED_DOCUMENT:
             skipped.append(
                 {
@@ -265,12 +306,21 @@ def build_register_graph(
                 run_id,
             )
 
+        reported = [
+            {
+                "file": instruction["source_file"],
+                "place": instruction["place"],
+                "quote": instruction["source_words"],
+            }
+            for instruction in located.extraction["embedded_instructions"]
+        ]
         async with pool.connection() as connection:
             await connection.execute(
                 "UPDATE documents SET extraction = %s WHERE id = %s",
                 (Jsonb(located.extraction), document_id),
             )
             await append_skipped(connection, run_id, skipped)
+            await append_reported_instructions(connection, run_id, reported)
             await _finish_stage(connection, run_id, EXTRACT_STAGE)
 
         for instruction in located.extraction["embedded_instructions"]:
@@ -295,6 +345,8 @@ def build_register_graph(
             "next_document_index": index + 1,
             "requirements_found": state.get("requirements_found", 0)
             + requirements_found,
+            "observations_found": state.get("observations_found", 0)
+            + _observations_in(located.extraction),
         }
 
     async def match(state: RunState) -> dict[str, Any]:
@@ -317,18 +369,27 @@ def build_register_graph(
                 requirements,
                 outcome_by_requirement,
             )
+            # Strictly after the rows are proposed: a testing observation and a
+            # piece of delivery evidence can only move a row that exists, and
+            # all four kinds of document arrive in one batch whenever a project
+            # is added over a folder that already holds them.
+            moves = await propose_moves(connection, model_client, run_id, project_id)
+            await append_skipped(connection, run_id, moves.unmatched)
             await _finish_stage(connection, run_id, MATCH_STAGE)
 
         _log(
             logging.INFO,
             "match_finished",
-            f"Match proposed {len(proposed.proposed_row_ids)} row(s) and asked "
-            f"the Delivery Owner about {len(proposed.gated_row_numbers)}.",
+            f"Match proposed {len(proposed.proposed_row_ids)} row(s), moved "
+            f"{len(moves.moved_row_numbers)} and asked the Delivery Owner "
+            f"about {len(proposed.gated_row_numbers) + len(moves.gated_row_numbers)}.",
             run_id,
-            gated_rows=proposed.gated_row_numbers,
+            gated_rows=proposed.gated_row_numbers + moves.gated_row_numbers,
+            moved_rows=moves.moved_row_numbers,
         )
         return {
             "proposed_rows": len(proposed.proposed_row_ids),
+            "moved_rows": len(moves.moved_row_numbers),
         }
 
     async def examine(state: RunState) -> dict[str, Any]:
@@ -447,11 +508,12 @@ def build_register_graph(
         _log(
             logging.INFO,
             "commit_finished",
-            f"Commit made {len(result.committed_row_numbers)} row(s) permanent "
-            f"and exported the register.",
+            f"Commit made {len(result.committed_row_numbers)} row(s) permanent, "
+            f"moved {len(result.moved_row_numbers)} and exported the register.",
             run_id,
             committed_rows=result.committed_row_numbers,
             merged_rows=result.merged_row_numbers,
+            moved_rows=result.moved_row_numbers,
         )
         return {}
 
@@ -488,8 +550,6 @@ def build_register_graph(
         requirements: list[dict[str, Any]] = []
         for document in await result.fetchall():
             extraction = document["extraction"]
-            if extraction["document_type"] not in PRIMARY_DOCUMENT_TYPES:
-                continue
             for requirement in extraction["requirements"]:
                 requirements.append(
                     {
@@ -599,13 +659,15 @@ def _route_after_ingest(state: RunState) -> str:
 def _route_after_extract(state: RunState) -> str:
     if state["next_document_index"] < len(state["document_ids"]):
         return EXTRACT_NODE
-    if state.get("requirements_found"):
+    # A batch of nothing but testing feedback and a handover summary states no
+    # requirement and still has work to do: it moves rows an earlier run made.
+    if state.get("requirements_found") or state.get("observations_found"):
         return MATCH_NODE
     return END_EARLY_NODE
 
 
 def _route_after_match(state: RunState) -> str:
-    if state.get("proposed_rows"):
+    if state.get("proposed_rows") or state.get("moved_rows"):
         return EXAMINE_NODE
     return END_EARLY_NODE
 
@@ -615,15 +677,23 @@ def _route_after_review(state: RunState) -> str:
 
 
 def _early_reason(state: RunState) -> str:
-    # Match is reached only when the batch found a requirement, and every
-    # requirement Match sees becomes a proposed row (app/register/propose_rows.py
-    # inserts one per requirement unconditionally) — so a run that reaches
-    # Match always has something to propose, and can only end early before it,
-    # for one of these three reasons.
+    # Every requirement Match sees becomes a proposed row, so a batch that
+    # stated one never ends here. What can is a batch whose observations were
+    # about no row the register traces, and a batch that said nothing at all.
     if state.get("document_ids"):
+        if state.get("observations_found") and not state.get("requirements_found"):
+            return NOTHING_MOVED
         return NOTHING_FOUND
     skipped_count = state.get("skipped_count", 0)
     return _nothing_read_reason(skipped_count) if skipped_count else NO_FILES_FOUND
+
+
+def _observations_in(extraction: dict[str, Any]) -> int:
+    """How much this document says about work the client already asked for."""
+    return sum(
+        len(extraction[list_name])
+        for list_name in ("testing_observations", "delivery_evidence", "blockers")
+    )
 
 
 def _resolve_folder(project_root: Path, project: dict[str, Any]) -> Path:

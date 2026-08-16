@@ -9,7 +9,12 @@ from reportlab.pdfgen import canvas
 
 from app.examine.examine_register import EXAMINE_PROMPT_MARKER
 from app.extract.answer import MEETING_NOTES
-from app.match.match_requirements import EXISTING_ROW, MATCH_PROMPT_MARKER, NEW_ROW
+from app.match.match_requirements import (
+    EXISTING_ROW,
+    MATCH_PROMPT_MARKER,
+    NEW_ROW,
+    OBSERVATION_PROMPT_MARKER,
+)
 
 
 EXTRACT_MARKER = "File name: {source_file}"
@@ -159,14 +164,50 @@ def extraction_answer(summary: str, quote: str) -> dict[str, Any]:
     }
 
 
-def unrelated_extraction_answer(summary: str, quote: str) -> dict[str, Any]:
-    """A document Extract judged unrelated, which still listed a requirement.
+def unrelated_extraction_answer() -> dict[str, Any]:
+    """A document Extract judged unrelated, reporting nothing in any list.
 
-    The Extract node already guards against this shape by forcing the
-    requirement count to zero for an unrelated document, so a batch can end
-    with nothing found while the stored extraction is not empty.
+    An unrelated document may fill none of the four lists, so this is the only
+    shape one can honestly come back in.
     """
-    return extraction_answer(summary, quote) | {"document_type": "unrelated"}
+    return extraction_answer_without_requirements() | {"document_type": "unrelated"}
+
+
+def feedback_extraction_answer(
+    observations: list[tuple[str, str, str]],
+    date: str = "25 March 2026",
+) -> dict[str, Any]:
+    """What testing found, as testing feedback: summary, label and quote each."""
+    return {
+        "document_type": "testing feedback",
+        "document_date": {"value": date, "quote": f"**Date:** {date}"},
+        "requirements": [],
+        "testing_observations": [
+            {"summary": summary, "label": label, "quote": quote}
+            for summary, label, quote in observations
+        ],
+        "delivery_evidence": [],
+        "blockers": [],
+        "embedded_instructions": [],
+    }
+
+
+def handover_answer(
+    delivered: list[tuple[str, str]],
+    date: str = "20 July 2026",
+) -> dict[str, Any]:
+    """What a handover summary reports as handed over, and nothing else."""
+    return {
+        "document_type": "related additional document",
+        "document_date": {"value": date, "quote": f"**Date:** {date}"},
+        "requirements": [],
+        "testing_observations": [],
+        "delivery_evidence": [
+            {"summary": summary, "quote": quote} for summary, quote in delivered
+        ],
+        "blockers": [],
+        "embedded_instructions": [],
+    }
 
 
 def extraction_answer_without_requirements() -> dict[str, Any]:
@@ -235,6 +276,25 @@ def match_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
     }
 
 
+def observation_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
+    """Match's answer per observation: the row it is about, or None for none.
+
+    Observations are answered with `observation_index`, never
+    `requirement_index`: the two calls have their own answer models so that
+    the schema the model is sent describes what it was actually asked about.
+    """
+    return {
+        "outcomes": [
+            {
+                "observation_index": index,
+                "outcome": NEW_ROW if row_number is None else EXISTING_ROW,
+                "row_number": row_number,
+            }
+            for index, row_number in enumerate(matched_row_numbers)
+        ]
+    }
+
+
 def extract_marker(source_file: str) -> str:
     return EXTRACT_MARKER.format(source_file=source_file)
 
@@ -246,6 +306,11 @@ def match_marker() -> str:
 def match_marker_against_an_empty_register() -> str:
     """The Match call of a run whose project has no committed row yet."""
     return EMPTY_REGISTER_MARKER
+
+
+def observation_marker() -> str:
+    """The call that asks which row each of a batch's observations is about."""
+    return OBSERVATION_PROMPT_MARKER
 
 
 def examine_marker() -> str:
