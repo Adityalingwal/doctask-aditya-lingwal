@@ -5,7 +5,7 @@ from typing import Any, NoReturn
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.examine.found_issue import finding_on_row
 from app.extract.answer import json_object_in
@@ -20,7 +20,7 @@ UNUSABLE_ANSWER_FIX = (
     "back this way, name a stronger model in config/model.yaml."
 )
 
-_INSTRUCTIONS = f"""You examine a Requirements-to-Delivery Register against the \
+_INSTRUCTIONS = """You examine a Requirements-to-Delivery Register against the \
 rules this run froze when it started.
 
 Report only what the rules and the register in front of you show. Never invent \
@@ -38,17 +38,18 @@ Each finding names:
 - issue — what this row shows that this rule does not allow.
 - evidence — the words in that row which show it.
 
-Reply with a JSON object and nothing else, in this shape:
-
-{{"findings": [{{"rule_id": "R1", "row_number": 1, "issue": "...",
-                 "evidence": "..."}}]}}"""
+Reply with nothing but the structured answer your schema defines."""
 
 
 class FoundIssue(BaseModel):
-    rule_id: str
-    row_number: int
-    issue: str
-    evidence: str
+    rule_id: str = Field(description="One of the rule ids you were given.")
+    row_number: int = Field(
+        description="The number of one of the register rows you were given."
+    )
+    issue: str = Field(
+        description="What this row shows that this rule does not allow."
+    )
+    evidence: str = Field(description="The words in that row which show it.")
 
 
 class ExamineAnswer(BaseModel):
@@ -67,7 +68,9 @@ async def examine_register(
     rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Judge the whole register against the whole rule set in one model call."""
-    answered = await call_the_model(model_client, _examine_prompt(rules, rows))
+    answered = await call_the_model(
+        model_client, _examine_prompt(rules, rows), ExamineAnswer
+    )
     answer = ExamineAnswer.model_validate_json(json_object_in(answered))
 
     rule_text_by_id = {rule["id"]: rule["text"] for rule in rules}

@@ -5,7 +5,7 @@ from typing import Any, NoReturn
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.extract.answer import json_object_in
 from app.model.call_the_model import call_the_model
@@ -39,16 +39,21 @@ person will decide. Requirements that are close in wording can still be \
 different asks — "email notification" and "WhatsApp notification" are two \
 requirements, not one.
 
-Reply with a JSON object and nothing else, in this shape:
-
-{{"outcomes": [{{"requirement_index": 0, "outcome": "{NEW_ROW}",
-                 "row_number": null}}]}}"""
+Answer for every requirement you were sent, exactly once each, and reply with \
+nothing but the structured answer your schema defines."""
 
 
 class MatchOutcome(BaseModel):
-    requirement_index: int
-    outcome: str
-    row_number: int | None = None
+    requirement_index: int = Field(
+        description="The index of the requirement this answer is about."
+    )
+    outcome: str = Field(description="One of the three outcomes above.")
+    row_number: int | None = Field(
+        default=None,
+        description=(
+            "The register row this requirement matched, or null for a new row."
+        ),
+    )
 
 
 class MatchAnswer(BaseModel):
@@ -67,7 +72,7 @@ async def match_requirements(
     requirements: list[dict[str, Any]],
 ) -> MatchAnswer:
     answered = await call_the_model(
-        model_client, _match_prompt(register_rows, requirements)
+        model_client, _match_prompt(register_rows, requirements), MatchAnswer
     )
     answer = MatchAnswer.model_validate_json(json_object_in(answered))
     _refuse_an_incomplete_answer(answer, len(requirements))

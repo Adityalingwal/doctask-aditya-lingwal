@@ -30,7 +30,7 @@ async def read_one_document(
     document_text: str,
 ) -> ExtractionAnswer:
     answered = await call_the_model(
-        model_client, extraction_prompt(source_file, document_text)
+        model_client, extraction_prompt(source_file, document_text), ExtractionAnswer
     )
     return parse_extraction_answer(answered)
 
