@@ -31,8 +31,8 @@ key and what is wrong with it.
 ## Editing `rules.yaml`
 
 Each rule needs an `id` and a `text`, and may carry `params` the text refers to,
-such as `max_days`. Ids must be unique, and `D1` and `D2` are reserved for the
-two deliverable checks the system runs itself.
+such as `max_days`. Ids must be unique. Every rule the register is judged
+against lives in this file; no rule is judged anywhere else.
 
 A run parses this file when it starts and keeps that copy for its whole life,
 alongside a fingerprint of the parsed rules — comments and layout do not change

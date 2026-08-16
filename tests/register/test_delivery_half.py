@@ -509,10 +509,10 @@ def test_a_row_this_run_moved_to_done_raises_no_finding_about_a_missing_outcome(
         },
     )
 
-    # D2 judges the register this run leaves, so it must see the citation this
-    # run's move supplies as well as the value. Seeing one without the other
-    # makes it report the row as Done with no testing outcome — a finding
-    # raised against the very evidence that moved it.
+    # Examine judges the register this run leaves, so it must see the citation
+    # this run's move supplies as well as the value. Seeing one without the
+    # other makes a rule report the row as Done with no testing outcome — a
+    # finding raised against the very evidence that moved it.
     assert finished.rows[1]["status"] == "Done"
     assert _findings_on(finished.export, 1) == []
     assert [one["rule_id"] for one in finished.run["examine"]["findings"]] == []

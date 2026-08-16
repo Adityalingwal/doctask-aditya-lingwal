@@ -10,8 +10,6 @@ import yaml
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
-from app.examine.deliverable_checks import DELIVERABLE_CHECK_IDS
-
 
 RULES_KEY = "rules"
 ID_KEY = "id"
@@ -142,11 +140,6 @@ def _normalised_rules(
             _refuse(f"rule {rule_id} in {config_path} has no '{TEXT_KEY}:'")
         if rule_id in seen_ids:
             _refuse(f"{config_path} gives two rules the id {rule_id}")
-        if rule_id in DELIVERABLE_CHECK_IDS:
-            _refuse(
-                f"{config_path} uses the id {rule_id}, which belongs to a "
-                "deliverable check this system runs itself"
-            )
         params = rule.get(PARAMS_KEY, {})
         if not isinstance(params, dict):
             _refuse(f"rule {rule_id} in {config_path} has a '{PARAMS_KEY}:' "

@@ -5,7 +5,6 @@ from uuid import UUID
 
 from psycopg import AsyncConnection
 
-from app.examine.deliverable_checks import DELIVERABLE_CHECKS
 from app.examine.frozen_rules import frozen_rules_of_run
 from app.review.review_queue import APPROVED
 
@@ -142,11 +141,9 @@ async def rules_that_ran(
     connection: AsyncConnection,
     run_id: UUID,
 ) -> list[dict[str, Any]]:
-    """Every rule this run was judged against — the user's, then the two owed."""
+    """Every rule this run was judged against — the ones it froze, and no others."""
     frozen = await frozen_rules_of_run(connection, run_id) or []
-    return [_rule_as_reported(rule) for rule in frozen] + [
-        dict(check) for check in DELIVERABLE_CHECKS
-    ]
+    return [_rule_as_reported(rule) for rule in frozen]
 
 
 def _rule_as_reported(rule: dict[str, Any]) -> dict[str, Any]:

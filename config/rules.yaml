@@ -12,3 +12,6 @@ rules:
 
   - id: R4
     text: "Every written requirement must have a testing outcome."
+
+  - id: R5
+    text: "No register row is 'Done' without a testing outcome."

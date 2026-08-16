@@ -62,13 +62,13 @@ async def commit_register(
     for row in await proposals.fetchall():
         citations = await _citations_of_row(connection, row["id"])
         if not citations:
-            # D1: a row without a source citation is an unsupported claim and
-            # must never reach the register.
+            # A row without a source citation is an unsupported claim and must
+            # never reach the register.
             raise RuntimeError(
                 f"Register row #{row['row_number']} carries no citation and "
-                "cannot be committed — rule D1 requires every committed row to "
-                "cite a source. Re-run the batch so the row is proposed with "
-                "its evidence."
+                "cannot be committed — every committed row states what a "
+                "document said and names where it said it. Re-run the batch so "
+                "the row is proposed with its evidence."
             )
 
         cells = {name: row[name] for name in CELL_NAMES}

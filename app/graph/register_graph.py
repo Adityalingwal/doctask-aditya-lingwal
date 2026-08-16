@@ -21,7 +21,6 @@ from app.extract.answer import (
     UnrecognisedDocumentType,
     describe_unreadable_answer,
 )
-from app.examine.deliverable_checks import DELIVERABLE_CHECKS, deliverable_findings
 from app.examine.examine_register import UnusableExamineAnswer, examine_register
 from app.examine.frozen_rules import (
     freeze_rules_for_run,
@@ -416,7 +415,6 @@ def build_register_graph(
                 "model is answering."
             ) from error
 
-        found += deliverable_findings(rows)
         async with pool.connection() as connection:
             await record_findings(connection, run_id, found)
             await connection.execute(
@@ -429,11 +427,9 @@ def build_register_graph(
             logging.INFO,
             "examine_finished",
             f"Examine judged {len(rows)} register row(s) against "
-            f"{len(rules) + len(DELIVERABLE_CHECKS)} rule(s) and raised "
-            f"{len(found)} finding(s).",
+            f"{len(rules)} rule(s) and raised {len(found)} finding(s).",
             run_id,
-            rules_that_ran=[rule["id"] for rule in rules]
-            + [check["id"] for check in DELIVERABLE_CHECKS],
+            rules_that_ran=[rule["id"] for rule in rules],
         )
         return {"findings_raised": len(found)}
 

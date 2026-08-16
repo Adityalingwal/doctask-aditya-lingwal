@@ -42,10 +42,10 @@ rules:
 RULES_WITH_A_CHANGED_VALUE = PLAIN_RULES.replace("max_days: 14", "max_days: 30")
 
 
-def test_the_shipped_rules_file_loads_as_the_four_default_rules() -> None:
+def test_the_shipped_rules_file_loads_as_the_default_rules() -> None:
     rules = load_rules(SHIPPED_RULES_FILE)
 
-    assert [rule["id"] for rule in rules] == ["R1", "R2", "R3", "R4"]
+    assert [rule["id"] for rule in rules] == ["R1", "R2", "R3", "R4", "R5"]
     assert rules[2]["params"] == {"max_days": 14}
 
 
@@ -84,10 +84,6 @@ def test_rules_fingerprint_changes_when_a_rule_value_changes(
         (
             "rules:\n  - id: R1\n    text: one\n  - id: R1\n    text: two\n",
             "two rules the id R1",
-        ),
-        (
-            "rules:\n  - id: D1\n    text: every row cites a source\n",
-            "belongs to a deliverable check",
         ),
     ],
 )

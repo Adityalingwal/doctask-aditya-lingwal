@@ -40,8 +40,7 @@ from tests.documents.register_documents import (
 
 SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
-SHIPPED_RULES = ("R1", "R2", "R3", "R4")
-DELIVERABLE_CHECKS = ("D1", "D2")
+SHIPPED_RULES = ("R1", "R2", "R3", "R4", "R5")
 # R3's text says "beyond max_days"; the limit itself lives in the rule's
 # params, so reporting the text alone never says which limit a run was judged
 # against.
@@ -164,17 +163,17 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     assert _decision_of_kind(waiting, "finding") is None
     assert written_findings == 0
     assert [rule["id"] for rule in waiting["examine"]["rules"]] == list(
-        SHIPPED_RULES + DELIVERABLE_CHECKS
+        SHIPPED_RULES
     )
     assert waiting["examine"]["rows_examined"] == 1
     assert waiting["examine"]["findings"] == []
     assert [rule["id"] for rule in export["examine"]["rules"]] == list(
-        SHIPPED_RULES + DELIVERABLE_CHECKS
+        SHIPPED_RULES
     )
     assert export["examine"]["rows_examined"] == 1
     assert export["examine"]["findings"] == []
     assert "No findings" in markdown
-    for rule_id in SHIPPED_RULES + DELIVERABLE_CHECKS:
+    for rule_id in SHIPPED_RULES:
         assert rule_id in markdown
     # Naming R3 is not stating what ran while its limit stays hidden: nothing
     # here would tell a reader whether 14 days applied or 30.
@@ -415,11 +414,7 @@ def test_editing_the_rules_file_after_a_run_started_leaves_that_run_examining(
     assert [rule["id"] for rule in frozen] == ["R1", "R3"]
     assert frozen[1]["params"]["max_days"] == 14
     assert fingerprint == frozen_fingerprint
-    assert [rule["id"] for rule in waiting["examine"]["rules"]] == [
-        "R1",
-        "R3",
-        *DELIVERABLE_CHECKS,
-    ]
+    assert [rule["id"] for rule in waiting["examine"]["rules"]] == ["R1", "R3"]
 
 
 def _frozen_rules_of(engine: Any, run_id: str) -> list[dict[str, Any]] | None:
