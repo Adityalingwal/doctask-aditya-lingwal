@@ -99,7 +99,7 @@ def _undated_handover(delivered: list[tuple[str, str]]) -> dict:
 
 def _handover(delivered: list[tuple[str, str]], date: str = HANDOVER_DATE) -> dict:
     return {
-        "document_type": "related additional document",
+        "document_type": "handover summary",
         "document_date": _dated(date),
         "requirements": [],
         "testing_observations": [],

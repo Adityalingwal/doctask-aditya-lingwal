@@ -249,7 +249,7 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
 def _handover_answer() -> dict[str, Any]:
     """The Northside handover, as its own document says what was handed over."""
     return {
-        "document_type": "related additional document",
+        "document_type": "handover summary",
         "document_date": {
             "value": "20 July 2026",
             "quote": "**Date:** 20 July 2026",

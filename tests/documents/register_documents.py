@@ -190,7 +190,7 @@ def handover_answer(
 ) -> dict[str, Any]:
     """What a handover summary reports as handed over, and nothing else."""
     return {
-        "document_type": "related additional document",
+        "document_type": "handover summary",
         "document_date": {"value": date, "quote": f"**Date:** {date}"},
         "requirements": [],
         "testing_observations": [],

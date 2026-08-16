@@ -52,17 +52,17 @@ yours, not the document's.
 ## What each document type may report
 
 Only meeting notes and a client requirements document report new asks.
-Testing feedback reports only what testing found. A related additional
-document (for example a handover summary) reports only what was delivered
-and, if it says so, a blocker — never a new ask and never a testing
-verdict. An unrelated document reports nothing in the four lists below.
+Testing feedback reports only what testing found. A handover summary reports
+only what was delivered and, if it says so, a blocker — never a new ask and
+never a testing verdict. An unrelated document reports nothing in the four
+lists below.
 
 | document_type | requirements | testing_observations | delivery_evidence | blockers |
 |---|---|---|---|---|
 | meeting notes | yes | no | no | yes |
 | client requirements document | yes | no | no | yes |
 | testing feedback | no | yes | no | yes |
-| related additional document | no | no | yes | yes |
+| handover summary | no | no | yes | yes |
 | unrelated | no | no | no | no |
 
 A filled list where this table says "no" is a wrong answer, not a style
@@ -78,10 +78,10 @@ to look thorough.
 
 ## delivery_evidence
 
-A related additional document's job is to say what was actually handed
-over. "The booking pages, the reminder job, and the schedule screen were
-handed over to the clinic's team on 20 July" is delivery_evidence: it
-reports completed work, not an ask and not a pass/fail verdict.
+A handover summary's job is to say what was actually handed over. "The
+booking pages, the reminder job, and the schedule screen were handed over
+to the clinic's team on 20 July" is delivery_evidence: it reports completed
+work, not an ask and not a pass/fail verdict.
 
 ## Testing observations
 

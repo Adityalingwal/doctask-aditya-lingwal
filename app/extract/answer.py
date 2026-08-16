@@ -9,14 +9,14 @@ class DocumentType(StrEnum):
     MEETING_NOTES = "meeting notes"
     CLIENT_REQUIREMENTS_DOCUMENT = "client requirements document"
     TESTING_FEEDBACK = "testing feedback"
-    RELATED_ADDITIONAL_DOCUMENT = "related additional document"
+    HANDOVER_SUMMARY = "handover summary"
     UNRELATED = "unrelated"
 
 
 MEETING_NOTES = DocumentType.MEETING_NOTES.value
 CLIENT_REQUIREMENTS_DOCUMENT = DocumentType.CLIENT_REQUIREMENTS_DOCUMENT.value
 TESTING_FEEDBACK = DocumentType.TESTING_FEEDBACK.value
-RELATED_ADDITIONAL_DOCUMENT = DocumentType.RELATED_ADDITIONAL_DOCUMENT.value
+HANDOVER_SUMMARY = DocumentType.HANDOVER_SUMMARY.value
 UNRELATED_DOCUMENT = DocumentType.UNRELATED.value
 DOCUMENT_TYPES = tuple(document_type.value for document_type in DocumentType)
 REQUIREMENTS = "requirements"
@@ -33,9 +33,7 @@ LISTS_A_TYPE_MAY_FILL: dict[DocumentType, frozenset[str]] = {
     DocumentType.MEETING_NOTES: frozenset({REQUIREMENTS, BLOCKERS}),
     DocumentType.CLIENT_REQUIREMENTS_DOCUMENT: frozenset({REQUIREMENTS, BLOCKERS}),
     DocumentType.TESTING_FEEDBACK: frozenset({TESTING_OBSERVATIONS, BLOCKERS}),
-    DocumentType.RELATED_ADDITIONAL_DOCUMENT: frozenset(
-        {DELIVERY_EVIDENCE, BLOCKERS}
-    ),
+    DocumentType.HANDOVER_SUMMARY: frozenset({DELIVERY_EVIDENCE, BLOCKERS}),
     DocumentType.UNRELATED: frozenset(),
 }
 
