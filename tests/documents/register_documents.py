@@ -77,6 +77,30 @@ def write_corrupt_pdf(path: Path) -> None:
     path.write_bytes(b"%PDF-1.4\nthis file was truncated before it was written")
 
 
+# The font object reportlab writes for every page's default font, byte for
+# byte. Overwriting it with garbage of the same length leaves every later
+# object at its original offset, so pypdf's page count (which never resolves
+# a page's fonts) still succeeds while pdfminer's parser — reached only once
+# text is actually extracted — fails on it.
+_PDF_FONT_OBJECT = (
+    b"<<\n/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 "
+    b"/Subtype /Type1 /Type /Font\n>>"
+)
+
+
+def write_pdf_with_unparseable_content(path: Path) -> None:
+    """A PDF pypdf can count the pages of, but pdfplumber cannot read the text of."""
+    write_pdf(path, [["This page will not be read."]])
+    data = path.read_bytes()
+    if data.count(_PDF_FONT_OBJECT) != 1:
+        raise AssertionError(
+            "write_pdf's output no longer matches this fixture's corruption "
+            "pattern — reportlab's default PDF layout must have changed"
+        )
+    garbage = b"<<" + b"$" * (len(_PDF_FONT_OBJECT) - 4) + b">>"
+    path.write_bytes(data.replace(_PDF_FONT_OBJECT, garbage))
+
+
 def write_corrupt_docx(path: Path) -> None:
     """A `.docx` that is not a Word package at all — Word files are zips."""
     path.write_bytes(b"this was renamed to .docx and is not a Word file")

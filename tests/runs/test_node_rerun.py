@@ -13,6 +13,7 @@ from app.examine.record_findings import record_findings
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH
 from app.register.propose_rows import propose_rows
+from app.runs.run_records import append_skipped, read_run
 from app.runs.statuses import RUNNING
 from tests.runs.application import temporary_database
 from tests.documents.register_documents import write_meeting_note
@@ -37,6 +38,37 @@ def test_ingest_rerun_does_not_duplicate_documents(tmp_path: Path) -> None:
     assert collected["written"] == 2
     assert collected["first_batch"] == collected["second_batch"]
     assert len(collected["second_batch"]) == 2
+
+
+def test_a_replayed_stage_does_not_record_the_same_skipped_file_twice(
+    tmp_path: Path,
+) -> None:
+    source_folder = tmp_path / "unsupported-format"
+    source_folder.mkdir()
+    (source_folder / "scope.rtf").write_text("Out of scope for this reader.")
+
+    skipped = asyncio.run(_collect_batch_and_append_skipped_twice(source_folder))
+
+    assert len(skipped) == 1
+    assert skipped[0]["file"] == "scope.rtf"
+
+
+def test_two_different_dropped_quotes_from_one_file_are_both_kept() -> None:
+    # Two requirements dropped from the same file: same kind, same file, same
+    # reason word for word — differing only in summary and quote, exactly the
+    # shape a comparison over the wrong keys would wrongly collapse into one.
+    first_dropped = _dropped_requirement(
+        "An SMS reminder before every appointment",
+        "the client wants a text message reminder before each appointment",
+    )
+    second_dropped = _dropped_requirement(
+        "A weekly digest of new intake records",
+        "the client wants a weekly digest of new intake records",
+    )
+
+    skipped = asyncio.run(_append_skipped_then_append_both_again(first_dropped, second_dropped))
+
+    assert skipped == [first_dropped, second_dropped]
 
 
 def test_match_rerun_does_not_duplicate_proposed_rows(tmp_path: Path) -> None:
@@ -146,6 +178,64 @@ async def _collect_batch_twice(source_folder: Path) -> dict[str, Any]:
                 }
         finally:
             await pool.close()
+
+
+async def _collect_batch_and_append_skipped_twice(
+    source_folder: Path,
+) -> list[dict[str, str]]:
+    """What Ingest itself does on every pass: collect the batch, then record
+    what it skipped — run twice, the way a resume replays the node from its
+    start (`app/graph/register_graph.py`'s own comment on `review`)."""
+    with temporary_database() as database_url:
+        pool = build_connection_pool(database_url)
+        await pool.open(wait=True)
+        try:
+            async with pool.connection() as connection:
+                project_id, run_id = await _project_with_a_running_run(connection)
+                for _ in range(2):
+                    batch = await collect_batch(
+                        connection,
+                        run_id,
+                        project_id,
+                        source_folder,
+                        MARKDOWN_ONLY,
+                        PAGE_LIMIT,
+                    )
+                    await append_skipped(connection, run_id, batch.skipped)
+                run = await read_run(connection, run_id)
+                return run["skipped"]
+        finally:
+            await pool.close()
+
+
+async def _append_skipped_then_append_both_again(
+    first: dict[str, str],
+    second: dict[str, str],
+) -> list[dict[str, str]]:
+    with temporary_database() as database_url:
+        pool = build_connection_pool(database_url)
+        await pool.open(wait=True)
+        try:
+            async with pool.connection() as connection:
+                project_id, run_id = await _project_with_a_running_run(connection)
+                await append_skipped(connection, run_id, [first])
+                # A replay recomputes the whole batch, so the second call
+                # carries the already-stored entry again alongside the new one.
+                await append_skipped(connection, run_id, [first, second])
+                run = await read_run(connection, run_id)
+                return run["skipped"]
+        finally:
+            await pool.close()
+
+
+def _dropped_requirement(summary: str, quote: str) -> dict[str, str]:
+    return {
+        "kind": "requirement",
+        "file": "shared-notes.md",
+        "summary": summary,
+        "quote": quote,
+        "reason": "These words were not found in the file, so this requirement was dropped.",
+    }
 
 
 async def _propose_rows_twice() -> dict[str, Any]:

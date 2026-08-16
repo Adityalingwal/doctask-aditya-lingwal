@@ -526,9 +526,11 @@ function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
   );
 }
 
-// Screen 5: the file name, then the sentence — the `file` and `reason`
-// labels themselves are never printed. A dropped quote carries no file name
-// (it is part of one already read), so it prints its sentence alone.
+// Screen 5: the file name, then what happened — the `file`, `summary` and
+// `reason` labels themselves are never printed. A dropped quote is told apart
+// by carrying `summary` (a whole skipped document never does), so it shows
+// its file, the requirement that was dropped, and why — never `quote`, which
+// is the model's words, not the document's, and unverified besides.
 function Skipped({ skipped }) {
   if (skipped.length === 0) {
     return <p className="m-0 text-ink-soft">This run skipped nothing.</p>;
@@ -537,7 +539,15 @@ function Skipped({ skipped }) {
     <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
       {skipped.map((entry, place) => (
         <li key={place} className="border border-line bg-card px-4 py-3 text-sm">
-          {entry.file !== undefined ? (
+          {entry.summary !== undefined ? (
+            <p className="m-0">
+              <span className="font-mono font-semibold">{entry.file}</span>
+              <br />
+              {entry.summary}
+              <br />
+              {entry.reason}
+            </p>
+          ) : entry.file !== undefined ? (
             <p className="m-0">
               <span className="font-mono font-semibold">{entry.file}</span>
               <br />

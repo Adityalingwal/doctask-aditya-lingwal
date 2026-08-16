@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pdfplumber
+from pdfplumber.utils.exceptions import PdfminerException
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
@@ -39,9 +40,21 @@ def pdf_page_count(path: Path) -> int:
 
 
 def read_pdf(path: Path) -> str:
-    """Every page's text, page-separated so a citation can name its page."""
-    with pdfplumber.open(str(path)) as pdf:
-        pages = [page.extract_text() or "" for page in pdf.pages]
+    """Every page's text, page-separated so a citation can name its page.
+
+    A PDF sound enough for `pdf_page_count` to count its pages can still have
+    a content stream pdfminer (pdfplumber's own parser) cannot read — the
+    same "damaged, or not a PDF" outcome `pdf_page_count` already guards
+    against, reached from the other half of the format instead.
+    """
+    try:
+        with pdfplumber.open(str(path)) as pdf:
+            pages = [page.extract_text() or "" for page in pdf.pages]
+    except PdfminerException as damaged:
+        raise DocumentUnreadable(
+            "This PDF's content could not be read — it is damaged. Supply a "
+            "working copy."
+        ) from damaged
 
     if not any(page.strip() for page in pages):
         raise DocumentUnreadable(
