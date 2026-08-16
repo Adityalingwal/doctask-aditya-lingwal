@@ -16,6 +16,7 @@ EXISTING_ROW = "existing row"
 POSSIBLE_MATCH = "possible match"
 OUTCOMES = (NEW_ROW, EXISTING_ROW, POSSIBLE_MATCH)
 MATCH_PROMPT_MARKER = "Match these requirements against the register"
+OBSERVATION_PROMPT_MARKER = "Match these observations against the register"
 INCOMPLETE_ANSWER_FIX = (
     " Nothing was proposed for the register, because a requirement Match did "
     "not answer for is not a new row. Start another run so Match is asked "
@@ -40,6 +41,32 @@ different asks — "email notification" and "WhatsApp notification" are two \
 requirements, not one.
 
 Answer for every requirement you were sent, exactly once each, and reply with \
+nothing but the structured answer your schema defines."""
+
+
+_OBSERVATION_INSTRUCTIONS = f"""You decide, for each observation found in this \
+batch of documents, which register row it is about.
+
+An observation is something a document says about work the client already \
+asked for: what testing found, what was handed over, or what is stopped. It \
+never states a new ask, so it never becomes a row of its own — it either \
+belongs to a row that already exists, or it belongs to none of them.
+
+Answer one of three outcomes per observation:
+- "{NEW_ROW}" — no existing row is what this observation is about.
+- "{EXISTING_ROW}" — this observation is about exactly this row; give its \
+row_number.
+- "{POSSIBLE_MATCH}" — it may be about an existing row but you are not \
+certain; give that row_number.
+
+Never attach an observation to a row you are unsure about. Attaching "the \
+daily schedule screen shows the wrong day" to a row about email reminders \
+puts a false testing verdict on the register, so where there is real doubt \
+answer "{POSSIBLE_MATCH}" and a person will decide. An observation about work \
+no row traces is answered "{NEW_ROW}"; it is reported to a person rather than \
+forced onto the nearest row.
+
+Answer for every observation you were sent, exactly once each, and reply with \
 nothing but the structured answer your schema defines."""
 
 
@@ -76,6 +103,20 @@ async def match_requirements(
     )
     answer = MatchAnswer.model_validate_json(json_object_in(answered))
     _refuse_an_incomplete_answer(answer, len(requirements))
+    return answer
+
+
+async def match_observations(
+    model_client: BaseChatModel,
+    register_rows: list[dict[str, Any]],
+    observations: list[dict[str, Any]],
+) -> MatchAnswer:
+    """Which register row each of this batch's observations is about."""
+    answered = await call_the_model(
+        model_client, _observation_prompt(register_rows, observations), MatchAnswer
+    )
+    answer = MatchAnswer.model_validate_json(json_object_in(answered))
+    _refuse_an_incomplete_answer(answer, len(observations))
     return answer
 
 
@@ -119,14 +160,45 @@ def _refuse(cause: str) -> NoReturn:
     raise IncompleteMatchAnswer(f"{cause}.{INCOMPLETE_ANSWER_FIX}")
 
 
+def _observation_prompt(
+    register_rows: list[dict[str, Any]],
+    observations: list[dict[str, Any]],
+) -> list[BaseMessage]:
+    observation_view = [
+        {
+            "requirement_index": index,
+            "kind": observation["kind"],
+            "summary": observation["summary"],
+            "source_file": observation["source_file"],
+            "source_words": observation["source_words"],
+        }
+        for index, observation in enumerate(observations)
+    ]
+    return [
+        SystemMessage(content=_OBSERVATION_INSTRUCTIONS),
+        HumanMessage(
+            content=(
+                f"{OBSERVATION_PROMPT_MARKER}.\n\n"
+                f"Register rows:\n{json.dumps(_register_view(register_rows), indent=2)}"
+                f"\n\nObservations found in this batch:\n"
+                f"{json.dumps(observation_view, indent=2)}"
+            )
+        ),
+    ]
+
+
+def _register_view(register_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {"row_number": row["row_number"], "what_was_asked": row["what_was_asked"]}
+        for row in register_rows
+    ]
+
+
 def _match_prompt(
     register_rows: list[dict[str, Any]],
     requirements: list[dict[str, Any]],
 ) -> list[BaseMessage]:
-    register_view = [
-        {"row_number": row["row_number"], "what_was_asked": row["what_was_asked"]}
-        for row in register_rows
-    ]
+    register_view = _register_view(register_rows)
     requirement_view = [
         {
             "requirement_index": index,

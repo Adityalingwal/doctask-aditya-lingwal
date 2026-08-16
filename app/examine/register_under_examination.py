@@ -31,15 +31,38 @@ async def register_under_examination(
     cited_cells = await _cited_cells_by_row(
         connection, [row["id"] for row in rows]
     )
+    moved = await _cells_this_run_moves(connection, run_id)
     return [
         {
             "id": row["id"],
             "row_number": row["row_number"],
-            "cells": {name: row[name] for name in CELL_NAMES},
+            "cells": {name: row[name] for name in CELL_NAMES}
+            | moved.get(str(row["id"]), {}),
             "cited_cells": cited_cells.get(row["id"], frozenset()),
         }
         for row in rows
     ]
+
+
+async def _cells_this_run_moves(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> dict[str, dict[str, str]]:
+    """What this run's moves will leave each row holding, once Commit runs.
+
+    A move is not written to the row until Commit, so a rule judging the
+    stored cells alone would raise a finding against evidence this very batch
+    supplied — and a finding a person only sees after approving the export is
+    raised too late.
+    """
+    result = await connection.execute(
+        "SELECT pending_moves FROM runs WHERE id = %s", (run_id,)
+    )
+    stored = await result.fetchone()
+    moved: dict[str, dict[str, str]] = {}
+    for move in (stored["pending_moves"] if stored else []) or []:
+        moved.setdefault(move["register_row_id"], {})[move["cell"]] = move["value"]
+    return moved
 
 
 async def _cited_cells_by_row(

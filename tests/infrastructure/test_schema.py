@@ -45,6 +45,7 @@ EXPECTED_COLUMNS = {
         "ended_early_reason",
         "failure_reason",
         "export_json",
+        "pending_moves",
         "review_finished_at",
         "rules_snapshot",
         "rules_fingerprint",

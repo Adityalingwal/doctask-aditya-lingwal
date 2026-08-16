@@ -22,9 +22,11 @@ from tests.documents.register_documents import (
     match_marker,
     match_marker_against_an_empty_register,
     no_findings_answer,
+    observation_marker,
 )
 from tests.register.stored_register import documents_of_run, stored_rows
 
+from app.register.cells import CELL_NAMES
 from app.extract.answer import (
     CLIENT_REQUIREMENTS_DOCUMENT,
     MEETING_NOTES,
@@ -184,6 +186,9 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
             ),
             extract_marker(testing_feedback): _testing_feedback_answer(),
             match_marker(): match_answer_of([1, None, 3, None]),
+            # Booking is row 1 and the daily schedule screen is row 3; both are
+            # committed rows this batch's testing feedback is about.
+            observation_marker(): match_answer_of([1, 3]),
             examine_marker(): no_findings_answer(),
         },
     )
@@ -191,14 +196,30 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
     assert read_again == [requirements, testing_feedback]
     assert sorted(after_first_run) == [1, 2, 3]
     assert sorted(after_second_run) == [1, 2, 3, 5, 7]
-    # The SMS reminder row is the one nothing that arrived asked about.
+    # The SMS reminder row is the one nothing that arrived asked about, and it
+    # comes back out of the second run byte for byte.
     assert after_second_run[2] == after_first_run[2]
-    for merged_into in (1, 3):
-        assert after_second_run[merged_into].cells == after_first_run[merged_into].cells
-        assert (
-            after_second_run[merged_into].fingerprint
-            == after_first_run[merged_into].fingerprint
+    # Rows 1 and 3 are what the arriving testing feedback was about, so they
+    # move — which is the whole point of reading a testing document.
+    assert _cell(after_second_run[1], "status") == "Done"
+    assert (
+        _cell(after_second_run[1], "what_testing_found")
+        == "online booking saved every test appointment"
+    )
+    assert _cell(after_second_run[3], "status") == "Partial"
+    # first_seen still comes from the document that first asked for this and
+    # last_moved from the one that moved it, so the two finally differ.
+    assert _cell(after_second_run[3], "last_moved") == "15 July 2026"
+    assert _cell(after_second_run[3], "first_seen") == "5 June 2026"
+    for moved in (1, 3):
+        assert after_second_run[moved].fingerprint != after_first_run[moved].fingerprint
+        assert _cell(after_second_run[moved], "what_was_asked") == _cell(
+            after_first_run[moved], "what_was_asked"
         )
+
+
+def _cell(row: Any, cell_name: str) -> str:
+    return row.cells[CELL_NAMES.index(cell_name)]
 
 
 def _meeting_notes_answer() -> dict[str, Any]:
@@ -252,6 +273,9 @@ def _written_scope_answer() -> dict[str, Any]:
 def _testing_feedback_answer() -> dict[str, Any]:
     """The testing document reports what it found and asks for nothing new."""
     return dated_extraction_answer([], TESTING_FEEDBACK, "15 July 2026") | {
+        # The PDF writes its date without Markdown emphasis, and a quote that
+        # is not in the file is dropped along with what it supports.
+        "document_date": {"value": "15 July 2026", "quote": "Date: 15 July 2026"},
         "testing_observations": [
             {
                 "summary": "online booking saved every test appointment",

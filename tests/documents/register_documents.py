@@ -9,7 +9,12 @@ from reportlab.pdfgen import canvas
 
 from app.examine.examine_register import EXAMINE_PROMPT_MARKER
 from app.extract.answer import MEETING_NOTES
-from app.match.match_requirements import EXISTING_ROW, MATCH_PROMPT_MARKER, NEW_ROW
+from app.match.match_requirements import (
+    EXISTING_ROW,
+    MATCH_PROMPT_MARKER,
+    NEW_ROW,
+    OBSERVATION_PROMPT_MARKER,
+)
 
 
 EXTRACT_MARKER = "File name: {source_file}"
@@ -282,6 +287,11 @@ def match_marker() -> str:
 def match_marker_against_an_empty_register() -> str:
     """The Match call of a run whose project has no committed row yet."""
     return EMPTY_REGISTER_MARKER
+
+
+def observation_marker() -> str:
+    """The call that asks which row each of a batch's observations is about."""
+    return OBSERVATION_PROMPT_MARKER
 
 
 def examine_marker() -> str:
