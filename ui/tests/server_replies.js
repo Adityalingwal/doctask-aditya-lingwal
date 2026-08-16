@@ -14,6 +14,7 @@ export function runReply(overrides = {}) {
     status: "needs review",
     stage: "review",
     skipped: [],
+    reported_instructions: [],
     ended_early_reason: null,
     failure_reason: null,
     decisions: [],

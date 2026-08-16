@@ -111,6 +111,9 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
                     approve_every_decision_and_finish_review(client, run_id)
                     wait_for_run_status(client, run_id, "done")
                     exported = client.get(f"/runs/{run_id}/export").json()
+                    exported_markdown = client.get(
+                        f"/runs/{run_id}/export", params={"format": "markdown"}
+                    ).text
 
                 documents = documents_of_run(database_url, run_id)
                 extraction = extraction_of_document(
@@ -136,6 +139,20 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
         for event in logged_run_events(log_path)
     )
 
+    # It reaches a person, not only the container log: the run payload, the
+    # JSON export and the Markdown generated from it all carry it, and the two
+    # shapes of one export never say different things.
+    for carried in (at_review["reported_instructions"], exported["reported_instructions"]):
+        assert len(carried) == 1
+        assert carried[0]["file"] == NOTES_CARRYING_THE_INSTRUCTION
+        assert carried[0]["place"] == "Notes pasted from the client's email"
+        assert "ignore previous instructions" in carried[0]["quote"]
+    assert "## Reported instructions" in exported_markdown
+    assert "Reported, not followed." in exported_markdown
+    assert NOTES_CARRYING_THE_INSTRUCTION in exported_markdown.split(
+        "## Reported instructions"
+    )[1]
+
     # Not obeyed: nothing was approved, nothing exported before the human, and
     # the instruction reached the Delivery Owner as no proposed action at all.
     assert refused_export.status_code == NOT_EXPORTED_YET
@@ -150,7 +167,17 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
     assert register[FIRST_ROW].cells[WHAT_WAS_ASKED_CELL] == BENIGN_REQUIREMENT
     for cell in register[FIRST_ROW].cells:
         _assert_free_of_the_instruction(cell)
-    _assert_free_of_the_instruction(json.dumps(exported))
+    # Everywhere but the section that exists to report it: the words must not
+    # have reached a row, a cell, a citation or a finding.
+    _assert_free_of_the_instruction(
+        json.dumps(
+            {
+                name: value
+                for name, value in exported.items()
+                if name != "reported_instructions"
+            }
+        )
+    )
 
 
 def _reported_instruction() -> dict[str, Any]:

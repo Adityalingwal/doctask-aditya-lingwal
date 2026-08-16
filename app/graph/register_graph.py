@@ -46,6 +46,7 @@ from app.review.review_queue import ensure_export_decision, export_was_approved
 from app.run_logging import log_run_event
 from app.runs.finished_stages import record_stage_finished
 from app.runs.run_records import (
+    append_reported_instructions,
     append_skipped,
     enter_stage,
     read_project,
@@ -301,12 +302,21 @@ def build_register_graph(
                 run_id,
             )
 
+        reported = [
+            {
+                "file": instruction["source_file"],
+                "place": instruction["place"],
+                "quote": instruction["source_words"],
+            }
+            for instruction in located.extraction["embedded_instructions"]
+        ]
         async with pool.connection() as connection:
             await connection.execute(
                 "UPDATE documents SET extraction = %s WHERE id = %s",
                 (Jsonb(located.extraction), document_id),
             )
             await append_skipped(connection, run_id, skipped)
+            await append_reported_instructions(connection, run_id, reported)
             await _finish_stage(connection, run_id, EXTRACT_STAGE)
 
         for instruction in located.extraction["embedded_instructions"]:
