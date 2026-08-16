@@ -46,6 +46,7 @@ EXPECTED_COLUMNS = {
         "failure_reason",
         "export_json",
         "pending_moves",
+        "reported_instructions",
         "review_finished_at",
         "rules_snapshot",
         "rules_fingerprint",
