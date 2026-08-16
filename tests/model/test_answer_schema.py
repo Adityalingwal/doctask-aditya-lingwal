@@ -66,7 +66,6 @@ def test_the_answer_still_parses_without_a_live_key() -> None:
             _scripted_client(
                 {
                     "document_type": "testing feedback",
-                    "document_date": None,
                     "requirements": [],
                     "testing_observations": [
                         {
@@ -75,7 +74,7 @@ def test_the_answer_still_parses_without_a_live_key() -> None:
                             "quote": "The intake form submits correctly",
                         }
                     ],
-                    "blockers": [],
+                    "delivery_evidence": [],
                     "embedded_instructions": [],
                 }
             ),

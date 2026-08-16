@@ -22,18 +22,17 @@ DOCUMENT_TYPES = tuple(document_type.value for document_type in DocumentType)
 REQUIREMENTS = "requirements"
 TESTING_OBSERVATIONS = "testing_observations"
 DELIVERY_EVIDENCE = "delivery_evidence"
-BLOCKERS = "blockers"
-QUOTED_LISTS = (REQUIREMENTS, TESTING_OBSERVATIONS, DELIVERY_EVIDENCE, BLOCKERS)
+QUOTED_LISTS = (REQUIREMENTS, TESTING_OBSERVATIONS, DELIVERY_EVIDENCE)
 
-# Which of those four lists each document type may fill at all. The prompt
+# Which of those three lists each document type may fill at all. The prompt
 # states this table and the generated schema carries it in the field
 # descriptions; a filled list where the table says empty is a wrong answer
 # rather than something Python quietly zeroes.
 LISTS_A_TYPE_MAY_FILL: dict[DocumentType, frozenset[str]] = {
-    DocumentType.MEETING_NOTES: frozenset({REQUIREMENTS, BLOCKERS}),
-    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT: frozenset({REQUIREMENTS, BLOCKERS}),
-    DocumentType.TESTING_FEEDBACK: frozenset({TESTING_OBSERVATIONS, BLOCKERS}),
-    DocumentType.HANDOVER_SUMMARY: frozenset({DELIVERY_EVIDENCE, BLOCKERS}),
+    DocumentType.MEETING_NOTES: frozenset({REQUIREMENTS}),
+    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT: frozenset({REQUIREMENTS}),
+    DocumentType.TESTING_FEEDBACK: frozenset({TESTING_OBSERVATIONS}),
+    DocumentType.HANDOVER_SUMMARY: frozenset({DELIVERY_EVIDENCE}),
     DocumentType.UNRELATED: frozenset(),
 }
 
@@ -66,7 +65,7 @@ class UnrecognisedDocumentType(ValueError):
 
 # Every field carries its own meaning as a description, because the generated
 # schema is what the model is actually asked for. The prompt explains judgement
-# — what a label means, what counts as a blocker — and never the shape.
+# — what a label means, what a handover reports — and never the shape.
 _SUMMARY_MEANING = "One short sentence stating this fact in your own words."
 _QUOTE_MEANING = (
     "The document's own words supporting it, copied character for character."
@@ -108,21 +107,9 @@ class QuotedInstruction(BaseModel):
     )
 
 
-class DocumentDate(BaseModel):
-    value: str = Field(description="The date as the document writes it.")
-    quote: str = Field(description=_QUOTE_MEANING)
-
-
 class ExtractionAnswer(BaseModel):
     document_type: DocumentType = Field(
         description="Which kind of document this one is."
-    )
-    document_date: DocumentDate | None = Field(
-        default=None,
-        description=(
-            "The date this document states about itself, or null when it "
-            "states none."
-        ),
     )
     requirements: list[QuotedFact] = Field(
         default_factory=list,
@@ -137,12 +124,6 @@ class ExtractionAnswer(BaseModel):
         description=(
             "One entry for each piece of work this document reports as handed "
             "over."
-        ),
-    )
-    blockers: list[QuotedFact] = Field(
-        default_factory=list,
-        description=(
-            "One entry for each piece of work this document says is stopped."
         ),
     )
     embedded_instructions: list[QuotedInstruction] = Field(

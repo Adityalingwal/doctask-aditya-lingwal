@@ -23,14 +23,13 @@ REPORTED_NOT_FOLLOWED = (
 JSON_FORMAT = "json"
 MARKDOWN_FORMAT = "markdown"
 EXPORT_FORMATS = (JSON_FORMAT, MARKDOWN_FORMAT)
+# The stored column stays `in_writing`; only the heading a reader sees asks
+# the question in words a first-time reader does not have to decode.
 COLUMN_HEADINGS = {
     "what_was_asked": "What was asked",
-    "in_writing": "In writing?",
+    "in_writing": "Written down?",
     "what_testing_found": "What testing found",
     "status": "Status",
-    "blocked_on": "Blocked on",
-    "first_seen": "First seen",
-    "last_moved": "Last moved",
 }
 
 
@@ -147,7 +146,7 @@ def _reported_instruction_lines(reported: list[dict[str, Any]]) -> list[str]:
 
 
 def _rule_settings(rule: dict[str, Any]) -> str:
-    """R3 reads "beyond max_days", so the limit belongs beside its text here."""
+    """A rule whose text names a setting cannot be read without its value."""
     params = rule.get("params")
     if not params:
         return ""

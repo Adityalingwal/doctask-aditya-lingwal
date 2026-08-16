@@ -44,8 +44,13 @@ LOG_CONFIG_FILE_SUFFIX = ".log-config.json"
 
 
 @contextmanager
-def temporary_database() -> Iterator[str]:
-    """A real PostgreSQL database of its own, migrated and then dropped."""
+def temporary_database(upgrade_to: str = "head") -> Iterator[str]:
+    """A real PostgreSQL database of its own, migrated and then dropped.
+
+    `upgrade_to` names how far to migrate it. A migration test needs the
+    schema as it stood before the migration under test, so that it can seed
+    rows the older shape could hold and then run that one step by hand.
+    """
     application_url = make_url(
         os.environ.get(DATABASE_URL_ENVIRONMENT_VARIABLE, DEFAULT_DATABASE_URL)
     )
@@ -62,7 +67,7 @@ def temporary_database() -> Iterator[str]:
         alembic_config.set_main_option(
             "sqlalchemy.url", test_url.render_as_string(hide_password=False)
         )
-        command.upgrade(alembic_config, "head")
+        command.upgrade(alembic_config, upgrade_to)
         yield test_url.render_as_string(hide_password=False)
     finally:
         with maintenance_engine.connect() as connection:
@@ -246,6 +251,13 @@ def logged_run_events(log_path: Path) -> list[dict[str, Any]]:
         if isinstance(payload, dict) and "event" in payload:
             events.append(payload)
     return events
+
+
+def migrate(database_url: str, revision: str) -> None:
+    """Run the migrations of one already-created database up to `revision`."""
+    alembic_config = Config(PROJECT_ROOT / "alembic.ini")
+    alembic_config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(alembic_config, revision)
 
 
 def _run_event_log_config(log_path: Path) -> Path:

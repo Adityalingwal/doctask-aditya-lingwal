@@ -15,9 +15,7 @@ from app.register.cells import shorten_quote
 REQUIREMENT_KIND = "requirement"
 TESTING_OBSERVATION_KIND = "testing observation"
 DELIVERY_EVIDENCE_KIND = "delivery evidence"
-BLOCKER_KIND = "blocker"
 EMBEDDED_INSTRUCTION_KIND = "embedded instruction"
-DOCUMENT_DATE_KIND = "document date"
 
 
 class LocatedExtraction(NamedTuple):
@@ -76,22 +74,11 @@ def locate_extraction(
     extraction: dict[str, Any] = {
         "document_type": answer.document_type.value,
         "source_file": source_file,
-        "document_date": None,
         "requirements": [],
         "testing_observations": [],
         "delivery_evidence": [],
-        "blockers": [],
         "embedded_instructions": [],
     }
-
-    if answer.document_date is not None:
-        dated = located(
-            answer.document_date.value,
-            answer.document_date.quote,
-            DOCUMENT_DATE_KIND,
-        )
-        if dated is not None:
-            extraction["document_date"] = dated
 
     for requirement in answer.requirements:
         found = located(requirement.summary, requirement.quote, REQUIREMENT_KIND)
@@ -111,11 +98,6 @@ def locate_extraction(
         found = located(delivered.summary, delivered.quote, DELIVERY_EVIDENCE_KIND)
         if found is not None:
             extraction["delivery_evidence"].append(found)
-
-    for blocker in answer.blockers:
-        found = located(blocker.summary, blocker.quote, BLOCKER_KIND)
-        if found is not None:
-            extraction["blockers"].append(found)
 
     for instruction in answer.embedded_instructions:
         found = located(

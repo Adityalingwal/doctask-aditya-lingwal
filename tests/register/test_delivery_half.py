@@ -59,54 +59,39 @@ def _write_document(folder: Path, name: str, date: str, line: str) -> None:
     )
 
 
-def _dated(date: str) -> dict[str, str]:
-    return {"value": date, "quote": f"**Date:** {date}"}
-
-
-def _asks(requirements: list[tuple[str, str]], date: str, document_type: str) -> dict:
+def _asks(requirements: list[tuple[str, str]], document_type: str) -> dict:
     return {
         "document_type": document_type,
-        "document_date": _dated(date),
         "requirements": [
             {"summary": summary, "quote": quote} for summary, quote in requirements
         ],
         "testing_observations": [],
         "delivery_evidence": [],
-        "blockers": [],
         "embedded_instructions": [],
     }
 
 
-def _testing(observations: list[tuple[str, str, str]], date: str = TESTING_DATE) -> dict:
+def _testing(observations: list[tuple[str, str, str]]) -> dict:
     return {
         "document_type": "testing feedback",
-        "document_date": _dated(date),
         "requirements": [],
         "testing_observations": [
             {"summary": summary, "label": label, "quote": quote}
             for summary, label, quote in observations
         ],
         "delivery_evidence": [],
-        "blockers": [],
         "embedded_instructions": [],
     }
 
 
-def _undated_handover(delivered: list[tuple[str, str]]) -> dict:
-    """A handover stating no date of its own — the case that moved nothing."""
-    return _handover(delivered) | {"document_date": None}
-
-
-def _handover(delivered: list[tuple[str, str]], date: str = HANDOVER_DATE) -> dict:
+def _handover(delivered: list[tuple[str, str]]) -> dict:
     return {
         "document_type": "handover summary",
-        "document_date": _dated(date),
         "requirements": [],
         "testing_observations": [],
         "delivery_evidence": [
             {"summary": summary, "quote": quote} for summary, quote in delivered
         ],
-        "blockers": [],
         "embedded_instructions": [],
     }
 
@@ -262,9 +247,7 @@ def test_a_passed_observation_moves_the_status_to_done_with_its_citation(
             (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
             extract_marker(TESTING_FILE): _testing(
                 [("the notification reaches the team", "Passed", TESTING_QUOTE)]
             ),
@@ -290,9 +273,7 @@ def test_a_change_request_never_moves_the_status(tmp_path: Path) -> None:
             (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
             extract_marker(TESTING_FILE): _testing(
                 [("the team wants a daily digest too", "Change request", TESTING_QUOTE)]
             ),
@@ -317,12 +298,8 @@ def test_a_row_no_document_mentions_keeps_no_evidence_yet(tmp_path: Path) -> Non
             (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
-            extract_marker(WRITTEN_SCOPE_FILE): _asks(
-                [(SECOND_ASKED, SECOND_QUOTE)], WRITTEN_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
+            extract_marker(WRITTEN_SCOPE_FILE): _asks([(SECOND_ASKED, SECOND_QUOTE)], "meeting notes"),
             extract_marker(TESTING_FILE): _testing(
                 [("the notification reaches the team", "Passed", TESTING_QUOTE)]
             ),
@@ -336,35 +313,6 @@ def test_a_row_no_document_mentions_keeps_no_evidence_yet(tmp_path: Path) -> Non
     # Nothing read said anything about the search row, so it claims nothing.
     assert finished.rows[2]["status"] == NO_EVIDENCE_YET
     assert finished.rows[2]["what_testing_found"].startswith("Not known yet")
-    assert finished.rows[2]["first_seen"] == finished.rows[2]["last_moved"]
-
-
-def test_last_moved_carries_the_date_of_the_document_that_moved_the_row(
-    tmp_path: Path,
-) -> None:
-    finished = _run_once(
-        tmp_path,
-        [
-            (MEETING_NOTES_FILE, MEETING_DATE, ASKED_QUOTE),
-            (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
-        ],
-        {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
-            extract_marker(TESTING_FILE): _testing(
-                [("the notification reaches the team", "Passed", TESTING_QUOTE)]
-            ),
-            match_marker(): match_answer(1),
-            observation_marker(): observation_answer_of([1]),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    # Both dates come from documents, and they finally differ: one names when
-    # the ask was first seen, the other when the row last changed.
-    assert finished.rows[1]["first_seen"] == MEETING_DATE
-    assert finished.rows[1]["last_moved"] == TESTING_DATE
 
 
 def test_a_handover_summary_moves_an_existing_row_and_creates_none(
@@ -377,9 +325,7 @@ def test_a_handover_summary_moves_an_existing_row_and_creates_none(
             (HANDOVER_FILE, HANDOVER_DATE, HANDOVER_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
             extract_marker(HANDOVER_FILE): _handover(
                 [("the intake portal was handed over", HANDOVER_QUOTE)]
             ),
@@ -389,9 +335,8 @@ def test_a_handover_summary_moves_an_existing_row_and_creates_none(
         },
     )
 
-    # One row, from the meeting note alone. The handover moved it and made none.
+    # One row, from the meeting note alone. The handover made none.
     assert sorted(finished.rows) == [1]
-    assert finished.rows[1]["last_moved"] == HANDOVER_DATE
     # A handover says the work exists, never that it behaves as asked, so it
     # is not on its own a reason to call the row Done.
     assert finished.rows[1]["status"] == NO_EVIDENCE_YET
@@ -409,13 +354,9 @@ def test_a_row_created_and_moved_in_the_same_batch_ends_with_both_its_evidence(
             (HANDOVER_FILE, HANDOVER_DATE, HANDOVER_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
             extract_marker(WRITTEN_SCOPE_FILE): _asks(
-                [(ASKED, WRITTEN_QUOTE)],
-                WRITTEN_DATE,
-                "client requirements document",
+                [(ASKED, WRITTEN_QUOTE)], "client requirements document"
             ),
             extract_marker(TESTING_FILE): _testing(
                 [("the notification reaches the team", "Passed", TESTING_QUOTE)]
@@ -438,20 +379,13 @@ def test_a_row_created_and_moved_in_the_same_batch_ends_with_both_its_evidence(
     assert finished.rows[1]["in_writing"].startswith("Yes")
     assert finished.rows[1]["status"] == "Done"
     assert finished.rows[1]["what_testing_found"] == "the notification reaches the team"
-    assert finished.rows[1]["first_seen"] == WRITTEN_DATE
-    # Two documents move this row in one batch. `last_moved` carries the date
-    # of the one read last, which is the one whose value the cell ends holding
-    # — the documents are read in file-name order, not date order.
-    assert finished.rows[1]["last_moved"] == TESTING_DATE
 
 
 def test_an_uncertain_observation_to_row_link_is_flagged_and_never_settled(
     tmp_path: Path,
 ) -> None:
     answers = {
-        extract_marker(MEETING_NOTES_FILE): _asks(
-            [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-        ),
+        extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
         extract_marker(TESTING_FILE): _testing(
             [("something the tester was vague about", "Passed", TESTING_QUOTE)]
         ),
@@ -497,9 +431,7 @@ def test_a_row_this_run_moved_to_done_raises_no_finding_about_a_missing_outcome(
             (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
             extract_marker(TESTING_FILE): _testing(
                 [("the notification reaches the team", "Passed", TESTING_QUOTE)]
             ),
@@ -518,32 +450,6 @@ def test_a_row_this_run_moved_to_done_raises_no_finding_about_a_missing_outcome(
     assert [one["rule_id"] for one in finished.run["examine"]["findings"]] == []
 
 
-def test_an_undated_handover_still_moves_the_row_it_matched(tmp_path: Path) -> None:
-    finished = _run_once(
-        tmp_path,
-        [
-            (MEETING_NOTES_FILE, MEETING_DATE, ASKED_QUOTE),
-            (HANDOVER_FILE, HANDOVER_DATE, HANDOVER_QUOTE),
-        ],
-        {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
-            extract_marker(HANDOVER_FILE): _undated_handover(
-                [("the portal was handed over", HANDOVER_QUOTE)]
-            ),
-            match_marker(): match_answer(1),
-            observation_marker(): observation_answer_of([1]),
-            examine_marker(): no_findings_answer(),
-        },
-    )
-
-    # A handover that states no date still moved this row. Reporting nothing
-    # moved would deny evidence the run actually read.
-    assert finished.rows[1]["last_moved"] == "date unknown"
-    assert finished.rows[1]["first_seen"] == MEETING_DATE
-
-
 def test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_delivered(
     tmp_path: Path,
 ) -> None:
@@ -554,9 +460,7 @@ def test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_
             (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
             extract_marker(TESTING_FILE): _testing(
                 [("there is no notification at all", "Not found", TESTING_QUOTE)]
             ),
@@ -582,9 +486,7 @@ def test_a_handover_claiming_delivery_against_testing_reporting_missing_is_dispu
             (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
         ],
         {
-            extract_marker(MEETING_NOTES_FILE): _asks(
-                [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-            ),
+            extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
             extract_marker(HANDOVER_FILE): _handover(
                 [("the notification was handed over", HANDOVER_QUOTE)]
             ),
@@ -622,9 +524,7 @@ def _committed_row_then_moved(
 ) -> tuple[tuple[str, str], dict[str, tuple[str | None, str]]]:
     """One run commits a row; a second run's testing feedback moves it."""
     answers = {
-        extract_marker(MEETING_NOTES_FILE): _asks(
-            [(ASKED, ASKED_QUOTE)], MEETING_DATE, "meeting notes"
-        ),
+        extract_marker(MEETING_NOTES_FILE): _asks([(ASKED, ASKED_QUOTE)], "meeting notes"),
         extract_marker(TESTING_FILE): _testing(
             [("the notification reaches the team", "Passed", TESTING_QUOTE)]
         ),

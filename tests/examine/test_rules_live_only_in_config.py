@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from app.examine.frozen_rules import load_rules
 from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
@@ -46,6 +47,23 @@ def test_no_rule_is_judged_outside_config_rules_yaml(tmp_path: Path) -> None:
     assert "R1" in reported["markdown"]
     for named_in_code in ("D1", "D2"):
         assert named_in_code not in reported["markdown"]
+
+
+def test_no_rule_in_config_rules_yaml_asks_for_a_document_date() -> None:
+    """The register keeps no document date, so no shipped rule may ask for one.
+
+    An elapsed-time rule would be judged against evidence the register no
+    longer holds, leaving the model to invent the days it counted.
+    """
+    shipped = Path(__file__).resolve().parents[2] / "config" / "rules.yaml"
+
+    for rule in load_rules(shipped):
+        wording = " ".join([rule["text"], *rule["params"]]).lower()
+        for date_word in ("date", "day", "week", "month", "elapsed"):
+            assert date_word not in wording, (
+                f"rule {rule['id']} names '{date_word}', and the register no "
+                "longer keeps a document date for a rule to count from"
+            )
 
 
 def _run_against(tmp_path: Path, rules_file: str) -> dict[str, Any]:

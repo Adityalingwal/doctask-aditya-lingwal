@@ -9,13 +9,12 @@ from app.extract.answer import CLIENT_REQUIREMENTS_DOCUMENT, MEETING_NOTES
 from app.match.match_requirements import EXISTING_ROW, NEW_ROW, POSSIBLE_MATCH
 from app.register.cells import (
     CELL_NAMES,
-    FIRST_SEEN,
     IN_WRITING,
     IN_WRITING_NOT_KNOWN_YET,
     WHAT_WAS_ASKED,
 )
 from tests.documents.register_documents import (
-    dated_extraction_answer,
+    several_requirements_answer,
     examine_marker,
     extract_marker,
     match_answer_within_batch,
@@ -34,9 +33,9 @@ from tests.runs.application import (
 )
 
 
-# The requirements document sorts first by file name and is dated a week after
-# the meeting note that raised the ask, so read order and document order
-# disagree — which is the whole point of first_seen not following read order.
+# The requirements document sorts first by file name, so file-name order and
+# workflow order disagree — which is the point the batch ordering has to get
+# right.
 REQUIREMENTS_FILE = "client-requirements-v1.md"
 MEETING_FILE = "meeting-notes-10-mar.md"
 REQUIREMENTS_DATE = "12 March 2026"
@@ -106,8 +105,10 @@ def _runs_over(
         script: dict[str, Any] = {**answers, examine_marker(): no_findings_answer()}
         for batch in batches:
             for document in batch:
-                script[extract_marker(document.source_file)] = dated_extraction_answer(
-                    document.requirements, document.document_type, document.date
+                script[extract_marker(document.source_file)] = (
+                    several_requirements_answer(
+                        document.requirements, document.document_type
+                    )
                 )
         script_path = tmp_path / "script.json"
         write_script(script_path, script)
@@ -221,14 +222,6 @@ def test_that_row_says_it_is_in_writing_and_cites_both_documents(
     assert _cell(row, IN_WRITING) == f"Yes — written in {REQUIREMENTS_FILE}."
     assert _cited_files(row, WHAT_WAS_ASKED) == [REQUIREMENTS_FILE, MEETING_FILE]
     assert _cited_files(row, IN_WRITING) == [REQUIREMENTS_FILE]
-
-
-def test_first_seen_is_the_earliest_document_date_not_the_first_file_read(
-    one_ask_in_two_documents: RunOutcome,
-) -> None:
-    row = one_ask_in_two_documents.rows[1]
-    assert _cell(row, FIRST_SEEN) == MEETING_DATE
-    assert _cited_files(row, FIRST_SEEN) == [MEETING_FILE]
 
 
 def test_a_confident_batch_match_raises_no_decision(

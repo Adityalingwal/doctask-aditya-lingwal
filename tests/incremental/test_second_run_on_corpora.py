@@ -14,7 +14,7 @@ from tests.runs.application import (
     write_script,
 )
 from tests.documents.register_documents import (
-    dated_extraction_answer,
+    several_requirements_answer,
     examine_marker,
     extract_marker,
     match_answer,
@@ -153,7 +153,7 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
         [requirements, handover, testing_feedback],
         {
             match_marker_against_an_empty_register(): match_answer(3),
-            extract_marker(meeting_notes): dated_extraction_answer(
+            extract_marker(meeting_notes): several_requirements_answer(
                 [
                     (
                         "online appointment booking on the clinic website",
@@ -173,9 +173,8 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
                     ),
                 ],
                 MEETING_NOTES,
-                "5 June 2026",
             ),
-            extract_marker(requirements): dated_extraction_answer(
+            extract_marker(requirements): several_requirements_answer(
                 [
                     (
                         "online booking from the clinic website",
@@ -199,7 +198,6 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
                     ),
                 ],
                 CLIENT_REQUIREMENTS_DOCUMENT,
-                "10 June 2026",
             ),
             extract_marker(handover): _handover_answer(),
             extract_marker(testing_feedback): _testing_feedback_answer(),
@@ -229,20 +227,13 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
         == "online booking saved every test appointment"
     )
     assert _cell(after_second_run[3], "status") == "Partial"
-    # first_seen still comes from the document that first asked for this and
-    # last_moved from the one that moved it, so the two finally differ.
-    assert _cell(after_second_run[3], "last_moved") == "15 July 2026"
-    assert _cell(after_second_run[3], "first_seen") == "5 June 2026"
     for moved in (1, 3):
         assert after_second_run[moved].fingerprint != after_first_run[moved].fingerprint
         assert _cell(after_second_run[moved], "what_was_asked") == _cell(
             after_first_run[moved], "what_was_asked"
         )
-    # The handover moved three rows of its own: two the testing feedback also
-    # touched, and row 5, which this same batch proposed and the handover then
-    # reported delivered. A handover states delivery, never a verdict, so it
-    # moves `last_moved` and leaves the status alone.
-    assert _cell(after_second_run[5], "last_moved") == "20 July 2026"
+    # Row 5 is the one this same batch proposed and the handover then reported
+    # delivered. A handover states delivery, never a verdict.
     assert _cell(after_second_run[5], "status") == "No evidence yet"
 
 
@@ -250,10 +241,6 @@ def _handover_answer() -> dict[str, Any]:
     """The Northside handover, as its own document says what was handed over."""
     return {
         "document_type": "handover summary",
-        "document_date": {
-            "value": "20 July 2026",
-            "quote": "**Date:** 20 July 2026",
-        },
         "requirements": [],
         "testing_observations": [],
         "delivery_evidence": [
@@ -272,7 +259,6 @@ def _handover_answer() -> dict[str, Any]:
                 "quote": "the daily schedule screen",
             },
         ],
-        "blockers": [],
         "embedded_instructions": [],
     }
 
@@ -282,7 +268,7 @@ def _cell(row: Any, cell_name: str) -> str:
 
 
 def _meeting_notes_answer() -> dict[str, Any]:
-    return dated_extraction_answer(
+    return several_requirements_answer(
         [
             (
                 "a notification to the operations team on intake form submit",
@@ -301,12 +287,11 @@ def _meeting_notes_answer() -> dict[str, Any]:
             ),
         ],
         MEETING_NOTES,
-        "10 March 2026",
     )
 
 
 def _written_scope_answer() -> dict[str, Any]:
-    return dated_extraction_answer(
+    return several_requirements_answer(
         [
             (
                 "an intake form that validates every required field",
@@ -325,16 +310,12 @@ def _written_scope_answer() -> dict[str, Any]:
             ),
         ],
         CLIENT_REQUIREMENTS_DOCUMENT,
-        "12 March 2026",
     )
 
 
 def _testing_feedback_answer() -> dict[str, Any]:
     """The testing document reports what it found and asks for nothing new."""
-    return dated_extraction_answer([], TESTING_FEEDBACK, "15 July 2026") | {
-        # The PDF writes its date without Markdown emphasis, and a quote that
-        # is not in the file is dropped along with what it supports.
-        "document_date": {"value": "15 July 2026", "quote": "Date: 15 July 2026"},
+    return several_requirements_answer([], TESTING_FEEDBACK) | {
         "testing_observations": [
             {
                 "summary": "online booking saved every test appointment",

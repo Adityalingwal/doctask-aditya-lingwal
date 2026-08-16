@@ -45,8 +45,8 @@ RULES_WITH_A_CHANGED_VALUE = PLAIN_RULES.replace("max_days: 14", "max_days: 30")
 def test_the_shipped_rules_file_loads_as_the_default_rules() -> None:
     rules = load_rules(SHIPPED_RULES_FILE)
 
-    assert [rule["id"] for rule in rules] == ["R1", "R2", "R3", "R4", "R5"]
-    assert rules[2]["params"] == {"max_days": 14}
+    assert [rule["id"] for rule in rules] == ["R1", "R2", "R4", "R5"]
+    assert all(rule["params"] == {} for rule in rules)
 
 
 def test_rules_fingerprint_ignores_comments_and_layout(tmp_path: Path) -> None:

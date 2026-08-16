@@ -69,9 +69,6 @@ EXPECTED_COLUMNS = {
         "in_writing",
         "what_testing_found",
         "status",
-        "blocked_on",
-        "first_seen",
-        "last_moved",
         "fingerprint",
         "row_number",
         "proposed_by_run_id",
@@ -136,7 +133,7 @@ REGISTER_ROW_STATUSES = (
     "Done",
     "Partial",
     "Not delivered",
-    "Blocked",
+    "Handed over",
     "Disputed",
     "No evidence yet",
 )
@@ -248,63 +245,43 @@ def _insert_document(connection: Connection, run_id: UUID) -> UUID:
     return document_id
 
 
+# The three cells 20260817_0017 dropped. A test that first downgrades past
+# that migration writes them too, because the older shape holds them NOT NULL.
+CELLS_DROPPED_BY_THE_NARROWING = {
+    "blocked_on": "Not blocked",
+    "first_seen": "10 March 2026",
+    "last_moved": "10 March 2026",
+}
+
+
 def _insert_register_row(
     connection: Connection,
     project_id: UUID | None,
     run_id: UUID,
     status: str = "No evidence yet",
     row_number: int = 1,
+    on_the_seven_cell_shape: bool = False,
 ) -> UUID:
     register_row_id = uuid4()
+    values = {
+        "id": register_row_id,
+        "project_id": project_id,
+        "what_was_asked": "Send a notification on form submission.",
+        "in_writing": "Yes",
+        "what_testing_found": "No testing evidence yet.",
+        "status": status,
+        "fingerprint": f"fingerprint-{register_row_id}",
+        "row_number": row_number,
+        "proposed_by_run_id": run_id,
+        "is_committed": False,
+    }
+    if on_the_seven_cell_shape:
+        values |= CELLS_DROPPED_BY_THE_NARROWING
+    columns = ", ".join(values)
+    placeholders = ", ".join(f":{name}" for name in values)
     connection.execute(
-        text(
-            """
-            INSERT INTO register_rows (
-                id,
-                project_id,
-                what_was_asked,
-                in_writing,
-                what_testing_found,
-                status,
-                blocked_on,
-                first_seen,
-                last_moved,
-                fingerprint,
-                row_number,
-                proposed_by_run_id,
-                is_committed
-            ) VALUES (
-                :id,
-                :project_id,
-                :what_was_asked,
-                :in_writing,
-                :what_testing_found,
-                :status,
-                :blocked_on,
-                :first_seen,
-                :last_moved,
-                :fingerprint,
-                :row_number,
-                :proposed_by_run_id,
-                :is_committed
-            )
-            """
-        ),
-        {
-            "id": register_row_id,
-            "project_id": project_id,
-            "what_was_asked": "Send a notification on form submission.",
-            "in_writing": "Yes",
-            "what_testing_found": "No testing evidence yet.",
-            "status": status,
-            "blocked_on": "Not blocked",
-            "first_seen": "10 March 2026",
-            "last_moved": "10 March 2026",
-            "fingerprint": f"fingerprint-{register_row_id}",
-            "row_number": row_number,
-            "proposed_by_run_id": run_id,
-            "is_committed": False,
-        },
+        text(f"INSERT INTO register_rows ({columns}) VALUES ({placeholders})"),
+        values,
     )
     return register_row_id
 
@@ -561,9 +538,15 @@ def test_attachment_audit_event_refuses_to_name_a_changed_cell(
             )
 
 
-def test_cell_change_audit_event_still_names_one_of_the_seven_cells(
+def test_cell_change_audit_event_still_names_a_register_cell(
     database_connection: Connection,
 ) -> None:
+    """The audit check keeps the names of the cells 20260817_0017 dropped.
+
+    An audit entry is history: a row whose `Blocked on` changed before that
+    migration ran still names that cell, and narrowing the check would either
+    refuse the entry or force it to be deleted.
+    """
     project_id = _insert_project(database_connection)
     run_id = _insert_run(database_connection, project_id)
     register_row_id = _insert_register_row(database_connection, project_id, run_id)
@@ -679,7 +662,11 @@ def test_the_upgrade_removing_withdrawal_refuses_while_a_withdrawn_row_exists(
                 project_id = _insert_project(connection)
                 run_id = _insert_run(connection, project_id)
                 _insert_register_row(
-                    connection, project_id, run_id, status="Withdrawn"
+                    connection,
+                    project_id,
+                    run_id,
+                    status="Withdrawn",
+                    on_the_seven_cell_shape=True,
                 )
 
             with pytest.raises(RuntimeError) as refused:

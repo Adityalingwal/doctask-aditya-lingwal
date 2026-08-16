@@ -134,10 +134,9 @@ def requirement_extraction_answer(
     """One requirement from a document that states no date of its own."""
     return {
         "document_type": document_type,
-        "document_date": None,
         "requirements": [{"summary": summary, "quote": quote}],
         "testing_observations": [],
-        "blockers": [],
+        "delivery_evidence": [],
         "embedded_instructions": [],
     }
 
@@ -145,13 +144,9 @@ def requirement_extraction_answer(
 def extraction_answer(summary: str, quote: str) -> dict[str, Any]:
     return {
         "document_type": "meeting notes",
-        "document_date": {
-            "value": "10 March 2026",
-            "quote": "**Date:** 10 March 2026",
-        },
         "requirements": [{"summary": summary, "quote": quote}],
         "testing_observations": [],
-        "blockers": [],
+        "delivery_evidence": [],
         "embedded_instructions": [],
     }
 
@@ -167,37 +162,29 @@ def unrelated_extraction_answer() -> dict[str, Any]:
 
 def feedback_extraction_answer(
     observations: list[tuple[str, str, str]],
-    date: str = "25 March 2026",
 ) -> dict[str, Any]:
     """What testing found, as testing feedback: summary, label and quote each."""
     return {
         "document_type": "testing feedback",
-        "document_date": {"value": date, "quote": f"**Date:** {date}"},
         "requirements": [],
         "testing_observations": [
             {"summary": summary, "label": label, "quote": quote}
             for summary, label, quote in observations
         ],
         "delivery_evidence": [],
-        "blockers": [],
         "embedded_instructions": [],
     }
 
 
-def handover_answer(
-    delivered: list[tuple[str, str]],
-    date: str = "20 July 2026",
-) -> dict[str, Any]:
+def handover_answer(delivered: list[tuple[str, str]]) -> dict[str, Any]:
     """What a handover summary reports as handed over, and nothing else."""
     return {
         "document_type": "handover summary",
-        "document_date": {"value": date, "quote": f"**Date:** {date}"},
         "requirements": [],
         "testing_observations": [],
         "delivery_evidence": [
             {"summary": summary, "quote": quote} for summary, quote in delivered
         ],
-        "blockers": [],
         "embedded_instructions": [],
     }
 
@@ -206,28 +193,25 @@ def extraction_answer_without_requirements() -> dict[str, Any]:
     """A document of this engagement that simply asks for nothing."""
     return {
         "document_type": "meeting notes",
-        "document_date": None,
         "requirements": [],
         "testing_observations": [],
-        "blockers": [],
+        "delivery_evidence": [],
         "embedded_instructions": [],
     }
 
 
-def dated_extraction_answer(
+def several_requirements_answer(
     requirements: list[tuple[str, str]],
     document_type: str,
-    date: str,
 ) -> dict[str, Any]:
-    """Several requirements out of one document that states its own date."""
+    """Several requirements out of one document."""
     return {
         "document_type": document_type,
-        "document_date": {"value": date, "quote": f"**Date:** {date}"},
         "requirements": [
             {"summary": summary, "quote": quote} for summary, quote in requirements
         ],
         "testing_observations": [],
-        "blockers": [],
+        "delivery_evidence": [],
         "embedded_instructions": [],
     }
 

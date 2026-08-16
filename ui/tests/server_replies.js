@@ -87,15 +87,7 @@ export function exportReply(overrides = {}) {
     project: { id: projectId, name: "Acme intake portal" },
     run_id: runId,
     exported_at: "2026-03-26T10:00:00+00:00",
-    columns: [
-      "what_was_asked",
-      "in_writing",
-      "what_testing_found",
-      "status",
-      "blocked_on",
-      "first_seen",
-      "last_moved",
-    ],
+    columns: ["what_was_asked", "in_writing", "what_testing_found", "status"],
     rows: [
       {
         row_number: 1,
@@ -105,9 +97,6 @@ export function exportReply(overrides = {}) {
           in_writing: "Yes — 12 March scope, section 2.",
           what_testing_found: "Upload failed for files over 10 MB.",
           status: "Partial",
-          blocked_on: "Nothing recorded.",
-          first_seen: "2026-03-12",
-          last_moved: "2026-03-26",
         },
         citations: [
           {

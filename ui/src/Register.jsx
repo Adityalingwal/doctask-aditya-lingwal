@@ -1,17 +1,15 @@
 import screenConfig from "../config/screen.json";
 import { dayMonthTime } from "./format_date.js";
 
-// D05 fixes the seven cell names; the export sends the column keys, not the
+// D05 fixes the four cell names; the export sends the column keys, not the
 // words a person reads. An unknown key is shown as the server sent it rather
-// than turned into a heading nobody chose.
+// than turned into a heading nobody chose. The stored column is still
+// `in_writing`; only the heading asks the question in a reader's words.
 const CELL_HEADINGS = {
   what_was_asked: "What was asked",
-  in_writing: "In writing?",
+  in_writing: "Written down?",
   what_testing_found: "What testing found",
   status: "Status",
-  blocked_on: "Blocked on",
-  first_seen: "First seen",
-  last_moved: "Last moved",
 };
 
 const STATUS_CELL = "status";
@@ -175,10 +173,9 @@ function findingLine(finding) {
   return `Row ${finding.row_number} — ${finding.issue} (${finding.evidence})`;
 }
 
-// A rule's own parameters, folded into its sentence: R3's config text names
-// max_days directly ("blocked beyond max_days days"), and this replaces that
-// word with the value the run judged against — never printed after the
-// sentence as "(max_days: 14)".
+// A rule's own parameters, folded into its sentence: a rule whose text names
+// a setting is shown with the value the run judged against in that word's
+// place, never printed after the sentence as "(max_days: 14)".
 function foldedRuleText(rule) {
   const params = rule.params ?? {};
   return Object.entries(params).reduce(

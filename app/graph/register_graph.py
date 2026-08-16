@@ -549,11 +549,7 @@ def build_register_graph(
             extraction = document["extraction"]
             for requirement in extraction["requirements"]:
                 requirements.append(
-                    {
-                        **requirement,
-                        "document_type": extraction["document_type"],
-                        "document_date": extraction["document_date"],
-                    }
+                    {**requirement, "document_type": extraction["document_type"]}
                 )
         return requirements
 
@@ -702,7 +698,7 @@ def _observations_in(extraction: dict[str, Any]) -> int:
     """How much this document says about work the client already asked for."""
     return sum(
         len(extraction[list_name])
-        for list_name in ("testing_observations", "delivery_evidence", "blockers")
+        for list_name in ("testing_observations", "delivery_evidence")
     )
 
 
