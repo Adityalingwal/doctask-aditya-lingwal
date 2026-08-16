@@ -868,6 +868,12 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
+- `Disputed` is reached only when the handover and the testing feedback that
+  contradict each other are read in the **same batch**. `status_after` decides
+  it from the delivery evidence this batch supplied, and nothing stores the
+  fact that a handover once claimed delivery — so a handover read in an earlier
+  run leaves a later "not there" verdict landing on `Not delivered` instead.
+  Closing it needs a stored claim on the row, not a wider read.
 - The 20-page limit binds `.pdf` only; Markdown, plain text and Word report no
   page count and none is invented for them.
 - A `.docx` citation names a line of the extracted text, not a line Word
