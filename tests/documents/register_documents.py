@@ -159,14 +159,50 @@ def extraction_answer(summary: str, quote: str) -> dict[str, Any]:
     }
 
 
-def unrelated_extraction_answer(summary: str, quote: str) -> dict[str, Any]:
-    """A document Extract judged unrelated, which still listed a requirement.
+def unrelated_extraction_answer() -> dict[str, Any]:
+    """A document Extract judged unrelated, reporting nothing in any list.
 
-    The Extract node already guards against this shape by forcing the
-    requirement count to zero for an unrelated document, so a batch can end
-    with nothing found while the stored extraction is not empty.
+    An unrelated document may fill none of the four lists, so this is the only
+    shape one can honestly come back in.
     """
-    return extraction_answer(summary, quote) | {"document_type": "unrelated"}
+    return extraction_answer_without_requirements() | {"document_type": "unrelated"}
+
+
+def feedback_extraction_answer(
+    observations: list[tuple[str, str, str]],
+    date: str = "25 March 2026",
+) -> dict[str, Any]:
+    """What testing found, as testing feedback: summary, label and quote each."""
+    return {
+        "document_type": "testing feedback",
+        "document_date": {"value": date, "quote": f"**Date:** {date}"},
+        "requirements": [],
+        "testing_observations": [
+            {"summary": summary, "label": label, "quote": quote}
+            for summary, label, quote in observations
+        ],
+        "delivery_evidence": [],
+        "blockers": [],
+        "embedded_instructions": [],
+    }
+
+
+def handover_answer(
+    delivered: list[tuple[str, str]],
+    date: str = "20 July 2026",
+) -> dict[str, Any]:
+    """What a handover summary reports as handed over, and nothing else."""
+    return {
+        "document_type": "related additional document",
+        "document_date": {"value": date, "quote": f"**Date:** {date}"},
+        "requirements": [],
+        "testing_observations": [],
+        "delivery_evidence": [
+            {"summary": summary, "quote": quote} for summary, quote in delivered
+        ],
+        "blockers": [],
+        "embedded_instructions": [],
+    }
 
 
 def extraction_answer_without_requirements() -> dict[str, Any]:

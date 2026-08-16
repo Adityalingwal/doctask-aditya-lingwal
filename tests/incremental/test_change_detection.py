@@ -299,13 +299,13 @@ def test_an_unchanged_unrelated_document_is_not_sent_to_the_model_twice(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("stray-file") as (source_folder, source_folder_path):
-        quote = write_meeting_note(source_folder, UNRELATED_FILE, UNRELATED_REQUIREMENT)
+        write_meeting_note(source_folder, UNRELATED_FILE, UNRELATED_REQUIREMENT)
 
         markers = _markers_from_two_runs_over(
             tmp_path,
             source_folder_path,
             UNRELATED_FILE,
-            unrelated_extraction_answer(UNRELATED_REQUIREMENT, quote),
+            unrelated_extraction_answer(),
         )
 
     # A run holding only an unrelated document never exports, so an export can

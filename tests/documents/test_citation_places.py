@@ -23,11 +23,11 @@ from tests.documents.register_documents import (
 )
 
 
-PDF_FILE = "testing-feedback.pdf"
+PDF_FILE = "meeting-notes.pdf"
 DOCX_FILE = "client-requirements.docx"
 TEXT_FILE = "call-note.txt"
 
-PDF_QUOTE = "The list page opens but has no search box at all."
+PDF_QUOTE = "The client asked for a search box on the records list page."
 DOCX_QUOTE = "The portal must let staff export a record as a PDF."
 TEXT_QUOTE = "The client asked for a weekly digest of new intake records."
 
@@ -51,8 +51,8 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
         write_pdf(
             source_folder / PDF_FILE,
             [
-                ["Testing feedback", "The intake form submits correctly."],
-                ["The email notification reaches the operations team."],
+                ["Meeting notes", "The operations lead walked us through intake."],
+                ["The second half of the call covered the records list page."],
                 ["Records", PDF_QUOTE],
             ],
         )
@@ -79,7 +79,7 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
             script_path,
             {
                 extract_marker(PDF_FILE): requirement_extraction_answer(
-                    PDF_REQUIREMENT, PDF_QUOTE, document_type="testing feedback"
+                    PDF_REQUIREMENT, PDF_QUOTE
                 ),
                 extract_marker(DOCX_FILE): requirement_extraction_answer(
                     DOCX_REQUIREMENT,

@@ -16,8 +16,8 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from app.extract.answer import (
-    PRIMARY_DOCUMENT_TYPES,
     UNRELATED_DOCUMENT,
+    ListTheDocumentTypeMayNotFill,
     UnrecognisedDocumentType,
     describe_unreadable_answer,
 )
@@ -209,6 +209,39 @@ def build_register_graph(
                 )
                 await _finish_stage(connection, run_id, EXTRACT_STAGE)
             return {"next_document_index": index + 1}
+        except ListTheDocumentTypeMayNotFill as not_allowed:
+            # The prompt and the schema both state which lists a type may
+            # fill, so this is a wrong answer rather than something to correct
+            # quietly. One document is skipped; the batch carries on.
+            skip_reason = (
+                "The model reported something this kind of document may not "
+                "report."
+            )
+            log_reason = (
+                f"{source_file} was skipped: {not_allowed}. The other "
+                "documents in the batch continue and the next run reads this "
+                "one again."
+            )
+            _log(
+                logging.WARNING,
+                "extract_list_not_allowed_for_document_type",
+                log_reason,
+                run_id,
+            )
+            async with pool.connection() as connection:
+                await append_skipped(
+                    connection,
+                    run_id,
+                    [
+                        {
+                            "kind": SKIPPED_DOCUMENT_KIND,
+                            "file": source_file,
+                            "reason": skip_reason,
+                        }
+                    ],
+                )
+                await _finish_stage(connection, run_id, EXTRACT_STAGE)
+            return {"next_document_index": index + 1}
         except Exception as error:
             # One document degrades the run; a broken setup stops it, because
             # skipping every document would export an empty register instead
@@ -240,11 +273,6 @@ def build_register_graph(
         located = locate_extraction(answer, document["extracted_text"], source_file)
         skipped = list(located.dropped)
         requirements_found = len(located.extraction["requirements"])
-        if answer.document_type not in PRIMARY_DOCUMENT_TYPES:
-            # A related additional document is still read, labelled and stored
-            # for what it adds to a row; what it may not do is put a row in the
-            # register by itself.
-            requirements_found = 0
         if answer.document_type == UNRELATED_DOCUMENT:
             skipped.append(
                 {
@@ -488,8 +516,6 @@ def build_register_graph(
         requirements: list[dict[str, Any]] = []
         for document in await result.fetchall():
             extraction = document["extraction"]
-            if extraction["document_type"] not in PRIMARY_DOCUMENT_TYPES:
-                continue
             for requirement in extraction["requirements"]:
                 requirements.append(
                     {
