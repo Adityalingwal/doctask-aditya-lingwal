@@ -489,7 +489,20 @@ match.
   approved, since two proposals of one batch can settle in either order — and
   marks the proposal with `merged_into_register_row_id`; it is retained and
   skipped by Commit. Reject keeps it as a separate proposed row. Row-number
-  gaps are accepted.
+  gaps are accepted. **Every marker is left pointing at the row that holds the
+  evidence**, so a marker is never two hops from it: readers of that column
+  follow it exactly once, and a two-hop chain would report a finding against a
+  row Commit never commits.
+- **An approved merge brings the surviving row's cells up to the evidence it
+  just gained**, which reverses the slice-1 rule that a merge moved citations
+  and never a cell. Only the two cells the arriving requirement can speak to
+  move: `In writing?`, which otherwise keeps denying a requirements document
+  the row now cites, and `First seen`, which takes the earlier of the two
+  dates. The replaced cell's old citation goes with its old value. On an
+  already-committed row this writes the before-and-after audit entry and moves
+  the fingerprint, exactly as an approved move does — a changed cell that left
+  the fingerprint still would be the register lying about itself. History:
+  `documentation/decision-history.md`, 2026-08-16.
 - **Evidence/status:** Implemented and verified by coverage, duplicate-index,
   missing-candidate, merge, rejection, and node-rerun tests, by ten
   within-batch tests in `tests/match/test_within_batch_duplicates.py`, and by

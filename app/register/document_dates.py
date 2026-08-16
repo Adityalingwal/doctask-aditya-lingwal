@@ -22,15 +22,28 @@ def earliest_dated(requirements: list[dict[str, Any]]) -> dict[str, Any] | None:
     dated = [one for one in requirements if one.get("document_date") is not None]
     if not dated:
         return None
-    return min(
-        enumerate(dated),
-        key=lambda pair: _when(pair[1]["document_date"]["summary"], pair[0]),
-    )[1]
+    placed = [_placed(one["document_date"]["summary"]) for one in dated]
+    # One date nobody can place makes the whole comparison a guess: the
+    # unplaceable one may itself be the earliest, and sorting it last would let
+    # the row claim a first-seen date its own evidence does not support. Read
+    # order claims nothing, so read order is what is kept.
+    if any(when is None for when in placed):
+        return dated[0]
+    return min(zip(placed, dated), key=lambda pair: pair[0])[1]
 
 
-def _when(written: str, read_order: int) -> tuple[bool, date, int]:
-    placed = _placed(written)
-    return (placed is None, placed or date.min, read_order)
+def earlier_of(held: str, arriving: str) -> str:
+    """The earlier of two written dates, keeping the held one where unplaceable.
+
+    A merge brings a second document's date onto a row that already carries
+    one. Where either cannot be placed the row keeps what it had, for the same
+    reason `earliest_dated` keeps read order: an order nobody can check is not
+    an order.
+    """
+    first, second = _placed(held), _placed(arriving)
+    if first is None or second is None:
+        return held
+    return held if first <= second else arriving
 
 
 def _placed(written: str) -> date | None:

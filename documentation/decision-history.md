@@ -3847,3 +3847,64 @@ free text. `app/register/document_dates.py` places `10 March 2026`,
 cell unchanged, and the row keeps read order rather than claiming an order
 nobody could check. Ambiguous all-numeric forms such as `03/10/2026` are
 deliberately absent — placing one would mean guessing which half is the month.
+
+## 2026-08-16 — review repairs to "one ask stated in two documents becomes one row"
+
+Codex reviewed the branch read-only and returned three findings. All three were
+re-checked against the code in the foreground and all three were real. Aditya
+chose to fix all three.
+
+**Superseded — a merge moved citations and never a cell.** The slice-1 rule,
+asserted by
+`test_a_second_run_over_the_intake_portal_corpus_touches_only_what_arrived`
+since 2026-08-14, was that an approved merge adds the arriving row's citations
+to the surviving row and leaves its seven cells and its fingerprint untouched.
+That was written when the only candidate a merge could have was a committed
+row, and it reads as caution: do not rewrite what a person already approved.
+
+It produces a row that denies its own evidence. A row proposed from a meeting
+note carries `In writing?` = "Not known yet — no client requirements document
+has been read for this project." When the client's requirements document
+arrives in a later run, states the same ask, and the Delivery Owner approves
+the merge, that sentence stays on the row while the requirements document's
+citation is attached to it. The register then shows a cell and a citation that
+contradict each other, and the rule "anything built must have a written
+requirement" judges a row whose written evidence is sitting on it unread.
+
+**Replacing it:** an approved merge brings the surviving row's cells up to the
+evidence it just gained. Only the two cells the arriving requirement can speak
+to move — `In writing?` and `First seen`, the earlier of the two dates — and
+the replaced cell's old citation goes with its old value. On an already
+committed row the change writes its before-and-after audit entry and moves the
+fingerprint, the same way an approved move already does. Every other cell is
+untouched: a merge settles what a row cites, never what testing found or what
+was delivered. The corpus test now asserts that shape instead.
+
+**Rejected alternative:** applying the recompute only to rows this batch
+proposed, leaving committed rows as they were. It would have kept the old rule
+and its test intact, and it was rejected because the false sentence is the same
+false sentence in both places — the merge is exactly the event that makes it
+false, and a limitation saying so would be documenting a defect rather than
+fixing it.
+
+**New — a merge marker is never two hops from the row holding the evidence.**
+Approved merges are settled in decision-id order, which is a random uuid, so
+`B → A` can be written before `A → committed`. Citations still reach the
+committed row, because they are physically moved a second time, but `B`'s
+marker keeps pointing at `A`. `app/examine/read_findings.py` resolves exactly
+one hop through `COALESCE(merged_into_register_row_id, id)`, so a finding
+raised against `B` would be reported against `A` — a row Commit never commits —
+and would vanish from the surviving row's exported findings. Each merge now
+re-points every row already merged into its proposal at the same destination,
+so the column is always one hop deep. Unreachable before this work: every
+possible-match candidate was a committed row, so no chain could form.
+
+**Corrected — an unplaceable date no longer hands the row a later one.**
+`earliest_dated` dropped undated requirements and then sorted a placeable date
+ahead of an unplaceable one, so a document writing "sometime in March" followed
+by one writing "12 March 2026" gave the row `First seen` = 12 March. Proved
+against the pre-fix code before the change. That contradicted the limitation
+recorded above, which says the row keeps read order rather than claiming an
+order nobody could check. Where any date on the row cannot be placed, read
+order is now what is kept; a requirement stating no date at all is not an
+unplaceable date and does not block the others.

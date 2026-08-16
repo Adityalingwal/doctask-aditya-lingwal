@@ -14,6 +14,7 @@ from app.register.cells import (
     IN_WRITING,
     IN_WRITING_NOT_FOUND_IN,
     IN_WRITING_NOT_KNOWN_YET,
+    IN_WRITING_WRITTEN_IN_OPENING,
     LAST_MOVED,
     STATUS_NO_EVIDENCE_YET,
     TESTING_NOT_KNOWN_YET,
@@ -322,7 +323,7 @@ def _in_writing_cell(
     # claim at all, and one not mentioning an ask does not prove the client
     # never put it in writing.
     if written_down is not None:
-        return f"Yes — written in {written_down['source_file']}."
+        return f"{IN_WRITING_WRITTEN_IN_OPENING}{written_down['source_file']}."
     if documents_read:
         return IN_WRITING_NOT_FOUND_IN.format(documents=", ".join(documents_read))
     return IN_WRITING_NOT_KNOWN_YET

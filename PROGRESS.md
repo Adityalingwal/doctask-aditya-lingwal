@@ -295,6 +295,44 @@ into D05 and can be reversed with one line if it is wrong.
       in either order cannot strand evidence on a row Commit never commits.
 - [x] The Match prompt locked with Aditya on 2026-08-16, pasted word for word.
 - [x] No migration was needed.
+- [x] Reviewed by Codex (`-s read-only`, CLI `0.147.0`,
+      `handoff/review-report-batch-duplicates.md`): **not merge-ready**, three
+      findings (two P1, one P2). Every one was re-checked against the code in
+      the foreground and all three were real; Aditya chose to fix all three.
+      Both suites were re-run in the foreground too, because Codex's sandbox
+      has no Docker socket and its verdict is code-level only.
+- [x] Review findings repaired in the foreground, on the same branch, tests
+      first. **An approved merge now brings the surviving row's cells up to the
+      evidence it just gained** — `In writing?` stops denying a requirements
+      document the row now cites, `First seen` takes the earlier of the two
+      dates, the replaced cell's old citation goes with its old value, and an
+      already-committed row gets its before-and-after audit entry with its
+      fingerprint moved. This **reverses the slice-1 rule** that a merge moved
+      citations and never a cell; `documentation/decision-history.md` carries
+      the superseded wording and the narrower alternative that was rejected.
+      **A merge marker is never two hops from the row holding the evidence** —
+      each merge re-points every row already merged into its proposal, because
+      `read_findings.py` resolves exactly one hop and a two-hop chain would
+      report a finding against a row Commit never commits.
+      **An unplaceable document date no longer hands the row a later one** —
+      where any date on a row cannot be placed, read order is kept, which is
+      what the recorded limitation always said.
+- [x] Tests written before those fixes:
+      `test_an_approved_merge_leaves_no_cell_denying_the_row_s_own_evidence`
+      and `test_a_merge_into_a_row_that_is_itself_merged_leaves_no_two_hop_marker`
+      (`tests/register/test_merge_lands_on_one_row.py`), plus six unit cases in
+      `tests/register/test_merge_leaves_no_contradiction.py`. At the pre-fix
+      state neither file could be collected — the constants they are written
+      against did not exist there — which is a weaker result than an assertion
+      failure and is recorded as what it is. The date defect itself was proved
+      directly against the pre-fix code, which chose the 12 March document over
+      a "sometime in March" one read before it.
+- [x] `test_a_second_run_over_the_intake_portal_corpus_touches_only_what_arrived`
+      was changed because the behaviour it locked was deliberately reversed,
+      not because it was failing awkwardly: it now asserts that the merge moves
+      `In writing?` and the fingerprint, and that every other cell is untouched.
+- [x] **195 Python and 44 front-end tests pass** with no live API key, both
+      counts read from the suites' own printed summary in the foreground.
 
 ### Rules and findings slice (branch `rules-and-findings`)
 
@@ -1056,6 +1094,8 @@ working claim only after its own implementation and proof land.
 | Migration `20260815_0013` forward and backward on real data | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Seeded two projects over one folder at revision `20260815_0012`; `alembic upgrade head` refused, naming both project ids and the folder, transaction rolled back (`alembic current` still `20260815_0012`, constraint absent via `pg_constraint`); duplicate resolved by hand; `alembic upgrade head` then succeeded and the constraint was confirmed present; `alembic downgrade -1` dropped it (confirmed absent); `alembic upgrade head` re-applied cleanly |
 | Folder-is-a-project hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Real application, scripted model, browser: Add-project dropdown listed all three unclaimed folders, then two, then showed "No folder left to add." once all three had projects; the demo project's derived name read "Intake Portal"; a new project's derived name read "Hand Drive Check" from `sample-projects/hand-drive-check`; `POST /projects` twice for one folder returned the same `project_id` with `"created": false` the second time and `projects` held exactly one row per folder (confirmed by direct query); `..`, `/` and `/workspace` were each refused by name over HTTP, no row added by any of the three |
 | Register-moves hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Same session: a project that had never run read "Nothing has been added to this register yet."; a run driven to Review showed the question "Add this run's changes to the register?" verbatim; after approving and finishing, its project's Register entry read "1 row" and opening it showed the full table with citations and rules; opening the run's own Decisions tab (showing the answered export decision) and then clicking Register left no trace of the run's decision or its Approve/Reject buttons on screen |
+| `docker compose -p fx8 run --rm app pytest` | 2026-08-16, `match-within-batch-duplicates` branch, after the review repairs | 195 passed, real PostgreSQL, no live key. Was 188 before the three repairs; the seven new tests cover the merge recompute, the merge chain and the date ordering. Re-run in the foreground, independently of the implementing agent, because Codex cannot reach a Docker socket |
+| `npm --prefix ui test` | 2026-08-16, same branch, after the review repairs | 44 passed, 29 files, no live key — unchanged; no front-end file was touched |
 | Live model | Never | Unverified |
 | Fresh clone/image-only | Not run yet | Open release gate |
 

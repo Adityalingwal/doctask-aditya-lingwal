@@ -27,7 +27,11 @@ from tests.documents.register_documents import (
 )
 from tests.register.stored_register import documents_of_run, stored_rows
 
-from app.register.cells import CELL_NAMES
+from app.register.cells import (
+    CELL_NAMES,
+    IN_WRITING,
+    IN_WRITING_WRITTEN_IN_OPENING,
+)
 from app.extract.answer import (
     CLIENT_REQUIREMENTS_DOCUMENT,
     MEETING_NOTES,
@@ -117,11 +121,22 @@ def test_a_second_run_over_the_intake_portal_corpus_touches_only_what_arrived(
     # about, and they come back out of the second run unchanged to the byte.
     assert after_second_run[2] == after_first_run[2]
     assert after_second_run[3] == after_first_run[3]
-    # Row 1 gained the written evidence the approved merge moved onto it, and
-    # its seven cells and their fingerprint still did not move.
-    assert after_second_run[1].cells == after_first_run[1].cells
-    assert after_second_run[1].fingerprint == after_first_run[1].fingerprint
+    # Row 1 gained the written evidence the approved merge moved onto it, so
+    # `In writing?` stops saying no requirements document has been read for
+    # this project, and the fingerprint moves with the cell. Every other cell
+    # is untouched: a merge settles what a row cites, never what testing found
+    # or what was delivered.
     assert len(after_second_run[1].citations) > len(after_first_run[1].citations)
+    written = CELL_NAMES.index(IN_WRITING)
+    assert after_second_run[1].cells[written].startswith(
+        IN_WRITING_WRITTEN_IN_OPENING
+    )
+    assert after_second_run[1].fingerprint != after_first_run[1].fingerprint
+    assert [
+        cell for index, cell in enumerate(after_second_run[1].cells) if index != written
+    ] == [
+        cell for index, cell in enumerate(after_first_run[1].cells) if index != written
+    ]
 
 
 def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived(

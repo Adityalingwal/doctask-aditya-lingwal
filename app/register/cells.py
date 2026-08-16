@@ -41,6 +41,7 @@ IN_WRITING_NOT_KNOWN_YET = (
 # The sentence above would be a plain falsehood there, and "No" would claim
 # more than a document saying nothing about an ask can support.
 IN_WRITING_NOT_FOUND_IN = "Not found in {documents}."
+IN_WRITING_WRITTEN_IN_OPENING = "Yes — written in "
 TESTING_NOT_KNOWN_YET = (
     "Not known yet — no testing outcome has been read for this requirement."
 )
@@ -48,6 +49,11 @@ BLOCKED_ON_NOT_KNOWN_YET = (
     "Not known yet — no source read so far reports work stopped on this "
     "requirement."
 )
+
+
+def in_writing_says_yes(cell: str) -> bool:
+    """Whether this cell reports the ask written down, whichever file it names."""
+    return cell.startswith(IN_WRITING_WRITTEN_IN_OPENING)
 
 
 def fingerprint_of_cells(cells: dict[str, str]) -> str:
