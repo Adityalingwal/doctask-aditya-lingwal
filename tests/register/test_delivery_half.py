@@ -10,6 +10,7 @@ from tests.documents.register_documents import (
     extract_marker,
     match_answer,
     match_answer_of,
+    match_answer_within_batch,
     match_marker,
     match_marker_against_an_empty_register,
     no_findings_answer,
@@ -375,17 +376,19 @@ def test_a_row_created_and_moved_in_the_same_batch_ends_with_both_its_evidence(
             extract_marker(HANDOVER_FILE): _handover(
                 [("the intake portal was handed over", HANDOVER_QUOTE)]
             ),
-            # Both statements of the ask become rows; the review queue is what
-            # settles whether they are one, exactly as before this work.
-            match_marker(): match_answer(2),
+            # The batch is read in workflow order, so the meeting note states
+            # the ask first and the written scope matches backwards onto it.
+            match_marker(): match_answer_within_batch(
+                [("new row", None, None), ("existing row", None, 0)]
+            ),
             observation_marker(): observation_answer_of([1, 1]),
             examine_marker(): no_findings_answer(),
         },
     )
 
-    # All four kinds of document in one run: row 1 is created by the written
-    # scope (documents are read in file-name order, so it is read first) and
-    # moved by the testing feedback and the handover, without a second run.
+    # All four kinds of document in one run: row 1 is created by the meeting
+    # note, said again by the written scope, and moved by the testing feedback
+    # and the handover, without a second run.
     assert finished.rows[1]["what_was_asked"] == ASKED
     assert finished.rows[1]["in_writing"].startswith("Yes")
     assert finished.rows[1]["status"] == "Done"

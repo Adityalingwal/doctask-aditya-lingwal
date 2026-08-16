@@ -20,6 +20,7 @@ from app.extract.answer import (
     ListTheDocumentTypeMayNotFill,
     UnrecognisedDocumentType,
     describe_unreadable_answer,
+    workflow_position,
 )
 from app.examine.examine_register import UnusableExamineAnswer, examine_register
 from app.examine.frozen_rules import (
@@ -539,14 +540,24 @@ def build_register_graph(
         connection: AsyncConnection,
         run_id: UUID,
     ) -> list[dict[str, Any]]:
+        """This batch's requirements in workflow order, so a name decides nothing.
+
+        The document read first is the one whose requirement creates the row and
+        supplies its wording, and a later statement of the same ask matches
+        backwards onto it. Two documents of one type fall back to file name,
+        which is the order the query returns and which a stable sort keeps.
+        """
         result = await connection.execute(
             "SELECT extraction FROM documents WHERE run_id = %s AND "
             "extraction IS NOT NULL ORDER BY source_path",
             (run_id,),
         )
+        read_in_workflow_order = sorted(
+            (document["extraction"] for document in await result.fetchall()),
+            key=lambda extraction: workflow_position(extraction["document_type"]),
+        )
         requirements: list[dict[str, Any]] = []
-        for document in await result.fetchall():
-            extraction = document["extraction"]
+        for extraction in read_in_workflow_order:
             for requirement in extraction["requirements"]:
                 requirements.append(
                     {**requirement, "document_type": extraction["document_type"]}

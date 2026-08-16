@@ -19,6 +19,17 @@ TESTING_FEEDBACK = DocumentType.TESTING_FEEDBACK.value
 HANDOVER_SUMMARY = DocumentType.HANDOVER_SUMMARY.value
 UNRELATED_DOCUMENT = DocumentType.UNRELATED.value
 DOCUMENT_TYPES = tuple(document_type.value for document_type in DocumentType)
+
+# The order the work itself happens in: an ask is raised in a meeting, written
+# into the client's requirements, built and handed over, then tested. A batch
+# is read in this order so that which statement of an ask creates a row is a
+# fact about the documents rather than about what they were named.
+DOCUMENT_WORKFLOW_ORDER = (
+    DocumentType.MEETING_NOTES.value,
+    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT.value,
+    DocumentType.HANDOVER_SUMMARY.value,
+    DocumentType.TESTING_FEEDBACK.value,
+)
 REQUIREMENTS = "requirements"
 TESTING_OBSERVATIONS = "testing_observations"
 DELIVERY_EVIDENCE = "delivery_evidence"
@@ -133,6 +144,17 @@ class ExtractionAnswer(BaseModel):
             "processes this document."
         ),
     )
+
+
+def workflow_position(document_type: str) -> int:
+    """Where this kind of document sits in the workflow, last where unplaced.
+
+    Only `unrelated` is unplaced, and an unrelated document states no
+    requirement, so where it sorts decides nothing.
+    """
+    if document_type not in DOCUMENT_WORKFLOW_ORDER:
+        return len(DOCUMENT_WORKFLOW_ORDER)
+    return DOCUMENT_WORKFLOW_ORDER.index(document_type)
 
 
 def parse_extraction_answer(model_reply: str) -> ExtractionAnswer:
