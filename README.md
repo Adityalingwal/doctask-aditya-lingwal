@@ -25,6 +25,12 @@ slice, the incremental update slice, and the review screen are implemented:
 - Review decisions are one proposal at a time; export is unavailable until
   approved.
 - One browser page at `/ui` shows a run and answers its gates.
+- Meeting notes and a client requirements document create rows; testing
+  feedback and a handover summary move rows that already exist, and create
+  none.
+- A line inside a document addressed to the system is reported on the run, in
+  both exports and on the screen, and never followed — and that document is
+  still read.
 - Examine judges the whole register against the rules the run froze and raises
   a finding as a question, never as an edit.
 - Startup resumes a run killed mid-flight from its durable checkpoint.
@@ -33,6 +39,40 @@ slice, the incremental update slice, and the review screen are implemented:
 No live hosted-model run has been completed yet. Current proof is for the
 orchestration, persistence, validation, review, and export paths using the
 scripted client.
+
+## The register's statuses, and what moves them
+
+Every row starts at `No evidence yet` and moves only on what a document says.
+
+| Status | What it means |
+|---|---|
+| `No evidence yet` | Nothing read so far says whether this was delivered or tested. It makes no claim. |
+| `Done` | A document reports the work exists and behaves as asked. |
+| `Partial` | A document reports the work exists but is wrong or incomplete. |
+| `Not delivered` | A document states the work is not there. A positive claim, and it needs a citation. |
+| `Blocked` | A document reports work on this requirement is stopped, waiting on something. |
+| `Disputed` | Two documents make opposing claims. The system never resolves it; it goes to a person. |
+
+Testing feedback moves a row by its label: `Passed` makes it `Done`, `Defect`
+makes it `Partial`, and `Change request` and `Unclear` move no status — a new
+ask arriving during testing is not a verdict on the work. Any document
+reporting work stopped makes the row `Blocked`. A handover summary moves
+`Last moved` and no status: it says the work exists, never that it behaves as
+asked.
+
+`First seen` carries the date of the document that first asked for the
+requirement and `Last moved` the date of the document that last changed the
+row; both come from the documents, never from the clock.
+
+Attaching a document's evidence to a row that is already committed is asked
+about before it happens, and so is any link the system is unsure of. An
+observation about no requirement the register traces is reported on the
+Skipped tab rather than forced onto the nearest row.
+
+**Not yet reachable:** nothing writes `Not delivered` or `Disputed`. Both need
+a document to state that asked-for work is *not there*, and the four testing
+labels the extraction contract allows — `Passed`, `Defect`, `Change request`,
+`Unclear` — cannot express it. See `PROGRESS.md`.
 
 ## Rules and findings
 

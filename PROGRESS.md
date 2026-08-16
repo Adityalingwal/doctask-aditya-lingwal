@@ -6,6 +6,91 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-16, branch `extract-schema-and-the-delivery-half`
+
+Built, and each item run rather than type-checked:
+
+- **The extraction contract is a schema.** `app/model/answer_schema.py`
+  generates a strict `json_schema` from the Pydantic answer model and
+  `call_the_model` sends it; Extract, Match and Examine share the one helper,
+  and the hand-written JSON examples are gone from all three prompts. Pydantic
+  validation and `json_object_in` stay, because the scripted client returns
+  plain text.
+- **`app/extract/prompt.py` carries the prompt locked with Aditya on
+  2026-08-16**, pasted word for word. It states judgement only: what a label
+  means, what counts as a blocker, and which lists each document type may fill.
+- **`delivery_evidence` is a fourth quoted list.** A handover summary reports
+  what was handed over, located in the source exactly like every other quote.
+- **Which lists a type may fill is enforced at the boundary, not papered over.**
+  `register_graph.py`'s silent `requirements_found = 0` is gone; a filled list
+  the type may not use skips that one document with a reason naming what came
+  back, and the batch continues.
+- **The delivery half is wired.** Testing feedback and a handover summary move
+  rows and create none: `what_testing_found`, `blocked_on`, `status` and
+  `last_moved` all move, with the moving document's citation. `first_seen` and
+  `last_moved` finally diverge.
+- **A move is proposed, never written where it is worked out.** Moves are
+  stored on `runs.pending_moves`, overlaid so Examine judges the register as
+  the run leaves it, and applied inside Commit's transaction after merges
+  settle their targets — so a rejected export leaves the register unchanged.
+  Attaching evidence to a committed row, and any uncertain link, is a new
+  `observation match` question in the review queue.
+- **A reported embedded instruction reaches a person**: `runs.reported_instructions`,
+  `GET /runs/{id}`, both export shapes and a fourth tab on the run panel. The
+  document is still read; the closing sentence saying so is on the card and in
+  the Markdown export.
+- **`Never happened` is renamed `Not delivered`** (migration `20260816_0014`),
+  proven forward and backward by hand against a real database with a stored row
+  actually holding the old value, reading `pg_get_constraintdef` rather than
+  trusting the three migration files that spell the old literal out.
+
+**Assumptions made while building this, written here rather than left in a
+message:**
+
+- **`last_moved` when two documents move one row in one batch** carries the
+  date of the document read *last*, which is the one whose value the cell ends
+  holding. Documents are read in file-name order, not date order, so a handover
+  dated later than a testing document can leave the earlier date in the cell.
+  Deterministic, and stated rather than hidden.
+- **An observation matching no row is reported on the Skipped tab**, the
+  reporting surface the brief left to the implementer, with a reason naming the
+  kind of observation and saying it was reported rather than attached.
+- **A confident link to a row this same batch proposed applies without its own
+  question.** Nothing in the batch is committed and the export gate still
+  covers it — the within-batch rule already locked for Match. A link to a
+  *committed* row, and any uncertain link, is always asked about.
+- **A moved cell's citation is replaced, not accumulated.** The old citation
+  supported a value the cell no longer holds; the audit keeps the history.
+
+### The signal `Not delivered` and `Disputed` need — blocked, not built
+
+`Not delivered` and `Disputed` are in the check constraint and **nothing writes
+either**. The brief's status table reaches both only through a testing verdict
+of "not there" — "handover silent + testing says not there" is `Not delivered`,
+"handover claims delivered + testing says not there" is `Disputed` — and the
+four locked testing labels cannot express it:
+
+- `Defect` is defined in the locked prompt as "anything testing found broken",
+  which is the *`Partial`* row of the same table, so it cannot also carry
+  "not there" without making the two rows indistinguishable.
+- `Change request` and `Unclear` move no status at all.
+
+Inventing a fifth label would mean rewording a prompt that is locked word for
+word, and guessing at a text heuristic would be exactly the hard-coded special
+case `TASK.md` forbids. So the two statuses are left unreachable and reported
+rather than guessed. Two never-do tests wait on the same answer and are **not
+written**: `test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_delivered`
+and `test_a_handover_claiming_delivery_against_testing_reporting_missing_is_disputed`.
+
+A second, smaller gap in the same table: it names no line for "handover says
+delivered, testing says nothing". A handover alone therefore moves `Last moved`
+and no status, on the reasoning that a handover says the work exists and never
+that it behaves as asked — which is what `Done` means. That reading is written
+into D05 and can be reversed with one line if it is wrong.
+
+**Next action:** Aditya decides how a document reports that asked-for work is
+not there. Everything else in the brief is built.
+
 ## Snapshot — 2026-08-14
 
 - Slice 1, the formats and types slice, the rules and findings slice, the MCP
@@ -740,9 +825,16 @@ working claim only after its own implementation and proof land.
 - A rejected finding stays suppressed if later evidence strengthens it.
 - A finding already approved onto a row is not re-examined by a later run; a
   rules change is applied the next time a run examines that register.
-- D1 and D2 cannot fire on the register slice 1 produces: every proposed row is
-  written with a `what_was_asked` citation and no stage yet sets a row to
-  `Done`. Both were driven against seeded rows instead.
+- D1 and D2 were driven against seeded rows: every proposed row is written with
+  a `what_was_asked` citation, so D1 has nothing to catch. D2 ("no row is `Done`
+  without a testing outcome") is reachable from 2026-08-16 — a `Passed`
+  observation now sets a row `Done` and fills `what_testing_found` in the same
+  move, so a `Done` row without an outcome still needs seeding to produce.
+- R3 and R4 in `config/rules.yaml` could not fire before 2026-08-16, because
+  `what_testing_found` and `blocked_on` were constants. Both now move. **Not
+  yet confirmed by a run**: no run has been driven that leaves a row blocked
+  past `max_days`, or written without a testing outcome, and watched Examine
+  raise the finding. Neither rule's text or parameters changed.
 - Files arriving during Review wait; that run holds the project lock, and the
   watcher starts nothing behind it.
 - The watcher keeps what it last saw in memory, so restarting the application

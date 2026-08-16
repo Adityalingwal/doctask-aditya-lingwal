@@ -239,12 +239,26 @@ match.
 | Folder scan | Top-level files only, read in place | Implemented for all four formats |
 
 Format is checked before type. Type is a Pydantic enum at the model boundary,
-and its buckets are:
+and which lists each type may fill is stated in the prompt and carried in the
+generated schema:
+
+| Document type | requirements | testing_observations | delivery_evidence | blockers |
+|---|---|---|---|---|
+| meeting notes | yes | — | — | yes |
+| client requirements document | yes | — | — | yes |
+| testing feedback | — | yes | — | yes |
+| related additional document | — | — | yes | yes |
+| unrelated | — | — | — | — |
+
+`embedded_instructions` and `document_date` may appear on any type. A filled
+list where this table says otherwise is a wrong answer: that one document is
+skipped with a reason naming what came back, the batch continues, and nothing
+is quietly emptied. Its buckets are:
 
 | Bucket | Action | Status |
 |---|---|---|
 | Primary: meeting notes, client requirements document, testing feedback | Full declared processing | Implemented |
-| Related additional | Read, labelled and stored; never creates a register row on its own | Implemented |
+| Related additional | Read, labelled and stored; never creates a register row on its own | Implemented; the "on its own" half built 2026-08-16 — it reports `delivery_evidence`, which moves a row that already exists |
 | Unrelated | Skip with reason | Implemented |
 | Outside the enum | Skip that document with `document type not recognised`; the run continues | Implemented |
 
@@ -277,11 +291,35 @@ Seven cells, each with its own citations:
 
 Statuses are fixed in code and in a database check constraint:
 
-`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed` ·
+`Done` · `Partial` · `Not delivered` · `Blocked` · `Disputed` ·
 `No evidence yet`
 
-- `Never happened` is a positive evidenced claim; `No evidence yet` makes no
-  such claim.
+Each means one thing, written down so a model, an implementer and a reader
+cannot each assume a different one:
+
+- **`No evidence yet`** — no document read so far says anything about whether
+  this was delivered or tested. Every row starts here. It makes no claim.
+- **`Done`** — a document reports the asked-for work exists and behaves as
+  asked.
+- **`Partial`** — a document reports the work exists but is wrong or
+  incomplete.
+- **`Not delivered`** — a document states the asked-for work is not there. This
+  is a positive claim and needs a citation.
+- **`Blocked`** — a document reports work on this requirement is stopped,
+  waiting on something.
+- **`Disputed`** — two documents make opposing claims about this requirement.
+  The system never resolves it; it goes to a person.
+
+- What moves a row: a testing observation's label (`Passed` → `Done`,
+  `Defect` → `Partial`; `Change request` and `Unclear` move no status, because
+  a new ask arriving during testing is not a verdict on the work), and any
+  document reporting work stopped → `Blocked`. Delivery evidence alone moves
+  `Last moved` and no status: a handover says the work exists, never that it
+  behaves as asked.
+- **Open, and not this work's to choose:** `Not delivered` and `Disputed` are
+  in the constraint and nothing writes them yet. Both need a document to say
+  the asked-for work is *not there*, and the four locked testing labels cannot
+  express that — see PROGRESS, "The signal `Not delivered` and `Disputed` need".
 - Unknown cells say why they are unknown; they are never blank or guessed.
 - Dates come from documents, not run time. Unknown date stays unknown and R3
   does not run on it.
@@ -373,9 +411,19 @@ Extract never routes on to it, when the batch found nothing to match.
 
 - **Decision:** One model call per document, sequentially. This makes filename
   attribution deterministic, checkpointing clean, and failures isolated.
-- **Output:** type, date, requirements, testing observations, blockers, and
-  embedded instructions, each tied to exact words. This list may widen only
-  with a real later-slice need.
+- **Output:** type, date, requirements, testing observations, delivery
+  evidence, blockers, and embedded instructions, each tied to exact words. This
+  list may widen only with a real later-slice need.
+- **Contract:** the model call sends `response_format` of type `json_schema`
+  with `strict: true`, and the schema is **generated from the Pydantic answer
+  model** (`app/model/answer_schema.py`), never hand-written a second time.
+  Each field's meaning travels in the schema as its description; the prompt
+  carries judgement only. Match and Examine use the same helper.
+  Pydantic validation and `json_object_in` both stay regardless: the scripted
+  client the test suite runs against returns plain text and knows nothing about
+  `response_format`. **A schema guarantees the shape, never the truth** — a
+  quote the document does not contain is still caught only by
+  `app/ingest/locate_quote.py`, which is unchanged.
 - **Injection:** Document text is data, never system authority. It has no code
   path to approve, commit, or export. The model may report suspicious text;
   detection is not guaranteed and no brittle phrase list is built.

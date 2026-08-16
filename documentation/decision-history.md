@@ -3715,3 +3715,66 @@ path can reach the database, and re-checking on every run would spend a check
 on a path that cannot exist. A folder named only with dashes still derives an
 empty project name; no client folder is named `---`, and building for it would
 be the speculative edge case `TASK.md` forbids.
+
+## 2026-08-16 — the extraction contract becomes a schema, and the delivery half is wired
+
+**Superseded — D05's status `Never happened`, renamed to `Not delivered`.**
+D05 read "`Done` · `Partial` · `Never happened` · `Blocked` · `Disputed` ·
+`No evidence yet`", with the note "`Never happened` is a positive evidenced
+claim; `No evidence yet` makes no such claim." `Never happened` says nothing
+about who observed it or when, and reads as a claim about history rather than
+about delivery. `Not delivered` reads one way only, and the cell's citation
+carries the evidence. `No evidence yet` is deliberately unchanged: it reads
+correctly to a person and makes no claim. The rename is migration
+`20260816_0014`; the old value appears as a literal in three earlier migration
+files, and the live constraint was read with `pg_get_constraintdef` rather
+than trusted from any of them.
+
+**Superseded — D05 defined two of its six statuses.** Only `Never happened`
+and `No evidence yet` had written meanings, so a model, an implementer and a
+reader could each assume a different one for the other four. All six now carry
+a written meaning in D05.
+
+**Superseded — the extraction shape lived in two places.** `app/extract/prompt.py`
+carried a hand-written JSON example that was the de-facto contract, while
+`ExtractionAnswer` was the real one, and the model call sent no
+`response_format` at all — the shape was asked for in prose. The alternative
+considered was keeping the prose example and adding a schema; it was rejected
+because two homes for one shape is exactly what drifts. The schema is now
+generated from the Pydantic model (`app/model/answer_schema.py`) and sent as a
+strict `json_schema`, and each field's meaning travels in the schema as its
+description. Pydantic validation and `json_object_in` both stay: the scripted
+client the whole test suite runs against returns plain text and knows nothing
+about `response_format`.
+
+**Superseded — a non-primary document's requirement count was silently zeroed.**
+`register_graph.py` set `requirements_found = 0` for any document type outside
+the primary three, which turned a wrong answer into a quiet one: nobody learned
+that a testing document had come back claiming to state new asks. Which lists
+each type may fill is now stated in the prompt and carried in the schema, and a
+filled list where the table says empty skips that one document with a reason
+naming what came back, while the batch continues.
+
+**Superseded — D04's "related additional document: read, labelled and stored;
+never creates a register row on its own."** The wording does not change; the
+"on its own" half was never built. A handover summary now reports
+`delivery_evidence`, and that evidence reaches the step that moves rows.
+
+**New — `observation match` joins the decision kinds.** A testing observation
+or a piece of delivery evidence attaching to a **committed** row changes what
+that row says, which is D02 scenario 3 and therefore gated; an uncertain link
+is gated however new the row is. A confident link to a row this same batch
+proposed is not asked about separately — nothing in the batch is committed and
+the export gate still covers it, which is the within-batch rule already locked
+for Match on 2026-08-16. It could not reuse `possible match`, whose columns
+name a proposed row an observation does not have.
+
+**New — a run holds the moves it proposes.** The register is the committed
+rows, and this run reaches them only after the Delivery Owner approves the
+export, so a move cannot be written where it is worked out. The alternative
+was writing moves straight onto the rows before Examine; it was rejected
+because a rejected export would then leave the register already changed.
+Moves are stored on the run (`runs.pending_moves`, migration `20260816_0015`),
+overlaid for Examine so a rule judges the register as this run leaves it, and
+applied inside Commit's own transaction after merges have settled their
+targets.
