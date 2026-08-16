@@ -143,7 +143,7 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
     tmp_path: Path,
 ) -> None:
     meeting_notes = "meeting-notes-05-jun.md"
-    requirements = "client-requirements-v1.docx"
+    requirements = "client-requirements-v1.md"
     handover = "handover-summary.md"
     testing_feedback = "testing-feedback-15-jul.pdf"
     after_first_run, after_second_run, read_again = _two_runs_over(

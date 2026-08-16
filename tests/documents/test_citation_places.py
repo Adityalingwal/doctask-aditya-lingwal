@@ -17,29 +17,23 @@ from tests.documents.register_documents import (
     match_marker,
     no_findings_answer,
     requirement_extraction_answer,
-    write_docx,
+    write_document_stating,
     write_pdf,
-    write_text_file,
 )
 
 
 PDF_FILE = "meeting-notes.pdf"
-DOCX_FILE = "client-requirements.docx"
-TEXT_FILE = "call-note.txt"
+MARKDOWN_FILE = "client-requirements.md"
 
 PDF_QUOTE = "The client asked for a search box on the records list page."
-DOCX_QUOTE = "The portal must let staff export a record as a PDF."
-TEXT_QUOTE = "The client asked for a weekly digest of new intake records."
+MARKDOWN_QUOTE = "The portal must let staff export a record as a PDF."
 
 PDF_REQUIREMENT = "a search box on the records list page"
-DOCX_REQUIREMENT = "exporting one record as a PDF"
-TEXT_REQUIREMENT = "a weekly digest of new intake records"
+MARKDOWN_REQUIREMENT = "exporting one record as a PDF"
 
-LAST_HEADING = "Open questions"
-# Word keeps no page numbers and its headings live in styling rather than in
-# the text, so a Word citation names the line the reader put the quote on:
-# "Scope", its paragraph, "Open questions", then the quote.
-DOCX_PLACE = "line 4"
+# write_document_stating puts every statement under this heading, and the
+# quote sits well below the file's first heading.
+MARKDOWN_PLACE = "Discussion"
 
 
 def test_a_citation_names_only_a_place_the_reader_actually_produced(
@@ -56,22 +50,11 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
                 ["Records", PDF_QUOTE],
             ],
         )
-        write_docx(
-            source_folder / DOCX_FILE,
-            [
-                ("Scope", ["The provider will build the intake portal."]),
-                (LAST_HEADING, [DOCX_QUOTE]),
-            ],
-        )
-        write_text_file(
-            source_folder / TEXT_FILE,
-            [
-                "Call with the operations lead.",
-                "",
-                "Nothing was settled in the first half of the call.",
-                "",
-                TEXT_QUOTE,
-            ],
+        write_document_stating(
+            source_folder,
+            MARKDOWN_FILE,
+            "10 March 2026",
+            ["Nothing was settled in the first half of the call.", MARKDOWN_QUOTE],
         )
 
         script_path = tmp_path / "script.json"
@@ -81,15 +64,12 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
                 extract_marker(PDF_FILE): requirement_extraction_answer(
                     PDF_REQUIREMENT, PDF_QUOTE
                 ),
-                extract_marker(DOCX_FILE): requirement_extraction_answer(
-                    DOCX_REQUIREMENT,
-                    DOCX_QUOTE,
+                extract_marker(MARKDOWN_FILE): requirement_extraction_answer(
+                    MARKDOWN_REQUIREMENT,
+                    MARKDOWN_QUOTE,
                     document_type="client requirements document",
                 ),
-                extract_marker(TEXT_FILE): requirement_extraction_answer(
-                    TEXT_REQUIREMENT, TEXT_QUOTE
-                ),
-                match_marker(): match_answer(3),
+                match_marker(): match_answer(2),
                 examine_marker(): no_findings_answer(),
             },
         )
@@ -124,5 +104,4 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
         if citation["cell"] == "what_was_asked"
     }
     assert place_by_file[PDF_FILE] == "page 3"
-    assert place_by_file[DOCX_FILE] == DOCX_PLACE
-    assert place_by_file[TEXT_FILE] == "line 5"
+    assert place_by_file[MARKDOWN_FILE] == MARKDOWN_PLACE

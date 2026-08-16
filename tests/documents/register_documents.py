@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from docx import Document
 from pypdf import PdfWriter
 from reportlab.pdfgen import canvas
 
@@ -125,34 +124,6 @@ def write_pdf_with_unparseable_content(path: Path) -> None:
         )
     garbage = b"<<" + b"$" * (len(_PDF_FONT_OBJECT) - 4) + b">>"
     path.write_bytes(data.replace(_PDF_FONT_OBJECT, garbage))
-
-
-def write_corrupt_docx(path: Path) -> None:
-    """A `.docx` that is not a Word package at all — Word files are zips."""
-    path.write_bytes(b"this was renamed to .docx and is not a Word file")
-
-
-def write_docx(
-    path: Path,
-    sections: list[tuple[str, list[str]]],
-    table_rows: list[list[str]] | None = None,
-) -> None:
-    """One fabricated Word document of headed paragraphs and an optional table."""
-    document = Document()
-    for heading, paragraphs in sections:
-        document.add_heading(heading, level=1)
-        for paragraph in paragraphs:
-            document.add_paragraph(paragraph)
-    if table_rows:
-        table = document.add_table(rows=len(table_rows), cols=len(table_rows[0]))
-        for row_index, row in enumerate(table_rows):
-            for cell_index, cell_text in enumerate(row):
-                table.cell(row_index, cell_index).text = cell_text
-    document.save(str(path))
-
-
-def write_text_file(path: Path, lines: list[str]) -> None:
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def requirement_extraction_answer(

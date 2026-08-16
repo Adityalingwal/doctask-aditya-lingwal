@@ -4,28 +4,21 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
-from app.ingest.read_docx import DOCX_EXTENSION, read_docx
 from app.ingest.read_pdf import PDF_EXTENSION, pdf_page_count, read_pdf
-from app.ingest.read_text_document import (
-    MARKDOWN_EXTENSION,
-    TEXT_EXTENSION,
-    read_text_document,
-)
+from app.ingest.read_text_document import MARKDOWN_EXTENSION, read_text_document
 from app.ingest.unreadable_document import DocumentUnreadable
 
 
 class SourceReader(NamedTuple):
     read_text: Callable[[Path], str]
-    # Only a format that genuinely paginates can report a page count. Markdown,
-    # plain text and Word have no pages, and claiming one for them would invent
-    # the very locator the citation contract forbids.
+    # Only a format that genuinely paginates can report a page count. Markdown
+    # has no pages, and claiming one for it would invent the very locator the
+    # citation contract forbids.
     count_pages: Callable[[Path], int] | None
 
 
 _READERS: dict[str, SourceReader] = {
     MARKDOWN_EXTENSION: SourceReader(read_text_document, None),
-    TEXT_EXTENSION: SourceReader(read_text_document, None),
-    DOCX_EXTENSION: SourceReader(read_docx, None),
     PDF_EXTENSION: SourceReader(read_pdf, pdf_page_count),
 }
 
