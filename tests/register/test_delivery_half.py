@@ -289,7 +289,9 @@ def test_a_change_request_never_moves_the_status(tmp_path: Path) -> None:
     assert finished.rows[1]["what_testing_found"] == "the team wants a daily digest too"
 
 
-def test_a_row_no_document_mentions_keeps_no_evidence_yet(tmp_path: Path) -> None:
+def test_a_row_nobody_has_looked_at_stays_no_evidence_yet_with_no_citation(
+    tmp_path: Path,
+) -> None:
     finished = _run_once(
         tmp_path,
         [
@@ -313,9 +315,12 @@ def test_a_row_no_document_mentions_keeps_no_evidence_yet(tmp_path: Path) -> Non
     # Nothing read said anything about the search row, so it claims nothing.
     assert finished.rows[2]["status"] == NO_EVIDENCE_YET
     assert finished.rows[2]["what_testing_found"].startswith("Not known yet")
+    # `No evidence yet` means nobody looked, so nothing is cited behind it.
+    # `Not delivered` is the opposite claim and always carries a citation.
+    assert _citations_on(finished.export, 2, "status") == []
 
 
-def test_a_handover_summary_moves_an_existing_row_and_creates_none(
+def test_a_handover_with_no_testing_behind_it_moves_the_row_to_handed_over(
     tmp_path: Path,
 ) -> None:
     finished = _run_once(
@@ -338,8 +343,14 @@ def test_a_handover_summary_moves_an_existing_row_and_creates_none(
     # One row, from the meeting note alone. The handover made none.
     assert sorted(finished.rows) == [1]
     # A handover says the work exists, never that it behaves as asked, so it
-    # is not on its own a reason to call the row Done.
-    assert finished.rows[1]["status"] == NO_EVIDENCE_YET
+    # is not on its own a reason to call the row Done — but it is a claim, and
+    # a run that read it must leave a mark.
+    assert finished.rows[1]["status"] == "Handed over"
+    assert finished.rows[1]["what_testing_found"].startswith("Not known yet")
+    assert [
+        citation["source_file"]
+        for citation in _citations_on(finished.export, 1, "status")
+    ] == [HANDOVER_FILE]
 
 
 def test_a_row_created_and_moved_in_the_same_batch_ends_with_both_its_evidence(
@@ -450,7 +461,7 @@ def test_a_row_this_run_moved_to_done_raises_no_finding_about_a_missing_outcome(
     assert [one["rule_id"] for one in finished.run["examine"]["findings"]] == []
 
 
-def test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_delivered(
+def test_not_delivered_still_needs_a_document_that_looked_and_did_not_find_it(
     tmp_path: Path,
 ) -> None:
     finished = _run_once(
@@ -471,8 +482,13 @@ def test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_
     )
 
     # Silence is not a claim: no handover said this was delivered, so testing
-    # reporting it absent contradicts nothing.
+    # reporting it absent contradicts nothing. `Not delivered` is a positive
+    # claim, so unlike `No evidence yet` it names the document that made it.
     assert finished.rows[1]["status"] == "Not delivered"
+    assert [
+        citation["source_file"]
+        for citation in _citations_on(finished.export, 1, "status")
+    ] == [TESTING_FILE]
 
 
 def test_a_handover_claiming_delivery_against_testing_reporting_missing_is_disputed(

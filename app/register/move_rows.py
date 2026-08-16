@@ -15,6 +15,7 @@ from app.register.cells import (
     STATUS,
     STATUS_DISPUTED,
     STATUS_DONE,
+    STATUS_HANDED_OVER,
     STATUS_NOT_DELIVERED,
     STATUS_PARTIAL,
     WHAT_TESTING_FOUND,
@@ -214,6 +215,11 @@ def status_after(
     over is two claims that oppose each other, which is `Disputed`. The same
     report with no handover behind it contradicts nothing — silence is not a
     claim — so it is `Not delivered`.
+
+    A handover with no testing behind it lands on `Handed over`. The three
+    states are distinct claims rather than shades of one: `No evidence yet`
+    means nobody has looked, `Handed over` means we say we built it, and
+    `Done` means testing confirmed it behaves as asked.
     """
     labels = {one["label"] for one in testing}
     if TestingLabel.NOT_FOUND in labels:
@@ -222,7 +228,7 @@ def status_after(
         return STATUS_PARTIAL
     if TestingLabel.PASSED in labels:
         return STATUS_DONE
-    return None
+    return STATUS_HANDED_OVER if delivery_claimed else None
 
 
 def _joined(observations: list[dict[str, Any]]) -> str:

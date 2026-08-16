@@ -233,8 +233,9 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
             after_first_run[moved], "what_was_asked"
         )
     # Row 5 is the one this same batch proposed and the handover then reported
-    # delivered. A handover states delivery, never a verdict.
-    assert _cell(after_second_run[5], "status") == "No evidence yet"
+    # delivered. A handover states delivery, never a verdict, so the row says
+    # the work was handed over and not that testing confirmed it.
+    assert _cell(after_second_run[5], "status") == "Handed over"
 
 
 def _handover_answer() -> dict[str, Any]:
