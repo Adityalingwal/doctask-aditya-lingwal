@@ -276,6 +276,25 @@ def match_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
     }
 
 
+def observation_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
+    """Match's answer per observation: the row it is about, or None for none.
+
+    Observations are answered with `observation_index`, never
+    `requirement_index`: the two calls have their own answer models so that
+    the schema the model is sent describes what it was actually asked about.
+    """
+    return {
+        "outcomes": [
+            {
+                "observation_index": index,
+                "outcome": NEW_ROW if row_number is None else EXISTING_ROW,
+                "row_number": row_number,
+            }
+            for index, row_number in enumerate(matched_row_numbers)
+        ]
+    }
+
+
 def extract_marker(source_file: str) -> str:
     return EXTRACT_MARKER.format(source_file=source_file)
 

@@ -62,34 +62,99 @@ message:**
 - **A moved cell's citation is replaced, not accumulated.** The old citation
   supported a value the cell no longer holds; the audit keeps the history.
 
-### The signal `Not delivered` and `Disputed` need — blocked, not built
+### Review findings repaired in the foreground, after the review
 
-`Not delivered` and `Disputed` are in the check constraint and **nothing writes
-either**. The brief's status table reaches both only through a testing verdict
-of "not there" — "handover silent + testing says not there" is `Not delivered`,
-"handover claims delivered + testing says not there" is `Disputed` — and the
-four locked testing labels cannot express it:
+Codex returned **not merge-ready** with two P1s, three P2s and one P3. Every
+finding was re-checked against the code in the foreground and all six were
+real; Aditya chose to fix all six, plus three deviations from the brief's own
+protocol. The reviewed code and the merged code therefore differ, which is why
+each repair is named here.
 
-- `Defect` is defined in the locked prompt as "anything testing found broken",
-  which is the *`Partial`* row of the same table, so it cannot also carry
-  "not there" without making the two rows indistinguishable.
-- `Change request` and `Unclear` move no status at all.
+- **P1 — a `Passed` move produced a false D2 finding.**
+  `register_under_examination` overlaid this run's pending cell values but not
+  its pending citations, so Examine saw `status = Done` with no
+  `what_testing_found` citation and reported the row as Done without a testing
+  outcome — against the very evidence that moved it. Pending citations now
+  travel with pending values, and
+  `test_a_row_this_run_moved_to_done_raises_no_finding_about_a_missing_outcome`
+  asserts what the existing delivery tests never did.
+- **P1 — an undated handover matched a row and moved nothing.** The
+  `last_moved` fallback fired only when another cell had already moved, and
+  delivery evidence alone moves no other cell. Delivery evidence now always
+  moves `last_moved`: the document's date when it has one, `date unknown` when
+  it does not.
+- **P2 — the stored skip reason did not name what came back.** The Skipped tab
+  said only that the model reported something the type may not; the type and
+  the list lived in the log line, which never reaches a screen. Both are now in
+  the stored sentence, and the test that blessed the generic wording asserts
+  the named one.
+- **P2 — observation matching was sent a schema describing requirements.**
+  `match_observations` reused `MatchAnswer`, whose descriptions say
+  "requirement", and refusals reported missing "requirements" for observations.
+  Observations now have `ObservationAnswer` with `observation_index` and their
+  own refusal wording, plus
+  `test_an_incomplete_observation_answer_is_refused`.
+- **P2 — "its requirements are in the register" was not always true.** An
+  embedded instruction may appear on a document that states no requirement at
+  all — the backend test uses exactly such a document. The sentence stops at
+  "This document was still read." The brief's §5.4 wording is superseded.
+- **P3 — the canonical documents still described the old behaviour.**
+  `DECISIONS.md` said an embedded instruction appears nowhere in the export and
+  `PROGRESS.md` said it reached only the log; both are now true, and the
+  resolved limitation is removed rather than reworded.
 
-Inventing a fifth label would mean rewording a prompt that is locked word for
-word, and guessing at a text heuristic would be exactly the hard-coded special
-case `TASK.md` forbids. So the two statuses are left unreachable and reported
-rather than guessed. Two never-do tests wait on the same answer and are **not
-written**: `test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_delivered`
+Three deviations from the brief's protocol were closed with them:
+
+- **The Northside handover now runs.** `handover-summary.md` was in no batch of
+  any test — not a defect, but a corpus test that copies selected files and
+  never included it. It joins the second run's batch and moves three rows: the
+  booking pages, the daily schedule screen, and the email reminder this same
+  batch proposed. The SMS reminder row still comes back byte for byte.
+- **The never-do tests were run at the baseline `927dc25`** in a worktree of
+  their own. They fail there on `ImportError: cannot import name
+  'OBSERVATION_PROMPT_MARKER'` — the whole delivery half does not exist at that
+  commit, so the file cannot be collected. That is a weaker result than an
+  assertion failure and is recorded as what it is, not dressed up.
+- **`test_a_cell_moved_by_an_observation_writes_its_audit_entry_and_moves_the_fingerprint`
+  is written**, and deliberately drives two runs: a row created and moved in
+  one run never publicly holds `No evidence yet`, so only a second run
+  exercises the move against an already-committed row — the branch the test
+  exists for.
+
+**170 Python and 44 front-end tests pass** with no live API key, both counts
+read from the suites' own printed summary in the foreground.
+
+### `Not delivered` and `Disputed` are reachable — a fifth testing label
+
+Decided with Aditya on 2026-08-16, after the review. Both statuses need a
+document to say the asked-for work is *not there*, and the four testing labels
+could not express it: `Defect` is "anything testing found broken", which is the
+`Partial` row of the same table, and `Change request` and `Unclear` move no
+status. `TestingLabel` therefore gains a fifth value, **`Not found`** — testing
+looked and the thing is not there at all — and the locked extraction prompt
+gains it with a worked example from the intake-portal corpus's own testing
+feedback ("The records list page opens, but there is no way to search old
+records from it" is `Passed` for the page and `Not found` for the search).
+
+`status_after` reads it against what else the batch supplied: `Not found` with a
+handover claiming delivery is `Disputed`, and `Not found` with no handover
+behind it is `Not delivered` — silence is not a claim, so nothing is
+contradicted. The two never-do tests that waited on this are written and pass:
+`test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_delivered`
 and `test_a_handover_claiming_delivery_against_testing_reporting_missing_is_disputed`.
+
+**`Disputed` is reachable but not demonstrated on a corpus.** Neither synthetic
+corpus contains a handover claiming delivery of something testing then reports
+absent — Northside's testing feedback says the SMS reminder "still does not
+reach the patient", which is broken rather than missing. The corpus was left
+alone rather than edited to flatter the feature; the status is proven by a test,
+not by a corpus run, and that difference is stated here rather than blurred.
 
 A second, smaller gap in the same table: it names no line for "handover says
 delivered, testing says nothing". A handover alone therefore moves `Last moved`
 and no status, on the reasoning that a handover says the work exists and never
 that it behaves as asked — which is what `Done` means. That reading is written
 into D05 and can be reversed with one line if it is wrong.
-
-**Next action:** Aditya decides how a document reports that asked-for work is
-not there. Everything else in the brief is built.
 
 ## Snapshot — 2026-08-14
 
@@ -877,10 +942,6 @@ working claim only after its own implementation and proof land.
   fixed interval, whatever is on screen and whatever a run's status is
   (L1, locked 2026-08-15) — there is no per-project runs endpoint and no
   conditional refresh.
-- A reported embedded instruction reaches a person only through the run's log
-  line: `GET /runs/{id}` does not carry it, and neither does the export. D02
-  scenario 9 makes it information rather than a gate, and there is currently no
-  surface that shows that information.
 - Run events below `WARNING` reach nothing when the application is started the
   way the Dockerfile starts it. uvicorn's shipped logging configuration leaves
   the `register.run` logger without a handler, so `log_run_event` at INFO is

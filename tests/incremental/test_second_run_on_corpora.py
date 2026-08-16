@@ -22,6 +22,7 @@ from tests.documents.register_documents import (
     match_marker,
     match_marker_against_an_empty_register,
     no_findings_answer,
+    observation_answer_of,
     observation_marker,
 )
 from tests.register.stored_register import documents_of_run, stored_rows
@@ -128,12 +129,13 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
 ) -> None:
     meeting_notes = "meeting-notes-05-jun.md"
     requirements = "client-requirements-v1.docx"
+    handover = "handover-summary.md"
     testing_feedback = "testing-feedback-15-jul.pdf"
     after_first_run, after_second_run, read_again = _two_runs_over(
         tmp_path,
         NORTHSIDE_DENTAL,
         [meeting_notes],
-        [requirements, testing_feedback],
+        [requirements, handover, testing_feedback],
         {
             match_marker_against_an_empty_register(): match_answer(3),
             extract_marker(meeting_notes): dated_extraction_answer(
@@ -184,16 +186,21 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
                 CLIENT_REQUIREMENTS_DOCUMENT,
                 "10 June 2026",
             ),
+            extract_marker(handover): _handover_answer(),
             extract_marker(testing_feedback): _testing_feedback_answer(),
             match_marker(): match_answer_of([1, None, 3, None]),
-            # Booking is row 1 and the daily schedule screen is row 3; both are
-            # committed rows this batch's testing feedback is about.
-            observation_marker(): match_answer_of([1, 3]),
+            # Read in file-name order, so the handover's three pieces of
+            # delivery evidence are observations 0 to 2 and the testing
+            # feedback's two are 3 and 4. The handover names the booking
+            # pages (row 1), the email reminder this same batch proposed
+            # (row 5) and the daily schedule screen (row 3); testing is about
+            # rows 1 and 3.
+            observation_marker(): observation_answer_of([1, 5, 3, 1, 3]),
             examine_marker(): no_findings_answer(),
         },
     )
 
-    assert read_again == [requirements, testing_feedback]
+    assert read_again == [requirements, handover, testing_feedback]
     assert sorted(after_first_run) == [1, 2, 3]
     assert sorted(after_second_run) == [1, 2, 3, 5, 7]
     # The SMS reminder row is the one nothing that arrived asked about, and it
@@ -216,6 +223,43 @@ def test_a_second_run_over_the_northside_dental_corpus_touches_only_what_arrived
         assert _cell(after_second_run[moved], "what_was_asked") == _cell(
             after_first_run[moved], "what_was_asked"
         )
+    # The handover moved three rows of its own: two the testing feedback also
+    # touched, and row 5, which this same batch proposed and the handover then
+    # reported delivered. A handover states delivery, never a verdict, so it
+    # moves `last_moved` and leaves the status alone.
+    assert _cell(after_second_run[5], "last_moved") == "20 July 2026"
+    assert _cell(after_second_run[5], "status") == "No evidence yet"
+
+
+def _handover_answer() -> dict[str, Any]:
+    """The Northside handover, as its own document says what was handed over."""
+    return {
+        "document_type": "related additional document",
+        "document_date": {
+            "value": "20 July 2026",
+            "quote": "**Date:** 20 July 2026",
+        },
+        "requirements": [],
+        "testing_observations": [],
+        "delivery_evidence": [
+            {
+                "summary": "the online booking pages were handed over",
+                "quote": "The online booking pages, the appointment reminder "
+                "job, and the daily schedule screen were handed over to the "
+                "clinic's own practice management team on\n20 July 2026.",
+            },
+            {
+                "summary": "the appointment reminder job was handed over",
+                "quote": "the appointment reminder job",
+            },
+            {
+                "summary": "the daily schedule screen was handed over",
+                "quote": "the daily schedule screen",
+            },
+        ],
+        "blockers": [],
+        "embedded_instructions": [],
+    }
 
 
 def _cell(row: Any, cell_name: str) -> str:

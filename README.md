@@ -69,10 +69,11 @@ about before it happens, and so is any link the system is unsure of. An
 observation about no requirement the register traces is reported on the
 Skipped tab rather than forced onto the nearest row.
 
-**Not yet reachable:** nothing writes `Not delivered` or `Disputed`. Both need
-a document to state that asked-for work is *not there*, and the four testing
-labels the extraction contract allows — `Passed`, `Defect`, `Change request`,
-`Unclear` — cannot express it. See `PROGRESS.md`.
+Testing feedback carries one of five labels — `Passed`, `Defect`, `Not found`,
+`Change request`, `Unclear`. `Not found` is what reaches the last two statuses:
+with a handover claiming delivery it is `Disputed`, and without one it is `Not
+delivered`. Neither synthetic corpus contains a handover contradicted by
+testing, so `Disputed` is proven by test rather than by a corpus run.
 
 ## Rules and findings
 

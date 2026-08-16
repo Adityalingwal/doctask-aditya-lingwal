@@ -222,9 +222,13 @@ def build_register_graph(
             # The prompt and the schema both state which lists a type may
             # fill, so this is a wrong answer rather than something to correct
             # quietly. One document is skipped; the batch carries on.
+            # The stored reason names what came back: "something it may not
+            # report" leaves the Delivery Owner nothing to act on, and the
+            # detail lived only in the log line, which never reaches a screen.
             skip_reason = (
-                "The model reported something this kind of document may not "
-                "report."
+                f"The model read this as {not_allowed.reported_type} and "
+                f"reported {not_allowed.list_name}, which that kind of "
+                "document may not report."
             )
             log_reason = (
                 f"{source_file} was skipped: {not_allowed}. The other "

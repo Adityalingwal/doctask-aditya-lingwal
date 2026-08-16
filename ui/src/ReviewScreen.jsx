@@ -593,10 +593,11 @@ function Reported({ reported }) {
           </p>
           <p className="m-0 mt-2 italic">{`"${entry.quote}"`}</p>
           {/* Required, not decoration: without it a reader assumes the
-              document was discarded rather than read. */}
+              document was discarded rather than read. It stops there because
+              an embedded instruction can appear on any document type,
+              including one that states no requirement at all. */}
           <p className="m-0 mt-2 text-ink-soft">
-            Reported, not followed. This document was still read and its
-            requirements are in the register.
+            Reported, not followed. This document was still read.
           </p>
         </li>
       ))}

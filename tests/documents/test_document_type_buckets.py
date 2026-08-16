@@ -223,8 +223,11 @@ def test_a_filled_list_the_type_may_not_use_skips_that_document_and_the_batch_co
         entry for entry in finished["skipped"] if entry.get("file") == TESTING_FILE
     ]
     assert len(skipped) == 1
+    # The reason a person reads names what came back, not merely that
+    # something did: without the type and the list there is nothing to act on.
     assert skipped[0]["reason"] == (
-        "The model reported something this kind of document may not report."
+        "The model read this as testing feedback and reported requirements, "
+        "which that kind of document may not report."
     )
     # The run did not fail, the list was not quietly emptied into the register,
     # and the other document in the batch still became its row.

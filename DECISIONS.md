@@ -101,7 +101,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | Conflict | Incompatible claims are shown together; the system chooses neither |
 | Blocker | Only explicit stopped work waiting on an answer/dependency counts |
 | New detail | No semantic match creates a row; compatible detail enriches; incompatible detail uses conflict review |
-| Testing feedback | Label `Passed`, `Defect`, `Change request`, or `Unclear` from evidence |
+| Testing feedback | Label `Passed`, `Defect`, `Not found`, `Change request`, or `Unclear` from evidence |
 | Baseline correctness | Crash, data loss, failed core action, or false success is a defect even if unstated |
 
 ## Human review
@@ -316,10 +316,11 @@ cannot each assume a different one:
   document reporting work stopped → `Blocked`. Delivery evidence alone moves
   `Last moved` and no status: a handover says the work exists, never that it
   behaves as asked.
-- **Open, and not this work's to choose:** `Not delivered` and `Disputed` are
-  in the constraint and nothing writes them yet. Both need a document to say
-  the asked-for work is *not there*, and the four locked testing labels cannot
-  express that — see PROGRESS, "The signal `Not delivered` and `Disputed` need".
+- A fifth testing label, **`Not found`**, carries "testing looked and the work
+  is not there" — the one thing `Defect` (broken, therefore `Partial`) cannot
+  say. `Not found` behind a handover claiming delivery is `Disputed`; `Not
+  found` with no handover behind it is `Not delivered`, because silence
+  contradicts nothing. Without this label neither status could ever be written.
 - Unknown cells say why they are unknown; they are never blank or guessed.
 - Dates come from documents, not run time. Unknown date stays unknown and R3
   does not run on it.
@@ -431,8 +432,10 @@ Extract never routes on to it, when the batch found nothing to match.
   `tests/documents/test_document_instruction_is_reported.py`, which drives the
   demo document that buries the hostile line through a real run: the line is
   stored as an embedded instruction placed in that document and logged against
-  the run, and it creates no row, changes no cell, reaches the Delivery Owner
-  as no proposed action, and appears nowhere in the export. The export was
+  the run, and it creates no row, changes no cell, and reaches the Delivery
+  Owner as no proposed action. It **is** reported to a person on purpose — the
+  run's own column, `GET /runs/{id}`, both exports and a fourth tab beside
+  Skipped — because information nobody can see is not a report. The export was
   still refused until a person approved it.
 - **What that proof does not cover:** the model is scripted, so this shows the
   pipeline has no path from document text to an approval, a commit or an

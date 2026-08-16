@@ -17,7 +17,9 @@ from app.register.cells import (
     LAST_MOVED,
     STATUS,
     STATUS_BLOCKED,
+    STATUS_DISPUTED,
     STATUS_DONE,
+    STATUS_NOT_DELIVERED,
     STATUS_PARTIAL,
     WHAT_TESTING_FOUND,
     fingerprint_of_cells,
@@ -118,7 +120,7 @@ async def propose_moves(
     ask_about: set[int] = set()
     unmatched: list[dict[str, str]] = []
     for outcome in answer.outcomes:
-        observation = observations[outcome.requirement_index]
+        observation = observations[outcome.observation_index]
         row = row_by_number.get(outcome.row_number or -1)
         if outcome.outcome == NEW_ROW or row is None:
             unmatched.append(_unmatched_entry(observation))
@@ -205,18 +207,23 @@ def _cells_the_observations_move(
     if blockers:
         moved.append((BLOCKED_ON, _joined(blockers), _citations_of(blockers)))
 
-    status = status_after(testing, bool(blockers))
+    delivery_claimed = any(
+        one["kind"] == DELIVERY_EVIDENCE for one in observations
+    )
+    status = status_after(testing, bool(blockers), delivery_claimed)
     if status is not None:
         moved.append((STATUS, status, _citations_of(testing + blockers)))
 
     # The date of the document that last changed this row. Several documents
     # can move one row in a batch; the last one read is the one whose date the
-    # cell carries, which is why documents are read in a stable order.
+    # cell carries, which is why documents are read in a stable order. A
+    # handover stating no date still moved this row, so the cell says the date
+    # is unknown rather than the row reporting no move at all.
     dated = [one for one in observations if one["document_date"] is not None]
     if dated:
         last_date = dated[-1]["document_date"]
         moved.append((LAST_MOVED, last_date["summary"], [_citation(last_date)]))
-    elif moved:
+    elif observations:
         moved.append((LAST_MOVED, DATE_UNKNOWN, []))
     return moved
 
@@ -224,6 +231,7 @@ def _cells_the_observations_move(
 def status_after(
     testing: list[dict[str, Any]],
     work_is_stopped: bool,
+    delivery_claimed: bool,
 ) -> str | None:
     """The status this row's evidence lands on, or None when nothing moves it.
 
@@ -231,10 +239,18 @@ def status_after(
     testing is not a verdict on the work, and a note with no verdict is not
     one either. Delivery evidence alone moves nothing for the same reason —
     a handover says the work exists, never that it behaves as asked.
+
+    `Not found` is the one label whose meaning depends on what else was read.
+    Testing reporting the work absent while a handover claims it was handed
+    over is two claims that oppose each other, which is `Disputed`. The same
+    report with no handover behind it contradicts nothing — silence is not a
+    claim — so it is `Not delivered`.
     """
     if work_is_stopped:
         return STATUS_BLOCKED
     labels = {one["label"] for one in testing}
+    if TestingLabel.NOT_FOUND in labels:
+        return STATUS_DISPUTED if delivery_claimed else STATUS_NOT_DELIVERED
     if TestingLabel.DEFECT in labels:
         return STATUS_PARTIAL
     if TestingLabel.PASSED in labels:

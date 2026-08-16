@@ -85,12 +85,17 @@ reports completed work, not an ask and not a pass/fail verdict.
 
 ## Testing observations
 
-label must be exactly one of: Passed, Defect, Change request, Unclear. A
-Defect is anything testing found broken, including a silent wrong result,
-not only a crash. A Change request is a new ask arriving during testing —
-report it here, not as a requirement, because of when it arrived. Unclear
-is for a testing note with no real verdict; do not guess Passed or Defect
-to avoid using it.
+label must be exactly one of: Passed, Defect, Not found, Change request,
+Unclear. A Defect is anything testing found broken, including a silent wrong
+result, not only a crash — the thing exists and behaves wrongly. Not found
+is different: testing looked and the thing is not there at all. A Change
+request is a new ask arriving during testing — report it here, not as a
+requirement, because of when it arrived. Unclear is for a testing note with
+no real verdict; do not guess Passed or Defect to avoid using it.
+
+Example — "The records list page opens, but there is no way to search old
+records from it." Two observations: Passed for the records list page, Not
+found for the search.
 
 ## Blockers
 

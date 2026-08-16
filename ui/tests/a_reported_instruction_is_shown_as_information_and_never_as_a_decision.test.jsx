@@ -44,7 +44,7 @@ test("a reported instruction is shown as information and never as a decision", a
   expect(card).toContain(reportedInstruction.place);
   expect(card).toContain(reportedInstruction.quote);
   // Without this sentence a reader assumes the document was thrown away.
-  expect(card).toContain("still read and its requirements are in the register");
+  expect(card).toContain("This document was still read.");
   // The answer is always "do not follow", so this is never a question.
   expect(screen.queryByRole("button", { name: /approve/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /reject/i })).toBeNull();

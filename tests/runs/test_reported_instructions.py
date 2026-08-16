@@ -17,6 +17,7 @@ from tests.documents.register_documents import (
     match_answer_of,
     match_marker,
     no_findings_answer,
+    observation_answer_of,
     observation_marker,
 )
 from tests.runs.application import (
@@ -80,7 +81,7 @@ def test_a_document_carrying_an_instruction_still_contributes_its_requirements(
                     "embedded_instructions": [{"quote": BURIED_INSTRUCTION}],
                 },
                 match_marker(): match_answer(1),
-                observation_marker(): match_answer_of([]),
+                observation_marker(): observation_answer_of([]),
                 examine_marker(): no_findings_answer(),
             },
         )

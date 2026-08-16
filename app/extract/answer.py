@@ -43,6 +43,10 @@ LISTS_A_TYPE_MAY_FILL: dict[DocumentType, frozenset[str]] = {
 class TestingLabel(StrEnum):
     PASSED = "Passed"
     DEFECT = "Defect"
+    # Testing looked and found nothing built. Without it neither `Not
+    # delivered` nor `Disputed` can ever be reached: `Defect` means the work
+    # exists and is wrong, which is the `Partial` line.
+    NOT_FOUND = "Not found"
     CHANGE_REQUEST = "Change request"
     UNCLEAR = "Unclear"
 

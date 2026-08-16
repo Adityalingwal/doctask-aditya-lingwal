@@ -23,6 +23,7 @@ from tests.documents.register_documents import (
     match_answer_of,
     match_marker,
     no_findings_answer,
+    observation_answer_of,
     observation_marker,
 )
 from tests.register.stored_register import documents_of_run, extraction_of_document, stored_rows
@@ -83,7 +84,7 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
                 match_marker(): match_answer(1),
                 # The blocker this document reports is about WhatsApp, which
                 # no row of this one-row register traces.
-                observation_marker(): match_answer_of([None]),
+                observation_marker(): observation_answer_of([None]),
                 examine_marker(): no_findings_answer(),
             },
         )

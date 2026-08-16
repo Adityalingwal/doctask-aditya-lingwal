@@ -14,10 +14,11 @@ from app.register.cells import CELL_NAMES
 
 
 # Required, not decoration: without it a reader assumes the document was
-# discarded rather than read.
+# discarded rather than read. It stops at "were still read" because an
+# embedded instruction can appear on any document type, including one that
+# states no requirement at all.
 REPORTED_NOT_FOLLOWED = (
-    "Reported, not followed. These documents were still read and their "
-    "requirements are in the register."
+    "Reported, not followed. These documents were still read."
 )
 JSON_FORMAT = "json"
 MARKDOWN_FORMAT = "markdown"

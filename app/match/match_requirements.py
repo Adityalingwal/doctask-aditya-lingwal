@@ -18,8 +18,8 @@ OUTCOMES = (NEW_ROW, EXISTING_ROW, POSSIBLE_MATCH)
 MATCH_PROMPT_MARKER = "Match these requirements against the register"
 OBSERVATION_PROMPT_MARKER = "Match these observations against the register"
 INCOMPLETE_ANSWER_FIX = (
-    " Nothing was proposed for the register, because a requirement Match did "
-    "not answer for is not a new row. Start another run so Match is asked "
+    " Nothing was proposed for the register, because an item Match did not "
+    "answer for is not a new row. Start another run so Match is asked "
     "again; if it keeps answering incompletely, name a stronger model in "
     "config/model.yaml."
 )
@@ -89,8 +89,30 @@ class MatchAnswer(BaseModel):
     outcomes: list[MatchOutcome]
 
 
+# Observations get their own model rather than borrowing the requirement one.
+# The generated schema is what the model is actually asked for, so a field
+# described as "the requirement this answer is about" while the prompt asks
+# about observations makes the contract contradict itself.
+class ObservationOutcome(BaseModel):
+    observation_index: int = Field(
+        description="The index of the observation this answer is about."
+    )
+    outcome: str = Field(description="One of the three outcomes above.")
+    row_number: int | None = Field(
+        default=None,
+        description=(
+            "The register row this observation is about, or null when no row "
+            "is."
+        ),
+    )
+
+
+class ObservationAnswer(BaseModel):
+    outcomes: list[ObservationOutcome]
+
+
 class IncompleteMatchAnswer(RuntimeError):
-    """Match answered about a different set of requirements than it was sent."""
+    """Match answered about a different set of items than it was sent."""
 
 
 async def match_requirements(
@@ -110,13 +132,15 @@ async def match_observations(
     model_client: BaseChatModel,
     register_rows: list[dict[str, Any]],
     observations: list[dict[str, Any]],
-) -> MatchAnswer:
+) -> ObservationAnswer:
     """Which register row each of this batch's observations is about."""
     answered = await call_the_model(
-        model_client, _observation_prompt(register_rows, observations), MatchAnswer
+        model_client,
+        _observation_prompt(register_rows, observations),
+        ObservationAnswer,
     )
-    answer = MatchAnswer.model_validate_json(json_object_in(answered))
-    _refuse_an_incomplete_answer(answer, len(observations))
+    answer = ObservationAnswer.model_validate_json(json_object_in(answered))
+    _refuse_an_incomplete_observation_answer(answer, len(observations))
     return answer
 
 
@@ -132,27 +156,61 @@ def _refuse_an_incomplete_answer(answer: MatchAnswer, asked_about: int) -> None:
         if index in answered:
             _refuse(f"Match answered twice for requirement {index}")
         answered.add(index)
-
-        if outcome.outcome not in OUTCOMES:
-            _refuse(
-                f"Match answered '{outcome.outcome}' for requirement {index}, "
-                f"which is not one of {', '.join(OUTCOMES)}"
-            )
-        if outcome.outcome == NEW_ROW and outcome.row_number is not None:
-            _refuse(
-                f"Match answered '{NEW_ROW}' for requirement {index} and still "
-                f"named row #{outcome.row_number}"
-            )
-        if outcome.outcome != NEW_ROW and outcome.row_number is None:
-            _refuse(
-                f"Match answered '{outcome.outcome}' for requirement {index} "
-                "without naming the register row it matched"
-            )
+        _refuse_an_unusable_outcome(outcome.outcome, outcome.row_number, index)
 
     if answered != set(range(asked_about)):
         _refuse(
             f"Match was asked about {asked_about} requirement(s), numbered 0 to "
             f"{asked_about - 1}, and answered for {sorted(answered)}"
+        )
+
+
+def _refuse_an_incomplete_observation_answer(
+    answer: ObservationAnswer,
+    asked_about: int,
+) -> None:
+    """The same coverage check, in the words of what was actually asked about.
+
+    An observation left unanswered is not "no row is about it"; it is an answer
+    we never received, and the two must not read alike in a failure message.
+    """
+    answered: set[int] = set()
+    for outcome in answer.outcomes:
+        index = outcome.observation_index
+        if index in answered:
+            _refuse(f"Match answered twice for observation {index}")
+        answered.add(index)
+        _refuse_an_unusable_outcome(
+            outcome.outcome, outcome.row_number, index, item="observation"
+        )
+
+    if answered != set(range(asked_about)):
+        _refuse(
+            f"Match was asked about {asked_about} observation(s), numbered 0 to "
+            f"{asked_about - 1}, and answered for {sorted(answered)}"
+        )
+
+
+def _refuse_an_unusable_outcome(
+    outcome: str,
+    row_number: int | None,
+    index: int,
+    item: str = "requirement",
+) -> None:
+    if outcome not in OUTCOMES:
+        _refuse(
+            f"Match answered '{outcome}' for {item} {index}, "
+            f"which is not one of {', '.join(OUTCOMES)}"
+        )
+    if outcome == NEW_ROW and row_number is not None:
+        _refuse(
+            f"Match answered '{NEW_ROW}' for {item} {index} and still "
+            f"named row #{row_number}"
+        )
+    if outcome != NEW_ROW and row_number is None:
+        _refuse(
+            f"Match answered '{outcome}' for {item} {index} "
+            "without naming the register row it matched"
         )
 
 
@@ -166,7 +224,7 @@ def _observation_prompt(
 ) -> list[BaseMessage]:
     observation_view = [
         {
-            "requirement_index": index,
+            "observation_index": index,
             "kind": observation["kind"],
             "summary": observation["summary"],
             "source_file": observation["source_file"],
