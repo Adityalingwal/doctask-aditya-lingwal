@@ -1089,8 +1089,8 @@ working claim only after its own implementation and proof land.
 - A project's register panel shows the empty line
   ("Nothing has been added to this register yet.") until that project has a
   run that has exported — a new project, a first run still working, or a
-  run whose export was rejected all read the same way, since none of them
-  has moved `row_count` off `null` yet.
+  discarded run all read the same way, since none of them has moved
+  `row_count` off `null` yet.
 - The screen is built by Node, which the application image does not carry, and
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.
