@@ -3,8 +3,9 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import {
-  exportReply,
+  projectId,
   projectsReply,
+  registerReply,
   runId,
   runReply,
   serverAnswering,
@@ -48,6 +49,13 @@ test("the project's register panel says nothing has been added yet rather than s
         path: `/runs/${runId}`,
         reply: { body: runReply({ status: "running", stage: "match", exported: false }) },
       },
+      {
+        method: "GET",
+        path: `/projects/${projectId}/register`,
+        reply: {
+          body: registerReply({ rows: [], exported_at: null, examine: null }),
+        },
+      },
     ]),
   );
 
@@ -57,5 +65,5 @@ test("the project's register panel says nothing has been added yet rather than s
 
   expect(within(register).queryByRole("table")).toBeNull();
   expect(register.textContent).toMatch(/nothing has been added to this register yet/i);
-  expect(register.textContent).not.toContain(exportReply().rows[0].cells.what_was_asked);
+  expect(register.textContent).not.toContain(registerReply().rows[0].cells.what_was_asked);
 });

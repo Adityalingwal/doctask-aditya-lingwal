@@ -3,10 +3,10 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import {
-  exportReply,
+  projectId,
   projectReply,
   projectsReply,
-  runId,
+  registerReply,
   serverAnswering,
 } from "./server_replies.js";
 
@@ -30,7 +30,7 @@ async function openRegister(exported) {
           body: projectsReply({ projects: [exportedProject(exported.rows.length)] }),
         },
       },
-      { method: "GET", path: `/runs/${runId}/export`, reply: { body: exported } },
+      { method: "GET", path: `/projects/${projectId}/register`, reply: { body: exported } },
     ]),
   );
 
@@ -41,7 +41,7 @@ async function openRegister(exported) {
 }
 
 test("the register heads the written-down cell with the question it asks", async () => {
-  const register = await openRegister(exportReply());
+  const register = await openRegister(registerReply());
 
   expect(
     within(register).getByRole("columnheader", { name: "Written down?" }),
@@ -52,7 +52,7 @@ test("the register heads the written-down cell with the question it asks", async
 });
 
 test("the register shows the four cells and no heading for a cell that left", async () => {
-  const register = await openRegister(exportReply());
+  const register = await openRegister(registerReply());
 
   expect(
     within(register)

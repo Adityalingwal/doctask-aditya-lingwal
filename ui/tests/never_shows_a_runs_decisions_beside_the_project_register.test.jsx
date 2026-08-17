@@ -9,6 +9,7 @@ import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
 import {
   decisionReply,
+  projectId,
   projectReply,
   projectsReply,
   runId,
@@ -51,7 +52,7 @@ test("never_shows_a_runs_decisions_beside_the_project_register", async () => {
       },
       {
         method: "GET",
-        path: `/runs/${exportedRun.run_id}/export`,
+        path: `/projects/${projectId}/register`,
         reply: { body: { rows: [], columns: [], examine: { rules: [], rows_examined: 0, findings: [] }, exported_at: "2026-03-27T10:00:00+00:00", project: { name: withTwoRuns.name } } },
       },
     ]),

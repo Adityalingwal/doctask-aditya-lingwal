@@ -1,6 +1,6 @@
 // The shapes these builders return are the shapes the API actually returns:
-// `app/runs/run_status.py` for a run, `app/register/export_register.py` for an
-// export, and `app/refusal.py` carried as `{"detail": ...}` by
+// `app/runs/run_status.py` for a run, `app/register/export_register.py` for
+// the register document, and `app/refusal.py` carried as `{"detail": ...}` by
 // `app/api/routes.py`. A test that invented its own shape would prove only
 // that the component renders its own props.
 
@@ -87,10 +87,9 @@ export function examineReply(overrides = {}) {
   };
 }
 
-export function exportReply(overrides = {}) {
+export function registerReply(overrides = {}) {
   return {
     project: { id: projectId, name: "Acme intake portal" },
-    run_id: runId,
     exported_at: "2026-03-26T10:00:00+00:00",
     columns: ["what_was_asked", "in_writing", "what_testing_found", "status"],
     rows: [

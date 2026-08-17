@@ -12,7 +12,7 @@
 import {
   decisionReply,
   examineReply,
-  exportReply,
+  registerReply,
   runReply,
 } from "../tests/server_replies.js";
 
@@ -137,7 +137,7 @@ function demoRuns() {
 }
 
 function exportedRegister() {
-  const base = exportReply();
+  const base = registerReply();
   return {
     ...base,
     run_id: "demo-exported",

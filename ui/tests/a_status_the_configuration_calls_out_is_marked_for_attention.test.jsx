@@ -3,10 +3,10 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import {
-  exportReply,
+  projectId,
   projectReply,
   projectsReply,
-  runId,
+  registerReply,
   serverAnswering,
 } from "./server_replies.js";
 
@@ -20,7 +20,7 @@ afterEach(() => {
 // the configuration still said "No evidence yet" after the register started
 // saying "Nothing said yet", and no test caught the chip losing its colour.
 test("the starting status is marked for attention and a settled one is not", async () => {
-  const exported = exportReply();
+  const exported = registerReply();
   exported.rows[0].cells.status = "Nothing said yet";
   const run = { ...projectReply().runs[0], row_count: exported.rows.length };
   const project = projectReply({ runs: [run] });
@@ -32,7 +32,7 @@ test("the starting status is marked for attention and a settled one is not", asy
         path: "/projects",
         reply: { body: projectsReply({ projects: [project] }) },
       },
-      { method: "GET", path: `/runs/${runId}/export`, reply: { body: exported } },
+      { method: "GET", path: `/projects/${projectId}/register`, reply: { body: exported } },
     ]),
   );
 

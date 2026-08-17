@@ -1,18 +1,18 @@
 // Review repair, Codex finding 4. Opening the register cleared `exported` to
 // null, and null was rendered as "nothing has been added" — so a project the
 // server had already reported as holding rows showed an empty register for as
-// long as `GET /runs/{id}/export` took. "Not read yet" and "read, and there is
+// long as the register read took. "Not read yet" and "read, and there is
 // nothing" are two different states and the screen may not collapse them.
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import {
-  exportReply,
+  projectId,
   projectReply,
   projectsReply,
+  registerReply,
   runId,
-  runReply,
   serverAnswering,
 } from "./server_replies.js";
 
@@ -23,9 +23,9 @@ afterEach(() => {
 const EMPTY_LINE = /Nothing has been added to this register yet/i;
 
 test("never_calls_a_register_empty_before_it_has_been_read", async () => {
-  let releaseExport = () => {};
-  const heldExport = new Promise((resolve) => {
-    releaseExport = resolve;
+  let releaseRegister = () => {};
+  const heldRegister = new Promise((resolve) => {
+    releaseRegister = resolve;
   });
 
   const exportedProject = projectReply({
@@ -45,20 +45,19 @@ test("never_calls_a_register_empty_before_it_has_been_read", async () => {
 
   const answering = serverAnswering([
     { method: "GET", path: "/projects", reply: () => ({ body: projectsReply({ projects: [exportedProject] }) }) },
-    { method: "GET", path: `/runs/${runId}`, reply: () => ({ body: runReply({ status: "done", exported: true }) }) },
     {
       method: "GET",
-      path: `/runs/${runId}/export`,
-      reply: () => ({ body: exportReply() }),
+      path: `/projects/${projectId}/register`,
+      reply: () => ({ body: registerReply() }),
     },
   ]);
 
-  // Hold the export read open so the window between opening the register and
-  // its answer is a real one, not a race the test happens to lose.
+  // Hold the register read open so the window between opening the register
+  // and its answer is a real one, not a race the test happens to lose.
   const held = async (requested, options) => {
     const path = new URL(requested, "http://localhost:8000").pathname;
-    if (path === `/runs/${runId}/export`) {
-      await heldExport;
+    if (path === `/projects/${projectId}/register`) {
+      await heldRegister;
     }
     return answering(requested, options);
   };
@@ -74,7 +73,7 @@ test("never_calls_a_register_empty_before_it_has_been_read", async () => {
   });
   expect(screen.queryByText(EMPTY_LINE)).toBeNull();
 
-  releaseExport();
+  releaseRegister();
   await waitFor(() => {
     expect(screen.queryByText(/Reading this register/i)).toBeNull();
   });

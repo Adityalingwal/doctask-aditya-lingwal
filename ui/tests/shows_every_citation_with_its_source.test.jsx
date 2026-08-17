@@ -3,10 +3,10 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import {
-  exportReply,
+  projectId,
   projectReply,
   projectsReply,
-  runId,
+  registerReply,
   serverAnswering,
 } from "./server_replies.js";
 
@@ -23,7 +23,7 @@ function exportedProject(rowCount) {
 }
 
 test("every citation names the source file and the place the server gave it", async () => {
-  const exported = exportReply();
+  const exported = registerReply();
   vi.stubGlobal(
     "fetch",
     serverAnswering([
@@ -32,7 +32,7 @@ test("every citation names the source file and the place the server gave it", as
         path: "/projects",
         reply: { body: projectsReply({ projects: [exportedProject(exported.rows.length)] }) },
       },
-      { method: "GET", path: `/runs/${runId}/export`, reply: { body: exported } },
+      { method: "GET", path: `/projects/${projectId}/register`, reply: { body: exported } },
     ]),
   );
 
@@ -57,7 +57,7 @@ test("every citation names the source file and the place the server gave it", as
 });
 
 test("a citation whose quoted words the server did not send is never shown as a quote", async () => {
-  const exported = exportReply();
+  const exported = registerReply();
   exported.rows[0].citations = [
     {
       cell: "what_was_asked",
@@ -75,7 +75,7 @@ test("a citation whose quoted words the server did not send is never shown as a 
         path: "/projects",
         reply: { body: projectsReply({ projects: [exportedProject(exported.rows.length)] }) },
       },
-      { method: "GET", path: `/runs/${runId}/export`, reply: { body: exported } },
+      { method: "GET", path: `/projects/${projectId}/register`, reply: { body: exported } },
     ]),
   );
 
