@@ -80,7 +80,7 @@ differently.
 
 - **Use the locked vocabulary, everywhere.** This project's words are fixed in
   `DECISIONS.md`'s `## Vocabulary` section: *register, row, requirement,
-  finding, rule, run, project, batch, blocker*. Use exactly those in code,
+  finding, rule, run, project, batch*. Use exactly those in code,
   tests, and log messages. Never write `item`, `entry`, or `record` where the
   thing is a row. The founder reads the decisions and then the code; both
   must speak one language.

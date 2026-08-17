@@ -204,7 +204,7 @@ function exportedRegister() {
           what_was_asked: "Patients get an SMS reminder before an appointment.",
           in_writing: "No written scope entry.",
           what_testing_found: "No evidence yet.",
-          status: "No evidence yet",
+          status: "Nothing said yet",
           blocked_on: "Nothing recorded.",
           first_seen: "2026-03-20",
           last_moved: "2026-03-20",

@@ -74,6 +74,20 @@ constraint exactly, and upgrading again reached the same state.
 stood at `20260816_0016`, where the rows are seeded before the narrowing runs;
 rewriting it would make the seed violate that revision's own constraint.
 
+**Codex's three findings repaired in the foreground, on the same branch, after
+Aditya decided all three.** `ui/config/screen.json` marks `Nothing said yet`
+again — with a new test written first and seen failing on the assertion
+(`a_status_the_configuration_calls_out_is_marked_for_attention.test.jsx`);
+`TASK.md`'s vocabulary list no longer names `blocker`; and
+`ui/demo/serve_demo_runs.js` emits the renamed status. The demo file's
+`what_testing_found: "No evidence yet."` lines predate this work — the real
+cell sentence there has been "Not known yet — …" since before the rename — and
+are left as part of the already-recorded stale-demo limitation. After the
+repairs the front-end suite printed **47 passed across 31 files** in the
+foreground; the Python suite was not re-run for them — the repairs touch no
+`.py` file — and stands at the **202 passed** printed independently in the
+foreground before the repairs.
+
 ### The register becomes four cells (branch `register-becomes-four-cells`)
 
 Eight parts, one commit each, from `main` at `85e97bb`. Baseline counts printed
@@ -832,21 +846,7 @@ working claim only after its own implementation and proof land.
    **Decided 2026-08-17: the downgrade stays and the gate is not widened.** The
    demo is driven in pairs, where the question never arises at all; the cost of
    the one-per-run order is written up under `## Known limitations`.
-2. **`ui/config/screen.json` still calls out `No evidence yet`, so the review
-   screen no longer marks the status it is meant to mark.** Found while
-   renaming the status and deliberately left alone: the brief for that work
-   counted its blast radius over `ui/src/` and `ui/tests/`, which hold none,
-   and bounded the change to leaving the front end untouched. The value is
-   live — `ui/src/Register.jsx` imports the file and `StatusChip` asks
-   `screenConfig.attention_statuses.includes(status)` — and no front-end test
-   covers the marking, so both suites pass while the chip silently renders
-   plainly. The fix is one line, `["Nothing said yet"]`, and it is Aditya's
-   call rather than the implementing agent's.
-3. **`TASK.md` still lists `blocker` among the locked vocabulary words** that it
-   says are fixed in `DECISIONS.md`'s `## Vocabulary`, which no longer defines
-   it. `TASK.md` is the permanent working contract and was outside that work's
-   bounds; deleting the one word from its list closes the contradiction.
-4. **Development Compose mount is too broad for final proof.** `.:/workspace`
+2. **Development Compose mount is too broad for final proof.** `.:/workspace`
    is intentionally retained for iteration, exposes local `.env`, and lets
    local files override the image. Remove/narrow it and wipe stale dev DB
    before final image-only/fresh-clone verification.
