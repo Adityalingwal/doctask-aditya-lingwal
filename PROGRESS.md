@@ -969,14 +969,6 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
-- **A run sitting at `needs review` across the one-press-gate upgrade is not
-  supported.** Such a run carries an export decision raised by the old code:
-  unanswered, the screen hides it while the server still counts it, so both
-  ending buttons answer 409 and the run holds its project's lock; answered, the
-  press writes a second export decision and `export_was_approved` reads one
-  matching row without ordering. Deliberately not built for — the development
-  database is emptied when the stack comes up fresh, so no such run exists here
-  (raised by review on the `gate-becomes-one-button` branch, 2026-08-18).
 - `Disputed` is reached only when the handover and the testing feedback that
   contradict each other are read in the **same batch**. `status_after` decides
   it from the delivery evidence this batch supplied, and nothing stores the
