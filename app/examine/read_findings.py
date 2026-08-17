@@ -149,8 +149,10 @@ async def rules_that_ran(
 def _rule_as_reported(rule: dict[str, Any]) -> dict[str, Any]:
     """A rule's text alone does not say what it ran at.
 
-    R3 reads "beyond max_days" and keeps the limit in its params, so reporting
-    the text without them cannot tell a reader whether 14 days applied or 30.
+    A rule may name a limit in its text and keep the value in its params, so
+    reporting the text without them cannot tell a reader which value applied.
+    No rule in `config/rules.yaml` carries params today; the last one that did
+    left with the date cells on 2026-08-17.
     """
     reported: dict[str, Any] = {"id": rule["id"], "text": rule["text"]}
     if rule.get("params"):

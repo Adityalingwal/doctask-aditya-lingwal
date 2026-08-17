@@ -832,6 +832,16 @@ working claim only after its own implementation and proof land.
   the fallback fires on every full batch. It is harmless while the two state
   different asks, which is the case in both corpora, and undecided if they ever
   state the same one.
+- **A finding's `evidence` is never checked against the row it names.** Examine
+  refuses an answer naming a rule or a row it was not given, but the `evidence`
+  string is only checked for being non-empty — nothing looks for those words in
+  the row's four cells. A model that paraphrases instead of quoting therefore
+  puts its own sentence on the review screen and in the export under "Evidence".
+  Unlike Extract, where `locate_quote` drops a quote it cannot find in the
+  document, nothing here verifies the copy. **Decided 2026-08-17 not to add the
+  check**: rejecting the whole answer over one imperfect copy is worse than the
+  fault, and this is to be closed by strengthening the Examine prompt instead.
+  Not observed — no live model has run.
 - **A confident match against a committed row still raises a question, one per
   overlapping ask.** It appears only when documents arrive one per run: the
   meeting note's asks are committed by the first run, so every ask the client
