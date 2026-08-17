@@ -41,8 +41,8 @@ test("a run with no changes still shows its early stage done", () => {
   expect(states.find((stage) => stage.name === "ingest").state).toBe("done");
 });
 
-test("a run whose export was rejected shows review done, not working", () => {
-  const states = stageStates("review", "export rejected", ["ingest", "review"]);
+test("a discarded run shows review done, not working", () => {
+  const states = stageStates("review", "discarded", ["ingest", "review"]);
 
   expect(states.find((stage) => stage.name === "review").state).toBe("done");
 });

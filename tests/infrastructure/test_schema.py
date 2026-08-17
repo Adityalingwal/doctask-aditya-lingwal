@@ -125,7 +125,7 @@ RUN_STATUSES = (
     "running",
     "needs review",
     "done",
-    "export rejected",
+    "discarded",
     "failed",
     "no changes",
 )

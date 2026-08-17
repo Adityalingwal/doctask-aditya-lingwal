@@ -217,7 +217,7 @@ def test_a_second_run_proposal_reaches_the_register_only_after_the_export_gate(
                 },
             ).raise_for_status()
             client.post(f"/runs/{second_run}/finish-review").raise_for_status()
-            wait_for_run_status(client, second_run, "export rejected")
+            wait_for_run_status(client, second_run, "discarded")
             after_rejection = stored_rows(database_url, project_id)
 
     assert while_waiting == after_first_run
