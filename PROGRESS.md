@@ -789,10 +789,15 @@ working claim only after its own implementation and proof land.
    no cell, no citation. `build_export` does carry `rows[].cells` and
    `rows[].citations`, but only `WHERE is_committed`, and it is built inside
    Commit, after the gate is answered; `GET /runs/{id}/export` answered `409`
-   before approval. `_merge_approved_matches` is driven only by an approved
-   possible-match decision, so with the downgrade removed nothing would perform
-   the merge at all and the proposal would be committed as a second row for the
-   same ask. **Aditya decides**: leave the downgrade, or widen the gate first.
+   before approval. Removing only the downgrade would in fact change nothing:
+   `_the_candidate_to_ask_about` raises the possible-match decision whenever the
+   answer names a committed row, whatever the outcome, so the question would
+   still be asked and an approval would still merge. Making the merge automatic
+   needs three things together — stop raising the question, perform the merge
+   without a decision, and show the merge at the gate.
+   **Decided 2026-08-17: the downgrade stays and the gate is not widened.** The
+   demo is driven in pairs, where the question never arises at all; the cost of
+   the one-per-run order is written up under `## Known limitations`.
 2. **Development Compose mount is too broad for final proof.** `.:/workspace`
    is intentionally retained for iteration, exposes local `.env`, and lets
    local files override the image. Remove/narrow it and wipe stale dev DB
@@ -827,6 +832,19 @@ working claim only after its own implementation and proof land.
   the fallback fires on every full batch. It is harmless while the two state
   different asks, which is the case in both corpora, and undecided if they ever
   state the same one.
+- **A confident match against a committed row still raises a question, one per
+  overlapping ask.** It appears only when documents arrive one per run: the
+  meeting note's asks are committed by the first run, so every ask the client
+  requirements document restates in the second is a match against a committed
+  row, and each raises its own question. In the intake-portal corpus that is
+  **one** question, because only the email notification is stated in both
+  documents; on an engagement whose requirements document writes down most of
+  the meeting, it would be one per row, which is the noise that trains a
+  reviewer to approve without reading. **Arriving in pairs or all at once raises
+  none of them**, because nothing inside one batch is committed — that is why
+  the demo is driven in pairs. A confirmation is not a contradiction and the
+  brief asks only for the second; removing the question is blocker 1 and was
+  deliberately not built.
 - **A handover read after testing has already moved a row sends that row back
   to `Handed over`, and drops the testing citation with it.** `status_after`
   asks only whether *this batch* holds testing, never whether testing has ever

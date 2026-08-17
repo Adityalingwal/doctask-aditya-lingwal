@@ -4022,5 +4022,38 @@ the downgrade would in fact change nothing: `_the_candidate_to_ask_about` raises
 the possible-match decision whenever the answer names a committed row, whatever
 the outcome, so the question would still be asked and an approval would still
 merge. Making the merge automatic needs the gate to show the merge first. The
-gate as it stands is not a guard over this, so the decision goes back to Aditya
-rather than being built around.
+gate as it stands is not a guard over this, so the decision went back to Aditya,
+who **settled it the same day: the downgrade stays.** A confirmation is not a
+contradiction, and the brief asks only for the second to be surfaced — but the
+question is cheap where it actually appears. It arises only in the one-per-run
+order, one per ask that both the meeting note and the requirements document
+state, and the intake-portal corpus has exactly one such ask. Arriving in pairs
+raises none at all, because nothing inside one batch is committed, so the demo
+is driven in pairs and the code is left alone.
+
+**Not taken — splitting the two files that have outgrown 300 lines.** Surveyed
+on 2026-08-15 because `TASK.md` puts a stop-and-ask line at around 300 lines,
+and refused on 2026-08-16 by the same sentence that raises it — *"If the honest
+answer is no, leave it long."* `app/graph/register_graph.py` is one graph:
+separating its node bodies from the routing between them would put the steps in
+one file and the order they run in another. `ui/src/ReviewScreen.jsx` is one
+screen — its tail is seven components that each render a section of that page
+and nothing else, and its state is eighteen `useState` values that constrain
+each other, a rule that was a P1 review finding on pull request #22 precisely
+because it is easy to get wrong even in one file. The survey expected both to
+shrink once the cells were cut. Measured on 2026-08-17 after that work landed,
+`register_graph.py` is **722** lines — it grew from 705 — and `ReviewScreen.jsx`
+is **709**, unchanged. The expectation was wrong; the refusal stands on its own
+reasoning rather than on the number.
+
+**Not taken — simplifying citations away, and merging Match into Examine.** Both
+were first instincts, and both conflict with the brief rather than with a
+preference. The working notes require every claim to trace to an exact source
+location, and they name compare/examine as a step the workflow must run
+visibly. Beyond the brief the two jobs differ in kind: Match must flag rather
+than decide when it is unsure, while Examine judges a finished register against
+frozen rules. One prompt holding both invites the model to settle an uncertain
+match on its way to a finding, which is the behaviour the gate exists to
+prevent. The code is also small — `place_in_document.py` is 39 lines — so
+citations are the most expensive thing here to give up and among the least
+rewarding to remove.
