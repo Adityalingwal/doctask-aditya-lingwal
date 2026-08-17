@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import create_engine, text
 
@@ -13,6 +14,7 @@ from tests.runs.application import (
     wait_until,
     write_script,
 )
+from tests.examine.answers import examine_answer, one_finding
 from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
@@ -31,8 +33,14 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 @contextmanager
 def _application_at_review(
     tmp_path: Path,
+    examine: dict[str, Any] | None = None,
 ) -> Iterator[tuple[ApplicationProcess, str, str]]:
-    """One run driven through the API until it is parked at Review."""
+    """One run driven through the API until it is parked at Review.
+
+    `examine` decides whether the run reaches Review with a question of its
+    own: the export gate is no longer one, so a test about an unanswered
+    decision has to give the run a real finding to leave unanswered.
+    """
     with temporary_project_folder("review-export") as (source_folder, source_folder_path):
         quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
         script_path = tmp_path / "script.json"
@@ -40,7 +48,7 @@ def _application_at_review(
             script_path,
             {
                 match_marker(): match_answer(1),
-                examine_marker(): no_findings_answer(),
+                examine_marker(): examine or no_findings_answer(),
                 extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
             },
         )
@@ -79,24 +87,22 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
     ):
         with application.client() as client:
             waiting = client.get(f"/runs/{run_id}").json()
+            # The gate is not in the queue: one press writes it and ends the
+            # review in the same step.
+            assert waiting["decisions"] == []
+
+            finished = client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
+            )
+            assert finished.status_code == 200
+
             export_decision = next(
                 decision
-                for decision in waiting["decisions"]
+                for decision in client.get(f"/runs/{run_id}").json()["decisions"]
                 if decision["kind"] == "export"
             )
-            assert export_decision["outcome"] is None
-
-            answered = client.post(
-                f"/runs/{run_id}/decisions",
-                json={
-                    "decision_id": export_decision["decision_id"],
-                    "outcome": "approved",
-                },
-            )
-            assert answered.status_code == 200
-
-            finished = client.post(f"/runs/{run_id}/finish-review")
-            assert finished.status_code == 200
+            assert export_decision["outcome"] == "approved"
 
             wait_until(
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
@@ -147,7 +153,10 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
 
 
 def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> None:
-    with _application_at_review(tmp_path) as (
+    with _application_at_review(
+        tmp_path,
+        examine_answer([one_finding()]),
+    ) as (
         application,
         _database_url,
         run_id,
@@ -160,7 +169,10 @@ def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> No
                 if decision["outcome"] is None
             ]
 
-            refusal = client.post(f"/runs/{run_id}/finish-review")
+            refusal = client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
+            )
             after_refusal = client.get(f"/runs/{run_id}").json()
             export_attempt = client.get(f"/runs/{run_id}/export")
 

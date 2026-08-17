@@ -20,13 +20,6 @@ const ADD = /add this run's changes to the register/i;
 const DISCARD = /discard this run's changes/i;
 
 const answered = decisionReply({ outcome: "approved" });
-const unanswered = decisionReply({
-  decision_id: "5f7b9d13-4444-4e55-8666-777788889999",
-  question:
-    "Is 'Operations are emailed on submit' the same requirement as row 3, "
-    + "'Email the operations team'?",
-  row_number: 3,
-});
 // The gate is written when the button is pressed, so a run that has already
 // been finished carries an answered export decision in the same payload.
 const gate = decisionReply({
@@ -78,24 +71,6 @@ test("the export gate is never shown as a question with answers to give", async 
 
   expect(screen.queryByText(gate.question)).toBeNull();
   expect(screen.queryByText("export")).toBeNull();
-});
-
-test("neither ending is offered while one decision is still unanswered", async () => {
-  screenShowing([answered, unanswered]);
-  await openSection(/decisions/i);
-  await screen.findByText(unanswered.question);
-
-  expect(screen.queryByRole("button", { name: ADD })).toBeNull();
-  expect(screen.queryByRole("button", { name: DISCARD })).toBeNull();
-  expect(screen.getByText("Answer all 1 to finish this review.")).toBeTruthy();
-});
-
-test("both endings are offered once the server reports every decision answered", async () => {
-  screenShowing([answered]);
-  await openSection(/decisions/i);
-
-  expect(await screen.findByRole("button", { name: ADD })).toBeTruthy();
-  expect(screen.getByRole("button", { name: DISCARD })).toBeTruthy();
 });
 
 test("pressing add sends the answer that adds this run's changes to the register", async () => {

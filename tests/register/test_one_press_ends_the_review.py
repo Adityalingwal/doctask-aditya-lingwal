@@ -145,9 +145,10 @@ def test_one_press_discarding_this_runs_changes_commits_nothing_and_ends_the_run
             export_attempt = client.get(f"/runs/{run_id}/export")
 
         recorded = _export_decision(database_url, run_id)
+        committed = _committed_row_count(database_url, run_id)
 
     assert finished.status_code == 200
-    assert _committed_row_count(database_url, run_id) == 0
+    assert committed == 0
     # The export answers exactly as it does for any run that committed nothing.
     assert export_attempt.status_code == 409
     assert "exported nothing" in export_attempt.json()["detail"]

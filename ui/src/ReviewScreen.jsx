@@ -22,6 +22,10 @@ import {
 // The one status in which the server accepts an answer or a finished review.
 const WAITING_FOR_REVIEW = "needs review";
 
+// The decision the ending press writes. It is recorded, and it is shown
+// nowhere as something to answer.
+const EXPORT_GATE_KIND = "export";
+
 // The screen's own name. The register it shows keeps the name the decisions and
 // the exports give it; this is only what the person looking at it calls the
 // thing, and it lives in one place so it can be changed in one place.
@@ -266,14 +270,19 @@ export default function ReviewScreen({ runId: openedRunId }) {
     [runId, readFromServer, actionReachedTheApplication],
   );
 
-  const finish = useCallback(async () => {
-    setAnswering(true);
-    const finished = await finishReview(runId);
-    if (actionReachedTheApplication(finished)) {
-      await readFromServer();
-    }
-    setAnswering(false);
-  }, [runId, readFromServer, actionReachedTheApplication]);
+  // One press ends the review and carries the answer with it, so this is
+  // called with what the pressed button means, never with nothing.
+  const finish = useCallback(
+    async (addToRegister) => {
+      setAnswering(true);
+      const finished = await finishReview(runId, addToRegister);
+      if (actionReachedTheApplication(finished)) {
+        await readFromServer();
+      }
+      setAnswering(false);
+    },
+    [runId, readFromServer, actionReachedTheApplication],
+  );
 
   // L5: nothing the person typed into the Add-project box reaches the screen.
   // The list is re-read and the run the server actually created is what gets
@@ -287,13 +296,21 @@ export default function ReviewScreen({ runId: openedRunId }) {
     [readProjectsFromServer, openRun],
   );
 
+  // The gate is not a question anybody is asked: it is written when one of
+  // the two ending buttons is pressed, and the run then carries it answered.
+  // Filtered here, once, so the count and the cards can never disagree.
+  const questions =
+    run === null
+      ? []
+      : run.decisions.filter((decision) => decision.kind !== EXPORT_GATE_KIND);
+
   // L5: only a run the server says is at review has work waiting. Decisions
   // left unanswered on a run that stopped can never be answered — counting
   // them would offer work the server refuses.
   const waiting =
     run === null || run.status !== WAITING_FOR_REVIEW
       ? 0
-      : run.decisions.filter((decision) => decision.outcome === null).length;
+      : questions.filter((decision) => decision.outcome === null).length;
 
   const selectedProject =
     projects.find((project) => project.project_id === selectedProjectId) ?? null;
@@ -330,7 +347,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
             tabWaiting: waiting > 0,
             body: (
               <Decisions
-                decisions={run.decisions}
+                decisions={questions}
                 examine={run.examine}
                 reviewing={run.status === WAITING_FOR_REVIEW}
                 answering={answering}
@@ -492,7 +509,7 @@ function Loading() {
 
 // Tabs, not buttons: choosing which part of a run to read is navigation, and
 // the only things on this screen that act on a run are Approve, Reject and
-// Finish review.
+// the two buttons that end the review.
 function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
   if (disabled) {
     return null;
@@ -639,7 +656,7 @@ function Decisions({
           <Examine examine={examine} />
         </div>
       )}
-      <FinishReview
+      <EndReview
         reviewing={reviewing}
         unanswered={waiting}
         answering={answering}
@@ -650,9 +667,15 @@ function Decisions({
 }
 
 // Both rules belong to the server: it refuses a run that is not at review, and
-// it refuses a review with an unanswered decision. The button is offered only
-// where the run the server just described allows it.
-function FinishReview({ reviewing, unanswered, answering, onFinish }) {
+// it refuses a review with an unanswered decision. The two endings are offered
+// only where the run the server just described allows them.
+//
+// Two buttons and not one, because saying no is how a run ends without
+// committing: with only the adding button, a run nobody wants could never
+// finish and would hold its project's lock for ever. Neither is louder than
+// the other — a screen that makes one ending look like the expected answer is
+// answering for the person.
+function EndReview({ reviewing, unanswered, answering, onFinish }) {
   if (!reviewing) {
     return (
       <p className="mt-8 text-sm text-ink-soft">
@@ -668,13 +691,30 @@ function FinishReview({ reviewing, unanswered, answering, onFinish }) {
     );
   }
   return (
+    <p className="m-0 mt-8 flex flex-wrap gap-3">
+      <EndReviewButton
+        label="Add this run's changes to the register"
+        answering={answering}
+        onClick={() => onFinish(true)}
+      />
+      <EndReviewButton
+        label="Discard this run's changes"
+        answering={answering}
+        onClick={() => onFinish(false)}
+      />
+    </p>
+  );
+}
+
+function EndReviewButton({ label, answering, onClick }) {
+  return (
     <button
       type="button"
       disabled={answering}
-      onClick={onFinish}
-      className="edge-shadow mt-8 border-2 border-signal-edge bg-signal px-6 py-3 font-mono text-sm font-semibold disabled:opacity-40"
+      onClick={onClick}
+      className="edge-shadow border-2 border-signal-edge bg-signal px-6 py-3 font-mono text-sm font-semibold disabled:opacity-40"
     >
-      Finish review
+      {label}
     </button>
   );
 }
@@ -682,7 +722,7 @@ function FinishReview({ reviewing, unanswered, answering, onFinish }) {
 // The project's own panel (section 2.3): the same register component a run
 // used to show under its own Register tab, reused here rather than
 // duplicated. The empty state (section 2.4) covers a new project, a first
-// run still working, and a run whose export was rejected — every case in
+// run still working, and a run whose changes were discarded — every case in
 // which this project has never exported — with one line, never an empty
 // table.
 function ProjectRegisterSection({ exported, read }) {

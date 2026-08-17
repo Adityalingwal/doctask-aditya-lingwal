@@ -89,9 +89,17 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
             return await submit_decision(connection, run_id, decision_id, outcome)
 
     @server.tool(name="finish_review")
-    async def finish_review_tool(run_id: UUID) -> dict[str, str]:
-        """Finish one run's review once every decision it raised is answered."""
-        return await finish_review(_run_engine(application), run_id)
+    async def finish_review_tool(
+        run_id: UUID,
+        add_to_register: bool,
+    ) -> dict[str, str]:
+        """End one run's review once every decision it raised is answered.
+
+        `add_to_register`: yes = add this run's changes to the register; no =
+        discard this run's changes. It has no default — one press ends the
+        review, and the call has to say which of the two it is.
+        """
+        return await finish_review(_run_engine(application), run_id, add_to_register)
 
     @server.tool(name="get_export")
     async def get_export_tool(

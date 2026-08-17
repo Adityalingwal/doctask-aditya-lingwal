@@ -43,7 +43,7 @@ from app.model.call_failure import ModelCallFailed, raise_if_configuration_failu
 from app.register.commit_register import commit_register
 from app.register.move_rows import propose_moves
 from app.register.propose_rows import MatchSettlement, committed_rows, propose_rows
-from app.review.review_queue import ensure_export_decision, export_was_approved
+from app.review.review_queue import export_was_approved
 from app.run_logging import log_run_event
 from app.runs.finished_stages import record_stage_finished
 from app.runs.run_records import (
@@ -442,22 +442,13 @@ def build_register_graph(
         # LangGraph replays an interrupted node from its start on every
         # resume, so this node cannot otherwise tell a first entry from a
         # post-review replay. review_finished_at is the durable fact that
-        # tells them apart: once it is set, raising the export decision,
-        # entering the stage, reporting 'needs review', and the
-        # interrupt itself must not happen again.
+        # tells them apart: once it is set, entering the stage, reporting
+        # 'needs review', and the interrupt itself must not happen again.
         if run["review_finished_at"] is None:
             async with pool.connection() as connection:
-                # No row count in the question: a rules-only run reaches
-                # Review with zero proposed rows and still commits merges and
-                # findings, so a wording naming a count would read wrongly
-                # there. This gate is the one place a human approves the
-                # whole run's work (working notes line 161), not a download
-                # prompt, so "export" is never the verb here.
-                await ensure_export_decision(
-                    connection,
-                    run_id,
-                    "Add this run's changes to the register?",
-                )
+                # No export gate is raised here: the person answers it by
+                # pressing one of the two buttons that end the review, and
+                # finish_review writes the decision that press carried.
                 await enter_stage(connection, run_id, REVIEW_STAGE)
                 await set_run_status(connection, run_id, WAITING_FOR_REVIEW)
 

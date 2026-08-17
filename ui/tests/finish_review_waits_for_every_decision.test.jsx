@@ -5,6 +5,7 @@ import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
 import {
   decisionReply,
+  findingDecisionReply,
   projectsReply,
   runId,
   runReply,
@@ -15,14 +16,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const answered = decisionReply({ outcome: "approved" });
-const unanswered = decisionReply({
-  decision_id: "5f7b9d13-4444-4e55-8666-777788889999",
-  kind: "export",
-  question: "Add this run's changes to the register?",
-});
+const ADD = /add this run's changes to the register/i;
+const DISCARD = /discard this run's changes/i;
 
-test("finishing the review is not offered while one decision is still unanswered", async () => {
+const answered = decisionReply({ outcome: "approved" });
+// A finding, because the gate no longer waits in the queue for anybody: the
+// unanswered decision has to be one of the run's own questions.
+const unanswered = findingDecisionReply();
+
+test("neither ending is offered while one decision is still unanswered", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
@@ -37,13 +39,14 @@ test("finishing the review is not offered while one decision is still unanswered
 
   render(<ReviewScreen runId={runId} />);
   await openSection(/decisions/i);
-  await screen.findByText(unanswered.question);
+  await screen.findByText(unanswered.issue);
 
-  expect(screen.queryByRole("button", { name: /finish review/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: ADD })).toBeNull();
+  expect(screen.queryByRole("button", { name: DISCARD })).toBeNull();
   expect(screen.getByText("Answer all 1 to finish this review.")).toBeTruthy();
 });
 
-test("finishing the review is offered once the server reports every decision answered", async () => {
+test("both endings are offered once the server reports every decision answered", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
@@ -53,7 +56,10 @@ test("finishing the review is offered once the server reports every decision ans
         path: `/runs/${runId}`,
         reply: {
           body: runReply({
-            decisions: [answered, decisionReply({ ...unanswered, outcome: "rejected" })],
+            decisions: [
+              answered,
+              findingDecisionReply({ outcome: "rejected" }),
+            ],
           }),
         },
       },
@@ -63,5 +69,6 @@ test("finishing the review is offered once the server reports every decision ans
   render(<ReviewScreen runId={runId} />);
   await openSection(/decisions/i);
 
-  expect(await screen.findByRole("button", { name: /finish review/i })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: ADD })).toBeTruthy();
+  expect(screen.getByRole("button", { name: DISCARD })).toBeTruthy();
 });

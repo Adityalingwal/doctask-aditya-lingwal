@@ -60,12 +60,20 @@ def test_the_review_question_asks_to_add_the_runs_changes_not_to_export(
                         "/runs", json={"project_id": project_id}
                     ).json()["run_id"]
                     waiting = wait_for_run_status(client, run_id, "needs review")
+                    # The wording is what the person read on the button, so
+                    # it is read back from the decision the press wrote.
+                    client.post(
+                        f"/runs/{run_id}/finish-review",
+                        json={"add_to_register": True},
+                    ).raise_for_status()
+                    finished = client.get(f"/runs/{run_id}").json()
             finally:
                 application.stop()
 
+        assert waiting["decisions"] == []
         export_decision = next(
             decision
-            for decision in waiting["decisions"]
+            for decision in finished["decisions"]
             if decision["kind"] == "export"
         )
         assert export_decision["question"] == NEW_WORDING
@@ -76,8 +84,8 @@ def test_a_rules_only_run_reaches_review_with_the_same_question(
 ) -> None:
     """The zero-proposed-rows case: a run that only re-examines the register
     under changed rules — no new document, no match decision — must still
-    raise this exact question, because it still commits merges and findings
-    with no human approval otherwise."""
+    record this exact question when it ends, because it still commits merges
+    and findings with no human approval otherwise."""
     with temporary_project_folder("rules-only-review-wording") as (
         source_folder,
         folder_path,
@@ -132,10 +140,17 @@ def test_a_rules_only_run_reaches_review_with_the_same_question(
                         "/runs", json={"project_id": project_id}
                     ).json()["run_id"]
                     waiting = wait_for_run_status(client, second_run, "needs review")
+                    client.post(
+                        f"/runs/{second_run}/finish-review",
+                        json={"add_to_register": True},
+                    ).raise_for_status()
+                    finished = client.get(f"/runs/{second_run}").json()
             finally:
                 application.stop()
 
-        # Only the export decision — no match or finding raised this run —
-        # is the check that this really is the zero-proposed-rows case.
-        assert [decision["kind"] for decision in waiting["decisions"]] == ["export"]
-        assert waiting["decisions"][0]["question"] == NEW_WORDING
+        # No decision at all while it waits — no match and no finding raised
+        # this run — is the check that this really is the zero-proposed-rows
+        # case, and the gate the press writes carries the same wording there.
+        assert waiting["decisions"] == []
+        assert [decision["kind"] for decision in finished["decisions"]] == ["export"]
+        assert finished["decisions"][0]["question"] == NEW_WORDING

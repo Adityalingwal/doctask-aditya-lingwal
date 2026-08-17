@@ -15,13 +15,13 @@ from tests.runs.application import (
     write_script,
 )
 from tests.interfaces.mcp_client import call_tool, tool_names
+from tests.examine.answers import examine_answer, one_finding
 from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_marker,
-    no_findings_answer,
     write_meeting_note,
 )
 
@@ -51,7 +51,7 @@ def _application(
             script_path,
             {
                 match_marker(): match_answer(1),
-                examine_marker(): no_findings_answer(),
+                examine_marker(): examine_answer([one_finding()]),
                 extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
             },
         )
@@ -164,7 +164,16 @@ def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
     with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
         run_id = _run_at_review(application, source_folder_path)
 
-        finishing = call_tool(application.base_url, "finish_review", {"run_id": run_id})
+        # The finding is unanswered, so no ending may be taken; and a call
+        # that does not say which ending is refused before anything is read.
+        finishing = call_tool(
+            application.base_url,
+            "finish_review",
+            {"run_id": run_id, "add_to_register": True},
+        )
+        without_an_answer = call_tool(
+            application.base_url, "finish_review", {"run_id": run_id}
+        )
         exporting = call_tool(
             application.base_url, "get_export", {"run_id": run_id, "export_format": "json"}
         )
@@ -181,6 +190,7 @@ def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
         engine.dispose()
 
     assert finishing.refused is True
+    assert without_an_answer.refused is True
     assert exporting.refused is True
     assert run.status == "needs review"
     assert run.export_json is None
@@ -191,17 +201,17 @@ def test_a_tool_reports_only_the_run_state_the_database_holds(tmp_path: Path) ->
     with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
         run_id = _run_at_review(application, source_folder_path)
         waiting = call_tool(application.base_url, "get_run_status", {"run_id": run_id})
-        export_decision = next(
+        finding_decision = next(
             decision
             for decision in waiting.payload["decisions"]
-            if decision["kind"] == "export"
+            if decision["kind"] == "finding"
         )
         answered = call_tool(
             application.base_url,
             "submit_decision",
             {
                 "run_id": run_id,
-                "decision_id": export_decision["decision_id"],
+                "decision_id": finding_decision["decision_id"],
                 "outcome": "approved",
             },
         )

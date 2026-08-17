@@ -163,9 +163,10 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     ) as (application, database_url, run_id):
         with application.client() as client:
             waiting = client.get(f"/runs/{run_id}").json()
-            export_decision = _decision_of_kind(waiting, "export")
-            _answer(client, run_id, export_decision["decision_id"], "approved")
-            client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+            client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
+            ).raise_for_status()
             wait_until(
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
                 "the clean run commits",
@@ -223,17 +224,17 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
             assert finding_decision["row_number"] == 1
             assert finding_decision["issue"] == R1_ISSUE
             assert finding_decision["evidence"] == R1_EVIDENCE
-            refusal = client.post(f"/runs/{run_id}/finish-review")
+            refusal = client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
+            )
             export_attempt = client.get(f"/runs/{run_id}/export")
 
             _answer(client, run_id, finding_decision["decision_id"], "approved")
-            _answer(
-                client,
-                run_id,
-                _decision_of_kind(waiting, "export")["decision_id"],
-                "approved",
-            )
-            client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+            client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
+            ).raise_for_status()
             wait_until(
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
                 "the run with an approved finding commits",
@@ -297,13 +298,10 @@ def test_a_rejected_finding_stays_in_the_run_and_never_reaches_the_export(
                 _decision_of_kind(waiting, "finding")["decision_id"],
                 "rejected",
             )
-            _answer(
-                client,
-                run_id,
-                _decision_of_kind(waiting, "export")["decision_id"],
-                "approved",
-            )
-            client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+            client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
+            ).raise_for_status()
             wait_until(
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
                 "the run with a rejected finding commits",

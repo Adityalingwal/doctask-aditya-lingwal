@@ -29,8 +29,8 @@ async def read_export(
     if run["export_json"] is None:
         raise NotPossibleNow(
             "this run has exported nothing — the register is exported only "
-            "after the Delivery Owner approves the export decision and POST "
-            f"/runs/{run_id}/finish-review commits the run."
+            "once the Delivery Owner adds this run's changes to it with POST "
+            f'/runs/{run_id}/finish-review {{"add_to_register": true}}.'
         )
     if export_format == MARKDOWN_FORMAT:
         return export_as_markdown(run["export_json"])

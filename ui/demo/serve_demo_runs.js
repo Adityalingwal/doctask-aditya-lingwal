@@ -332,7 +332,8 @@ export default function serveDemoRuns() {
             });
             return;
           }
-          demoRun.run.status = "done";
+          const ending = JSON.parse(await bodyOf(request));
+          demoRun.run.status = ending.add_to_register ? "done" : "discarded";
           demoRun.run.stage = "commit";
           // A run that finished its review finished Review and Commit with it.
           // Without these the stage strip reads "never ran" and "not started"
@@ -342,7 +343,10 @@ export default function serveDemoRuns() {
             "review",
             "commit",
           ];
-          reply(response, 200, { run_id: demoRun.run.run_id, status: "done" });
+          reply(response, 200, {
+            run_id: demoRun.run.run_id,
+            status: "review finished",
+          });
           return;
         }
         next();
