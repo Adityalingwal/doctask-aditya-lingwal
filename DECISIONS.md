@@ -230,27 +230,38 @@ match.
 
 | Concern | Current contract | Status |
 |---|---|---|
-| Declared formats | `.pdf`, `.docx`, `.md`, `.txt` in `config/formats.yaml` | All four readers implemented and verified |
-| Unsupported format | Skip with `unsupported format` reason | Implemented and verified |
+| Declared formats | `.pdf`, `.md` in `config/formats.yaml` | Both readers implemented and verified |
+| Unsupported format | Skip with a reason naming the two formats | Implemented and verified |
 | Page limit | 20 pages in config; oversized documents skip | Implemented in `app/ingest/read_source_document.py`; binds `.pdf` only |
 | PDF | `pdfplumber` extraction, `pypdf` encryption check; scanned/encrypted skip | Implemented and verified for encrypted, scanned, and oversized skips |
-| DOCX | `python-docx`, paragraphs and table cells in document order | Implemented and verified |
-| TXT | UTF-8 with Latin-1 fallback | Implemented and verified |
-| Folder scan | Top-level files only, read in place | Implemented for all four formats |
+| Markdown | UTF-8 with Latin-1 fallback | Implemented and verified |
+| Folder scan | Top-level files only, read in place | Implemented for both formats |
+
+The two kept formats cover the two shapes a citation place can take — a
+heading and a page. `.docx` and `.txt` were removed on 2026-08-17 with their
+readers, tests, corpus document and dependency; history:
+`documentation/decision-history.md`, "the register becomes four cells".
 
 Format is checked before type. Type is a Pydantic enum at the model boundary,
 and which lists each type may fill is stated in the prompt and carried in the
 generated schema:
 
-| Document type | requirements | testing_observations | delivery_evidence | blockers |
-|---|---|---|---|---|
-| meeting notes | yes | — | — | yes |
-| client requirements document | yes | — | — | yes |
-| testing feedback | — | yes | — | yes |
-| related additional document | — | — | yes | yes |
-| unrelated | — | — | — | — |
+| Document type | requirements | testing_observations | delivery_evidence |
+|---|---|---|---|
+| meeting notes | yes | — | — |
+| client requirements document | yes | — | — |
+| testing feedback | — | yes | — |
+| handover summary | — | — | yes |
+| unrelated | — | — | — |
 
-`embedded_instructions` and `document_date` may appear on any type. A filled
+The fourth type was named `related additional document` until 2026-08-17; it
+is the only type allowed to fill `delivery_evidence`, so it is named after
+what it is. **A batch is read in workflow order** — meeting notes → client
+requirements → handover summary → testing feedback — so the document that
+states an ask first is the one whose requirement creates the row and supplies
+its wording. Two documents of one type fall back to file name.
+
+`embedded_instructions` may appear on any type. A filled
 list where this table says otherwise is a wrong answer: that one document is
 skipped with a reason naming what came back, the batch continues, and nothing
 is quietly emptied. Its buckets are:
@@ -258,25 +269,21 @@ is quietly emptied. Its buckets are:
 | Bucket | Action | Status |
 |---|---|---|
 | Primary: meeting notes, client requirements document, testing feedback | Full declared processing | Implemented |
-| Related additional | Read, labelled and stored; never creates a register row on its own | Implemented; the "on its own" half built 2026-08-16 — it reports `delivery_evidence`, which moves a row that already exists |
+| Handover summary | Read, labelled and stored; never creates a register row on its own | Implemented; it reports `delivery_evidence`, which moves a row that already exists to `Handed over` |
 | Unrelated | Skip with reason | Implemented |
 | Outside the enum | Skip that document with `document type not recognised`; the run continues | Implemented |
 
 - **Must preserve:** Accepted-format list is config; actual readers are code;
   startup warns when config names a format with no reader.
-- **Word text is copied, never marked up:** the DOCX reader adds no heading
-  marker and no cell separator, because whatever it produces is both what the
-  model reads as evidence and what a citation quotes back. Each table cell
-  takes its own line, so a quote spanning two cells is not found and its
-  requirement is dropped rather than supported by assembled words.
-- **Damaged files are one document's problem:** a `.pdf` or `.docx` that no
-  library can open is skipped with its reason, like an encrypted or scanned
-  one, instead of ending the batch.
+- **Damaged files are one document's problem:** a `.pdf` that no library can
+  open is skipped with its reason, like an encrypted or scanned one, instead of
+  ending the batch.
 - **Limitation:** the page limit binds `.pdf` only, because only a paginated
   format can report a page count. Markdown, plain text and Word have none and
   none is invented for them; the shared gate in the dispatch limits any
   paginated reader added later.
 - **Evidence:** `tests/documents/test_document_readers.py`,
+  `tests/documents/test_supported_formats.py`,
   `tests/documents/test_document_type_buckets.py`, and one run over the
   six-document Northside Dental corpus.
 
@@ -284,14 +291,19 @@ is quietly emptied. Its buckets are:
 
 ### D05 — row shape
 
-Seven cells, each with its own citations:
+Four cells, each with its own citations:
 
-`What was asked` · `In writing?` · `What testing found` · `Status` ·
-`Blocked on` · `First seen` · `Last moved`
+`What was asked` · `Written down?` · `What testing found` · `Status`
+
+The register answers one question — was this asked for, and did we deliver it
+— and every cell that does not serve it is weight the reader carries for
+nothing. The stored column behind `Written down?` is still `in_writing`.
+Migration `20260817_0017` dropped the other three cells; history:
+`documentation/decision-history.md`, 2026-08-17.
 
 Statuses are fixed in code and in a database check constraint:
 
-`Done` · `Partial` · `Not delivered` · `Blocked` · `Disputed` ·
+`Done` · `Partial` · `Not delivered` · `Handed over` · `Disputed` ·
 `No evidence yet`
 
 Each means one thing, written down so a model, an implementer and a reader
@@ -304,74 +316,75 @@ cannot each assume a different one:
 - **`Partial`** — a document reports the work exists but is wrong or
   incomplete.
 - **`Not delivered`** — a document states the asked-for work is not there. This
-  is a positive claim and needs a citation.
-- **`Blocked`** — a document reports work on this requirement is stopped,
-  waiting on something.
+  is a positive claim and needs a citation. It is not `No evidence yet`:
+  someone looked.
+- **`Handed over`** — a handover summary reports the work exists, and testing
+  has not spoken yet.
 - **`Disputed`** — two documents make opposing claims about this requirement.
   The system never resolves it; it goes to a person.
 
 - What moves a row: a testing observation's label (`Passed` → `Done`,
   `Defect` → `Partial`; `Change request` and `Unclear` move no status, because
-  a new ask arriving during testing is not a verdict on the work), and any
-  document reporting work stopped → `Blocked`. Delivery evidence alone moves
-  `Last moved` and no status: a handover says the work exists, never that it
-  behaves as asked.
+  a new ask arriving during testing is not a verdict on the work), and delivery
+  evidence with no testing behind it → `Handed over`.
 - A fifth testing label, **`Not found`**, carries "testing looked and the work
   is not there" — the one thing `Defect` (broken, therefore `Partial`) cannot
   say. `Not found` behind a handover claiming delivery is `Disputed`; `Not
   found` with no handover behind it is `Not delivered`, because silence
   contradicts nothing. Without this label neither status could ever be written.
 - Unknown cells say why they are unknown; they are never blank or guessed.
-- **`In writing?` is answered against every client requirements document the
+- **`Written down?` is answered against every client requirements document the
   *project* has read**, not this run's batch. A document is read once for a
   project's whole life, so a run-scoped answer would put "no client
   requirements document has been read" back on every row a later run proposes.
   Once one has been read and does not mention the ask the cell reads
   `Not found in <file>.`, never "No" — a document saying nothing about an ask
   cannot support that claim.
-- Dates come from documents, not run time. Unknown date stays unknown and R3
-  does not run on it.
 - Conflicts, findings, and possible-match questions attach to rows but are not
   row cells. This preserves gate separation and cell-only fingerprints.
-- **Implemented and verified:** Slice-1 proposal/commit/export shape and six
-  statuses, plus finding attachments, which appear on the row in the export and
-  leave its cells and fingerprint untouched.
+- **A cell keeps the citation of every document that still supports the value
+  it now holds, and drops any citation supporting a value it no longer holds.**
+  There is no cap on the number. `Status` is the cell this changes: the
+  handover's citation stays as the row moves `Handed over` → `Done`, because
+  "the work exists" is still true, while a superseded testing verdict goes,
+  because it now proves something the cell denies. Every other cell holds one
+  claim, so its old citation goes with its old value. This is what makes the
+  one-document-per-run and paired arrival orders end with the same register.
+- **Implemented and verified:** proposal/commit/export shape and six statuses,
+  plus finding attachments, which appear on the row in the export and leave its
+  cells and fingerprint untouched. Both corpora were driven end to end in both
+  arrival orders on 2026-08-17 and ended identically.
 
 ### Citations
 
 - Present evidence = source file + usable place + exact source words.
 - Absence evidence = exact file read plus explicit absence statement.
-- Locator by format: PDF page, Markdown nearest heading, DOCX line, TXT line.
-  Do not invent DOCX page numbers.
+- Locator by format: PDF page, Markdown nearest heading.
 - The model supplies exact words; code derives the place. Repeated words use
   the first occurrence.
 - An unfindable quote drops that requirement and records a skip reason. Plain
   normalized substring matching is intentional; no fuzzy match.
 - **Evidence/status:** Markdown quote location, multi-line normalization,
   invented quote rejection, first occurrence, and Latin-1 read are verified.
-  The PDF page, DOCX line, and TXT line locators are implemented and verified
-  by `tests/documents/test_citation_places.py`; each citation may only name a
-  place its own reader produced.
-- **Limitation:** a DOCX line number counts lines of the text this system
-  extracted, not lines Word displays, so a reader cannot open the file and
-  jump to it — the quoted words remain the reliable way to find the passage.
-  A Word citation names its heading only once headings can travel out of the
-  reader without being written into the text; that is deferred, not refused.
+  Both locators are verified by `tests/documents/test_citation_places.py`; each
+  citation may only name a place its own reader produced.
 
 ### Export, audit, and fingerprints
 
 - JSON is the record; Markdown is generated from it. Markdown is never edited
   as a second truth.
 - Commit atomically writes approved rows, cell-level audit, fingerprints, and
-  export. A fingerprint covers the seven cells only, excluding attachments.
+  export. A fingerprint covers the four cells only, excluding attachments.
 - Audit answers: which cell/attachment, before, after, run, and source.
 - **Implemented:** First-run cell audit and fingerprints are written; JSON and
   Markdown exports are verified.
 - **Audit events:** `audit.event_kind` holds `cell change` or `attachment`
   (plain text plus a `CheckConstraint`, never a PostgreSQL `ENUM`).
-  `cell_name` is nullable, and the seven-cell check applies only to a cell
+  `cell_name` is nullable, and the cell-name check applies only to a cell
   change; an attachment must name no cell, because a finding attaches to a row
-  and there is no honest cell name to write. Migration `20260813_0005`
+  and there is no honest cell name to write. That check still names the three
+  cells `20260817_0017` dropped, because an audit entry written before that
+  migration ran is history and must survive it. Migration `20260813_0005`
   backfills every existing row as a cell change; its downgrade drops
   attachment rows, which the older shape cannot represent. Proven by
   `tests/infrastructure/test_schema.py`.
@@ -391,8 +404,8 @@ Full locked pipeline:
 
 | Stage | Job | Model call | Current status |
 |---|---|---|---|
-| Ingest | Read files never read before, by name or content | No | Implemented and verified for all four formats |
-| Extract | One document: type/date/requirements/testing/blockers/instructions | One per document | Implemented and verified with scripted model |
+| Ingest | Read files never read before, by name or content | No | Implemented and verified for `.md` and `.pdf` |
+| Extract | One document: type/requirements/testing/delivery/instructions | One per document | Implemented and verified with scripted model |
 | Match | Whole batch against current register | One per batch | Implemented and verified with scripted model |
 | Examine | Whole register against frozen rules | One per register | Implemented and verified with scripted model |
 | Review | Present gated proposals and wait | No | Implemented and verified for slice-1 proposals |
@@ -470,16 +483,26 @@ match.
 - A confident existing-row answer against a **committed** row is deliberately
   downgraded to human-reviewed possible match before evidence reaches it. A
   confident within-batch match is not: nothing in the batch is committed, and
-  the export gate already shows the merged row and both its citations. An
-  uncertain within-batch match is still asked about, between the two proposed
-  rows.
+  the run still faces the export gate. An uncertain within-batch match is still
+  asked about, between the two proposed rows.
+- **Open, and deliberately not built (2026-08-17).** Removing that downgrade
+  was locked on 2026-08-16 on the understanding that the export gate shows such
+  a merge. It does not: `GET /runs/{id}` at `needs review` carries no proposed
+  row, no cell and no citation, and `GET /runs/{id}/export` answers `409` until
+  the run has committed. Removing only the downgrade would in fact change
+  nothing: `_the_candidate_to_ask_about` raises the possible-match decision
+  whenever the answer names a committed row, whatever the outcome, so the
+  question would still be asked and an approval would still merge. Making the
+  merge automatic therefore needs the gate to show the merge first. The
+  decision goes back to Aditya rather than being built around; history:
+  `documentation/decision-history.md`, 2026-08-17.
 - **A match may only point backwards**, and a chain is followed: a requirement
   may name one that created no row of its own, and the evidence lands on the
   row at the end of that chain. Pointing forward is refused, never reordered.
 - The row a within-batch match lands on keeps the **earlier** requirement's
-  `What was asked`, recomputes `In writing?` across every requirement on it,
-  and takes the **earliest** document date as `First seen` — the batch is read
-  in file-name order, which is not date order.
+  `What was asked` and recomputes `Written down?` across every requirement on
+  it. The batch is read in workflow order (D04), so "earlier" means stated
+  earlier in the work rather than named earlier in the alphabet.
 - Every requirement index must return exactly once with a valid outcome, and
   with exactly one candidate named wherever the outcome names one. An
   incomplete answer fails the run; it never defaults to a guess.
@@ -495,10 +518,10 @@ match.
   row Commit never commits.
 - **An approved merge brings the surviving row's cells up to the evidence it
   just gained**, which reverses the slice-1 rule that a merge moved citations
-  and never a cell. Only the two cells the arriving requirement can speak to
-  move: `In writing?`, which otherwise keeps denying a requirements document
-  the row now cites, and `First seen`, which takes the earlier of the two
-  dates. The replaced cell's old citation goes with its old value. On an
+  and never a cell. Only the cell the arriving requirement can speak to
+  moves: `Written down?`, which otherwise keeps denying a requirements document
+  the row now cites. It holds one claim, so its old citation goes with its old
+  value. On an
   already-committed row this writes the before-and-after audit entry and moves
   the fingerprint, exactly as an approved move does — a changed cell that left
   the fingerprint still would be the register lying about itself. History:
@@ -514,11 +537,17 @@ match.
 
 ### D10 — rules and findings
 
-- Rules live in user-editable `config/rules.yaml`; adding/changing a rule is a
-  data change. Default R1–R4 cover written requirement, change request versus
-  bug, blocker age, and missing testing outcome.
-- Deliverable checks D1/D2 require every row to cite a source and forbid
+- Rules live in user-editable `config/rules.yaml`; adding or changing a rule is
+  a data change, and there is no other way in. Shipped R1, R2, R4 and R5 cover
+  written requirement, change request versus bug, missing testing outcome, and
   `Done` without a testing outcome.
+- **No rule is judged outside `config/rules.yaml` (2026-08-17).** The two
+  deliverable checks that lived in code are gone: D1 was deleted, because
+  `commit_register` already refuses to commit a row carrying no citation, and
+  D2 moved into the rules file as `R5`. `R3`, the only rule that needed a
+  document date, left with the date cells. Ids are not renumbered — a finding
+  stores the id it was raised under. What is given up: a code check always
+  runs, while a model-judged rule depends on the model.
 - One findings table, no rules table. Each finding freezes rule id and text,
   found issue, evidence, row, and human question; its answer is read from the
   decision it names (D02), not stored again.
@@ -534,11 +563,9 @@ match.
   ran and a run with no findings has that rule text nowhere else. Ingest
   freezes it once, guarded on `rules_snapshot IS NULL`, so a resumed run reads
   what it froze rather than the file.
-- **Who computes what:** R1–R4 are judged by the model in one Examine call;
-  the deliverable checks D1 and D2 are computed in code, because each is a
-  mechanical fact about the stored register — a row's citations are there or
-  they are not. An unusable rules file fails the run at the boundary and is
-  never read as "no rules".
+- **Who computes what:** every rule is judged by the model in one Examine call.
+  An unusable rules file fails the run at the boundary and is never read as
+  "no rules".
 - **`examined_row_count` on `runs`** records how many rows Examine judged, so
   the `No findings` result can state it after the run ends and whether or not
   an export exists.
@@ -549,7 +576,7 @@ match.
   Proven by `tests/examine/test_examine_findings.py`,
   `tests/examine/test_examine_answer.py`,
   `tests/examine/test_frozen_rules.py`,
-  `tests/examine/test_deliverable_checks.py`, and
+  `tests/examine/test_rules_live_only_in_config.py`, and
   `test_examine_rerun_does_not_duplicate_findings_for_the_same_run`.
 
 ## Model boundary and failure handling
@@ -871,7 +898,8 @@ a symlink after creation is not re-checked.
   document-type enum and its buckets, per-format citation places, and both
   synthetic corpora.
 - The rules and findings slice is built: Examine, the `findings` table, rules
-  frozen per run, D1/D2 in code, and the attachment audit event.
+  frozen per run, and the attachment audit event. Every rule lives in
+  `config/rules.yaml`.
 - The MCP slice is built: its six tools mounted in the same process over the
   same core functions the endpoints call.
 - The incremental update slice is built: the watched folder, the read-once
@@ -940,8 +968,13 @@ a symlink after creation is not re-checked.
 - Register-size and short-document assumptions remain unmeasured on full demo
   and second-run corpora.
 - The page limit binds `.pdf` only; no other declared format reports pages.
-- A related additional document that lists requirements, in a run that never
-  exports, is read again by the next run.
+- A handover summary that lists requirements, in a run that never exports, is
+  read again by the next run.
+- Rules about elapsed time cannot be judged: the register keeps no document
+  dates.
+- Work stopped by something outside the provider's control is reported through
+  the source document, not through a cell of its own.
+- A batch holding two documents of one type orders them by file name.
 - One Extract call can repeat in the answer-to-checkpoint kill window.
 - Rejected findings stay suppressed even if later evidence strengthens them.
 - Files arriving during Review wait; the project lock may be held a long time.
@@ -968,13 +1001,13 @@ ideas from resurfacing without duplicating their full prose here.
 |---|---|
 | Register/table initial proposal | D01 reviewed Requirements-to-Delivery Register |
 | Hard-coded accepted-format gate | D04 config list + code readers + startup reconciliation |
-| Known/related-unknown/unrelated | D04 primary/related additional/unrelated |
+| Known/related-unknown/unrelated | D04 primary/handover summary/unrelated |
 | Software feature delivery/customer/dev team | D01 Software Requirements-to-Delivery/Client/Software Provider |
 | Feature request list primary type | D04 client requirements document |
-| Blocker as document type/undecided representation | D01 condition + D05 status and `Blocked on` |
+| Blocker as document type/undecided representation | D01 condition; the source document reports it, and no cell does |
 | One run equals one project | D01 project context + document-batch run |
 | Manual-only run trigger | D03 auto-start watcher plus manual endpoint |
-| Five register statuses | D05 six statuses including `No evidence yet` |
+| Five register statuses; the seven-cell row | D05 four cells and six statuses including `Handed over` |
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
 | Five/six API endpoints; flat `GET /runs` run list | D14 seven endpoints including `GET /projects`, every project with its runs nested |

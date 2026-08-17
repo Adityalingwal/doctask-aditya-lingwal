@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 MARKDOWN_EXTENSION = ".md"
-TEXT_EXTENSION = ".txt"
 PRIMARY_ENCODING = "utf-8"
 FALLBACK_ENCODING = "latin-1"
 

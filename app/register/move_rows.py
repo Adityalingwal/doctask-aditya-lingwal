@@ -11,14 +11,11 @@ from app.extract.answer import TestingLabel
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH, match_observations
 from app.register.audit_entries import write_cell_change
 from app.register.cells import (
-    BLOCKED_ON,
     CELL_NAMES,
-    DATE_UNKNOWN,
-    LAST_MOVED,
     STATUS,
-    STATUS_BLOCKED,
     STATUS_DISPUTED,
     STATUS_DONE,
+    STATUS_HANDED_OVER,
     STATUS_NOT_DELIVERED,
     STATUS_PARTIAL,
     WHAT_TESTING_FOUND,
@@ -33,7 +30,6 @@ from app.review.review_queue import (
 
 TESTING_OBSERVATION = "testing observation"
 DELIVERY_EVIDENCE = "delivery evidence"
-BLOCKER = "blocker"
 SKIPPED_OBSERVATION_KIND = "observation"
 
 
@@ -59,16 +55,9 @@ async def observations_of_batch(
         for kind, list_name in (
             (TESTING_OBSERVATION, "testing_observations"),
             (DELIVERY_EVIDENCE, "delivery_evidence"),
-            (BLOCKER, "blockers"),
         ):
             for observed in extraction.get(list_name, []):
-                observations.append(
-                    {
-                        **observed,
-                        "kind": kind,
-                        "document_date": extraction["document_date"],
-                    }
-                )
+                observations.append({**observed, "kind": kind})
     return observations
 
 
@@ -197,57 +186,41 @@ def _cells_the_observations_move(
 ) -> list[tuple[str, str, list[dict[str, str]]]]:
     """Which cells one row's observations move, and the evidence for each."""
     testing = [one for one in observations if one["kind"] == TESTING_OBSERVATION]
-    blockers = [one for one in observations if one["kind"] == BLOCKER]
+    delivered = [one for one in observations if one["kind"] == DELIVERY_EVIDENCE]
 
     moved: list[tuple[str, str, list[dict[str, str]]]] = []
     if testing:
         moved.append(
             (WHAT_TESTING_FOUND, _joined(testing), _citations_of(testing))
         )
-    if blockers:
-        moved.append((BLOCKED_ON, _joined(blockers), _citations_of(blockers)))
 
-    delivery_claimed = any(
-        one["kind"] == DELIVERY_EVIDENCE for one in observations
-    )
-    status = status_after(testing, bool(blockers), delivery_claimed)
+    status = status_after(testing, bool(delivered))
     if status is not None:
-        moved.append((STATUS, status, _citations_of(testing + blockers)))
-
-    # The date of the document that last changed this row. Several documents
-    # can move one row in a batch; the last one read is the one whose date the
-    # cell carries, which is why documents are read in a stable order. A
-    # handover stating no date still moved this row, so the cell says the date
-    # is unknown rather than the row reporting no move at all.
-    dated = [one for one in observations if one["document_date"] is not None]
-    if dated:
-        last_date = dated[-1]["document_date"]
-        moved.append((LAST_MOVED, last_date["summary"], [_citation(last_date)]))
-    elif observations:
-        moved.append((LAST_MOVED, DATE_UNKNOWN, []))
+        moved.append((STATUS, status, _citations_of(testing + delivered)))
     return moved
 
 
 def status_after(
     testing: list[dict[str, Any]],
-    work_is_stopped: bool,
     delivery_claimed: bool,
 ) -> str | None:
     """The status this row's evidence lands on, or None when nothing moves it.
 
     `Change request` and `Unclear` move nothing: a new ask arriving during
     testing is not a verdict on the work, and a note with no verdict is not
-    one either. Delivery evidence alone moves nothing for the same reason —
-    a handover says the work exists, never that it behaves as asked.
+    one either.
 
     `Not found` is the one label whose meaning depends on what else was read.
     Testing reporting the work absent while a handover claims it was handed
     over is two claims that oppose each other, which is `Disputed`. The same
     report with no handover behind it contradicts nothing — silence is not a
     claim — so it is `Not delivered`.
+
+    A handover with no testing behind it lands on `Handed over`. The three
+    states are distinct claims rather than shades of one: `No evidence yet`
+    means nobody has looked, `Handed over` means we say we built it, and
+    `Done` means testing confirmed it behaves as asked.
     """
-    if work_is_stopped:
-        return STATUS_BLOCKED
     labels = {one["label"] for one in testing}
     if TestingLabel.NOT_FOUND in labels:
         return STATUS_DISPUTED if delivery_claimed else STATUS_NOT_DELIVERED
@@ -255,7 +228,7 @@ def status_after(
         return STATUS_PARTIAL
     if TestingLabel.PASSED in labels:
         return STATUS_DONE
-    return None
+    return STATUS_HANDED_OVER if delivery_claimed else None
 
 
 def _joined(observations: list[dict[str, Any]]) -> str:
@@ -369,6 +342,11 @@ async def _write_one_rows_moves(
     if row is None:
         return None
 
+    # Read before any move is written, because the moves replace this cell
+    # first and `Status` needs the verdict it is about to supersede, not the
+    # one arriving in the same batch.
+    superseded = await _citations_of_cell(connection, row["id"], WHAT_TESTING_FOUND)
+
     for move in moves:
         old_value = row[move["cell"]]
         if old_value == move["value"]:
@@ -377,7 +355,7 @@ async def _write_one_rows_moves(
             f"UPDATE register_rows SET {move['cell']} = %s WHERE id = %s",
             (move["value"], row["id"]),
         )
-        await _replace_the_citations(connection, row["id"], move)
+        await _settle_the_citations(connection, row["id"], move, superseded)
         if row["is_committed"]:
             # A row this run proposed has its whole first history written when
             # it is committed, so a second entry here would say the same thing
@@ -420,17 +398,32 @@ async def _row_the_move_reaches(
     return await _row_the_move_reaches(connection, row["merged_into_register_row_id"])
 
 
-async def _replace_the_citations(
+async def _settle_the_citations(
     connection: AsyncConnection,
     register_row_id: UUID,
     move: dict[str, Any],
+    superseded_testing: list[dict[str, Any]],
 ) -> None:
-    """The old citation supported a value this cell no longer holds, so it goes."""
-    await connection.execute(
-        "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
-        (register_row_id, move["cell"]),
-    )
+    """Keep every citation that still supports the value, drop the rest.
+
+    Every cell but `Status` holds one claim, so its old citation goes with its
+    old value. `Status` is built out of two: a handover says the work exists
+    and a testing document says it behaves as asked. When a later verdict
+    arrives only the verdict is superseded, so only its citation goes and the
+    handover's stays standing behind the cell it still supports.
+    """
+    if move["cell"] == STATUS:
+        for stale in superseded_testing:
+            await _drop_one_citation(connection, register_row_id, STATUS, stale)
+    else:
+        await connection.execute(
+            "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
+            (register_row_id, move["cell"]),
+        )
     for citation in move["citations"]:
+        # A document already cited on this cell is not cited twice for saying
+        # the same thing again.
+        await _drop_one_citation(connection, register_row_id, move["cell"], citation)
         await connection.execute(
             "INSERT INTO citations (id, register_row_id, cell_name, source_file, "
             "source_place, source_words) VALUES (gen_random_uuid(), %s, %s, %s, %s, %s)",
@@ -442,6 +435,37 @@ async def _replace_the_citations(
                 citation["source_words"],
             ),
         )
+
+
+async def _drop_one_citation(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+    cell_name: str,
+    citation: dict[str, Any],
+) -> None:
+    await connection.execute(
+        "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s "
+        "AND source_file = %s AND source_words = %s",
+        (
+            register_row_id,
+            cell_name,
+            citation["source_file"],
+            citation["source_words"],
+        ),
+    )
+
+
+async def _citations_of_cell(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+    cell_name: str,
+) -> list[dict[str, Any]]:
+    result = await connection.execute(
+        "SELECT source_file, source_words FROM citations "
+        "WHERE register_row_id = %s AND cell_name = %s",
+        (register_row_id, cell_name),
+    )
+    return list(await result.fetchall())
 
 
 def _source_document(

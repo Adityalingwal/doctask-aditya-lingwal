@@ -5,10 +5,8 @@ rules:
   - id: R2
     text: "Testing feedback asking for new behaviour is a change request, not a bug."
 
-  - id: R3
-    text: "No requirement stays blocked beyond max_days days without follow-up."
-    params:
-      max_days: 14
-
   - id: R4
     text: "Every written requirement must have a testing outcome."
+
+  - id: R5
+    text: "No register row is 'Done' without a testing outcome."

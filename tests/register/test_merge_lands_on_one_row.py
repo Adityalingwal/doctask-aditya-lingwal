@@ -13,7 +13,7 @@ from tests.runs.application import (
     write_script,
 )
 from tests.documents.register_documents import (
-    dated_extraction_answer,
+    several_requirements_answer,
     examine_marker,
     extract_marker,
     match_answer_within_batch,
@@ -42,15 +42,13 @@ def _batch_of_two(source_folder: Path) -> dict[str, dict]:
         source_folder, REQUIREMENTS_FILE, REQUIREMENTS_DATE, [WRITTEN_DOWN]
     )
     return {
-        extract_marker(MEETING_NOTE): dated_extraction_answer(
+        extract_marker(MEETING_NOTE): several_requirements_answer(
             [(RAISED_IN_THE_MEETING, RAISED_IN_THE_MEETING)],
             MEETING_NOTES,
-            MEETING_DATE,
         ),
-        extract_marker(REQUIREMENTS_FILE): dated_extraction_answer(
+        extract_marker(REQUIREMENTS_FILE): several_requirements_answer(
             [(WRITTEN_DOWN, WRITTEN_DOWN)],
             CLIENT_REQUIREMENTS_DOCUMENT,
-            REQUIREMENTS_DATE,
         ),
         examine_marker(): no_findings_answer(),
     }
@@ -112,7 +110,6 @@ def test_an_approved_merge_leaves_no_cell_denying_the_row_s_own_evidence(
         surviving["cells"]["in_writing"]
         == f"{IN_WRITING_WRITTEN_IN_OPENING}{REQUIREMENTS_FILE}."
     )
-    assert surviving["cells"]["first_seen"] == REQUIREMENTS_DATE
     # The cell that changed keeps exactly the citation supporting what it now
     # says, never the one that supported the sentence it no longer holds.
     in_writing_citations = [
@@ -143,8 +140,8 @@ def test_a_merge_into_a_row_that_is_itself_merged_leaves_no_two_hop_marker(
         script_path = tmp_path / "script.json"
         answers = _batch_of_two(source_folder)
         write_document_stating(source_folder, third_file, "12 March 2026", [stated_again])
-        answers[extract_marker(third_file)] = dated_extraction_answer(
-            [(stated_again, stated_again)], MEETING_NOTES, "12 March 2026"
+        answers[extract_marker(third_file)] = several_requirements_answer(
+            [(stated_again, stated_again)], MEETING_NOTES
         )
         answers[match_marker()] = match_answer_within_batch(
             [

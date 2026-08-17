@@ -51,17 +51,15 @@ and comes back.
 | # | File | What it holds | Type |
 |---|---|---|---|
 | 1 | `meeting-notes-05-jun.md` | Client asks for online booking, an **SMS** reminder, and a doctor-wise daily schedule | Meeting notes |
-| 2 | `client-requirements-v1.docx` | Written scope: booking, an **email** reminder, and the schedule screen. SMS is absent | Client requirements document |
+| 2 | `client-requirements-v1.md` | Written scope: booking, an **email** reminder, and the schedule screen. SMS is absent | Client requirements document |
 | 3 | `meeting-notes-18-jun.md` | SMS is blocked, waiting on the clinic's SMS provider account | Meeting notes |
 | 4 | `testing-feedback-15-jul.pdf` | Booking works, the email reminder works, the schedule screen shows the wrong day | Testing feedback |
 | 5 | `handover-summary.md` | A delivery summary — belongs to this engagement but is none of the three primary types | **Related additional** |
 | 6 | `clinic-staff-leave-policy.pdf` | Nothing to do with this engagement — must be skipped with its reason recorded | **Unrelated** |
 
 **Formats are deliberately mixed.** `intake-portal` is entirely `.md`. This
-corpus uses `.md`, `.docx` and `.pdf`, so a second run reads three of the four
-declared formats rather than only the one the demo used. No corpus carries a
-`.txt` document; that reader is covered by
-`tests/documents/test_document_readers.py`.
+corpus uses `.md` and `.pdf`, so a second run reads both declared formats
+rather than only the one the demo used.
 
 **The related additional and unrelated documents are both present on
 purpose.** The locked document-type handling requires the second-run test to
@@ -75,7 +73,7 @@ engine that never fires on the second corpus proves nothing.
 
 | Rule | What fires it here |
 |---|---|
-| **R1** — anything built must have a written requirement | SMS reminder is asked for in the 05 June meeting and appears nowhere in `client-requirements-v1.docx` |
+| **R1** — anything built must have a written requirement | SMS reminder is asked for in the 05 June meeting and appears nowhere in `client-requirements-v1.md` |
 | **R2** — testing feedback asking for new behaviour is a change request, not a bug | The client reports the missing SMS as a bug; the written requirements never mention it |
 | **R3** — no requirement stays blocked beyond `max_days` | SMS is blocked on the clinic's SMS provider account from 18 June, and is still blocked at the testing date |
 | **R4** — every written requirement has a testing outcome | One written requirement — a cancel/reschedule link — is not mentioned in the testing feedback at all |
@@ -85,7 +83,7 @@ Two details in the document set exist to make this possible:
 1. The testing feedback is dated **15 July**. With `max_days: 14`, an 18 June
    blocker and a 30 June test are only twelve days apart and R3 would not fire
    at all. 15 July crosses the threshold.
-2. `client-requirements-v1.docx` carries a small written requirement — a
+2. `client-requirements-v1.md` carries a small written requirement — a
    **cancel/reschedule link** — that the testing feedback never mentions, so
    R4 has something real to catch.
 
@@ -107,8 +105,8 @@ corpus has exactly one job: prove the system works on documents it has never
 seen. Put injection in it and one run is proving two unrelated things, so a
 failure no longer says which property broke.
 
-All six files are written, under `northside-dental/`. The `.docx` and the two
-`.pdf` files cannot be hand-edited, so they are produced by
+All six files are written, under `northside-dental/`. The two `.pdf` files
+cannot be hand-edited, so they are produced by
 `write_northside_dental_binaries.py` in this folder rather than committed as
 binaries nobody can review:
 

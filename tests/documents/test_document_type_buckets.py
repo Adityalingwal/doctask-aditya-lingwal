@@ -36,7 +36,7 @@ ORDINARY_REQUIREMENT = "an email to the operations team on intake form submit"
 RETRO_REQUIREMENT = "a longer stand-up on Mondays"
 HANDOVER_REQUIREMENT = "the records list page handed to the client's own team"
 INVENTED_TYPE = "sprint retrospective"
-RELATED_ADDITIONAL = "related additional document"
+HANDOVER_SUMMARY = "handover summary"
 
 
 def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continues(
@@ -102,7 +102,7 @@ def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continu
     ]
 
 
-def test_a_related_additional_document_reports_what_was_delivered_and_creates_no_row(
+def test_a_document_type_named_handover_summary_may_fill_delivery_evidence(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("handover-summary") as (source_folder, source_folder_path):
@@ -122,7 +122,9 @@ def test_a_related_additional_document_reports_what_was_delivered_and_creates_no
 
     # Processed and labelled, and its delivery evidence kept for the step that
     # moves rows; what it must not do is put a row in the register by itself.
-    assert stored["document_type"] == RELATED_ADDITIONAL
+    # It is the only type allowed to fill delivery_evidence, which is why the
+    # type is named after what it is rather than after what it is not.
+    assert stored["document_type"] == HANDOVER_SUMMARY
     assert stored["requirements"] == []
     assert len(stored["delivery_evidence"]) == 1
     assert ended["exported"] is False

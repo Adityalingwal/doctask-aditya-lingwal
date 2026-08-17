@@ -8,6 +8,244 @@ actions live in root `PROGRESS.md`; the exact byte-for-byte source is
 
 New completed entries are added newest-first below this header.
 
+**Superseded snapshots, moved here on 2026-08-17 when the register became
+four cells.** They describe the seven-cell row, four document formats and the
+two deliverable checks in code, none of which is current.
+
+## Snapshot — 2026-08-16, branch `extract-schema-and-the-delivery-half`
+
+Built, and each item run rather than type-checked:
+
+- **The extraction contract is a schema.** `app/model/answer_schema.py`
+  generates a strict `json_schema` from the Pydantic answer model and
+  `call_the_model` sends it; Extract, Match and Examine share the one helper,
+  and the hand-written JSON examples are gone from all three prompts. Pydantic
+  validation and `json_object_in` stay, because the scripted client returns
+  plain text.
+- **`app/extract/prompt.py` carries the prompt locked with Aditya on
+  2026-08-16**, pasted word for word. It states judgement only: what a label
+  means, what counts as a blocker, and which lists each document type may fill.
+- **`delivery_evidence` is a fourth quoted list.** A handover summary reports
+  what was handed over, located in the source exactly like every other quote.
+- **Which lists a type may fill is enforced at the boundary, not papered over.**
+  `register_graph.py`'s silent `requirements_found = 0` is gone; a filled list
+  the type may not use skips that one document with a reason naming what came
+  back, and the batch continues.
+- **The delivery half is wired.** Testing feedback and a handover summary move
+  rows and create none: `what_testing_found`, `blocked_on`, `status` and
+  `last_moved` all move, with the moving document's citation. `first_seen` and
+  `last_moved` finally diverge.
+- **A move is proposed, never written where it is worked out.** Moves are
+  stored on `runs.pending_moves`, overlaid so Examine judges the register as
+  the run leaves it, and applied inside Commit's transaction after merges
+  settle their targets — so a rejected export leaves the register unchanged.
+  Attaching evidence to a committed row, and any uncertain link, is a new
+  `observation match` question in the review queue.
+- **A reported embedded instruction reaches a person**: `runs.reported_instructions`,
+  `GET /runs/{id}`, both export shapes and a fourth tab on the run panel. The
+  document is still read; the closing sentence saying so is on the card and in
+  the Markdown export.
+- **`Never happened` is renamed `Not delivered`** (migration `20260816_0014`),
+  proven forward and backward by hand against a real database with a stored row
+  actually holding the old value, reading `pg_get_constraintdef` rather than
+  trusting the three migration files that spell the old literal out.
+
+**Assumptions made while building this, written here rather than left in a
+message:**
+
+- **`last_moved` when two documents move one row in one batch** carries the
+  date of the document read *last*, which is the one whose value the cell ends
+  holding. Documents are read in file-name order, not date order, so a handover
+  dated later than a testing document can leave the earlier date in the cell.
+  Deterministic, and stated rather than hidden.
+- **An observation matching no row is reported on the Skipped tab**, the
+  reporting surface the brief left to the implementer, with a reason naming the
+  kind of observation and saying it was reported rather than attached.
+- **A confident link to a row this same batch proposed applies without its own
+  question.** Nothing in the batch is committed and the export gate still
+  covers it — the within-batch rule already locked for Match. A link to a
+  *committed* row, and any uncertain link, is always asked about.
+- **A moved cell's citation is replaced, not accumulated.** The old citation
+  supported a value the cell no longer holds; the audit keeps the history.
+
+### Review findings repaired in the foreground, after the review
+
+Codex returned **not merge-ready** with two P1s, three P2s and one P3. Every
+finding was re-checked against the code in the foreground and all six were
+real; Aditya chose to fix all six, plus three deviations from the brief's own
+protocol. The reviewed code and the merged code therefore differ, which is why
+each repair is named here.
+
+- **P1 — a `Passed` move produced a false D2 finding.**
+  `register_under_examination` overlaid this run's pending cell values but not
+  its pending citations, so Examine saw `status = Done` with no
+  `what_testing_found` citation and reported the row as Done without a testing
+  outcome — against the very evidence that moved it. Pending citations now
+  travel with pending values, and
+  `test_a_row_this_run_moved_to_done_raises_no_finding_about_a_missing_outcome`
+  asserts what the existing delivery tests never did.
+- **P1 — an undated handover matched a row and moved nothing.** The
+  `last_moved` fallback fired only when another cell had already moved, and
+  delivery evidence alone moves no other cell. Delivery evidence now always
+  moves `last_moved`: the document's date when it has one, `date unknown` when
+  it does not.
+- **P2 — the stored skip reason did not name what came back.** The Skipped tab
+  said only that the model reported something the type may not; the type and
+  the list lived in the log line, which never reaches a screen. Both are now in
+  the stored sentence, and the test that blessed the generic wording asserts
+  the named one.
+- **P2 — observation matching was sent a schema describing requirements.**
+  `match_observations` reused `MatchAnswer`, whose descriptions say
+  "requirement", and refusals reported missing "requirements" for observations.
+  Observations now have `ObservationAnswer` with `observation_index` and their
+  own refusal wording, plus
+  `test_an_incomplete_observation_answer_is_refused`.
+- **P2 — "its requirements are in the register" was not always true.** An
+  embedded instruction may appear on a document that states no requirement at
+  all — the backend test uses exactly such a document. The sentence stops at
+  "This document was still read." The brief's §5.4 wording is superseded.
+- **P3 — the canonical documents still described the old behaviour.**
+  `DECISIONS.md` said an embedded instruction appears nowhere in the export and
+  `PROGRESS.md` said it reached only the log; both are now true, and the
+  resolved limitation is removed rather than reworded.
+
+Three deviations from the brief's protocol were closed with them:
+
+- **The Northside handover now runs.** `handover-summary.md` was in no batch of
+  any test — not a defect, but a corpus test that copies selected files and
+  never included it. It joins the second run's batch and moves three rows: the
+  booking pages, the daily schedule screen, and the email reminder this same
+  batch proposed. The SMS reminder row still comes back byte for byte.
+- **The never-do tests were run at the baseline `927dc25`** in a worktree of
+  their own. They fail there on `ImportError: cannot import name
+  'OBSERVATION_PROMPT_MARKER'` — the whole delivery half does not exist at that
+  commit, so the file cannot be collected. That is a weaker result than an
+  assertion failure and is recorded as what it is, not dressed up.
+- **`test_a_cell_moved_by_an_observation_writes_its_audit_entry_and_moves_the_fingerprint`
+  is written**, and deliberately drives two runs: a row created and moved in
+  one run never publicly holds `No evidence yet`, so only a second run
+  exercises the move against an already-committed row — the branch the test
+  exists for.
+
+**170 Python and 44 front-end tests pass** with no live API key, both counts
+read from the suites' own printed summary in the foreground.
+
+### `Not delivered` and `Disputed` are reachable — a fifth testing label
+
+Decided with Aditya on 2026-08-16, after the review. Both statuses need a
+document to say the asked-for work is *not there*, and the four testing labels
+could not express it: `Defect` is "anything testing found broken", which is the
+`Partial` row of the same table, and `Change request` and `Unclear` move no
+status. `TestingLabel` therefore gains a fifth value, **`Not found`** — testing
+looked and the thing is not there at all — and the locked extraction prompt
+gains it with a worked example from the intake-portal corpus's own testing
+feedback ("The records list page opens, but there is no way to search old
+records from it" is `Passed` for the page and `Not found` for the search).
+
+`status_after` reads it against what else the batch supplied: `Not found` with a
+handover claiming delivery is `Disputed`, and `Not found` with no handover
+behind it is `Not delivered` — silence is not a claim, so nothing is
+contradicted. The two never-do tests that waited on this are written and pass:
+`test_testing_reporting_a_requirement_missing_after_a_silent_handover_is_not_delivered`
+and `test_a_handover_claiming_delivery_against_testing_reporting_missing_is_disputed`.
+
+**`Disputed` is reachable but not demonstrated on a corpus.** Neither synthetic
+corpus contains a handover claiming delivery of something testing then reports
+absent — Northside's testing feedback says the SMS reminder "still does not
+reach the patient", which is broken rather than missing. The corpus was left
+alone rather than edited to flatter the feature; the status is proven by a test,
+not by a corpus run, and that difference is stated here rather than blurred.
+
+A second, smaller gap in the same table: it names no line for "handover says
+delivered, testing says nothing". A handover alone therefore moves `Last moved`
+and no status, on the reasoning that a handover says the work exists and never
+that it behaves as asked — which is what `Done` means. That reading is written
+into D05 and can be reversed with one line if it is wrong.
+
+## Snapshot — 2026-08-14
+
+- Slice 1, the formats and types slice, the rules and findings slice, the MCP
+  slice, the incremental update slice, the reliability slice and the React
+  slice are merged into `main`.
+- The operations slice is merged into `main` with its original timing and cost
+  behaviour dropped from the screen only.
+- On branch `finished-stages-and-list-runs`, not yet merged: `runs.finished_stages`
+  is built, timing and cost are removed from the application in full (D16),
+  and `GET /runs` plus its MCP tool `list_runs` are built (D14/D15) — the run
+  list on the review screen now has a real endpoint to read instead of
+  `ui/demo/`'s dev-only middleware. 129 Python tests and 20 front-end tests
+  pass on this branch without a live API key.
+- No live model call has been made; all runs/tests used the scripted client.
+- Implemented pipeline: `.md`, `.pdf`, `.docx` and `.txt` Ingest → Extract →
+  Match → Examine → Review → Commit.
+- Implemented interface: seven FastAPI endpoints and the same seven operations
+  as MCP tools mounted in the same process, startup demo-project seed, review
+  queue including finding gates, JSON/Markdown export.
+- Verified reliability: real-process `SIGKILL` resume, no repeated completed
+  extraction, Ingest/Match re-entry safety, honest terminal statuses.
+- Two projects run at once without either appearing in the other's rows,
+  citations, decisions, findings or log lines, and a second run on one project
+  waits until the first releases the lock.
+- The demo document's buried instruction is reported as a fact about that
+  document and never acted on.
+- Both synthetic corpora are written: four intake-portal documents and the six
+  Northside Dental documents in `.md`, `.docx` and `.pdf`.
+- Rules are frozen per run, findings are gated one by one, and an approved
+  finding attaches to its row without moving that row's fingerprint.
+- A second run reads only files it has never read before, by name or content,
+  and leaves every row an unaffected document supplied byte-identical, proven
+  on both corpora against the stored rows.
+- Each project's folder is watched: poll and quiet period come from
+  `config/watcher.yaml`, and nothing starts behind a run that is already in
+  flight.
+- The review screen was rebuilt on `review-screen-redesign`: the viewport is
+  split into a run list and one run's sections, read one at a time behind tabs,
+  on Tailwind tokens with IBM Plex served from the repository. Nobody types a
+  run id any more. Still nothing is shown that the server did not send back.
+- Timing and cost are gone from the screen and, on the
+  `finished-stages-and-list-runs` branch, from the rest of the application
+  too (D16).
+- **2026-08-15, branch `start-a-run-from-the-screen`:** the screen can now
+  start a run. A `StartRun` form (project name, source folder, `Start run`)
+  renders once `GET /runs` has answered with zero runs; it validates nothing
+  and shows the server's own refusal unchanged. A retry after a failed
+  `POST /runs` never repeats `POST /projects` (`projects.name` has no unique
+  constraint). Hand-driven against the application: an empty database showed
+  the form, a missing folder and a blank name were each refused word for
+  word, and a real folder created its project while the environment's
+  missing `OPENROUTER_API_KEY` refused the run start — a second click did
+  not create a second project. 25 front-end tests (was 20) and 129 Python
+  tests (unchanged) pass without a live key.
+- **2026-08-15, branch `read-each-document-once`:** requirement withdrawal is
+  removed, not disabled. A run now reads a document exactly once per project,
+  matched by name or by content, instead of re-reading a changed one; see the
+  branch's own entry under Completed and `documentation/progress-history.md`
+  for the full detail, and `documentation/decision-history.md` for why.
+  Migration `20260814_0011` was proven forward and backward on a real database
+  holding an approved withdrawal. 127 Python tests (was 129) and 27 front-end
+  tests (unchanged) pass without a live key.
+- **2026-08-15, branch `front-end-projects-and-runs`:** the screen becomes
+  projects, and inside each project its runs — see the branch's own entry
+  under Completed for the full detail. Four run statuses are renamed
+  (`waiting`→`queued`, `waiting for review`→`needs review`, `closed without
+  export`→`export rejected`, `ended without changes`→`no changes`); migration
+  `20260815_0012` narrows `ck_runs_status` and rebuilds both partial unique
+  indexes, proven forward and backward by hand. `GET /runs` and `list_runs`
+  are replaced by `GET /projects` and `list_projects` (endpoint and tool
+  counts stay at seven). 131 Python tests (was 127) and 32 front-end tests
+  (was 27) pass without a live key.
+- **2026-08-16, branch `folder-is-a-project-and-register-moves`:** a folder is
+  now a project's identity (get-or-create, unique `source_folder_path`, name
+  derived and never accepted, confined to the projects root), and the
+  register moved from a run's own tab to the project's own panel — see the
+  branch's own entry under Completed for the full detail. Migration
+  `20260815_0013` adds the unique constraint, proven forward and backward by
+  hand, including the duplicate-refusal path. Endpoint and MCP tool counts
+  stay at seven; no new door was added for the register. Codex reviewed it
+  read-only and returned seven findings; all seven were re-checked in the
+  foreground, five were repaired and two deliberately left. 141 Python tests
+  (was 131) and 41 front-end tests (was 32) pass without a live key.
+
 **2026-08-15.** Removed requirement withdrawal on `read-each-document-once`,
 cut from `main` at `826534e`. Written before any implementation: never-do
 tests for an edited document, a renamed document, a deleted document, an

@@ -5,7 +5,7 @@ Everything that should be changeable without touching code lives here.
 | File | Holds |
 |---|---|
 | `rules.yaml` | The rules the register is judged against in Examine. A default set ships with the repo so a fresh clone runs; set `RULES_CONFIG_PATH` to point at your own file instead. |
-| `formats.yaml` | The accepted file-format extensions (`.pdf`, `.docx`, `.md`, `.txt`) and the document page limit. Removing a format disables it; adding one only works if a reader for it exists in `app/ingest/` — a startup check says so if not. |
+| `formats.yaml` | The accepted file-format extensions (`.pdf`, `.md`) and the document page limit. Removing a format disables it; adding one only works if a reader for it exists in `app/ingest/` — a startup check says so if not. |
 | `model.yaml` | The OpenRouter model name and base URL. Its `call:` block holds the model-call attempt count and per-call timeout. A working default ships with the repo; the API key is not stored here and comes from the environment. |
 | `watcher.yaml` | `poll_seconds`, how often each project's source folder is looked at, and `quiet_seconds`, how long that folder must stop changing before the run reading it starts by itself. Set `WATCHER_CONFIG_PATH` to point at your own file instead. |
 | `projects.yaml` | `projects_root`, the folder the Add-project box's dropdown lists the contents of. Ships as `sample-projects`, and must stay a relative path inside the repository — an absolute root is refused, because project creation refuses absolute folders and the dropdown would otherwise offer some. The system never creates a folder inside it or discovers a project by itself — a person puts a new client's folder there. |
@@ -31,8 +31,8 @@ key and what is wrong with it.
 ## Editing `rules.yaml`
 
 Each rule needs an `id` and a `text`, and may carry `params` the text refers to,
-such as `max_days`. Ids must be unique, and `D1` and `D2` are reserved for the
-two deliverable checks the system runs itself.
+such as `max_days`. Ids must be unique. Every rule the register is judged
+against lives in this file; no rule is judged anywhere else.
 
 A run parses this file when it starts and keeps that copy for its whole life,
 alongside a fingerprint of the parsed rules — comments and layout do not change

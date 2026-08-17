@@ -68,16 +68,11 @@ def test_a_document_carrying_an_instruction_still_contributes_its_requirements(
             {
                 extract_marker(NOTES): {
                     "document_type": "meeting notes",
-                    "document_date": {
-                        "value": "20 March 2026",
-                        "quote": "**Date:** 20 March 2026",
-                    },
                     "requirements": [
                         {"summary": REQUIREMENT, "quote": REQUIREMENT_QUOTE}
                     ],
                     "testing_observations": [],
                     "delivery_evidence": [],
-                    "blockers": [],
                     "embedded_instructions": [{"quote": BURIED_INSTRUCTION}],
                 },
                 match_marker(): match_answer(1),

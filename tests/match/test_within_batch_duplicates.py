@@ -9,13 +9,12 @@ from app.extract.answer import CLIENT_REQUIREMENTS_DOCUMENT, MEETING_NOTES
 from app.match.match_requirements import EXISTING_ROW, NEW_ROW, POSSIBLE_MATCH
 from app.register.cells import (
     CELL_NAMES,
-    FIRST_SEEN,
     IN_WRITING,
     IN_WRITING_NOT_KNOWN_YET,
     WHAT_WAS_ASKED,
 )
 from tests.documents.register_documents import (
-    dated_extraction_answer,
+    several_requirements_answer,
     examine_marker,
     extract_marker,
     match_answer_within_batch,
@@ -34,11 +33,15 @@ from tests.runs.application import (
 )
 
 
-# The requirements document sorts first by file name and is dated a week after
-# the meeting note that raised the ask, so read order and document order
-# disagree — which is the whole point of first_seen not following read order.
+# The requirements document sorts first by file name, so file-name order and
+# workflow order disagree — which is the point the batch ordering has to get
+# right.
 REQUIREMENTS_FILE = "client-requirements-v1.md"
 MEETING_FILE = "meeting-notes-10-mar.md"
+# The same two documents with their file-name order reversed, so a rule that
+# reads the alphabet gives the two batches different answers.
+RENAMED_REQUIREMENTS = "zz-client-requirements-v1.md"
+RENAMED_MEETING = "aa-meeting-notes-10-mar.md"
 REQUIREMENTS_DATE = "12 March 2026"
 MEETING_DATE = "10 March 2026"
 
@@ -106,8 +109,10 @@ def _runs_over(
         script: dict[str, Any] = {**answers, examine_marker(): no_findings_answer()}
         for batch in batches:
             for document in batch:
-                script[extract_marker(document.source_file)] = dated_extraction_answer(
-                    document.requirements, document.document_type, document.date
+                script[extract_marker(document.source_file)] = (
+                    several_requirements_answer(
+                        document.requirements, document.document_type
+                    )
                 )
         script_path = tmp_path / "script.json"
         write_script(script_path, script)
@@ -211,7 +216,51 @@ def test_one_ask_stated_in_two_documents_of_one_batch_becomes_one_row(
     one_ask_in_two_documents: RunOutcome,
 ) -> None:
     assert sorted(one_ask_in_two_documents.rows) == [1]
-    assert _cell(one_ask_in_two_documents.rows[1], WHAT_WAS_ASKED) == WRITTEN_ASK
+
+
+def test_the_batch_is_ordered_by_document_type_not_by_file_name(
+    one_ask_in_two_documents: RunOutcome,
+) -> None:
+    """The ask is stated first in the meeting note, so it supplies the wording.
+
+    `client-requirements-v1.md` sorts before `meeting-notes-10-mar.md`, so
+    file-name order would hand the row the requirements document's words and
+    make the requirements document's statement the one that creates the row.
+    """
+    row = one_ask_in_two_documents.rows[1]
+    assert _cell(row, WHAT_WAS_ASKED) == SPOKEN_ASK
+    assert sorted(_cited_files(row, WHAT_WAS_ASKED)) == sorted(
+        [MEETING_FILE, REQUIREMENTS_FILE]
+    )
+
+
+def test_renaming_a_source_file_does_not_change_which_wording_the_row_keeps(
+    tmp_path: Path,
+    one_ask_in_two_documents: RunOutcome,
+) -> None:
+    """Nothing about a file's name is a fact about the evidence inside it."""
+    renamed = _runs_over(
+        tmp_path,
+        "renamed",
+        [
+            [
+                _requirements_document()._replace(source_file=RENAMED_REQUIREMENTS),
+                _meeting_note()._replace(source_file=RENAMED_MEETING),
+            ]
+        ],
+        {
+            match_marker(): match_answer_within_batch(
+                [(NEW_ROW, None, None), (EXISTING_ROW, None, 0)]
+            )
+        },
+    )[0]
+
+    assert _cell(renamed.rows[1], WHAT_WAS_ASKED) == _cell(
+        one_ask_in_two_documents.rows[1], WHAT_WAS_ASKED
+    )
+    assert sorted(_cited_files(renamed.rows[1], WHAT_WAS_ASKED)) == sorted(
+        [RENAMED_MEETING, RENAMED_REQUIREMENTS]
+    )
 
 
 def test_that_row_says_it_is_in_writing_and_cites_both_documents(
@@ -219,16 +268,7 @@ def test_that_row_says_it_is_in_writing_and_cites_both_documents(
 ) -> None:
     row = one_ask_in_two_documents.rows[1]
     assert _cell(row, IN_WRITING) == f"Yes — written in {REQUIREMENTS_FILE}."
-    assert _cited_files(row, WHAT_WAS_ASKED) == [REQUIREMENTS_FILE, MEETING_FILE]
     assert _cited_files(row, IN_WRITING) == [REQUIREMENTS_FILE]
-
-
-def test_first_seen_is_the_earliest_document_date_not_the_first_file_read(
-    one_ask_in_two_documents: RunOutcome,
-) -> None:
-    row = one_ask_in_two_documents.rows[1]
-    assert _cell(row, FIRST_SEEN) == MEETING_DATE
-    assert _cited_files(row, FIRST_SEEN) == [MEETING_FILE]
 
 
 def test_a_confident_batch_match_raises_no_decision(
@@ -283,10 +323,12 @@ def test_a_rejected_batch_merge_leaves_two_rows_each_with_its_own_evidence(
         reject_matches=True,
     )[0]
 
+    # The meeting note is read first, so it holds row 1 and the requirements
+    # document — the later statement of the same ask — holds row 2.
     assert sorted(outcome.rows) == [1, 2]
-    assert _cited_files(outcome.rows[1], WHAT_WAS_ASKED) == [REQUIREMENTS_FILE]
-    assert _cited_files(outcome.rows[2], WHAT_WAS_ASKED) == [MEETING_FILE]
-    assert _cell(outcome.rows[2], WHAT_WAS_ASKED) == SPOKEN_ASK
+    assert _cited_files(outcome.rows[1], WHAT_WAS_ASKED) == [MEETING_FILE]
+    assert _cited_files(outcome.rows[2], WHAT_WAS_ASKED) == [REQUIREMENTS_FILE]
+    assert _cell(outcome.rows[1], WHAT_WAS_ASKED) == SPOKEN_ASK
 
 
 def test_a_requirement_matched_against_one_that_created_no_row_reaches_the_row_at_the_end_of_the_chain(
@@ -348,11 +390,13 @@ def test_in_writing_says_the_requirements_document_does_not_mention_it(
         },
     )[0]
 
-    assert _cell(outcome.rows[1], IN_WRITING) == (
+    # The meeting note is read first, so its ask — the one the requirements
+    # document never mentions — is row 1.
+    assert _cell(outcome.rows[1], IN_WRITING) == f"Not found in {REQUIREMENTS_FILE}."
+    assert _cited_files(outcome.rows[1], IN_WRITING) == []
+    assert _cell(outcome.rows[2], IN_WRITING) == (
         f"Yes — written in {REQUIREMENTS_FILE}."
     )
-    assert _cell(outcome.rows[2], IN_WRITING) == f"Not found in {REQUIREMENTS_FILE}."
-    assert _cited_files(outcome.rows[2], IN_WRITING) == []
 
 
 def test_in_writing_names_a_requirements_document_read_by_an_earlier_run(

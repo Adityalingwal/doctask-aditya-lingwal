@@ -25,9 +25,13 @@ slice, the incremental update slice, and the review screen are implemented:
 - Review decisions are one proposal at a time; export is unavailable until
   approved.
 - One browser page at `/ui` shows a run and answers its gates.
-- Meeting notes and a client requirements document create rows; testing
-  feedback and a handover summary move rows that already exist, and create
-  none.
+- Four kinds of document are read, in the order the work happens: **meeting
+  notes → client requirements document → handover summary → testing feedback**.
+  The first two create rows; the last two move rows that already exist and
+  create none. They may arrive one per run or several together in one run, and
+  a batch is read in that order whatever the files are named. A document that
+  arrives before the requirement it talks about is reported on the Skipped tab
+  rather than acted on.
 - One ask stated in two documents of one batch becomes **one** row citing both
   — the meeting note that raised it and the requirements document that wrote it
   down — and that row says the ask is in writing. Where the match is uncertain,
@@ -44,7 +48,11 @@ No live hosted-model run has been completed yet. Current proof is for the
 orchestration, persistence, validation, review, and export paths using the
 scripted client.
 
-## The register's statuses, and what moves them
+## The register's cells, its statuses, and what moves them
+
+A row has four cells, each carrying its own citations:
+
+`What was asked` · `Written down?` · `What testing found` · `Status`
 
 Every row starts at `No evidence yet` and moves only on what a document says.
 
@@ -54,19 +62,19 @@ Every row starts at `No evidence yet` and moves only on what a document says.
 | `Done` | A document reports the work exists and behaves as asked. |
 | `Partial` | A document reports the work exists but is wrong or incomplete. |
 | `Not delivered` | A document states the work is not there. A positive claim, and it needs a citation. |
-| `Blocked` | A document reports work on this requirement is stopped, waiting on something. |
+| `Handed over` | A handover summary reports the work exists; testing has not spoken yet. |
 | `Disputed` | Two documents make opposing claims. The system never resolves it; it goes to a person. |
 
 Testing feedback moves a row by its label: `Passed` makes it `Done`, `Defect`
 makes it `Partial`, and `Change request` and `Unclear` move no status — a new
-ask arriving during testing is not a verdict on the work. Any document
-reporting work stopped makes the row `Blocked`. A handover summary moves
-`Last moved` and no status: it says the work exists, never that it behaves as
-asked.
+ask arriving during testing is not a verdict on the work. A handover summary
+with no testing behind it makes the row `Handed over`: it says the work exists,
+never that it behaves as asked.
 
-`First seen` carries the date of the document that first asked for the
-requirement and `Last moved` the date of the document that last changed the
-row; both come from the documents, never from the clock.
+`Status` keeps the citation of every document that still supports what it says,
+so a row that reads `Done` names both the handover that said the work exists
+and the testing document that said it behaves as asked. A superseded testing
+verdict is dropped, because it proves something the cell now denies.
 
 Attaching a document's evidence to a row that is already committed is asked
 about before it happens, and so is any link the system is unsure of. An
@@ -81,17 +89,17 @@ testing, so `Disputed` is proven by test rather than by a corpus run.
 
 ## Rules and findings
 
-`config/rules.yaml` holds the rules the register is judged against; R1–R4 ship
-with the repository. Two further checks, D1 and D2, are owed by the deliverable
-itself and live in code: every row cites a source, and no row is `Done` without
-a testing outcome.
+`config/rules.yaml` holds the rules the register is judged against; R1, R2, R4
+and R5 ship with the repository. Editing that file is the only way a rule
+enters the system — no screen, endpoint or MCP tool can add or change one, and
+none of them is judged anywhere but in that file.
 
 Examine runs once per run, between Match and Review, in a single model call for
 the whole register. Each finding names its rule, the row it is about, what it
 found, and the evidence — and becomes a question the Delivery Owner answers.
 Approving one attaches it to the row; rejecting one keeps it in the run record
 and out of the export. A finding never edits a cell, and attaching one does not
-change the row's fingerprint, which covers the seven cells only.
+change the row's fingerprint, which covers the four cells only.
 
 A run with nothing wrong says so: `GET /runs/{id}` and both exports name the
 rules that ran and how many rows they ran against, alongside an empty findings
@@ -168,9 +176,7 @@ resourcing, and CRM work are outside this domain.
 |---|---:|---:|---|
 | `.md` | Yes | **Yes** | Nearest heading |
 | `.pdf` | Yes | **Yes** | Page number |
-| `.docx` | Yes | **Yes** | Line number |
-| `.txt` | Yes | **Yes** | Line number |
-| `.xlsx`, `.pptx`, `.eml`, images | No | Skipped with reason | — |
+| `.docx`, `.txt`, `.xlsx`, `.pptx`, `.eml`, images | No | Skipped with reason | — |
 
 `config/formats.yaml` declares which extensions are accepted and the document
 page limit, currently 20 pages. A file whose extension is not listed there
@@ -362,7 +368,7 @@ development-worktree command, not yet a fresh-machine claim.
 | `config/formats.yaml` | Declared extensions and document page limit |
 | `config/model.yaml` | OpenRouter model, endpoint, call attempts, timeout |
 | `config/projects.yaml` | The projects root the Add-project box's folder dropdown lists |
-| `config/rules.yaml` | User-editable R1–R4 rule set Examine judges against |
+| `config/rules.yaml` | The user-editable rule set Examine judges against, and the only way a rule enters the system |
 | `config/watcher.yaml` | Folder poll interval and the quiet period before a run auto-starts |
 | `ui/config/screen.json` | How often the review screen polls the run it is showing |
 
@@ -377,13 +383,17 @@ the next run and never to one already under way or already finished. Point
 - The 20-page limit applies to PDFs only; the other formats report no page
   count and none is invented for them.
 - Scanned PDFs are skipped rather than read; there is no OCR.
-- `First seen` is the earliest date stated by the documents behind a row, and a
-  document's date is read as it wrote it. `10 March 2026`, `10 Mar 2026` and
-  `2026-03-10` can be ordered against each other; a date written any other way
-  is still shown in the cell, and the row falls back to the order the files
-  were read in.
-- A related additional document that lists requirements, in a run that never
-  exports, is read again by the next run.
+- Rules about elapsed time — "nothing stays blocked more than N days" — cannot
+  be judged, because the register keeps no document dates.
+- Work stopped by something outside the provider's control is reported through
+  the source document, not through a cell of its own.
+- A batch holding two documents of one type is read in file-name order between
+  them. That is harmless while the two state different asks, and undecided if
+  they ever state the same one.
+- Rules are supplied by editing `config/rules.yaml`; the screen, the API and
+  the MCP tools can read which rules ran but cannot add or change one.
+- A handover summary that lists requirements, in a run that never exports, is
+  read again by the next run.
 - Text in a document that addresses the system is reported and never acted on,
   but the only place that report reaches a person is the run's log line: it is
   in neither the run status nor the export.

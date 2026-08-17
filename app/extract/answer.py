@@ -9,33 +9,41 @@ class DocumentType(StrEnum):
     MEETING_NOTES = "meeting notes"
     CLIENT_REQUIREMENTS_DOCUMENT = "client requirements document"
     TESTING_FEEDBACK = "testing feedback"
-    RELATED_ADDITIONAL_DOCUMENT = "related additional document"
+    HANDOVER_SUMMARY = "handover summary"
     UNRELATED = "unrelated"
 
 
 MEETING_NOTES = DocumentType.MEETING_NOTES.value
 CLIENT_REQUIREMENTS_DOCUMENT = DocumentType.CLIENT_REQUIREMENTS_DOCUMENT.value
 TESTING_FEEDBACK = DocumentType.TESTING_FEEDBACK.value
-RELATED_ADDITIONAL_DOCUMENT = DocumentType.RELATED_ADDITIONAL_DOCUMENT.value
+HANDOVER_SUMMARY = DocumentType.HANDOVER_SUMMARY.value
 UNRELATED_DOCUMENT = DocumentType.UNRELATED.value
 DOCUMENT_TYPES = tuple(document_type.value for document_type in DocumentType)
+
+# The order the work itself happens in: an ask is raised in a meeting, written
+# into the client's requirements, built and handed over, then tested. A batch
+# is read in this order so that which statement of an ask creates a row is a
+# fact about the documents rather than about what they were named.
+DOCUMENT_WORKFLOW_ORDER = (
+    DocumentType.MEETING_NOTES.value,
+    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT.value,
+    DocumentType.HANDOVER_SUMMARY.value,
+    DocumentType.TESTING_FEEDBACK.value,
+)
 REQUIREMENTS = "requirements"
 TESTING_OBSERVATIONS = "testing_observations"
 DELIVERY_EVIDENCE = "delivery_evidence"
-BLOCKERS = "blockers"
-QUOTED_LISTS = (REQUIREMENTS, TESTING_OBSERVATIONS, DELIVERY_EVIDENCE, BLOCKERS)
+QUOTED_LISTS = (REQUIREMENTS, TESTING_OBSERVATIONS, DELIVERY_EVIDENCE)
 
-# Which of those four lists each document type may fill at all. The prompt
+# Which of those three lists each document type may fill at all. The prompt
 # states this table and the generated schema carries it in the field
 # descriptions; a filled list where the table says empty is a wrong answer
 # rather than something Python quietly zeroes.
 LISTS_A_TYPE_MAY_FILL: dict[DocumentType, frozenset[str]] = {
-    DocumentType.MEETING_NOTES: frozenset({REQUIREMENTS, BLOCKERS}),
-    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT: frozenset({REQUIREMENTS, BLOCKERS}),
-    DocumentType.TESTING_FEEDBACK: frozenset({TESTING_OBSERVATIONS, BLOCKERS}),
-    DocumentType.RELATED_ADDITIONAL_DOCUMENT: frozenset(
-        {DELIVERY_EVIDENCE, BLOCKERS}
-    ),
+    DocumentType.MEETING_NOTES: frozenset({REQUIREMENTS}),
+    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT: frozenset({REQUIREMENTS}),
+    DocumentType.TESTING_FEEDBACK: frozenset({TESTING_OBSERVATIONS}),
+    DocumentType.HANDOVER_SUMMARY: frozenset({DELIVERY_EVIDENCE}),
     DocumentType.UNRELATED: frozenset(),
 }
 
@@ -68,7 +76,7 @@ class UnrecognisedDocumentType(ValueError):
 
 # Every field carries its own meaning as a description, because the generated
 # schema is what the model is actually asked for. The prompt explains judgement
-# — what a label means, what counts as a blocker — and never the shape.
+# — what a label means, what a handover reports — and never the shape.
 _SUMMARY_MEANING = "One short sentence stating this fact in your own words."
 _QUOTE_MEANING = (
     "The document's own words supporting it, copied character for character."
@@ -110,21 +118,9 @@ class QuotedInstruction(BaseModel):
     )
 
 
-class DocumentDate(BaseModel):
-    value: str = Field(description="The date as the document writes it.")
-    quote: str = Field(description=_QUOTE_MEANING)
-
-
 class ExtractionAnswer(BaseModel):
     document_type: DocumentType = Field(
         description="Which kind of document this one is."
-    )
-    document_date: DocumentDate | None = Field(
-        default=None,
-        description=(
-            "The date this document states about itself, or null when it "
-            "states none."
-        ),
     )
     requirements: list[QuotedFact] = Field(
         default_factory=list,
@@ -141,12 +137,6 @@ class ExtractionAnswer(BaseModel):
             "over."
         ),
     )
-    blockers: list[QuotedFact] = Field(
-        default_factory=list,
-        description=(
-            "One entry for each piece of work this document says is stopped."
-        ),
-    )
     embedded_instructions: list[QuotedInstruction] = Field(
         default_factory=list,
         description=(
@@ -154,6 +144,17 @@ class ExtractionAnswer(BaseModel):
             "processes this document."
         ),
     )
+
+
+def workflow_position(document_type: str) -> int:
+    """Where this kind of document sits in the workflow, last where unplaced.
+
+    Only `unrelated` is unplaced, and an unrelated document states no
+    requirement, so where it sorts decides nothing.
+    """
+    if document_type not in DOCUMENT_WORKFLOW_ORDER:
+        return len(DOCUMENT_WORKFLOW_ORDER)
+    return DOCUMENT_WORKFLOW_ORDER.index(document_type)
 
 
 def parse_extraction_answer(model_reply: str) -> ExtractionAnswer:

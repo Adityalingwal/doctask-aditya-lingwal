@@ -272,7 +272,6 @@ def _requirement(summary: str, source_file: str) -> dict[str, Any]:
         "place": "Discussion",
         "source_words": f"The client asked for {summary}.",
         "document_type": "meeting notes",
-        "document_date": None,
     }
 
 
@@ -298,11 +297,10 @@ async def _insert_committed_row(
 ) -> None:
     await connection.execute(
         "INSERT INTO register_rows (id, project_id, what_was_asked, in_writing, "
-        "what_testing_found, status, blocked_on, first_seen, last_moved, "
+        "what_testing_found, status, "
         "fingerprint, row_number, proposed_by_run_id, is_committed) VALUES "
         "(%s, %s, %s, 'Yes', 'Not known yet', 'No evidence yet', "
-        "'Not known yet', '10 March 2026', '10 March 2026', 'fingerprint', "
-        "%s, %s, true)",
+        "'fingerprint', %s, %s, true)",
         (
             uuid4(),
             project_id,

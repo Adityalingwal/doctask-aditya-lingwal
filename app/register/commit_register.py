@@ -10,12 +10,10 @@ from app.examine.read_findings import findings_of_run
 from app.register.audit_entries import write_attachment, write_cell_change
 from app.register.cells import (
     CELL_NAMES,
-    FIRST_SEEN,
     IN_WRITING,
     fingerprint_of_cells,
     in_writing_says_yes,
 )
-from app.register.document_dates import earlier_of
 from app.register.move_rows import apply_moves
 from app.register.export_register import build_export
 from app.review.review_queue import (
@@ -62,13 +60,13 @@ async def commit_register(
     for row in await proposals.fetchall():
         citations = await _citations_of_row(connection, row["id"])
         if not citations:
-            # D1: a row without a source citation is an unsupported claim and
-            # must never reach the register.
+            # A row without a source citation is an unsupported claim and must
+            # never reach the register.
             raise RuntimeError(
                 f"Register row #{row['row_number']} carries no citation and "
-                "cannot be committed — rule D1 requires every committed row to "
-                "cite a source. Re-run the batch so the row is proposed with "
-                "its evidence."
+                "cannot be committed — every committed row states what a "
+                "document said and names where it said it. Re-run the batch so "
+                "the row is proposed with its evidence."
             )
 
         cells = {name: row[name] for name in CELL_NAMES}
@@ -160,10 +158,9 @@ async def _bring_cells_up_to_the_new_evidence(
     """Move the surviving row's cells to what the arriving evidence supports.
 
     A merge attaches the proposal's citations to the row that survives. A cell
-    saying the ask is not written down in a file the row now cites, or naming a
-    first-seen date later than a document it now cites, is contradicted by the
-    row's own evidence — and nothing else in Commit looks at those two cells
-    again.
+    saying the ask is not written down in a file the row now cites is
+    contradicted by the row's own evidence — and nothing else in Commit looks
+    at that cell again.
     """
     survivor = await _cells_of(connection, survivor_id)
     proposal = await _cells_of(connection, proposal_id)
@@ -175,15 +172,15 @@ async def _bring_cells_up_to_the_new_evidence(
         survivor[IN_WRITING]
     ):
         changed[IN_WRITING] = proposal[IN_WRITING]
-    first_seen = earlier_of(survivor[FIRST_SEEN], proposal[FIRST_SEEN])
-    if first_seen != survivor[FIRST_SEEN]:
-        changed[FIRST_SEEN] = first_seen
 
     for cell_name, value in changed.items():
         await connection.execute(
             f"UPDATE register_rows SET {cell_name} = %s WHERE id = %s",
             (value, survivor_id),
         )
+        # `Written down?` holds one claim about one document, so the citation
+        # behind the sentence it no longer says goes with that sentence. Only
+        # `Status` rests on more than one claim, and no merge moves it.
         await connection.execute(
             "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
             (survivor_id, cell_name),
@@ -256,7 +253,7 @@ async def _write_attachment_audit(
     """Record each approved finding as attached to its row, naming no cell.
 
     A finding is an attachment, not a cell change: it says nothing about what
-    any of the seven cells holds, which is why the row's fingerprint does not
+    any of the four cells holds, which is why the row's fingerprint does not
     move when one arrives.
     """
     for finding in await findings_of_run(connection, run_id, approved_only=True):

@@ -14,7 +14,7 @@ from app.ingest.unreadable_document import DocumentUnreadable
 
 
 SKIPPED_FILE_KIND = "file"
-UNREADABLE_FORMAT = "Not a format this system reads. It reads .md, .pdf, .docx and .txt."
+UNREADABLE_FORMAT = "Not a format this system reads. It reads .md and .pdf."
 
 
 class CollectedBatch(NamedTuple):

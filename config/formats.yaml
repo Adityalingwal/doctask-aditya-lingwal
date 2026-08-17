@@ -1,6 +1,4 @@
 accepted_extensions:
   - .pdf
-  - .docx
   - .md
-  - .txt
 document_page_limit: 20

@@ -8,19 +8,14 @@ from psycopg import AsyncConnection
 from app.extract.answer import CLIENT_REQUIREMENTS_DOCUMENT
 from app.match.match_requirements import EXISTING_ROW, NEW_ROW
 from app.register.cells import (
-    BLOCKED_ON_NOT_KNOWN_YET,
-    DATE_UNKNOWN,
-    FIRST_SEEN,
     IN_WRITING,
     IN_WRITING_NOT_FOUND_IN,
     IN_WRITING_NOT_KNOWN_YET,
     IN_WRITING_WRITTEN_IN_OPENING,
-    LAST_MOVED,
     STATUS_NO_EVIDENCE_YET,
     TESTING_NOT_KNOWN_YET,
     WHAT_WAS_ASKED,
 )
-from app.register.document_dates import earliest_dated
 from app.review.review_queue import raise_possible_match_decision
 
 
@@ -261,22 +256,17 @@ async def _insert_proposed_row(
     documents_read: list[str],
 ) -> UUID:
     row_id = uuid4()
+    # The batch is ordered by document type, so the first requirement on a row
+    # is the one stated earliest in the workflow, whatever the files are named.
     stated_the_ask = requirements_on_row[0]
-    # Read order is not date order: the batch is read in file-name order, so
-    # the document that raised the ask first can be read second.
-    dated_earliest = earliest_dated(requirements_on_row)
-    document_date = (
-        dated_earliest["document_date"] if dated_earliest is not None else None
-    )
-    seen_on = document_date["summary"] if document_date else DATE_UNKNOWN
     written_down = _the_requirement_in_writing(requirements_on_row)
     in_writing = _in_writing_cell(written_down, documents_read)
 
     await connection.execute(
         "INSERT INTO register_rows (id, project_id, what_was_asked, in_writing, "
-        "what_testing_found, status, blocked_on, first_seen, last_moved, "
-        "fingerprint, row_number, proposed_by_run_id, is_committed) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false)",
+        "what_testing_found, status, fingerprint, row_number, "
+        "proposed_by_run_id, is_committed) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, false)",
         (
             row_id,
             project_id,
@@ -284,9 +274,6 @@ async def _insert_proposed_row(
             in_writing,
             TESTING_NOT_KNOWN_YET,
             STATUS_NO_EVIDENCE_YET,
-            BLOCKED_ON_NOT_KNOWN_YET,
-            seen_on,
-            seen_on,
             UNSET_FINGERPRINT,
             row_number,
             run_id,
@@ -299,9 +286,6 @@ async def _insert_proposed_row(
         await _insert_citation(connection, row_id, WHAT_WAS_ASKED, requirement)
     if written_down is not None:
         await _insert_citation(connection, row_id, IN_WRITING, written_down)
-    if document_date is not None:
-        for cell_name in (FIRST_SEEN, LAST_MOVED):
-            await _insert_citation(connection, row_id, cell_name, document_date)
     return row_id
 
 

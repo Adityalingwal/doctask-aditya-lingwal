@@ -291,7 +291,7 @@ def test_a_changed_rules_file_re_examines_the_register_without_reading_a_documen
     assert markers.count(examine_marker()) == 2
     assert rules_run_batch == []
     assert examined["rows_examined"] == 1
-    assert [rule["id"] for rule in examined["rules"]] == ["R1", "R9", "D1", "D2"]
+    assert [rule["id"] for rule in examined["rules"]] == ["R1", "R9"]
     assert after_rules_run[UNTOUCHED_ROW] == after_first_run[UNTOUCHED_ROW]
     assert ended["ended_early_reason"] == (
         "Nothing was read — all 1 file was skipped. See the Skipped tab for why."

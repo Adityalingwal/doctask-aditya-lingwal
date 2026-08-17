@@ -20,6 +20,7 @@ from app.examine.frozen_rules import (
 from app.examine.record_findings import record_findings
 from app.examine.register_under_examination import register_under_examination
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
+from app.register.export_register import export_as_markdown
 from app.runs.statuses import RUNNING
 from tests.runs.application import (
     ApplicationProcess,
@@ -40,12 +41,36 @@ from tests.documents.register_documents import (
 
 SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
-SHIPPED_RULES = ("R1", "R2", "R3", "R4")
-DELIVERABLE_CHECKS = ("D1", "D2")
-# R3's text says "beyond max_days"; the limit itself lives in the rule's
-# params, so reporting the text alone never says which limit a run was judged
-# against.
+SHIPPED_RULES = ("R1", "R2", "R4", "R5")
+# The test rules file below gives R3 a limit in its params, so reporting the
+# text alone never says which limit a run was judged against.
 R3_MAX_DAYS = 14
+EXPORT_WITH_A_RULE_CARRYING_A_SETTING = {
+    "project": {"id": "p", "name": "Intake portal"},
+    "run_id": "r",
+    "exported_at": "2026-08-17T00:00:00+00:00",
+    "reported_instructions": [],
+    "columns": list(CELL_NAMES),
+    "rows": [],
+    "examine": {
+        "rules": [
+            {
+                "id": "R3",
+                "text": "No requirement stays blocked beyond max_days days.",
+                "params": {"max_days": R3_MAX_DAYS},
+            }
+        ],
+        "rows_examined": 0,
+        "findings": [],
+    },
+}
+
+
+def test_a_rule_reaches_the_export_with_the_setting_it_was_judged_against() -> None:
+    """A rule's text alone does not say what it ran at, so its params go with it."""
+    markdown = export_as_markdown(EXPORT_WITH_A_RULE_CARRYING_A_SETTING)
+
+    assert f"max_days: {R3_MAX_DAYS}" in markdown
 
 TWO_RULES = """\
 rules:
@@ -164,24 +189,19 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     assert _decision_of_kind(waiting, "finding") is None
     assert written_findings == 0
     assert [rule["id"] for rule in waiting["examine"]["rules"]] == list(
-        SHIPPED_RULES + DELIVERABLE_CHECKS
+        SHIPPED_RULES
     )
     assert waiting["examine"]["rows_examined"] == 1
     assert waiting["examine"]["findings"] == []
     assert [rule["id"] for rule in export["examine"]["rules"]] == list(
-        SHIPPED_RULES + DELIVERABLE_CHECKS
+        SHIPPED_RULES
     )
     assert export["examine"]["rows_examined"] == 1
     assert export["examine"]["findings"] == []
     assert "No findings" in markdown
-    for rule_id in SHIPPED_RULES + DELIVERABLE_CHECKS:
+    for rule_id in SHIPPED_RULES:
         assert rule_id in markdown
-    # Naming R3 is not stating what ran while its limit stays hidden: nothing
-    # here would tell a reader whether 14 days applied or 30.
-    for reported in (waiting["examine"]["rules"], export["examine"]["rules"]):
-        r3 = next(rule for rule in reported if rule["id"] == "R3")
-        assert r3["params"] == {"max_days": R3_MAX_DAYS}
-    assert f"max_days: {R3_MAX_DAYS}" in markdown
+    assert all(rule.get("params") is None for rule in export["examine"]["rules"])
 
 
 def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
@@ -415,11 +435,7 @@ def test_editing_the_rules_file_after_a_run_started_leaves_that_run_examining(
     assert [rule["id"] for rule in frozen] == ["R1", "R3"]
     assert frozen[1]["params"]["max_days"] == 14
     assert fingerprint == frozen_fingerprint
-    assert [rule["id"] for rule in waiting["examine"]["rules"]] == [
-        "R1",
-        "R3",
-        *DELIVERABLE_CHECKS,
-    ]
+    assert [rule["id"] for rule in waiting["examine"]["rules"]] == ["R1", "R3"]
 
 
 def _frozen_rules_of(engine: Any, run_id: str) -> list[dict[str, Any]] | None:
@@ -507,10 +523,9 @@ async def _insert_committed_row(
     row_id = uuid4()
     await connection.execute(
         "INSERT INTO register_rows (id, project_id, what_was_asked, in_writing, "
-        "what_testing_found, status, blocked_on, first_seen, last_moved, "
+        "what_testing_found, status, "
         "fingerprint, row_number, proposed_by_run_id, is_committed) VALUES "
-        "(%s, %s, %s, 'Yes', 'Not known yet', 'No evidence yet', "
-        "'Not known yet', '10 March 2026', '10 March 2026', %s, 1, %s, true)",
+        "(%s, %s, %s, 'Yes', 'Not known yet', 'No evidence yet', %s, 1, %s, true)",
         (row_id, project_id, REQUIREMENT, "fingerprint-before-examine", run_id),
     )
     await connection.execute(
