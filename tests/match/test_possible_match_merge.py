@@ -222,7 +222,10 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
                                 "outcome": outcome,
                             },
                         ).raise_for_status()
-                    client.post(f"/runs/{second_run}/finish-review").raise_for_status()
+                    client.post(
+                        f"/runs/{second_run}/finish-review",
+                        json={"add_to_register": True},
+                    ).raise_for_status()
                     wait_for_run_status(client, second_run, "done")
                     export = client.get(f"/runs/{second_run}/export").json()
             finally:

@@ -132,7 +132,21 @@ export is always gated.
 - **Decision:** Every gated proposal has only **Approve** or **Reject**. The
   buttons act on the stated proposal, never resolve the underlying truth.
 - **Reject:** Exclude the proposal from the register but retain it permanently
-  in the run record. Only rejecting final export ends `export rejected`.
+  in the run record.
+- **The final-export gate is one press, not a queued question (locked
+  2026-08-18).** Entering Review raises no export decision. Once every other
+  decision is answered, the review is ended by one of two buttons — `Add this
+  run's changes to the register` and `Discard this run's changes` — and that
+  press writes the export decision, its frozen question and its answer
+  together, inside the same atomic claim that takes the run out of review.
+  Two buttons and not one: refusing is how a run ends without committing, and
+  without it a run nobody wants would hold its project's lock for ever.
+  Discarding ends the run `discarded`.
+- **`finish_review` takes the answer, with no default.** `add_to_register`
+  reaches both doors — `POST /runs/{id}/finish-review` and the MCP tool — and
+  a call that omits it is refused with the body to send. The trade-off: the
+  answer can no longer be changed between giving it and finishing, because
+  the press is the decision.
 - **Known limitation:** A rejected finding does not automatically return when
   later evidence makes it stronger. Evidence that resolves it naturally stops
   the rule firing.
@@ -685,11 +699,12 @@ false-success `done` run.
 - Slice 1 executes background work inside one FastAPI process. A separate
   worker is a legitimate later change; database locks preserve correctness.
 - **Run statuses, renamed 2026-08-15 so the screen can print the stored value
-  verbatim:** `queued`, `running`, `needs review`, `done`,
-  `export rejected`, `failed`, `no changes`.
-- `done` means export exists. `export rejected` means export was rejected.
-  `failed` is deliberate unrecoverable stop. Early exits use `no changes`
-  plus a reason.
+  verbatim, and `export rejected` renamed to `discarded` 2026-08-18
+  (migration `20260817_0019`):** `queued`, `running`, `needs review`, `done`,
+  `discarded`, `failed`, `no changes`.
+- `done` means export exists. `discarded` means the Delivery Owner pressed
+  `Discard this run's changes`, so nothing was committed. `failed` is
+  deliberate unrecoverable stop. Early exits use `no changes` plus a reason.
 - **Implemented and verified** — 2026-08-14, by
   `tests/runs/test_two_projects_at_once.py` and
   `tests/runs/test_same_project_queue.py`,
@@ -773,7 +788,9 @@ a symlink after creation is not re-checked.
 
 - MCP mirrors the seven endpoints 1:1: `create_project`, `list_projects`,
   `start_run`, `get_run_status`, `submit_decision`, `finish_review`,
-  `get_export`.
+  `get_export`. `finish_review` takes `run_id` and `add_to_register` — yes
+  adds this run's changes to the register, no discards them — the same
+  argument the endpoint takes, into the same core function.
 - It mounts in the FastAPI process at `/mcp` and calls the same core functions
   the endpoints call. Existence checks, refusals and the shape a caller is told
   live in core, so a door decides only how to carry a refusal, never what it
@@ -802,7 +819,7 @@ a symlink after creation is not re-checked.
   on a run that is not at review.
 - Section tabs still carry `role="tab"`, not the button role, because
   choosing what to read is navigation — the only actions on a run stay
-  Approve, Reject and Finish review. **A run panel has three tabs — Stages,
+  Approve, Reject and the two buttons that end the review. **A run panel has three tabs — Stages,
   Skipped, Decisions (locked 2026-08-16, superseding a fourth Register tab —
   see the register bullet below).**
 - **The stage strip's own stage wins over "done" only while the run is active**
@@ -1050,7 +1067,7 @@ ideas from resurfacing without duplicating their full prose here.
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
 | Five/six API endpoints; flat `GET /runs` run list | D14 seven endpoints including `GET /projects`, every project with its runs nested |
-| `done` as generic terminal state | D13 honest `failed`/`no changes`/`export rejected` |
+| `done` as generic terminal state | D13 honest `failed`/`no changes`/`discarded` |
 | Status-only already-read check | D03 extraction + export/unrelated/no-requirement rule |
 | Already-read matched by name AND content; requirement withdrawal | D03 read-once rule matched by name OR content; withdrawal removed |
 | Unmarked emptied merge proposal | D09 `merged_into_register_row_id` |

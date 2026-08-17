@@ -5,7 +5,7 @@ WAITING = "queued"
 RUNNING = "running"
 WAITING_FOR_REVIEW = "needs review"
 DONE = "done"
-CLOSED_WITHOUT_EXPORT = "export rejected"
+CLOSED_WITHOUT_EXPORT = "discarded"
 FAILED = "failed"
 ENDED_WITHOUT_CHANGES = "no changes"
 

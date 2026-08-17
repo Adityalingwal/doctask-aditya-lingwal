@@ -18,7 +18,7 @@ export default function Register({ exported }) {
   return (
     <>
       <p className="eyebrow m-0 mb-4">
-        {exported.project.name} · exported {dayMonthTime(exported.exported_at)}
+        {exported.project.name} · last updated {dayMonthTime(exported.exported_at)}
       </p>
 
       <div className="overflow-x-auto border border-line bg-card">

@@ -323,7 +323,10 @@ def approve_every_decision_and_finish_review(
     run_id: str,
 ) -> None:
     approve_every_decision(client, run_id)
-    client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+    client.post(
+        f"/runs/{run_id}/finish-review",
+        json={"add_to_register": True},
+    ).raise_for_status()
 
 
 def wait_until(

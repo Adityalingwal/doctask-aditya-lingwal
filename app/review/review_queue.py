@@ -15,6 +15,13 @@ FINDING_DECISION = "finding"
 APPROVED = "approved"
 REJECTED = "rejected"
 
+# What the person read on the button they pressed, frozen with their answer.
+# No row count in it: a rules-only run ends the same way with zero proposed
+# rows, and a wording naming a count would read wrongly there. This gate is
+# the one place a human approves the whole run's work, not a download prompt,
+# so "export" is never the verb.
+EXPORT_QUESTION = "Add this run's changes to the register?"
+
 
 async def raise_finding_decision(
     connection: AsyncConnection,
@@ -76,24 +83,29 @@ async def raise_observation_match_decision(
     return decision_id
 
 
-async def ensure_export_decision(
+async def record_export_answer(
     connection: AsyncConnection,
     run_id: UUID,
-    question: str,
+    add_to_register: bool,
 ) -> UUID:
-    """Raise the export gate once, however often Review is re-entered."""
-    existing = await connection.execute(
-        "SELECT id FROM decisions WHERE run_id = %s AND kind = %s",
-        (run_id, EXPORT_DECISION),
-    )
-    already_raised = await existing.fetchone()
-    if already_raised is not None:
-        return already_raised["id"]
+    """Write the gate the person answered by pressing one of the two buttons.
 
+    The question and the answer are written together because the press is the
+    decision: it was never sitting in the queue waiting to be answered, and a
+    row holding one without the other would say a person read something they
+    did not.
+    """
     decision_id = uuid4()
     await connection.execute(
-        "INSERT INTO decisions (id, run_id, kind, question) VALUES (%s, %s, %s, %s)",
-        (decision_id, run_id, EXPORT_DECISION, question),
+        "INSERT INTO decisions (id, run_id, kind, question, outcome, decided_at) "
+        "VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)",
+        (
+            decision_id,
+            run_id,
+            EXPORT_DECISION,
+            EXPORT_QUESTION,
+            APPROVED if add_to_register else REJECTED,
+        ),
     )
     return decision_id
 

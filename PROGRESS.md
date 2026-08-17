@@ -6,25 +6,27 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
-## Snapshot — 2026-08-17, branch `wording-and-prompts`
+## Snapshot — 2026-08-18, branch `gate-becomes-one-button`
 
 Built and run rather than type-checked, committed and pushed; the branch is
 waiting for review and for Aditya's gates. No pull request is open.
 
-- **The model writes the question a person reads**, on all three surfaces:
-  Match's requirement answer, Match's observation answer, and Examine's
-  finding. The three code-composed sentences are gone. What Approve and Reject
-  will do is code-owned fixed text beside server-computed values.
-- **The three prompts were rewritten**: the Examine prompt in full, and both
-  Match prompts gained the question section. `document_type` now reaches the
-  Match prompt from the stored extraction.
-- **A reported instruction left the export.** It still reaches a person
-  through `GET /runs/{id}` and the Reported tab, whose notice is now said once
-  above the cards. No migration was involved.
-- **Both suites green on this branch, no live key:** **216 Python passed**
-  (baseline 202) and **53 front-end passed across 32 files** (baseline 47
-  across 31). Details, including the recorded test-first baseline failures, are
-  under `## Completed` and `## Verification evidence`.
+- **One press ends the review.** Entering Review raises no export decision;
+  once every other decision is answered the run is ended by `Add this run's
+  changes to the register` or `Discard this run's changes`, and that press
+  writes the decision it carried inside the same atomic claim. Both doors
+  take `add_to_register`, and a call that omits it is refused with the body
+  to send.
+- **The refused status is now `discarded`** (migration `20260817_0019`,
+  proven forward and backward by hand), and the register header reads
+  `last updated` rather than `exported`.
+- **Both suites green on this branch, no live key:** **224 Python passed**
+  (baseline 216) and **57 front-end passed across 33 files** (baseline 53
+  across 32).
+
+
+Details, including the recorded test-first baseline failures, are under
+`## Completed` and `## Verification evidence`.
 
 Everything before this branch — the four-cell row, `Handed over`, workflow
 order, rules living only in `config/rules.yaml`, two formats — is in
@@ -36,6 +38,63 @@ decision rests on the export gate showing such a merge, and the gate does not �
 see `## Active blockers`.
 
 ## Completed
+
+### The gate becomes one button, and a refused run is discarded (branch `gate-becomes-one-button`)
+
+From `main` at `963c3a7`, in two parts, the rename first and alone.
+
+**Part 1 — `export rejected` becomes `discarded`.** `CLOSED_WITHOUT_EXPORT`
+keeps its name and changes its value; migration `20260817_0019` follows the
+rename pattern of `20260816_0014` — drop `ck_runs_status`, rewrite stored rows,
+recreate the constraint. Neither partial unique index on `runs` names the value,
+read off a real database with `pg_get_constraintdef` and `pg_indexes` rather
+than taken from the migration files, so no index was rebuilt. No machinery was
+renamed: `export_json`, `GET /runs/{id}/export` and `build_export` are
+untouched. The register header now reads `last updated` instead of `exported`;
+`exported_at` is unchanged.
+
+**Part 2 — one press ends the review.** The Review node no longer raises the
+export decision. `finish_review(engine, run_id, add_to_register)` writes it —
+question and answer together, the same question sentence as before — inside the
+same `claim_review_finished` transaction, so the caller that loses the race
+writes nothing. `POST /runs/{id}/finish-review` and the MCP `finish_review` tool
+both carry the argument into that one core function; the endpoint refuses a call
+that omits it with the body to send (400), and the three existing refusals —
+unanswered decisions, not at review, finished a moment ago — are word for word
+what they were. The screen offers `Add this run's changes to the register` and
+`Discard this run's changes` under the same rule the old button followed, and
+filters the export decision out of the queue in one place so the count and the
+cards cannot disagree.
+
+**Test-first, and the baseline failures were recorded before any source
+changed.** On `963c3a7` the eight new Python cases failed —
+`tests/infrastructure/test_discarded_status_migration.py` (2),
+`tests/register/test_one_press_ends_the_review.py` (4) and
+`tests/interfaces/test_both_doors_end_the_review_alike.py` (2) — **8 failed**,
+every one a real assertion: `DID NOT RAISE`, `'done' != 'discarded'`,
+`['export', 'finding'] == ['finding']`, `409 == 400`, and four timeouts waiting
+for `done`/`discarded`. The new front-end file printed **4 failed, 2 passed**:
+the gate still rendered as a question, and neither ending button existed. The
+two that passed there are regression guards — the offering rule already refused
+to show an ending while a decision was unanswered, and the screen already
+printed the stored status verbatim.
+
+**Existing tests updated to the one-press contract — the deliberate change,
+listed so it can be checked.** The shared helper and every direct
+`finish-review` call gained `{"add_to_register": true}`; the approved-export
+test now presses once and reads the recorded decision back; the two
+replay-guard tests read the export decision after finishing rather than before,
+because it does not exist before; the pending-decision refusal, the MCP flow
+and two MCP tool tests were given a real finding to leave unanswered, since the
+gate is no longer a queue question; the rejected-export incremental test now
+presses discard; the two wording tests read the frozen question off the
+decision the press wrote. No test of the review contract — the refusals, the
+atomic claim, the replay guard — was weakened.
+
+**One change outside the file list, and why.** `app/register/read_export.py`'s
+refusal told a caller to approve the export decision and then finish the
+review, a flow that no longer exists; it now names the one call and the body
+that produces an export.
 
 ### The model writes the review question, and three prompts are rewritten (branch `wording-and-prompts`)
 
@@ -202,7 +261,7 @@ requirements document as `.md`.
 - [x] `.md` batch collection, exact quote location, extraction, matching.
 - [x] Possible-match review, atomic finish-review claim, commit, export.
 - [x] Six API endpoints and startup project seeding.
-- [x] `failed`, `no changes`, `export rejected` semantics.
+- [x] `failed`, `no changes`, `discarded` semantics.
 - [x] Configuration-vs-transient model failure classification.
 - [x] Already-read correction for failed, unrelated, and no-requirement docs.
 - [x] Ingest/Match node re-entry idempotency and merged-proposal marker.
@@ -566,9 +625,10 @@ merging and about `Written down?` still stands.
       proposed by this run?" to "Add this run's changes to the register?"
       (`app/graph/register_graph.py`) — no row count, so a rules-only run
       (zero proposed rows, examining the whole register under changed
-      rules) still asks the same question. The gate itself, `runs.status`'s
-      `export rejected`, and `runs.export_json`/`GET /runs/{id}/export` are
-      unchanged in behaviour.
+      rules) still asks the same question. (The gate itself became one press
+      and `export rejected` became `discarded` on the
+      `gate-becomes-one-button` branch; `runs.export_json` and
+      `GET /runs/{id}/export` are still unchanged.)
 - [x] **A real bug found and fixed outside the brief's scope, while wiring
       the register panel's polling:** `readRegisterFromServer` initially
       depended on the `projects` array directly. Since `GET /projects`
@@ -747,7 +807,8 @@ merging and about `Written down?` still stands.
 - [x] An answer is posted and then read back: no click reaches the screen, and
       a refused answer leaves the decision unanswered with the server's reason.
 - [x] Approve and Reject are offered only while the server reports the run at
-      review, and Finish review only once no decision is unanswered.
+      review, and the two buttons that end the review only once no decision is
+      unanswered.
 - [x] Polling at the interval in `ui/config/screen.json`; no websocket, no
       blocking spinner.
 - [x] `/ui` served by FastAPI from `ui/dist`, answering `503` with the build
@@ -887,6 +948,10 @@ working claim only after its own implementation and proof land.
    **Decided 2026-08-17: the downgrade stays and the gate is not widened.** The
    demo is driven in pairs, where the question never arises at all; the cost of
    the one-per-run order is written up under `## Known limitations`.
+   **Still open after 2026-08-18.** The gate is now one press
+   (`gate-becomes-one-button`), which changed when the decision is written and
+   not what it shows: the buttons carry no preview of what will change, and
+   whether they should is the question that remains here.
 2. **Development Compose mount is too broad for final proof.** `.:/workspace`
    is intentionally retained for iteration, exposes local `.env`, and lets
    local files override the image. Remove/narrow it and wipe stale dev DB
@@ -904,6 +969,14 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
+- **A run sitting at `needs review` across the one-press-gate upgrade is not
+  supported.** Such a run carries an export decision raised by the old code:
+  unanswered, the screen hides it while the server still counts it, so both
+  ending buttons answer 409 and the run holds its project's lock; answered, the
+  press writes a second export decision and `export_was_approved` reads one
+  matching row without ordering. Deliberately not built for — the development
+  database is emptied when the stack comes up fresh, so no such run exists here
+  (raised by review on the `gate-becomes-one-button` branch, 2026-08-18).
 - `Disputed` is reached only when the handover and the testing feedback that
   contradict each other are read in the **same batch**. `status_after` decides
   it from the delivery evidence this batch supplied, and nothing stores the
@@ -1024,8 +1097,8 @@ working claim only after its own implementation and proof land.
 - A project's register panel shows the empty line
   ("Nothing has been added to this register yet.") until that project has a
   run that has exported — a new project, a first run still working, or a
-  run whose export was rejected all read the same way, since none of them
-  has moved `row_count` off `null` yet.
+  discarded run all read the same way, since none of them has moved
+  `row_count` off `null` yet.
 - The screen is built by Node, which the application image does not carry, and
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.
@@ -1076,6 +1149,10 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
+| `docker compose -p brief3gate run --rm app pytest` | 2026-08-18, `gate-becomes-one-button` branch | **224 passed**, real PostgreSQL, no live key. The baseline at `963c3a7` printed 216; the eight new tests are the two migration tests, the four one-press tests and the two both-doors tests, all written and seen failing first |
+| `npm --prefix ui test` | 2026-08-18, `gate-becomes-one-button` branch | **57 passed, 33 files**, no live key. The baseline printed 53 across 32 files; the new file covers the gate never rendering as a question, the body each ending press sends, and a `discarded` run showing `discarded` |
+| Migration `20260817_0019` forward and backward on real data | 2026-08-18, `gate-becomes-one-button` branch | Seeded at `20260817_0018` with one run per status, each on its own project, including `export rejected`. Before the step, `pg_get_constraintdef` showed `ck_runs_status` naming `export rejected` and `pg_indexes` showed both partial unique indexes naming only `running`/`needs review` and `queued` — so no index needed rebuilding. The upgrade rewrote exactly that one run to `discarded` and recreated the constraint with the new value; inserting `export rejected` afterwards was refused by `ck_runs_status` and `discarded` was accepted; the downgrade restored both the rows and the old constraint; upgrading again reached the same shape |
+| Both presses driven by hand against the live stack | 2026-08-18, `gate-becomes-one-button` branch | Two throwaway projects under `sample-projects`, deleted after the run, with the scripted client and no key. Each run reached `needs review` carrying only its own finding — no export decision. Finishing with no body answered `400` naming the body to send; finishing with the finding unanswered answered `409` naming that decision. After approving it, `{"add_to_register": true}` answered `200 review finished`, the run reached `done`, the export held the one row with its approved finding, and the recorded export decision read `Add this run's changes to the register?` / `approved`. On the second project `{"add_to_register": false}` answered `200`, the run reached `discarded`, `exported` stayed false, `GET /runs/{id}/export` answered `409`, and `GET /projects` listed the two runs as `done` with 1 row and `discarded` with none |
 | `docker compose -p brief2wording run --rm app pytest` | 2026-08-17, `wording-and-prompts` branch | **214 passed**, real PostgreSQL, no live key. The baseline at `1a03ceb` printed 202; the twelve new tests are eight Match question refusals, two Examine question tests, the grouped-observation stacking test, and a re-run of the fixtures the required field touched |
 | `docker compose -p fgbrief2 run --rm app pytest` | 2026-08-17, `wording-and-prompts` branch, after the review repair | **216 passed**, real PostgreSQL, no live key. The two new tests are the blank-non-null-question refusals on both Match paths, written first and seen failing |
 | `npm --prefix ui test` | 2026-08-17, `wording-and-prompts` branch | **53 passed, 32 files**, no live key. The baseline printed 47 across 31 files; the new file covers the code-owned Approve/Reject block on all three kinds of card, and two cases were added to the Reported-tab file for the notice said once and the new empty state |

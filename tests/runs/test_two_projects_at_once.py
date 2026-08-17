@@ -152,7 +152,6 @@ def test_two_projects_running_at_once_never_appear_in_each_others_work(
 
     for at_review in (alpha_at_review, beta_at_review):
         assert sorted(decision["kind"] for decision in at_review["decisions"]) == [
-            "export",
             "finding",
         ]
     _assert_nothing_of_the_other_project(

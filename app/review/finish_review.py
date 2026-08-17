@@ -3,14 +3,23 @@ from __future__ import annotations
 from uuid import UUID
 
 from app.refusal import NotPossibleNow
-from app.review.review_queue import unanswered_decisions
+from app.review.review_queue import record_export_answer, unanswered_decisions
 from app.runs.run_lifecycle import REVIEW_FINISHED, RunEngine, resume_after_review
 from app.runs.run_records import claim_review_finished, require_run
 from app.runs.statuses import WAITING_FOR_REVIEW
 
 
-async def finish_review(engine: RunEngine, run_id: UUID) -> dict[str, str]:
-    """Take one run out of review once every gate it raised has been answered."""
+async def finish_review(
+    engine: RunEngine,
+    run_id: UUID,
+    add_to_register: bool,
+) -> dict[str, str]:
+    """End one run's review with the answer its one press carried.
+
+    `add_to_register` is that press: true adds this run's changes to the
+    register, false discards them. It has no default, because a caller that
+    did not say which one would leave the system to answer for the person.
+    """
     async with engine.pool.connection() as connection:
         run = await require_run(connection, run_id)
         if run["status"] != WAITING_FOR_REVIEW:
@@ -33,8 +42,14 @@ async def finish_review(engine: RunEngine, run_id: UUID) -> dict[str, str]:
                 "finish the review again."
             )
         # The run leaves review here, before anything is launched: an answer
-        # that nothing in the database records would be a false success.
-        claimed = await claim_review_finished(connection, run_id)
+        # that nothing in the database records would be a false success. The
+        # answer this press carried is written after the claim and in the same
+        # transaction, so the caller that loses the race writes no decision at
+        # all and the winner's decision is exactly as durable as the claim.
+        async with connection.transaction():
+            claimed = await claim_review_finished(connection, run_id)
+            if claimed is not None:
+                await record_export_answer(connection, run_id, add_to_register)
 
     if claimed is None:
         raise NotPossibleNow(

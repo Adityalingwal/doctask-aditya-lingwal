@@ -17,19 +17,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const ALLOWED_BUTTONS = ["show run", "approve", "reject", "finish review"];
+const ALLOWED_BUTTONS = [
+  "show run",
+  "approve",
+  "reject",
+  "add this run's changes to the register",
+  "discard this run's changes",
+];
 
+// The export gate is not among them: it is written by the ending press and is
+// never offered as a question, so a run at review shows only its own.
 const decisions = [
   decisionReply({ outcome: "approved" }),
   decisionReply({
     decision_id: "3d5f7b91-2222-4c33-9444-555566667777",
-    kind: "export",
-    question: "Add this run's changes to the register?",
+    kind: "observation match",
+    question:
+      "The 26 March scope no longer asks for supporting document upload. "
+      + "Record that against row 1?",
     outcome: "approved",
   }),
 ];
 
-test("a run at review offers approve, reject and finish review and no other action", async () => {
+test("a run at review offers approve, reject and the two endings and no other action", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([
@@ -44,7 +54,7 @@ test("a run at review offers approve, reject and finish review and no other acti
 
   render(<ReviewScreen runId={runId} />);
   await openSection(/decisions/i);
-  await screen.findByRole("button", { name: /finish review/i });
+  await screen.findByRole("button", { name: /add this run's changes to the register/i });
 
   // Scoped to the reading pane: the screen's own chrome — Add project,
   // collapse the runs column — offers buttons too, and this test is only

@@ -200,24 +200,15 @@ def test_a_second_run_proposal_reaches_the_register_only_after_the_export_gate(
             second_run = client.post(
                 "/runs", json={"project_id": project_id}
             ).json()["run_id"]
-            at_review = wait_for_run_status(client, second_run, "needs review")
+            wait_for_run_status(client, second_run, "needs review")
             # The proposal is waiting, and the register has not moved for it.
             while_waiting = stored_rows(database_url, project_id)
 
-            export_decision = next(
-                decision
-                for decision in at_review["decisions"]
-                if decision["kind"] == "export"
-            )
             client.post(
-                f"/runs/{second_run}/decisions",
-                json={
-                    "decision_id": export_decision["decision_id"],
-                    "outcome": "rejected",
-                },
+                f"/runs/{second_run}/finish-review",
+                json={"add_to_register": False},
             ).raise_for_status()
-            client.post(f"/runs/{second_run}/finish-review").raise_for_status()
-            wait_for_run_status(client, second_run, "export rejected")
+            wait_for_run_status(client, second_run, "discarded")
             after_rejection = stored_rows(database_url, project_id)
 
     assert while_waiting == after_first_run

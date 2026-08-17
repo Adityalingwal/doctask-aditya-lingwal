@@ -179,7 +179,10 @@ def _one_reviewed_run(
                 "outcome": "rejected" if rejected else "approved",
             },
         ).raise_for_status()
-    client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+    client.post(
+        f"/runs/{run_id}/finish-review",
+        json={"add_to_register": True},
+    ).raise_for_status()
     wait_for_run_status(client, run_id, "done")
     return RunOutcome(
         decisions=at_review["decisions"],

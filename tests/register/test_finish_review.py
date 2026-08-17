@@ -15,7 +15,12 @@ from sqlalchemy import create_engine, text
 from app.database import build_connection_pool
 from app.graph.register_graph import build_register_graph
 from app.model.scripted_client import build_scripted_client
-from app.review.review_queue import APPROVED, answer_decision, decisions_of_run
+from app.review.review_queue import (
+    APPROVED,
+    answer_decision,
+    decisions_of_run,
+    record_export_answer,
+)
 from app.runs.run_records import claim_review_finished, read_run
 from app.runs.statuses import DONE, RUNNING, WAITING_FOR_REVIEW
 from tests.runs.application import (
@@ -132,13 +137,14 @@ def test_a_decision_cannot_change_after_finish_review(tmp_path: Path) -> None:
         run_id,
     ):
         with application.client() as client:
-            export_decision = next(
-                decision
-                for decision in client.get(f"/runs/{run_id}").json()["decisions"]
-                if decision["kind"] == "export"
+            finished = client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
             )
-            finished = client.post(f"/runs/{run_id}/finish-review")
             wait_for_run_status(client, run_id, "done")
+            # Read after the press, because the press is what wrote it: the
+            # gate is never in the queue for anyone to answer beforehand.
+            export_decision = _export_decision(client, run_id)
             late_change = client.post(
                 f"/runs/{run_id}/decisions",
                 json={
@@ -172,13 +178,12 @@ def test_decision_refused_after_review_finished_even_if_status_regresses(
         run_id,
     ):
         with application.client() as client:
-            export_decision = next(
-                decision
-                for decision in client.get(f"/runs/{run_id}").json()["decisions"]
-                if decision["kind"] == "export"
+            finished = client.post(
+                f"/runs/{run_id}/finish-review",
+                json={"add_to_register": True},
             )
-            finished = client.post(f"/runs/{run_id}/finish-review")
             wait_for_run_status(client, run_id, "done")
+            export_decision = _export_decision(client, run_id)
 
             engine = create_engine(database_url)
             with engine.begin() as connection:
@@ -283,6 +288,9 @@ async def _drive_review_replay(
                     )
                 claimed = await claim_review_finished(connection, run_id)
                 assert claimed is not None
+                # What finish_review itself does inside that same claim: one
+                # press ends the review and writes the gate it carried.
+                await record_export_answer(connection, run_id, True)
 
             # What resume_unfinished_runs does for a run left at RUNNING with
             # an existing checkpoint: continue the same thread with no resume
@@ -295,6 +303,17 @@ async def _drive_review_replay(
             await pool.close()
 
 
+def _export_decision(client: Any, run_id: str) -> dict[str, Any]:
+    return next(
+        decision
+        for decision in client.get(f"/runs/{run_id}").json()["decisions"]
+        if decision["kind"] == "export"
+    )
+
+
 def _finish_review(base_url: str, run_id: str) -> int:
     with httpx.Client(base_url=base_url, timeout=30) as client:
-        return client.post(f"/runs/{run_id}/finish-review").status_code
+        return client.post(
+            f"/runs/{run_id}/finish-review",
+            json={"add_to_register": True},
+        ).status_code

@@ -268,7 +268,7 @@ To the right, one run's sections are read one at a time behind tabs:
 |---|---|
 | Stages | Every stage of the run — done, working, not needed, or pending — and the reason it ended early or failed, against the stage it failed at |
 | Skipped | Each file or quote this run skipped, with the reason recorded on the run |
-| Needs your decision | Every gate the run raised, its frozen question and its answer, what Approve and Reject will each do, plus the rules the run was judged against |
+| Needs your decision | Every question the run put to a person, its frozen wording and its answer, what Approve and Reject will each do, plus the rules the run was judged against, and the two buttons that end the review |
 | Reported, not followed | Every line in this run's documents that tried to give the system an instruction, with the file, the place and the document's own words |
 
 Opening the project's own **Register** entry (middle column) shows the same
@@ -288,8 +288,11 @@ beside the data it refused, not as that strip. Nothing shown comes from what
 was clicked: an answer is posted to `POST /runs/{id}/decisions` and the run is
 then read back, so a refused answer leaves the decision unanswered on screen
 with the server's own reason beside it. Approve and Reject appear only while
-the server reports the run at review, and **Finish review** only once no
-decision is unanswered — the server refuses both otherwise.
+the server reports the run at review, and the two buttons that end it —
+**Add this run's changes to the register** and **Discard this run's changes**
+— only once no decision is unanswered; the server refuses both otherwise. One
+press ends the review: it records the answer it carried and runs Commit, or
+ends the run `discarded` with the register untouched.
 
 The dev-only middleware under `ui/demo/`, served by `npm --prefix ui run dev`,
 **no longer works with this screen**: it answers the removed `GET /runs` and
@@ -320,12 +323,13 @@ the practical fix the endpoint would have given.
 | `start_run` | `project_id` |
 | `get_run_status` | `run_id` |
 | `submit_decision` | `run_id`, `decision_id`, `outcome` (`approved` or `rejected`) |
-| `finish_review` | `run_id` |
+| `finish_review` | `run_id`, `add_to_register` — yes adds this run's changes to the register, no discards them |
 | `get_export` | `run_id`, `export_format` (`json` or `markdown`) |
 
 A run is not one call here either: `start_run` returns a run id at once and
 `get_run_status` is polled until the run says it is done. Nothing commits or
-exports without the export decision being approved first.
+exports until `finish_review` is called with `add_to_register` true; called
+with false, the run ends `discarded` and the register is unchanged.
 
 Any MCP client that speaks streamable HTTP can point at that URL. With the
 official Python SDK:

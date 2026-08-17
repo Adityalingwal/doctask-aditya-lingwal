@@ -56,6 +56,14 @@ class SubmitDecision(BaseModel):
     outcome: Literal[APPROVED, REJECTED]
 
 
+class FinishReview(BaseModel):
+    # Optional here and required by core, on purpose: a caller who says
+    # neither must be refused in words that name what to send, and a field
+    # declared required would be answered by the framework's own validation
+    # error instead — a body this screen cannot read as a sentence.
+    add_to_register: bool | None = None
+
+
 def add_refusal_responses(application: FastAPI) -> None:
     """Answer each kind of core refusal with the status code that matches it."""
     for refused_kind, status_code in REFUSAL_STATUS_CODES:
@@ -119,8 +127,18 @@ async def submit_one_decision(
 
 
 @router.post("/runs/{run_id}/finish-review")
-async def finish_one_review(request: Request, run_id: UUID) -> dict[str, str]:
-    return await finish_review(_run_engine(request), run_id)
+async def finish_one_review(
+    request: Request,
+    run_id: UUID,
+    payload: FinishReview | None = None,
+) -> dict[str, str]:
+    if payload is None or payload.add_to_register is None:
+        raise UnusableRequest(
+            "this call did not say how to end the review — send "
+            '{"add_to_register": true} to add this run\'s changes to the '
+            'register, or {"add_to_register": false} to discard them.'
+        )
+    return await finish_review(_run_engine(request), run_id, payload.add_to_register)
 
 
 @router.get("/runs/{run_id}/export")

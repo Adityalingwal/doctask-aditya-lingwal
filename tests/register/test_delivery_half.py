@@ -162,7 +162,10 @@ def _run_once(
                     if reject_observation_matches:
                         _reject_every_observation_match(client, run_id)
                     approve_every_decision(client, run_id)
-                    client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+                    client.post(
+                        f"/runs/{run_id}/finish-review",
+                        json={"add_to_register": True},
+                    ).raise_for_status()
                     wait_for_run_status(client, run_id, "done")
                     export = client.get(f"/runs/{run_id}/export").json()
             finally:
@@ -604,7 +607,10 @@ def _one_run_through_review(client: Any, project_id: str) -> None:
     run_id = client.post("/runs", json={"project_id": project_id}).json()["run_id"]
     wait_for_run_status(client, run_id, "needs review")
     approve_every_decision(client, run_id)
-    client.post(f"/runs/{run_id}/finish-review").raise_for_status()
+    client.post(
+        f"/runs/{run_id}/finish-review",
+        json={"add_to_register": True},
+    ).raise_for_status()
     wait_for_run_status(client, run_id, "done")
 
 

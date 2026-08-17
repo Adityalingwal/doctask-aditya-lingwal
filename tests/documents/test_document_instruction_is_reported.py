@@ -151,7 +151,7 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
     # the instruction reached the Delivery Owner as no proposed action at all.
     assert refused_export.status_code == NOT_EXPORTED_YET
     assert at_review["exported"] is False
-    assert [decision["kind"] for decision in at_review["decisions"]] == ["export"]
+    assert at_review["decisions"] == []
     for decision in at_review["decisions"]:
         _assert_free_of_the_instruction(decision["question"])
 

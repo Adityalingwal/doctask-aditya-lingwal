@@ -10,13 +10,13 @@ from tests.runs.application import (
     write_script,
 )
 from tests.interfaces.mcp_client import call_tool
+from tests.examine.answers import examine_answer, one_finding
 from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
     extraction_answer,
     match_answer,
     match_marker,
-    no_findings_answer,
     write_meeting_note,
 )
 
@@ -40,7 +40,7 @@ def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> N
             script_path,
             {
                 match_marker(): match_answer(1),
-                examine_marker(): no_findings_answer(),
+                examine_marker(): examine_answer([one_finding()]),
                 extract_marker(SOURCE_FILE): extraction_answer(REQUIREMENT, quote),
             },
         )
@@ -67,21 +67,25 @@ def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> N
                     lambda: _status_of(base_url, run_id, WAITING_FOR_REVIEW),
                     "the run reports its status as needs review",
                 )
-                export_decision = next(
+                finding_decision = next(
                     decision
                     for decision in at_review["decisions"]
-                    if decision["kind"] == "export"
+                    if decision["kind"] == "finding"
                 )
                 answered = call_tool(
                     base_url,
                     "submit_decision",
                     {
                         "run_id": run_id,
-                        "decision_id": export_decision["decision_id"],
+                        "decision_id": finding_decision["decision_id"],
                         "outcome": "approved",
                     },
                 )
-                finished = call_tool(base_url, "finish_review", {"run_id": run_id})
+                finished = call_tool(
+                    base_url,
+                    "finish_review",
+                    {"run_id": run_id, "add_to_register": True},
+                )
                 committed = wait_until(
                     lambda: _status_of(base_url, run_id, DONE),
                     "the run reports it is done",
@@ -102,7 +106,7 @@ def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> N
     assert started.payload["status"] == "running"
     assert at_review["examine"]["rows_examined"] == 1
     assert answered.payload == {
-        "decision_id": export_decision["decision_id"],
+        "decision_id": finding_decision["decision_id"],
         "outcome": "approved",
     }
     assert finished.payload == {"run_id": run_id, "status": "review finished"}

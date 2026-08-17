@@ -34,8 +34,10 @@ export async function answerDecision(runId, decisionId, outcome) {
   });
 }
 
-export async function finishReview(runId) {
-  return await ask("POST", `/runs/${encodeURIComponent(runId)}/finish-review`);
+export async function finishReview(runId, addToRegister) {
+  return await ask("POST", `/runs/${encodeURIComponent(runId)}/finish-review`, {
+    add_to_register: addToRegister,
+  });
 }
 
 /**
