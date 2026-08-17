@@ -473,7 +473,8 @@ def build_register_graph(
         _log(
             logging.INFO,
             "review_finished",
-            f"Review finished with the export {'approved' if approved else 'rejected'}.",
+            "Review finished with this run's changes "
+            f"{'added to the register' if approved else 'discarded'}.",
             run_id,
         )
         return {"export_approved": approved}
@@ -521,8 +522,8 @@ def build_register_graph(
         _log(
             logging.INFO,
             "run_closed_without_export",
-            "The Delivery Owner rejected the export, so the run ended without "
-            "one and the register is unchanged.",
+            "The Delivery Owner discarded this run's changes, so the run "
+            "ended without an export and the register is unchanged.",
             run_id,
         )
         return {}

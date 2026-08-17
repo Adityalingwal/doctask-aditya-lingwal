@@ -65,7 +65,8 @@ async def propose_rows(
     """Write this batch's requirements as proposed rows, gating uncertain ones.
 
     Nothing here is settled: a proposed row becomes part of the register only
-    when Commit runs after the Delivery Owner has approved the export.
+    when Commit runs after the Delivery Owner has added this run's changes
+    to the register.
     """
     proposed_row_ids: list[UUID] = []
     gated_row_numbers: list[int] = []

@@ -96,7 +96,7 @@ async def propose_moves(
 
     Nothing is written to a row here. The register is the committed rows, and
     this run reaches them only through Commit, after the Delivery Owner has
-    approved the export.
+    added this run's changes to the register.
     """
     observations = await observations_of_batch(connection, run_id)
     if not observations:
