@@ -135,7 +135,7 @@ REGISTER_ROW_STATUSES = (
     "Not delivered",
     "Handed over",
     "Disputed",
-    "No evidence yet",
+    "Nothing said yet",
 )
 
 
@@ -258,7 +258,7 @@ def _insert_register_row(
     connection: Connection,
     project_id: UUID | None,
     run_id: UUID,
-    status: str = "No evidence yet",
+    status: str = "Nothing said yet",
     row_number: int = 1,
     on_the_seven_cell_shape: bool = False,
 ) -> UUID:
@@ -485,7 +485,7 @@ def test_audit_change_requires_one_existing_run(
                     "id": uuid4(),
                     "register_row_id": register_row_id,
                     "cell_name": "status",
-                    "old_value": "No evidence yet",
+                    "old_value": "Nothing said yet",
                     "new_value": "Done",
                     "run_id": audit_run_id,
                     "source_document_id": document_id,
@@ -639,6 +639,36 @@ def test_register_row_refuses_status_outside_the_locked_set(
                 invalid_project_id,
                 invalid_run_id,
                 status="Delivered",
+            )
+
+
+def test_register_row_takes_nothing_said_yet_and_refuses_the_name_it_replaced(
+    database_connection: Connection,
+) -> None:
+    """20260817_0018 renamed the value, so the old spelling is now outside the set.
+
+    A database left holding `No evidence yet` would show a status the register
+    no longer defines, which is why the rename rewrites the stored rows rather
+    than only widening the check.
+    """
+    accepting_project_id = _insert_project(database_connection)
+    accepting_run_id = _insert_run(database_connection, accepting_project_id)
+    _insert_register_row(
+        database_connection,
+        accepting_project_id,
+        accepting_run_id,
+        status="Nothing said yet",
+    )
+
+    refusing_project_id = _insert_project(database_connection)
+    refusing_run_id = _insert_run(database_connection, refusing_project_id)
+    with pytest.raises(IntegrityError):
+        with database_connection.begin_nested():
+            _insert_register_row(
+                database_connection,
+                refusing_project_id,
+                refusing_run_id,
+                status="No evidence yet",
             )
 
 

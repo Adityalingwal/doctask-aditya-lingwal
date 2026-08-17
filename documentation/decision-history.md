@@ -4057,3 +4057,42 @@ match on its way to a finding, which is the behaviour the gate exists to
 prevent. The code is also small — `place_in_document.py` is 39 lines — so
 citations are the most expensive thing here to give up and among the least
 rewarding to remove.
+
+## 2026-08-17 — the register status `No evidence yet` becomes `Nothing said yet`
+
+**Superseded — the status name `No evidence yet`.** Defined as "no document read
+so far says anything about whether this was delivered or tested. Every row
+starts here. It makes no claim." **Replaced by `Nothing said yet`**, the same
+meaning under a name that cannot be read as the sibling of its opposite. The two
+were routinely confused: `Nothing said yet` means the documents have been read,
+the requirement came from one of them, and none of them has said anything about
+this ask being built or tested, and it carries no citation; `Not delivered`
+means testing looked and reported the work is not there while no handover
+claimed it was, and it carries one. Every other value in the column says *who
+said what*, and the new name says it too.
+
+`Not delivered` is deliberately left alone. It was itself renamed from
+`Never happened` on 2026-08-16, and renaming it again would be churn.
+
+**Rejected on the way, recorded so they are not revived.** `Nothing reported
+yet` reads two ways — "no report was made" or "the report found nothing".
+`Not checked yet` implies the work exists and merely awaits testing, which is
+more than is known.
+
+Migration `20260817_0018` rewrites the stored rows and the check constraint,
+following the rename pattern of `20260816_0014` rather than the refusal pattern
+of `20260814_0011`: the new value means exactly what the old one meant, so there
+is nothing for a person to decide.
+
+## 2026-08-17 — `Blocker` leaves the locked vocabulary
+
+**Superseded — the vocabulary entry `- **Blocker** — work explicitly stopped by
+a missing answer or dependency.`** It named a domain concept the system no
+longer has anywhere: pull request #26 removed the `Blocked on` cell, the
+`Blocked` status and Extract's `blockers` list, so no cell, status, field or
+prompt carries it. Keeping a locked word for a thing that does not exist asks a
+reader to look for it. **Dropped**, with no replacement.
+
+The word survives only as a project-management term in `PROGRESS.md`'s
+`## Active blockers` heading, which is about this project's own work rather
+than the system's domain, and so is not the register's vocabulary.

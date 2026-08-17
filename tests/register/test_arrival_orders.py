@@ -105,6 +105,26 @@ class RunResult(NamedTuple):
     citations: dict[int, dict[str, list[tuple[str, str]]]]
 
 
+def test_a_row_nothing_has_spoken_about_starts_at_nothing_said_yet(
+    tmp_path: Path,
+) -> None:
+    """The starting status reports the reading, not the work.
+
+    A meeting note raised the ask and nothing read has said whether it was
+    built or tested, so the row claims nothing and cites nothing behind its
+    status.
+    """
+    (asked,) = drive_batches(
+        tmp_path,
+        "nothing-said-yet",
+        [[MEETING_NOTE]],
+        ONE_DOCUMENT_PER_RUN_SCRIPT,
+    )
+
+    assert asked.cells[1]["status"] == "Nothing said yet"
+    assert asked.citations[1].get("status", []) == []
+
+
 def test_testing_passing_moves_a_handed_over_row_to_done(tmp_path: Path) -> None:
     """The three states are distinct claims, not shades of one.
 
@@ -118,7 +138,7 @@ def test_testing_passing_moves_a_handed_over_row_to_done(tmp_path: Path) -> None
         ONE_DOCUMENT_PER_RUN_SCRIPT,
     )
 
-    assert asked.cells[1]["status"] == "No evidence yet"
+    assert asked.cells[1]["status"] == "Nothing said yet"
     assert handed_over.cells[1]["status"] == "Handed over"
     assert tested.cells[1]["status"] == "Done"
     assert tested.cells[1]["what_testing_found"] == TESTING_SUMMARY

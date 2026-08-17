@@ -91,6 +91,6 @@ def _cells_of_a_row_nobody_has_looked_at() -> tuple[str, ...]:
     """Whatever the cell list holds today; only the missing citation is the point."""
     written = {
         "what_was_asked": REQUIREMENT,
-        "status": "No evidence yet",
+        "status": "Nothing said yet",
     }
     return tuple(written.get(name, "Not known yet.") for name in CELL_NAMES)

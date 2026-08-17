@@ -15,7 +15,7 @@ CELL_NAMES = (
     STATUS,
 )
 
-STATUS_NO_EVIDENCE_YET = "No evidence yet"
+STATUS_NOTHING_SAID_YET = "Nothing said yet"
 STATUS_HANDED_OVER = "Handed over"
 STATUS_DONE = "Done"
 STATUS_PARTIAL = "Partial"

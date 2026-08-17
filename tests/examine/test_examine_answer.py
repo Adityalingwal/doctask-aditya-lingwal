@@ -46,7 +46,7 @@ def _examined(tmp_path: Path, answer: dict[str, Any]) -> list[dict[str, Any]]:
         {
             "id": uuid4(),
             "row_number": 1,
-            "cells": {"what_was_asked": REQUIREMENT, "status": "No evidence yet"},
+            "cells": {"what_was_asked": REQUIREMENT, "status": "Nothing said yet"},
             "cited_cells": frozenset({"what_was_asked"}),
         }
     ]
