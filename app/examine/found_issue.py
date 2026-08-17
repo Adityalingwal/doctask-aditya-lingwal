@@ -9,18 +9,14 @@ def finding_on_row(
     row: dict[str, Any],
     issue: str,
     evidence: str,
+    question: str,
 ) -> dict[str, Any]:
     """One finding, with the question a person is asked frozen into it.
 
-    The sentence is the record: months later an audit must show what the person
-    actually read when they answered, not a pointer to a rule file that may
-    have been edited since.
+    The sentence is Examine's own and is stored unchanged: months later an
+    audit must show what the person actually read when they answered, and a
+    sentence composed here would carry a rule code they have never seen.
     """
-    question = (
-        f"{rule_id} — {rule_text} Row #{row['row_number']} "
-        f"({row['cells']['what_was_asked']}): {issue} "
-        "Attach this finding to the row?"
-    )
     return {
         "rule_id": rule_id,
         "rule_text": rule_text,

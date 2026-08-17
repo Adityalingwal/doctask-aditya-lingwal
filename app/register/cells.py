@@ -15,6 +15,17 @@ CELL_NAMES = (
     STATUS,
 )
 
+# The stored column stays `in_writing`; only the heading a reader sees asks
+# the question in words a first-time reader does not have to decode. Both the
+# export and the review screen print cells, so the headings live with the
+# cells rather than with either surface.
+COLUMN_HEADINGS = {
+    WHAT_WAS_ASKED: "What was asked",
+    IN_WRITING: "Written down?",
+    WHAT_TESTING_FOUND: "What testing found",
+    STATUS: "Status",
+}
+
 STATUS_NOTHING_SAID_YET = "Nothing said yet"
 STATUS_HANDED_OVER = "Handed over"
 STATUS_DONE = "Done"

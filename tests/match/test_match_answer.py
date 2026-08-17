@@ -68,6 +68,7 @@ def _answered_by_the_model(
     requirements = [
         {
             "summary": f"requirement {index}",
+            "document_type": "meeting notes",
             "source_file": "meeting-note.md",
             "source_words": f"The client asked for requirement {index}.",
         }

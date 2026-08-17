@@ -49,7 +49,6 @@ EXPORT_WITH_A_RULE_CARRYING_A_SETTING = {
     "project": {"id": "p", "name": "Intake portal"},
     "run_id": "r",
     "exported_at": "2026-08-17T00:00:00+00:00",
-    "reported_instructions": [],
     "columns": list(CELL_NAMES),
     "rows": [],
     "examine": {

@@ -41,6 +41,9 @@ Two kinds of candidate exist, and a requirement may match either:
   requirement_index. Two documents read together often state one ask —
   a meeting note and the client's written requirements are the usual pair.
 
+Each requirement carries the kind of document it came from, as
+document_type — use that word, never a guess from the file name.
+
 Answer exactly one outcome per requirement, using its requirement_index:
 
 - "new row" — nothing above traces this requirement. Leave both
@@ -79,6 +82,32 @@ online." Requirement: "Add a way for clients to change their booking time
 without calling the clinic." These may be one ask in different words, or the
 second may also cover cancelling. Flag it rather than guessing either way.
 
+## The question a match against the register carries
+
+Write the question a person will read, in the `question` field,
+whenever your answer names a register row (row_number) — whether you
+are sure or not, because attaching to a row already in the register
+is always the person's decision — and whenever your outcome is
+"possible match". Name the kind of document each statement came
+from, and ask the one thing that matters — is this the same ask.
+Write plain sentences. Never describe what approving or rejecting
+will do — the person is shown that separately.
+
+Leave `question` null only for a "new row", and for a confident
+"existing row" match with an earlier requirement of this same batch
+(same_as_requirement_index) — that one merges without a question.
+
+Example, naming a register row:
+  "This ask was raised in meeting notes (meeting-notes-10-mar.md) —
+   row #2. It is now also written in the client requirements document
+   (client-requirements-v2.md). Is this the same ask?"
+
+Example, an uncertain match with an earlier requirement of this same
+batch — no row exists yet, so name no row number:
+  "This ask appears twice in this batch: raised in meeting notes
+   (meeting-notes-10-mar.md) and written in the client requirements
+   document (client-requirements-v2.md). Is this the same ask?"
+
 ## Answer every requirement exactly once
 
 You are given a list of requirement_index values. Answer for every one of
@@ -94,9 +123,9 @@ _OBSERVATION_INSTRUCTIONS = f"""You decide, for each observation found in this \
 batch of documents, which register row it is about.
 
 An observation is something a document says about work the client already \
-asked for: what testing found, what was handed over, or what is stopped. It \
-never states a new ask, so it never becomes a row of its own — it either \
-belongs to a row that already exists, or it belongs to none of them.
+asked for: what testing found, or what was handed over. It never states a new \
+ask, so it never becomes a row of its own — it either belongs to a row that \
+already exists, or it belongs to none of them.
 
 Answer one of three outcomes per observation:
 - "{NEW_ROW}" — no existing row is what this observation is about.
@@ -111,6 +140,26 @@ puts a false testing verdict on the register, so where there is real doubt \
 answer "{POSSIBLE_MATCH}" and a person will decide. An observation about work \
 no row traces is answered "{NEW_ROW}"; it is reported to a person rather than \
 forced onto the nearest row.
+
+## The question a match against the register carries
+
+Write the question a person will read, in the `question` field,
+whenever your answer names a register row (row_number) — whether you
+are sure or not, because attaching evidence to a row already in the
+register is always the person's decision. First say what kind of
+document said it and quote what it says, then ask whether it is
+about that row — named by its number and by what it asked for.
+
+Example:
+  "Testing feedback (testing-feedback-12-may.md) says: 'the reply
+   suggestion appears and can be edited'. Is this about row #1 —
+   an AI reply suggestion on every support ticket?"
+
+A handover summary reads the same way with its own first line —
+the observation's `kind` tells you which it is.
+
+Only a "new row" — no register row is what this observation is
+about — leaves `question` null.
 
 Answer for every observation you were sent, exactly once each, and reply with \
 nothing but the structured answer your schema defines."""
@@ -132,6 +181,14 @@ class MatchOutcome(BaseModel):
         description=(
             "The earlier requirement in this same batch stating the same ask, "
             "or null when no earlier requirement does."
+        ),
+    )
+    question: str | None = Field(
+        default=None,
+        description=(
+            "The whole sentence a person will read, whenever this answer "
+            "names a register row or its outcome is 'possible match'; null "
+            "otherwise."
         ),
     )
 
@@ -156,6 +213,13 @@ class ObservationOutcome(BaseModel):
         description=(
             "The register row this observation is about, or null when no row "
             "is."
+        ),
+    )
+    question: str | None = Field(
+        default=None,
+        description=(
+            "The whole sentence a person will read, whenever this answer "
+            "names a register row; null otherwise."
         ),
     )
 
@@ -233,9 +297,7 @@ def _refuse_an_incomplete_observation_answer(
         if index in answered:
             _refuse(f"Match answered twice for observation {index}")
         answered.add(index)
-        _refuse_an_unusable_observation_outcome(
-            outcome.outcome, outcome.row_number, index
-        )
+        _refuse_an_unusable_observation_outcome(outcome)
 
     if answered != set(range(asked_about)):
         _refuse(
@@ -280,6 +342,39 @@ def _refuse_an_unusable_requirement_outcome(
         )
     if same_as is not None:
         _refuse_an_unreachable_batch_candidate(index, same_as, asked_about)
+    _refuse_a_misplaced_requirement_question(outcome)
+
+
+def _refuse_a_misplaced_requirement_question(outcome: MatchOutcome) -> None:
+    """Refuse an answer whose question is missing, or written where none is put.
+
+    The register row the answer names decides this, not the word it used: a
+    confident match against a row already in the register is downgraded into a
+    possible match before its decision is raised, so both outcomes reach the
+    same card and both need the sentence a person will read.
+    """
+    index = outcome.requirement_index
+    asked = (outcome.question or "").strip()
+
+    if outcome.row_number is not None and not asked:
+        _refuse(
+            f"Match answered '{outcome.outcome}' for requirement {index} "
+            f"naming row #{outcome.row_number}, with no question in it — a "
+            "person is asked before this batch's evidence reaches a register "
+            "row, and there is no sentence to show them"
+        )
+    if outcome.outcome == POSSIBLE_MATCH and not asked:
+        _refuse(
+            f"Match answered '{POSSIBLE_MATCH}' for requirement {index} with "
+            "no question in it — a person is asked before two requirements "
+            "are treated as one ask, and there is no sentence to show them"
+        )
+    if outcome.row_number is None and outcome.outcome != POSSIBLE_MATCH and asked:
+        _refuse(
+            f"Match answered '{outcome.outcome}' for requirement {index} and "
+            "still wrote a question, when no register row is named and "
+            "nothing about it is put to a person"
+        )
 
 
 def _refuse_an_unreachable_batch_candidate(
@@ -304,20 +399,39 @@ def _refuse_an_unreachable_batch_candidate(
         )
 
 
-def _refuse_an_unusable_observation_outcome(
-    outcome: str,
-    row_number: int | None,
-    index: int,
-) -> None:
-    if outcome == NEW_ROW and row_number is not None:
+def _refuse_an_unusable_observation_outcome(outcome: ObservationOutcome) -> None:
+    """Refuse an observation answer that names no usable row, or no question.
+
+    Attaching this batch's evidence to a row already in the register is the
+    person's to decide however sure Match is, so a named row always carries
+    the sentence they will read.
+    """
+    index = outcome.observation_index
+    row_number = outcome.row_number
+    asked = (outcome.question or "").strip()
+
+    if outcome.outcome == NEW_ROW and row_number is not None:
         _refuse(
             f"Match answered '{NEW_ROW}' for observation {index} and still "
             f"named row #{row_number}"
         )
-    if outcome != NEW_ROW and row_number is None:
+    if outcome.outcome != NEW_ROW and row_number is None:
         _refuse(
-            f"Match answered '{outcome}' for observation {index} "
+            f"Match answered '{outcome.outcome}' for observation {index} "
             "without naming the register row it matched"
+        )
+    if row_number is not None and not asked:
+        _refuse(
+            f"Match answered '{outcome.outcome}' for observation {index} "
+            f"naming row #{row_number}, with no question in it — a person is "
+            "asked before this batch's evidence reaches a register row, and "
+            "there is no sentence to show them"
+        )
+    if row_number is None and asked:
+        _refuse(
+            f"Match answered '{outcome.outcome}' for observation {index} and "
+            "still wrote a question, when no register row is named and "
+            "nothing about it is put to a person"
         )
 
 
@@ -368,6 +482,7 @@ def _match_prompt(
         {
             "requirement_index": index,
             "summary": requirement["summary"],
+            "document_type": requirement["document_type"],
             "source_file": requirement["source_file"],
             "source_words": requirement["source_words"],
         }

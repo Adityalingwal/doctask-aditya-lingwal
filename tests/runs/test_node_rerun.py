@@ -116,6 +116,10 @@ async def _record_findings_twice() -> dict[str, Any]:
                         },
                         "No client requirements document states this in writing.",
                         f"Row #{row['row_number']} cites a meeting note only.",
+                        "Anything built must have a written requirement. Row "
+                        f"#{row['row_number']} — {row['what_was_asked']} — "
+                        "rests on a meeting note alone. Attach this finding "
+                        f"to row #{row['row_number']}?",
                     )
                 ]
                 await record_findings(connection, run_id, found)
