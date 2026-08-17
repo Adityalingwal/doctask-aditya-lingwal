@@ -4221,3 +4221,60 @@ run's changes` and the screen prints the stored status verbatim. The constant
 
 **Superseded — the register header's `exported <date>`.** It now reads `last
 updated <date>`; `exported_at` and everything behind it are unchanged.
+
+## 2026-08-18 — `skipped` becomes `not_used`, and every entry says which kind it is
+
+**Superseded — the word `skipped`, in all three places at once.** The column
+was `runs.skipped`, the field both doors answered with was `skipped`, and the
+run panel's second tab read `Skipped`. All three now read `not_used` /
+`Not used`, migration `20260818_0020`: a plain
+`ALTER TABLE runs RENAME COLUMN skipped TO not_used`, with the downgrade the
+exact reverse. The stored jsonb is not rewritten by the migration, and nothing
+needed backfilling — no constraint and no index names the column, read off a
+real database at `20260817_0019` with `pg_get_constraintdef` over
+`pg_constraint` and `pg_indexes` for `runs`.
+
+The reason: one flat list held three different weights of thing, and the name
+was wrong for the worst of them. "Already read, and unchanged since." happens
+on most second runs and means nothing went wrong. "This document is not related
+to this client or project." means a file was never read. "These words were not
+found in the file, so this requirement was dropped." means a requirement fell
+out of the register — and that file *was* read, so calling it skipped was the
+same fault as calling the commit gate an export.
+
+**Rejected alternative — rename only the tab, and leave the field and the
+column as `skipped`.** It was the smaller change, and it was refused: it would
+leave the screen and the two other doors using different words for one thing,
+which is the exact fault being fixed. Either all three change or none does.
+
+**Superseded — the three mismatched kind values.** `SKIPPED_FILE_KIND = "file"`
+(`app/ingest/collect_batch.py`), `SKIPPED_DOCUMENT_KIND = "document"`
+(`app/graph/register_graph.py`), `SKIPPED_OBSERVATION_KIND = "observation"`
+(`app/register/move_rows.py`), and — for a dropped quote — the kind of the
+quote itself (`"requirement"` / `"testing observation"` / `"delivery
+evidence"` / `"embedded instruction"`). Nothing in the application read any of
+them; they were four names for two facts. **Replaced by exactly three**, named
+once in `app/runs/not_used_kinds.py`: `already read`, `not read`, `dropped`.
+`SKIPPED_FILE_KIND` split into the first two, because its four call sites
+already knew which they were; `SKIPPED_DOCUMENT_KIND`'s four call sites are all
+`not read`; `SKIPPED_OBSERVATION_KIND` and every dropped quote became
+`dropped`.
+
+The one trap in that split: in `read_document.py` the dropped entry's `kind`
+key and its reason sentence were fed by one local variable. They are now two —
+the key says `dropped`, the sentence still names the quote's own kind, so it
+reads "so this requirement was dropped" and never "so this dropped was
+dropped". No reason sentence changed by a character.
+
+**New — the screen's label comes from the data, never from a guess.** The
+entry's `kind` is now read at runtime, which it never was before: the tab maps
+the three kinds to `Already read`, `Not read` and `Dropped`, and an entry whose
+kind it does not recognise renders with no label. No default label exists — a
+wrong label is worse than none, and the server may learn a kind before the
+screen does.
+
+Two pieces of screen text followed the tab rather than the reason sentences,
+which decision 5 of the brief did not protect: the count line now reads
+`N not used`, the empty state reads `Nothing in this run went unused.`, and the
+run's own `ended_early_reason` reads "Nothing was read — all N files were not
+used. See the Not used tab for why."

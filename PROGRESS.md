@@ -6,31 +6,35 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
-## Snapshot — 2026-08-18, branch `gate-becomes-one-button`
+## Snapshot — 2026-08-18, branch `skipped-becomes-not-used`
 
 Built and run rather than type-checked, committed and pushed; the branch is
 waiting for review and for Aditya's gates. No pull request is open.
 
-- **One press ends the review.** Entering Review raises no export decision;
-  once every other decision is answered the run is ended by `Add this run's
-  changes to the register` or `Discard this run's changes`, and that press
-  writes the decision it carried inside the same atomic claim. Both doors
-  take `add_to_register`, and a call that omits it is refused with the body
-  to send.
-- **The refused status is now `discarded`** (migration `20260817_0019`,
-  proven forward and backward by hand), and the register header reads
-  `last updated` rather than `exported`.
-- **Both suites green on this branch, no live key:** **224 Python passed**
-  (baseline 216) and **57 front-end passed across 33 files** (baseline 53
-  across 32).
-
+- **`skipped` is now `not_used` in all three places.** The column is
+  `runs.not_used` (migration `20260818_0020`, proven forward, backward and
+  forward again by hand with the stored jsonb byte-identical at every step),
+  the field both doors answer with is `not_used`, and the run panel's second
+  tab reads `Not used`.
+- **Every entry says which of three kinds it is** — `already read`,
+  `not read`, `dropped` — named once in `app/runs/not_used_kinds.py`,
+  replacing the four mismatched values that were there before. The screen maps
+  each kind to its label and shows no label at all for a kind it does not
+  recognise.
+- **No reason sentence changed by a character.** A dropped entry's `kind` says
+  `dropped` while its own sentence still names the quote's kind, so it reads
+  "so this requirement was dropped".
+- **Both suites green on this branch, no live key:** **227 Python passed**
+  (baseline 224) and **59 front-end passed across 34 files** (baseline 57
+  across 33).
 
 Details, including the recorded test-first baseline failures, are under
 `## Completed` and `## Verification evidence`.
 
-Everything before this branch — the four-cell row, `Handed over`, workflow
-order, rules living only in `config/rules.yaml`, two formats — is in
-`## Completed` under its own branch entry.
+Everything before this branch — the one-press review ending, `discarded`, the
+four-cell row, `Handed over`, workflow order, rules living only in
+`config/rules.yaml`, two formats — is in `## Completed` under its own branch
+entry.
 
 **Still not built, and it is a blocker for Aditya rather than a defect:**
 removing the downgrade of a confident match against a committed row. That
@@ -38,6 +42,52 @@ decision rests on the export gate showing such a merge, and the gate does not �
 see `## Active blockers`.
 
 ## Completed
+
+### `skipped` becomes `not_used`, and every entry says its kind (branch `skipped-becomes-not-used`)
+
+From `main` at `bb48974`, server first, screen second, tests last.
+
+- [x] **The never-do tests were written and run at the baseline before any
+      code changed**, and each failed there for the right reason:
+      `test_a_not_used_entry_names_whether_the_file_was_already_read_not_read_
+      or_dropped` with `KeyError: 'not_used'`;
+      `test_both_doors_call_the_list_not_used_and_report_the_same_entries` on
+      `assert "skipped" not in over_http`;
+      `test_the_rename_carries_every_entry_across_and_the_downgrade_carries_it_
+      back` with `UndefinedColumn: column "not_used" does not exist`; and both
+      front-end tests in `every_not_used_entry_wears_the_label_its_kind_names`
+      because no tab was named `Not used`.
+- [x] Migration `20260818_0020` renames `runs.skipped` to `runs.not_used` and
+      nothing else. Proven by hand on a real database: seeded at
+      `20260817_0019` with two entries, `md5(skipped::text)` recorded, upgraded
+      (column gone, `not_used` present, `NOT NULL` and `'[]'::jsonb` default
+      carried, same md5), downgraded (`skipped` back, same md5), upgraded again
+      (same md5). No constraint and no index names the column — read off the
+      real database with `pg_get_constraintdef` over `pg_constraint` and
+      `pg_indexes` for `runs`, not taken from the migration files.
+- [x] Four kind values became three, named once in
+      `app/runs/not_used_kinds.py`. `SKIPPED_FILE_KIND` split into
+      `ALREADY_READ_KIND` and `NOT_READ_KIND` at its four call sites;
+      `SKIPPED_DOCUMENT_KIND`'s four call sites in `register_graph.py` are all
+      `NOT_READ_KIND`; `SKIPPED_OBSERVATION_KIND` and every dropped quote
+      became `DROPPED_KIND`. No old constant survives.
+- [x] In `read_document.py` the entry's `kind` key and its reason sentence no
+      longer share one variable: the key takes `DROPPED_KIND` and the
+      sentence's `quote_kind` still names the quote's own kind.
+- [x] `append_skipped` became `append_not_used`, reading and writing
+      `runs.not_used`; its whole-entry reconciliation is unchanged, so a
+      replayed stage still records nothing twice.
+- [x] `ReviewScreen.jsx`'s second tab reads `Not used`, its count line reads
+      `N not used`, its empty state reads `Nothing in this run went unused.`,
+      and each card wears the label its `kind` names — from `NOT_USED_LABELS`
+      alone, with no default and no label for an unrecognised kind. The run's
+      `ended_early_reason` follows the tab's word too.
+- [x] Hand-driven, scripted model and no live key: a first run recorded one
+      `dropped` entry (reason still "…so this requirement was dropped.") and
+      one `not read` entry; the second run over the untouched folder recorded
+      two `already read` entries and ended with "Nothing was read — all 2 files
+      were not used. See the Not used tab for why." The payload carried
+      `not_used` and no `skipped` key.
 
 ### The gate becomes one button, and a refused run is discarded (branch `gate-becomes-one-button`)
 
@@ -732,7 +782,7 @@ merging and about `Written down?` still stands.
       comparison is over the whole entry, every key, so two different
       requirements dropped from one file — which share `kind`, `file` and
       `reason` and differ only in `summary` and `quote` — are never collapsed
-      into one (`test_a_replayed_stage_does_not_record_the_same_skipped_file_
+      into one (`test_a_replayed_stage_does_not_record_the_same_not_used_file_
       twice`, `test_two_different_dropped_quotes_from_one_file_are_both_kept`).
 - [x] `locate_quote` finds every occurrence of a quote and names every place
       it sits, in document order, instead of citing the first offset as if it
@@ -764,7 +814,7 @@ merging and about `Written down?` still stands.
       fabricated fixture (a font object overwritten with same-length garbage):
       pypdf still counts its one page, pdfplumber raises its own
       `PdfminerException`
-      (`test_a_pdf_that_cannot_be_parsed_is_skipped_and_the_batch_continues`).
+      (`test_a_pdf_that_cannot_be_parsed_is_not_read_and_the_batch_continues`).
 - [x] All five defects' tests were written and run at the baseline commit
       `38ec73b` before their fix; each failed there, except the ligature
       offset test, which is a regression guard and already passed. 148 Python
@@ -933,7 +983,7 @@ working claim only after its own implementation and proof land.
    the confident-match downgrade is not safe to build.** Locked as item 9 on
    2026-08-16 on the understanding that it does. Checked on 2026-08-17 by
    driving a real two-run merge: `GET /runs/{id}` at `needs review` answers
-   with `run_id`, `project_id`, `status`, `stage`, `skipped`,
+   with `run_id`, `project_id`, `status`, `stage`, `not_used`,
    `reported_instructions`, `ended_early_reason`, `failure_reason`,
    `decisions`, `examine`, `finished_stages` and `exported` — no proposed row,
    no cell, no citation. `build_export` does carry `rows[].cells` and
@@ -1054,7 +1104,7 @@ working claim only after its own implementation and proof land.
 - One Extract call may repeat in the answer-to-checkpoint kill window.
 - A run that fails is not restarted by itself, and nothing it read counts as
   read — the next run started on that project reads its documents again.
-- A document skipped rather than read (too long, encrypted, wrong format, a
+- A document not read rather than read (too long, encrypted, wrong format, a
   failed model call) is never written to `documents`, so it is not "already
   read" either; the next run attempts it again, paying again if a model call
   was what failed.

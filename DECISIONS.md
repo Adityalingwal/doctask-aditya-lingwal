@@ -122,7 +122,7 @@ export is always gated.
 | 7 | Deliverable-side finding | Yes |
 | 8 | Explicit blocker fact | No |
 | 9 | Suspicious instruction reported from a source | No |
-| 10 | File skipped with reason | No |
+| 10 | File not used, with reason | No |
 | 11 | Focused incremental-update proposal | Yes |
 | 12 | Final export/commit | Yes |
 | 13 | Honest `No findings` result | No |
@@ -288,21 +288,21 @@ its wording. Two documents of one type fall back to file name.
 
 `embedded_instructions` may appear on any type. A filled
 list where this table says otherwise is a wrong answer: that one document is
-skipped with a reason naming what came back, the batch continues, and nothing
+not read, with a reason naming what came back, the batch continues, and nothing
 is quietly emptied. Its buckets are:
 
 | Bucket | Action | Status |
 |---|---|---|
 | Primary: meeting notes, client requirements document, testing feedback | Full declared processing | Implemented |
 | Handover summary | Read, labelled and stored; never creates a register row on its own | Implemented; it reports `delivery_evidence`, which moves a row that already exists to `Handed over` |
-| Unrelated | Skip with reason | Implemented |
-| Outside the enum | Skip that document with `document type not recognised`; the run continues | Implemented |
+| Unrelated | Not read, with reason | Implemented |
+| Outside the enum | That document is not read, with `document type not recognised`; the run continues | Implemented |
 
 - **Must preserve:** Accepted-format list is config; actual readers are code;
   startup warns when config names a format with no reader.
 - **Damaged files are one document's problem:** a `.pdf` that no library can
-  open is skipped with its reason, like an encrypted or scanned one, instead of
-  ending the batch.
+  open is not read, with its reason, like an encrypted or scanned one, instead
+  of ending the batch.
 - **Limitation:** the page limit binds `.pdf` only, because only a paginated
   format can report a page count. Markdown, plain text and Word have none and
   none is invented for them; the shared gate in the dispatch limits any
@@ -488,7 +488,7 @@ match.
   the run, and it creates no row, changes no cell, and reaches the Delivery
   Owner as no proposed action. It **is** reported to a person on purpose — the
   run's own column, `GET /runs/{id}`, both exports and a fourth tab beside
-  Skipped — because information nobody can see is not a report. The export was
+  Not used — because information nobody can see is not a report. The export was
   still refused until a person approved it.
 - **What that proof does not cover:** the model is scripted, so this shows the
   pipeline has no path from document text to an approval, a commit or an
@@ -740,10 +740,29 @@ Seven slice-1 API endpoints:
 | `POST /projects` | Get-or-create the one project for a source folder (§ folder identity below); no name field |
 | `GET /projects` | Every project, each with its runs nested, in one answer (L1) — the folders `POST /projects` may point at ride along too |
 | `POST /runs` | Start/queue run by project id; return immediately |
-| `GET /runs/{id}` | Durable status, stage, skips, failure, decisions |
+| `GET /runs/{id}` | Durable status, stage, what the run did not use, failure, decisions |
 | `POST /runs/{id}/decisions` | Answer one decision UUID |
 | `POST /runs/{id}/finish-review` | Validate/claim review completion |
 | `GET /runs/{id}/export` | Approved JSON or Markdown export |
+
+**The list of what a run did not use is called `not_used`, in all three places
+(locked 2026-08-17, superseding `skipped` in the column, the payload field and
+the tab, and the three mismatched kind values `"file"`, `"document"` and
+`"observation"` — history: "`skipped` becomes `not_used`, and every entry says
+which kind it is").** The column is `runs.not_used` (migration
+`20260818_0020`, `ALTER TABLE ... RENAME COLUMN`, downgrade the exact
+reverse); the payload field both doors answer with is `not_used`; the tab
+reads `Not used`. Renaming only the tab was refused: it would leave the screen
+and the two other doors using different words for one thing, the fault being
+fixed. Every entry carries one of exactly three kinds, named once in
+`app/runs/not_used_kinds.py`: `already read` (an earlier finished run read
+this file, by name or content), `not read` (unrelated, too long, encrypted,
+wrong format, unknown document type, failed model call — every reason a file
+was never read), and `dropped` (a quote was not found in the file, so the
+requirement or observation it carried was dropped). A dropped entry keeps its
+`summary` and its reason sentence, and that sentence still names what was
+dropped — a requirement or a testing observation — so no field is added for
+it.
 
 `GET /runs` (every run, flat, newest first) is replaced by `GET /projects`,
 not kept beside it — two list shapes for the same data was exactly the drift
@@ -820,8 +839,14 @@ a symlink after creation is not re-checked.
 - Section tabs still carry `role="tab"`, not the button role, because
   choosing what to read is navigation — the only actions on a run stay
   Approve, Reject and the two buttons that end the review. **A run panel has three tabs — Stages,
-  Skipped, Decisions (locked 2026-08-16, superseding a fourth Register tab —
+  Not used, Decisions (locked 2026-08-16, superseding a fourth Register tab —
   see the register bullet below).**
+- **A not-used entry's label comes from its `kind` and from nothing else**
+  (locked 2026-08-17): the screen maps `already read`, `not read` and
+  `dropped` to `Already read`, `Not read` and `Dropped`, and an entry whose
+  kind it does not recognise renders with no label at all. There is no default
+  label anywhere — a wrong label is worse than none, and the server may learn
+  a kind before the screen does.
 - **The stage strip's own stage wins over "done" only while the run is active**
   (`running` or `needs review`). Extract writes its finished mark after
   every document, not just the last one, so a batch's own stage can read
@@ -1034,8 +1059,8 @@ a symlink after creation is not re-checked.
 - One Extract call can repeat in the answer-to-checkpoint kill window.
 - Rejected findings stay suppressed even if later evidence strengthens them.
 - Files arriving during Review wait; the project lock may be held a long time.
-- Oversized PDFs are skipped rather than chunked, and scanned PDFs are skipped
-  rather than read; chunking and OCR are not planned for V1.
+- Oversized PDFs are not read rather than chunked, and scanned PDFs are not
+  read rather than OCR'd; chunking and OCR are not planned for V1.
 - Timing and cost are dropped (D16). Nothing reports a duration, a token count
   or a cost; which stages a run finished is read from `runs.finished_stages`.
 - The review screen is built by Node, which the application image does not
