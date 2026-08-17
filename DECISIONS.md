@@ -147,6 +147,18 @@ export is always gated.
   approve seven at once quietly invites approving without reading.
 - **Review queue:** One `decisions` row stores the frozen question and answer.
   Its UUID is the API key; question and answer are never stored apart.
+- **A stored question is never rewritten or backfilled.** New wording applies
+  to newly raised questions only, so an audit shows what each person actually
+  read rather than what the system would say today.
+- **What Approve and Reject will do is code's to write, never the model's
+  (2026-08-17).** It is fixed text per kind, printed beside values the server
+  computed, and it is never part of the stored question. `decisions_of_run`
+  carries `row_number` — the register row the decision is about, whichever
+  kind it is — and `moved_cells`, read from the very `pending_moves` entry
+  Commit applies. A possible match shows only the shape (`one row` /
+  `a separate row`), because the new `Written down?` is worked out inside
+  Commit; an observation match shows the values, because they were stored
+  before the question was raised.
 - **A finding's answer lives only here.** `findings` carries the `decision_key`
   of its gated question and no `review_state` of its own, because an answer may
   change until `finish-review` and a second copy would have to be kept in step
@@ -374,6 +386,11 @@ cannot each assume a different one:
 
 - JSON is the record; Markdown is generated from it. Markdown is never edited
   as a second truth.
+- **The export carries no reported instruction (2026-08-17).** It is the
+  register the client is sent, and a note about our own reading of a document
+  is not part of it. `runs.reported_instructions` stays, and the run panel's
+  Reported tab still reads it from `GET /runs/{id}` — no migration was
+  involved. History: `documentation/decision-history.md`, 2026-08-17.
 - Commit atomically writes approved rows, cell-level audit, fingerprints, and
   export. A fingerprint covers the four cells only, excluding attachments.
 - Audit answers: which cell/attachment, before, after, run, and source.
@@ -509,6 +526,21 @@ match.
   incomplete answer fails the run; it never defaults to a guess.
 - The three outcome words are a `Literal` on both answer models, so the
   generated schema refuses an invented outcome before the reply is read.
+- **Match writes the question a person reads, and it is stored unchanged
+  (2026-08-17).** Both answer models carry a `question`, and the prompts carry
+  worked examples of the sentence. The rule follows the data, not the outcome
+  word: a question is required wherever an answer names a register row — for
+  either outcome, because a confident answer against a committed row is
+  downgraded into the same possible-match decision — and wherever the outcome
+  is `possible match`, which covers the within-batch pair that names no row.
+  It is refused everywhere else. `MatchSettlement` carries it from the graph to
+  `propose_rows`; nothing composes a sentence any more. A grouped
+  observation-match decision stores its observations' sentences in answer
+  order, joined by one blank line, character for character. History:
+  `documentation/decision-history.md`, 2026-08-17.
+- Each requirement reaches the Match prompt with its `document_type`, taken
+  from the stored extraction and never guessed from a file name, so the
+  question can name the kind of document each statement came from.
 - Approved merge moves citations to the candidate — following a merge already
   approved, since two proposals of one batch can settle in either order — and
   marks the proposal with `merged_into_register_row_id`; it is retained and
@@ -552,6 +584,12 @@ match.
 - One findings table, no rules table. Each finding freezes rule id and text,
   found issue, evidence, row, and human question; its answer is read from the
   decision it names (D02), not stored again.
+- **A finding is five fields, and Examine writes the question itself
+  (2026-08-17):** `rule_id`, `row_number`, `issue`, `evidence`, `question`. An
+  empty question is refused beside an empty issue or evidence. The sentence is
+  stored unchanged, states the rule in its own words, and carries no rule code
+  — the person reading it has never seen the rules file. History:
+  `documentation/decision-history.md`, 2026-08-17.
 - Configuration is frozen per run. A fingerprint covers parsed rules, ignoring
   comments/whitespace. Per-rule change detection is deliberately not built;
   a rules change re-examines the whole small register in one model call.
@@ -1020,6 +1058,8 @@ ideas from resurfacing without duplicating their full prose here.
 | Non-atomic finish-review read/launch | D02 atomic claim plus future replay marker |
 | Non-idempotent Ingest/Match re-entry | D12 unique/upsert Ingest + replace-own-uncommitted Match |
 | `audit.cell_name NOT NULL` for every event | D06 `event_kind` with a nullable cell name for attachments |
+| Code-composed review questions in `propose_rows`, `move_rows`, `found_issue` | D09/D10 the model writes the sentence and it is stored unchanged |
+| The export carrying `reported_instructions` | D05 the run payload and the Reported tab carry it; the export does not |
 
 For full chronology, alternatives, trade-offs, evidence language, and all 93
 original Decision Log rows, use `documentation/decision-history.md`.

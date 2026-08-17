@@ -4096,3 +4096,84 @@ reader to look for it. **Dropped**, with no replacement.
 The word survives only as a project-management term in `PROGRESS.md`'s
 `## Active blockers` heading, which is about this project's own work rather
 than the system's domain, and so is not the register's vocabulary.
+
+## 2026-08-17 — the model writes the question a person reads
+
+**Superseded — the three composed questions.** All three were built in code out
+of the parts a decision names:
+
+- `propose_rows._merge_question` — `"Merge '<summary>' (from <file>) into row
+  #<n> — <what was asked>?"`
+- `move_rows._attach_question` — `"Attach to row #<n> — <what was asked>:
+  <summary> (from <file>); <summary> (from <file>)?"`
+- `found_issue.finding_on_row` — `"<rule id> — <rule text> Row #<n> (<what was
+  asked>): <issue> Attach this finding to the row?"`
+
+**Replaced by the model's own sentence, stored unchanged.** A composed sentence
+can only restate the fields it was given, so it never says the one thing the
+person needs — what kind of document each statement came from, and why the two
+might be the same ask. The finding's version also opened with a rule code, in
+front of a reader who has never seen the rules file. Match's answer models and
+Examine's `FoundIssue` each gained a `question` field, and the prompts carry
+worked examples of the sentence.
+
+The rule follows the data, not the outcome word: a question is required
+wherever a Match answer names a register row, for either outcome, because a
+confident `existing row` against a committed row is downgraded into a
+possible-match decision upstream (`_outcome_the_candidate_allows`) and reaches
+the same card. It is also required for `possible match`, which covers the
+within-batch pair that names no row. It is refused everywhere else — a new row
+and a confident within-batch match put nothing to a person.
+
+**Rejected on the way.** Keeping a code-composed question for the downgraded
+confident match alone: it would put two sentence styles on one kind of card,
+which is the fault this change exists to remove. Telling Match to answer every
+register-row match `possible match` so the downgrade becomes unnecessary: that
+changes Match's locked answer space to avoid a validation rule.
+
+**A grouped observation decision stacks, never composes.** `move_rows` raises
+one decision per row over a list of observations, and each observation carries
+its own sentence. The stored question is those sentences in answer order,
+joined by one blank line, character for character; the screen renders them as
+paragraphs. Joining them into one sentence would be composing again.
+
+**Approve and Reject stay out of the stored question.** What each answer does
+is a fact the code knows and the model would be guessing at, so it is delivered
+as fixed text beside server-computed values — `row_number` and `moved_cells` on
+the decision payload — and rendered by `ui/src/Question.jsx`. A possible match
+shows only the shape (`one row` / `a separate row`) because the new
+`Written down?` is worked out inside Commit; an observation match shows the
+values, because they were computed and stored in `pending_moves` before the
+question was raised and that same stored move is what Commit applies.
+
+Stored questions are never rewritten or backfilled. New wording applies to
+newly raised questions only, so an audit still shows what each person actually
+read.
+
+## 2026-08-17 — a reported instruction leaves the export
+
+**Superseded — the export carrying `reported_instructions`**, as a JSON key and
+as the Markdown section `## Reported instructions` introduced by
+`"Reported, not followed. These documents were still read."` **Dropped from
+both shapes of the export.** The export is the register the client is sent, and
+a note about our own reading of a document is not part of that register. It
+still reaches a person through `GET /runs/{id}` and the run panel's Reported
+tab, which is where it was always read; `runs.reported_instructions` stays, so
+no migration is involved and nothing is lost.
+
+The same notice moved on the screen at the same time: it was repeated under
+every card and is now said once above them, in the plural the export used —
+the sentence sits above N cards from N documents, and the singular would read
+wrongly there. The empty state `"No document in this run addressed the
+system."` became `"No document in this run tried to give the system an
+instruction."`, which says what was looked for rather than naming a thing the
+documents do.
+
+## 2026-08-17 — an observation can no longer be about work that is stopped
+
+**Superseded — `_OBSERVATION_INSTRUCTIONS`' clause `"what testing found, what
+was handed over, or what is stopped."`** Pull request #26 removed the `Blocked
+on` cell, the `Blocked` status and Extract's `blockers` list, so an observation
+of that kind can no longer arrive and the clause described a route the system
+does not have. The sentence now ends `"what testing found, or what was handed
+over."`
