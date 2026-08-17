@@ -77,8 +77,12 @@ def test_two_projects_running_at_once_never_appear_in_each_others_work(
                     extract_marker(BETA_FILE): extraction_answer(BETA_ROW, beta_quote),
                     match_marker_for_batch_with(ALPHA_FILE): match_answer(1),
                     match_marker_for_batch_with(BETA_FILE): match_answer(1),
-                    examine_marker_for_register_holding(ALPHA_ROW): _one_finding(ALPHA_ISSUE),
-                    examine_marker_for_register_holding(BETA_ROW): _one_finding(BETA_ISSUE),
+                    examine_marker_for_register_holding(ALPHA_ROW): _one_finding(
+                        ALPHA_ISSUE, ALPHA_ROW
+                    ),
+                    examine_marker_for_register_holding(BETA_ROW): _one_finding(
+                        BETA_ISSUE, BETA_ROW
+                    ),
                 },
             )
 
@@ -170,7 +174,7 @@ def test_two_projects_running_at_once_never_appear_in_each_others_work(
         assert ALPHA_FILE not in json.dumps(event)
 
 
-def _one_finding(issue: str) -> dict[str, Any]:
+def _one_finding(issue: str, row: str) -> dict[str, Any]:
     return {
         "findings": [
             {
@@ -178,6 +182,14 @@ def _one_finding(issue: str) -> dict[str, Any]:
                 "row_number": FIRST_ROW,
                 "issue": issue,
                 "evidence": f"Row #{FIRST_ROW} cites a meeting note only.",
+                # Match and Examine both write their own question now, so the
+                # row's own words reach the stored sentence through the model
+                # rather than through anything the code composes.
+                "question": (
+                    "Anything built must have a written requirement. Row "
+                    f"#{FIRST_ROW} — {row} — rests on a meeting note alone. "
+                    f"Attach this finding to row #{FIRST_ROW}?"
+                ),
             }
         ]
     }

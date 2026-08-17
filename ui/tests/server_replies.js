@@ -36,9 +36,14 @@ export function decisionReply(overrides = {}) {
     // Only a "finding" decision carries these; every other kind sends null,
     // the same honesty rule the server itself follows.
     rule_text: null,
-    row_number: null,
     issue: null,
     evidence: null,
+    // The register row this decision is about — a finding's row, or the row a
+    // match would attach to. The export gate is about no single row and sends
+    // null. `moved_cells` is what an approved observation match would write,
+    // read back from the move Commit itself applies.
+    row_number: 2,
+    moved_cells: [],
     ...overrides,
   };
 }
@@ -50,10 +55,10 @@ export function findingDecisionReply(overrides = {}) {
     decision_id: "7a1b2c3d-4444-4e55-8666-777788889999",
     kind: "finding",
     question:
-      "R1 — Anything built must have a written requirement; a verbal mention "
-      + "is not enough. Row #4 (SMS reminders before an appointment): "
-      + "WhatsApp notification was asked for in the meeting but no written "
-      + "requirement names it. Attach this finding to the row?",
+      "Anything built must have a written requirement; a verbal mention is "
+      + "not enough. Row #4 — SMS reminders before an appointment — was "
+      + "asked for in the meeting, but no written requirement names it. "
+      + "Attach this finding to row #4?",
     rule_text:
       "Anything built must have a written requirement; a verbal mention is "
       + "not enough.",

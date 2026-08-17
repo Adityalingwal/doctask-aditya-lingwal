@@ -49,6 +49,21 @@ HANDOVER_DATE = "30 March 2026"
 
 NOTHING_SAID_YET = "Nothing said yet"
 
+# One sentence per observation, written by Match itself. Two observations
+# landing on one row raise one decision, so both sentences have to survive it.
+VAGUE_OBSERVATION_QUESTION = (
+    f"Testing feedback ({TESTING_FILE}) says: 'something the tester was vague "
+    f"about'. Is this about row #1 — {ASKED}?"
+)
+FIRST_OBSERVATION_QUESTION = (
+    f"Testing feedback ({TESTING_FILE}) says: 'the notification reaches the "
+    f"team'. Is this about row #1 — {ASKED}?"
+)
+SECOND_OBSERVATION_QUESTION = (
+    f"Testing feedback ({TESTING_FILE}) says: 'the notification names the "
+    f"visitor'. Is this about row #1 — {ASKED}?"
+)
+
 
 def _write_document(folder: Path, name: str, date: str, line: str) -> None:
     (folder / name).write_text(
@@ -410,6 +425,7 @@ def test_an_uncertain_observation_to_row_link_is_flagged_and_never_settled(
                     "observation_index": 0,
                     "outcome": "possible match",
                     "row_number": 1,
+                    "question": VAGUE_OBSERVATION_QUESTION,
                 }
             ]
         },
@@ -430,6 +446,7 @@ def test_an_uncertain_observation_to_row_link_is_flagged_and_never_settled(
         if decision["kind"] == "observation match"
     ]
     assert len(asked) == 1
+    assert asked[0]["question"] == VAGUE_OBSERVATION_QUESTION
     assert "row #1" in asked[0]["question"]
     assert finished.rows[1]["status"] == NOTHING_SAID_YET
     assert finished.rows[1]["what_testing_found"].startswith("Not known yet")
@@ -609,3 +626,59 @@ def _fingerprints(database_url: str, project_id: str) -> dict[int, str]:
     finally:
         engine.dispose()
     return {row["row_number"]: row["fingerprint"] for row in rows}
+
+
+def test_two_observations_on_one_row_stack_their_questions_verbatim(
+    tmp_path: Path,
+) -> None:
+    """One decision covers both observations, so it shows both sentences.
+
+    Joining them into a new sentence would put words in front of the person
+    that Match never wrote, and an audit could no longer show what was read.
+    """
+    finished = _run_once(
+        tmp_path,
+        [
+            (MEETING_NOTES_FILE, MEETING_DATE, ASKED_QUOTE),
+            (TESTING_FILE, TESTING_DATE, TESTING_QUOTE),
+        ],
+        {
+            extract_marker(MEETING_NOTES_FILE): _asks(
+                [(ASKED, ASKED_QUOTE)], "meeting notes"
+            ),
+            extract_marker(TESTING_FILE): _testing(
+                [
+                    ("the notification reaches the team", "Passed", TESTING_QUOTE),
+                    ("the notification names the visitor", "Passed", TESTING_QUOTE),
+                ]
+            ),
+            match_marker(): match_answer(1),
+            observation_marker(): {
+                "outcomes": [
+                    {
+                        "observation_index": 0,
+                        "outcome": "possible match",
+                        "row_number": 1,
+                        "question": FIRST_OBSERVATION_QUESTION,
+                    },
+                    {
+                        "observation_index": 1,
+                        "outcome": "possible match",
+                        "row_number": 1,
+                        "question": SECOND_OBSERVATION_QUESTION,
+                    },
+                ]
+            },
+            examine_marker(): no_findings_answer(),
+        },
+    )
+
+    asked = [
+        decision
+        for decision in finished.run["decisions"]
+        if decision["kind"] == "observation match"
+    ]
+    assert len(asked) == 1
+    assert asked[0]["question"] == (
+        f"{FIRST_OBSERVATION_QUESTION}\n\n{SECOND_OBSERVATION_QUESTION}"
+    )
