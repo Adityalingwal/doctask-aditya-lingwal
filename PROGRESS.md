@@ -40,6 +40,40 @@ the export gate showing such a merge, and the gate does not — see
 
 ## Completed
 
+### The status `No evidence yet` becomes `Nothing said yet` (branch `rename-status-nothing-said-yet`)
+
+One rename, from `main` at `13e1eca`. The value, the constant
+`STATUS_NO_EVIDENCE_YET` (now `STATUS_NOTHING_SAID_YET`), its two use sites, the
+literals in nine test files, `DECISIONS.md`, `README.md`, and a new migration
+`20260817_0018`. The dead `Blocker` entry left `DECISIONS.md`'s locked
+vocabulary in the same work. `documentation/decision-history.md` carries the
+superseded wording, the rejected alternatives and the reasoning for both.
+
+**Test-first, and the baseline failures were recorded before the rename.**
+`test_a_row_nothing_has_spoken_about_starts_at_nothing_said_yet` failed on
+`main` with `AssertionError: assert 'No evidence yet' == 'Nothing said yet'`,
+and `test_register_row_takes_nothing_said_yet_and_refuses_the_name_it_replaced`
+failed with a `CheckViolation` on `ck_register_rows_status` — both real
+assertions rather than import errors. After the rename: **202 Python tests
+passed** (200 before, plus these two) and **46 front-end tests across 30
+files**, unchanged because no front-end source was touched.
+
+**Migration evidence, driven by hand against a real database.**
+`pg_get_constraintdef` and `pg_indexes` were read at `20260817_0017` first:
+`ck_register_rows_status` is the only check constraint naming a status, and all
+four indexes on `register_rows`, `citations` and `audit` are plain btree with no
+predicate, so no index names the value. Two committed rows were seeded, one
+`No evidence yet` and one `Handed over`. `alembic upgrade head` left row 1
+reading `Nothing said yet` and row 2 untouched, with the constraint reading
+`Done, Partial, Not delivered, Handed over, Disputed, Nothing said yet`.
+`alembic downgrade 20260817_0017` restored both the old value and the old
+constraint exactly, and upgrading again reached the same state.
+
+**`tests/infrastructure/test_four_cell_migration.py` deliberately still spells
+`No evidence yet`.** Its `STATUSES_BEFORE` names the check constraint as it
+stood at `20260816_0016`, where the rows are seeded before the narrowing runs;
+rewriting it would make the seed violate that revision's own constraint.
+
 ### The register becomes four cells (branch `register-becomes-four-cells`)
 
 Eight parts, one commit each, from `main` at `85e97bb`. Baseline counts printed
@@ -798,7 +832,21 @@ working claim only after its own implementation and proof land.
    **Decided 2026-08-17: the downgrade stays and the gate is not widened.** The
    demo is driven in pairs, where the question never arises at all; the cost of
    the one-per-run order is written up under `## Known limitations`.
-2. **Development Compose mount is too broad for final proof.** `.:/workspace`
+2. **`ui/config/screen.json` still calls out `No evidence yet`, so the review
+   screen no longer marks the status it is meant to mark.** Found while
+   renaming the status and deliberately left alone: the brief for that work
+   counted its blast radius over `ui/src/` and `ui/tests/`, which hold none,
+   and bounded the change to leaving the front end untouched. The value is
+   live — `ui/src/Register.jsx` imports the file and `StatusChip` asks
+   `screenConfig.attention_statuses.includes(status)` — and no front-end test
+   covers the marking, so both suites pass while the chip silently renders
+   plainly. The fix is one line, `["Nothing said yet"]`, and it is Aditya's
+   call rather than the implementing agent's.
+3. **`TASK.md` still lists `blocker` among the locked vocabulary words** that it
+   says are fixed in `DECISIONS.md`'s `## Vocabulary`, which no longer defines
+   it. `TASK.md` is the permanent working contract and was outside that work's
+   bounds; deleting the one word from its list closes the contradiction.
+4. **Development Compose mount is too broad for final proof.** `.:/workspace`
    is intentionally retained for iteration, exposes local `.env`, and lets
    local files override the image. Remove/narrow it and wipe stale dev DB
    before final image-only/fresh-clone verification.

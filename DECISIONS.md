@@ -42,7 +42,6 @@ Do not turn our choices into brief claims.
 - **Batch** — the files one run picks up that this project has never read
   before, by name or content.
 - **Run** — one processing cycle for one project batch.
-- **Blocker** — work explicitly stopped by a missing answer or dependency.
 - **Delivery Owner** — the provider-side operator and human reviewer.
 
 Use these words in code, tests, logs, UI, and documentation. Do not substitute
@@ -298,25 +297,27 @@ Four cells, each with its own citations:
 The register answers one question — was this asked for, and did we deliver it
 — and every cell that does not serve it is weight the reader carries for
 nothing. The stored column behind `Written down?` is still `in_writing`.
-Migration `20260817_0017` dropped the other three cells; history:
+Migration `20260817_0017` dropped the other three cells, and `20260817_0018`
+renamed `No evidence yet` to `Nothing said yet` so it stops reading as the
+sibling of its opposite `Not delivered`; history:
 `documentation/decision-history.md`, 2026-08-17.
 
 Statuses are fixed in code and in a database check constraint:
 
 `Done` · `Partial` · `Not delivered` · `Handed over` · `Disputed` ·
-`No evidence yet`
+`Nothing said yet`
 
 Each means one thing, written down so a model, an implementer and a reader
 cannot each assume a different one:
 
-- **`No evidence yet`** — no document read so far says anything about whether
+- **`Nothing said yet`** — no document read so far says anything about whether
   this was delivered or tested. Every row starts here. It makes no claim.
 - **`Done`** — a document reports the asked-for work exists and behaves as
   asked.
 - **`Partial`** — a document reports the work exists but is wrong or
   incomplete.
 - **`Not delivered`** — a document states the asked-for work is not there. This
-  is a positive claim and needs a citation. It is not `No evidence yet`:
+  is a positive claim and needs a citation. It is not `Nothing said yet`:
   someone looked.
 - **`Handed over`** — a handover summary reports the work exists, and testing
   has not spoken yet.

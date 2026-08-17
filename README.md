@@ -54,11 +54,11 @@ A row has four cells, each carrying its own citations:
 
 `What was asked` · `Written down?` · `What testing found` · `Status`
 
-Every row starts at `No evidence yet` and moves only on what a document says.
+Every row starts at `Nothing said yet` and moves only on what a document says.
 
 | Status | What it means |
 |---|---|
-| `No evidence yet` | Nothing read so far says whether this was delivered or tested. It makes no claim. |
+| `Nothing said yet` | Nothing read so far says whether this was delivered or tested. It makes no claim. |
 | `Done` | A document reports the work exists and behaves as asked. |
 | `Partial` | A document reports the work exists but is wrong or incomplete. |
 | `Not delivered` | A document states the work is not there. A positive claim, and it needs a citation. |
