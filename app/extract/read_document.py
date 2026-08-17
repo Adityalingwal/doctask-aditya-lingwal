@@ -10,6 +10,7 @@ from app.ingest.locate_quote import locate_quote
 from app.ingest.place_in_document import place_finder_for
 from app.model.call_the_model import call_the_model
 from app.register.cells import shorten_quote
+from app.runs.not_used_kinds import DROPPED_KIND
 
 
 REQUIREMENT_KIND = "requirement"
@@ -48,18 +49,21 @@ def locate_extraction(
     dropped: list[dict[str, str]] = []
     place_of = place_finder_for(source_file)
 
-    def located(summary: str, quote: str, kind: str) -> dict[str, str] | None:
+    # The entry's own kind and the kind of quote that was dropped are two
+    # different things: every entry here is a dropped one, and the sentence
+    # still has to name what was dropped.
+    def located(summary: str, quote: str, quote_kind: str) -> dict[str, str] | None:
         location = locate_quote(document_text, quote, place_of)
         if location is None:
             dropped.append(
                 {
-                    "kind": kind,
+                    "kind": DROPPED_KIND,
                     "file": source_file,
                     "summary": summary,
                     "quote": quote,
                     "reason": (
                         "These words were not found in the file, so this "
-                        f"{kind} was dropped."
+                        f"{quote_kind} was dropped."
                     ),
                 }
             )

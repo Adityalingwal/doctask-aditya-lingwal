@@ -26,11 +26,11 @@ from app.review.review_queue import (
     OBSERVATION_MATCH_DECISION,
     raise_observation_match_decision,
 )
+from app.runs.not_used_kinds import DROPPED_KIND
 
 
 TESTING_OBSERVATION = "testing observation"
 DELIVERY_EVIDENCE = "delivery evidence"
-SKIPPED_OBSERVATION_KIND = "observation"
 # One decision covers a row's whole list of observations, so its sentences are
 # stacked as paragraphs rather than joined into one. Joining them would show
 # the person words Match never wrote.
@@ -269,7 +269,7 @@ def _unmatched_entries(observations: list[dict[str, Any]]) -> list[dict[str, str
 
 def _unmatched_entry(observation: dict[str, Any]) -> dict[str, str]:
     return {
-        "kind": SKIPPED_OBSERVATION_KIND,
+        "kind": DROPPED_KIND,
         "file": observation["source_file"],
         "summary": observation["summary"],
         "reason": (

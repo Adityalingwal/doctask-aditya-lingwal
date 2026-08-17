@@ -91,7 +91,7 @@ class ListTheDocumentTypeMayNotFill(ValueError):
         self.list_name = list_name
         super().__init__(
             f"a '{reported_type}' may not report {list_name}, and the model "
-            f"returned {list_name} on one — this document is skipped and the "
+            f"returned {list_name} on one — this document is not read and the "
             "rest of the batch continues; if it keeps happening, name a "
             "stronger model in config/model.yaml"
         )
@@ -162,7 +162,7 @@ def parse_extraction_answer(model_reply: str) -> ExtractionAnswer:
         answer = ExtractionAnswer.model_validate_json(json_object_in(model_reply))
     except ValidationError as invalid:
         # An invented type is a different problem from a malformed answer: one
-        # document is skipped for a reason a person can act on, rather than
+        # document is not read for a reason a person can act on, rather than
         # reported as the model failing to answer at all.
         for problem in invalid.errors():
             if problem["loc"] == ("document_type",):
