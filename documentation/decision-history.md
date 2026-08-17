@@ -4278,3 +4278,75 @@ which decision 5 of the brief did not protect: the count line now reads
 `N not used`, the empty state reads `Nothing in this run went unused.`, and the
 run's own `ended_early_reason` reads "Nothing was read — all N files were not
 used. See the Not used tab for why."
+
+## The register is read live, and the snapshot goes (2026-08-18)
+
+**Superseded — the run-level export snapshot.** From slice 1 until 2026-08-18,
+`commit_register` copied the whole register document into `runs.export_json`
+inside the commit transaction, and every display read that copy:
+`GET /runs/{id}/export` and the `get_export` MCP tool served the named run's
+snapshot (`409 — this run has exported nothing` before commit, the deliberate
+contract `test_finish_review_refused_while_a_decision_is_pending` and the
+one-press discard test locked), the screen's Register panel walked the
+project's runs for the newest one whose `row_count` was non-null and then
+fetched that run's export, and `list_projects` computed `row_count` as
+`jsonb_array_length(export_json -> 'rows')`. Only the newest snapshot was ever
+opened; every older one was written and never read again.
+
+**Why it existed.** The export was born in slice 1 as the gated artefact of
+one run — "approved JSON or Markdown export" — before the register moved to
+the project (2026-08-16). Once `register_rows` became one register per
+project accumulating across runs, the snapshot was a copy that could only be
+as fresh as the last commit, displayed as if it were the register.
+
+**The second job the column quietly held.** `collect_batch`'s already-read
+rule used `runs.export_json IS NOT NULL` as its committed-run test — not a
+display path, and the one reader whose breakage would have been silent:
+mishandled, documents start being re-read (paid for again) or stop being read
+at all, with no test failing on the word "export". This is why the review
+checklist ordered the swap first, on its own commit, proven on both corpora
+before anything else was touched.
+
+**Replaced by (item C2 of `handoff/review-wording-checklist.md`):**
+
+- `collect_batch` tests `runs.status = 'done'` — semantically exact, because
+  the commit node runs `commit_register` and `set_run_status(DONE)` inside one
+  `connection.transaction()` (`app/graph/register_graph.py`), so no run can
+  hold one fact without the other. Proven at the swap commit by the two
+  corpora second-run tests, the change-detection suite, and two new tests:
+  a `done` run's document is counted already read, a `discarded` run's is
+  read again.
+- One core function, `build_register_document`
+  (`app/register/export_register.py`), builds the register document from
+  `register_rows WHERE is_committed` at read time — rows, citations, approved
+  findings, and the examine section and `exported_at` of the newest `done`
+  run (`finished_at`, written in the commit transaction, is exactly the
+  moment the register last gained rows). `read_register`
+  (`app/register/read_export.py`) serves JSON and Markdown from it.
+- `GET /runs/{id}/export` became `GET /projects/{project_id}/register` and
+  `get_export` became `get_register` — repurposed, never added beside; both
+  counts stay at seven. A project with no committed rows answers `200` with
+  an empty register (`exported_at`/`examine` null), never a `409` and never
+  an error; the Markdown reads "Nothing has been added to this register
+  yet."
+- Commit stops writing the snapshot, and migration `20260818_0021` drops the
+  column. The downgrade re-adds it nullable and empty — the snapshots are
+  not reconstructible, and the migration says so rather than pretending.
+- The screen's Register panel makes one GET of the register route; the
+  walk-the-runs step died with `run.exported` reading and the `projectsRef`
+  machinery. `list_projects` reports `row_count` on each `done` run as the
+  project's committed-rows count, read live — an old `done` run now shows
+  the register's current size, accepted because the register is the
+  project's, not the run's.
+- `run_status`'s `exported` key stays (machinery both doors answer with) and
+  derives from `status == 'done'`.
+
+**Rejected alternative — keep writing the snapshot and only stop reading
+it.** Refused when the decision was locked (2026-08-17): a column that is
+written but never read keeps the trap alive for the next reader, who has no
+way to see that nothing opens it.
+
+**Standing limitation resolved.** "The register panel reads the empty line
+until that project has a run that has exported" described the snapshot path;
+the panel now shows committed rows the moment they exist, and the empty line
+exactly while the project holds none.

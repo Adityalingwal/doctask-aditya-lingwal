@@ -8,6 +8,19 @@ actions live in root `PROGRESS.md`; the exact byte-for-byte source is
 
 New completed entries are added newest-first below this header.
 
+## Resolved limitation — the register panel read empty until a run had exported (resolved 2026-08-18, branch `register-read-live`)
+
+The limitation read: a project's register panel shows the empty line
+("Nothing has been added to this register yet.") until that project has a run
+that has exported — a new project, a first run still working, or a discarded
+run all read the same way, since none of them has moved `row_count` off
+`null` yet. It described the snapshot path: the panel walked the project's
+runs for the newest exported one and fetched that run's copy. The register is
+now read live from `register_rows` through
+`GET /projects/{project_id}/register`, so the panel shows committed rows the
+moment they exist and the empty line exactly while the project holds none —
+the limitation is not narrowed but gone.
+
 **Superseded snapshots, moved here on 2026-08-17 when the register became
 four cells.** They describe the seven-cell row, four document formats and the
 two deliverable checks in code, none of which is current.

@@ -55,7 +55,7 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 | D02 | Human-gate scope, actions, and review queue | Implemented and verified for slice-1 gates | Human review |
 | D03 | Incremental batching, watched-folder trigger, and read-once rule | Implemented and verified | Input and incremental updates |
 | D04 | Formats, document types, and parsing | Mixed | Input and incremental updates |
-| D05 | Register cells, statuses, attachments, citations, and exports | Mixed | Register and evidence |
+| D05 | Register cells, statuses, attachments, citations, and the live register document | Mixed | Register and evidence |
 | D06 | Audit trail and unchanged-row proof | Implemented and verified | Register and evidence |
 | D07 | Pipeline stages and conditional routes | Mixed | Pipeline |
 | D08 | Extract, quote location, prompt injection | Mixed | Extract |
@@ -226,9 +226,12 @@ export is always gated.
 ### Read-once rule
 
 A document counts as already read, and is skipped, once an earlier run's
-extraction of it finished with nothing left to do — either that run exported a
-register, or the extraction showed the document was unrelated or held no
-requirement the register could take. That extraction must exist
+extraction of it finished with nothing left to do — either that run's changes
+were added to the register (its status is `done`, tested directly since
+2026-08-18: the commit node writes the rows and the status in one
+transaction, so neither fact exists without the other), or the extraction
+showed the document was unrelated or held no requirement the register could
+take. That extraction must exist
 (`extraction IS NOT NULL`), so a document whose model call failed has none and
 is read again next run regardless of what its name or content would otherwise
 match.
@@ -238,7 +241,7 @@ match.
   old content, so it is skipped by content. Only a document new on both counts
   reaches Extract. This is the incremental-update slice's one behavioural
   change from re-reading changed files: one operator, `AND` to `OR`,
-  parenthesised so it cannot swallow the extraction/export conditions around
+  parenthesised so it cannot swallow the extraction/status conditions around
   it.
 - **Why not re-read a changed document.** Re-reading a changed file to compare
   it against the register could change an already-committed row on evidence no
@@ -377,9 +380,9 @@ cannot each assume a different one:
   because it now proves something the cell denies. Every other cell holds one
   claim, so its old citation goes with its old value. This is what makes the
   one-document-per-run and paired arrival orders end with the same register.
-- **Implemented and verified:** proposal/commit/export shape and six statuses,
-  plus finding attachments, which appear on the row in the export and leave its
-  cells and fingerprint untouched. Both corpora were driven end to end in both
+- **Implemented and verified:** proposal/commit/register-document shape and
+  six statuses, plus finding attachments, which appear on the row in the
+  register document and leave its cells and fingerprint untouched. Both corpora were driven end to end in both
   arrival orders on 2026-08-17 and ended identically.
 
 ### Citations
@@ -396,20 +399,31 @@ cannot each assume a different one:
   Both locators are verified by `tests/documents/test_citation_places.py`; each
   citation may only name a place its own reader produced.
 
-### Export, audit, and fingerprints
+### The register document, audit, and fingerprints
 
+- **The register is read live, and the snapshot is gone (locked 2026-08-17,
+  built 2026-08-18).** Commit stops copying the register into
+  `runs.export_json`, and the column is dropped (migration `20260818_0021`;
+  the downgrade re-adds it empty — the snapshots are not reconstructible).
+  One core function builds the register document from `register_rows` at
+  read time; its `exported_at` and examine section come from the newest
+  `done` run, whose `finished_at` is exactly the moment the register last
+  gained rows. The snapshot's one non-display reader, `collect_batch`'s
+  already-read rule, tests `runs.status = 'done'` instead — semantically
+  exact, because the rows and the status commit in one transaction. History:
+  `documentation/decision-history.md`, 2026-08-18.
 - JSON is the record; Markdown is generated from it. Markdown is never edited
   as a second truth.
-- **The export carries no reported instruction (2026-08-17).** It is the
-  register the client is sent, and a note about our own reading of a document
-  is not part of it. `runs.reported_instructions` stays, and the run panel's
+- **The register carries no reported instruction (2026-08-17).** It is what
+  the client is sent, and a note about our own reading of a document is not
+  part of it. `runs.reported_instructions` stays, and the run panel's
   Reported tab still reads it from `GET /runs/{id}` — no migration was
   involved. History: `documentation/decision-history.md`, 2026-08-17.
-- Commit atomically writes approved rows, cell-level audit, fingerprints, and
-  export. A fingerprint covers the four cells only, excluding attachments.
+- Commit atomically writes approved rows, cell-level audit, and fingerprints.
+  A fingerprint covers the four cells only, excluding attachments.
 - Audit answers: which cell/attachment, before, after, run, and source.
-- **Implemented:** First-run cell audit and fingerprints are written; JSON and
-  Markdown exports are verified.
+- **Implemented:** First-run cell audit and fingerprints are written; the
+  register document is verified in both formats.
 - **Audit events:** `audit.event_kind` holds `cell change` or `attachment`
   (plain text plus a `CheckConstraint`, never a PostgreSQL `ENUM`).
   `cell_name` is nullable, and the cell-name check applies only to a cell
@@ -441,7 +455,7 @@ Full locked pipeline:
 | Match | Whole batch against current register | One per batch | Implemented and verified with scripted model |
 | Examine | Whole register against frozen rules | One per register | Implemented and verified with scripted model |
 | Review | Present gated proposals and wait | No | Implemented and verified for slice-1 proposals |
-| Commit | Atomic durable rows/audit/export | No | Implemented and verified |
+| Commit | Atomic durable rows/audit; the register is read live afterwards | No | Implemented and verified |
 
 All documents complete one stage before the batch moves on. Extract loops with
 a per-document checkpoint. All six stages are built: Match routes to Examine
@@ -487,9 +501,9 @@ match.
   stored as an embedded instruction placed in that document and logged against
   the run, and it creates no row, changes no cell, and reaches the Delivery
   Owner as no proposed action. It **is** reported to a person on purpose — the
-  run's own column, `GET /runs/{id}`, both exports and a fourth tab beside
-  Not used — because information nobody can see is not a report. The export was
-  still refused until a person approved it.
+  run's own column, `GET /runs/{id}` and a fourth tab beside
+  Not used — because information nobody can see is not a report. Nothing was
+  committed until a person approved it.
 - **What that proof does not cover:** the model is scripted, so this shows the
   pipeline has no path from document text to an approval, a commit or an
   export. Whether a live model spots the line is the detection the decision
@@ -520,8 +534,9 @@ match.
 - **Open, and deliberately not built (2026-08-17).** Removing that downgrade
   was locked on 2026-08-16 on the understanding that the export gate shows such
   a merge. It does not: `GET /runs/{id}` at `needs review` carries no proposed
-  row, no cell and no citation, and `GET /runs/{id}/export` answers `409` until
-  the run has committed. Removing only the downgrade would in fact change
+  row, no cell and no citation, and the register read shows committed rows
+  only, so nothing shows the merge before it commits. Removing only the
+  downgrade would in fact change
   nothing: `_the_candidate_to_ask_about` raises the possible-match decision
   whenever the answer names a committed row, whatever the outcome, so the
   question would still be asked and an approval would still merge. Making the
@@ -620,11 +635,11 @@ match.
   An unusable rules file fails the run at the boundary and is never read as
   "no rules".
 - **`examined_row_count` on `runs`** records how many rows Examine judged, so
-  the `No findings` result can state it after the run ends and whether or not
-  an export exists.
+  the `No findings` result can state it after the run ends, whether or not
+  the run committed.
 - **Status:** Implemented and verified with the scripted model. Findings reach
   the human gate through the existing review queue, a rejected finding stays in
-  the run record and never reaches the export, and Examine re-entry after a
+  the run record and never reaches the register, and Examine re-entry after a
   crash replaces this run's unanswered findings rather than adding to them.
   Proven by `tests/examine/test_examine_findings.py`,
   `tests/examine/test_examine_answer.py`,
@@ -702,7 +717,8 @@ false-success `done` run.
   verbatim, and `export rejected` renamed to `discarded` 2026-08-18
   (migration `20260817_0019`):** `queued`, `running`, `needs review`, `done`,
   `discarded`, `failed`, `no changes`.
-- `done` means export exists. `discarded` means the Delivery Owner pressed
+- `done` means the run's changes were added to the register. `discarded`
+  means the Delivery Owner pressed
   `Discard this run's changes`, so nothing was committed. `failed` is
   deliberate unrecoverable stop. Early exits use `no changes` plus a reason.
 - **Implemented and verified** — 2026-08-14, by
@@ -743,7 +759,7 @@ Seven slice-1 API endpoints:
 | `GET /runs/{id}` | Durable status, stage, what the run did not use, failure, decisions |
 | `POST /runs/{id}/decisions` | Answer one decision UUID |
 | `POST /runs/{id}/finish-review` | Validate/claim review completion |
-| `GET /runs/{id}/export` | Approved JSON or Markdown export |
+| `GET /projects/{project_id}/register` | The project's register, live from its committed rows, JSON or Markdown |
 
 **The list of what a run did not use is called `not_used`, in all three places
 (locked 2026-08-17, superseding `skipped` in the column, the payload field and
@@ -807,7 +823,7 @@ a symlink after creation is not re-checked.
 
 - MCP mirrors the seven endpoints 1:1: `create_project`, `list_projects`,
   `start_run`, `get_run_status`, `submit_decision`, `finish_review`,
-  `get_export`. `finish_review` takes `run_id` and `add_to_register` — yes
+  `get_register`. `finish_review` takes `run_id` and `add_to_register` — yes
   adds this run's changes to the register, no discards them — the same
   argument the endpoint takes, into the same core function.
 - It mounts in the FastAPI process at `/mcp` and calls the same core functions
@@ -880,8 +896,9 @@ a symlink after creation is not re-checked.
   and whatever a run's status is (L1, locked 2026-08-15).** There is no
   per-project runs endpoint and no conditional refresh: at this size the
   payload is a few kilobytes, and one unconditional read is easier to reason
-  about than conditional refresh rules. `GET /runs/{id}/export` is read only
-  once a run's status says it exported. Nothing a person clicked is shown: an
+  about than conditional refresh rules. `GET /projects/{id}/register` is
+  read on the same interval while the register panel is open. Nothing a
+  person clicked is shown: an
   answer is posted and the screen then re-reads the run it was recorded
   against.
 - The screen's own toolchain is Vite and Vitest with jsdom and
@@ -909,7 +926,8 @@ a symlink after creation is not re-checked.
   count, most recent run date, and its runs nested (id, run number within
   the project, status, `started_at` — `null` for a run that has not started,
   never substituted with `created_at` — stage, waiting-decision count,
-  finished stages, and row count once exported), plus the projects root and
+  finished stages, and — on a `done` run — the project's committed row
+  count, read live from `register_rows`), plus the projects root and
   the folders inside it, no cap on any list.
 - **The register is the project's own panel, not a run's tab (locked
   2026-08-16, superseding the register-tab limitation below — history: "A
@@ -917,17 +935,17 @@ a symlink after creation is not re-checked.
   `register_rows` was already keyed by `project_id` with `is_committed`, one
   register per project accumulating across runs; only the screen's
   presentation contradicted that. A `Register` entry sits above a project's
-  runs in the middle column (`ui/src/RunColumn.jsx`), showing the row count
-  of the newest run that has exported, if any; opening it shows the register
-  in the right panel — the same panel a run opens into, reusing
-  `ui/src/Register.jsx` unchanged — and clears whatever run was open, its
-  export and both refusals, the same clearing rule `openRun` already
-  follows. **No new endpoint and no new core function:** the panel is built
-  from the two calls that already exist — `GET /projects` (runs newest
-  first, each carrying `row_count`, non-null only once exported) to find the
-  most recent exported run, then `GET /runs/{id}/export` for its register.
-  Before any run has exported, the panel reads exactly "Nothing has been
-  added to this register yet." — never an empty table.
+  runs in the middle column (`ui/src/RunColumn.jsx`), showing the project's
+  committed row count once any run has committed; opening it shows the
+  register in the right panel — the same panel a run opens into, reusing
+  `ui/src/Register.jsx` unchanged — and clears whatever run was open and
+  both refusals, the same clearing rule `openRun` already follows. **The
+  panel reads the register route directly (2026-08-18, superseding the
+  walk over the project's runs and the run-level export read):** one GET of
+  `GET /projects/{id}/register`, no run in between. While the project holds
+  no committed row the server answers the register with no rows and the
+  panel reads exactly "Nothing has been added to this register yet." —
+  never an empty table and never an error.
 - Limitation: the tools inherit the HTTP surface's lack of authentication, and
   the SDK's own host check answers `421` to a request whose `Host` is neither
   `localhost` nor `127.0.0.1`, so a client on another machine needs transport
@@ -1049,8 +1067,8 @@ a symlink after creation is not re-checked.
 - Register-size and short-document assumptions remain unmeasured on full demo
   and second-run corpora.
 - The page limit binds `.pdf` only; no other declared format reports pages.
-- A handover summary that lists requirements, in a run that never exports, is
-  read again by the next run.
+- A handover summary that lists requirements, in a run that never ends
+  `done`, is read again by the next run.
 - Rules about elapsed time cannot be judged: the register keeps no document
   dates.
 - Work stopped by something outside the provider's control is reported through
@@ -1101,7 +1119,8 @@ ideas from resurfacing without duplicating their full prose here.
 | Non-idempotent Ingest/Match re-entry | D12 unique/upsert Ingest + replace-own-uncommitted Match |
 | `audit.cell_name NOT NULL` for every event | D06 `event_kind` with a nullable cell name for attachments |
 | Code-composed review questions in `propose_rows`, `move_rows`, `found_issue` | D09/D10 the model writes the sentence and it is stored unchanged |
-| The export carrying `reported_instructions` | D05 the run payload and the Reported tab carry it; the export does not |
+| The export carrying `reported_instructions` | D05 the run payload and the Reported tab carry it; the register does not |
+| Run-level export snapshot (`runs.export_json`, `GET /runs/{id}/export`, `get_export`, the 409-before-commit contract) | D05/D14/D15 the register is read live from `register_rows` through `GET /projects/{project_id}/register` and `get_register` |
 
 For full chronology, alternatives, trade-offs, evidence language, and all 93
 original Decision Log rows, use `documentation/decision-history.md`.
