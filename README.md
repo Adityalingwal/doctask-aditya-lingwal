@@ -36,9 +36,9 @@ slice, the incremental update slice, and the review screen are implemented:
   — the meeting note that raised it and the requirements document that wrote it
   down — and that row says the ask is in writing. Where the match is uncertain,
   two rows are proposed and the reviewer is asked which is right.
-- A line inside a document addressed to the system is reported on the run, in
-  both exports and on the screen, and never followed — and that document is
-  still read.
+- A line inside a document addressed to the system is reported on the run and
+  on the screen, and never followed — and that document is still read. It is
+  deliberately not part of the export, which is the register the client is sent.
 - Examine judges the whole register against the rules the run froze and raises
   a finding as a question, never as an edit.
 - Startup resumes a run killed mid-flight from its durable checkpoint.
@@ -268,7 +268,8 @@ To the right, one run's sections are read one at a time behind tabs:
 |---|---|
 | Stages | Every stage of the run — done, working, not needed, or pending — and the reason it ended early or failed, against the stage it failed at |
 | Skipped | Each file or quote this run skipped, with the reason recorded on the run |
-| Needs your decision | Every gate the run raised, its frozen question and its answer, plus the rules the run was judged against |
+| Needs your decision | Every gate the run raised, its frozen question and its answer, what Approve and Reject will each do, plus the rules the run was judged against |
+| Reported, not followed | Every line in this run's documents that tried to give the system an instruction, with the file, the place and the document's own words |
 
 Opening the project's own **Register** entry (middle column) shows the same
 right-hand panel, with the project's whole committed register — its cells,
@@ -394,9 +395,6 @@ the next run and never to one already under way or already finished. Point
   the MCP tools can read which rules ran but cannot add or change one.
 - A handover summary that lists requirements, in a run that never exports, is
   read again by the next run.
-- Text in a document that addresses the system is reported and never acted on,
-  but the only place that report reaches a person is the run's log line: it is
-  in neither the run status nor the export.
 - Run events below `WARNING` are dropped as the application is shipped, because
   uvicorn's logging configuration gives the run logger no handler; warnings and
   errors still reach the container's output.

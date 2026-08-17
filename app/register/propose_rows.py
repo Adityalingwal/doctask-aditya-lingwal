@@ -32,12 +32,15 @@ class MatchSettlement(NamedTuple):
 
     Both candidates are carried because a requirement matches either a register
     row that already exists or an earlier requirement of this same batch, and
-    the two are settled in different ways.
+    the two are settled in different ways. The question is Match's own sentence
+    and travels with the settlement: this is the only way it reaches the
+    decision, and a decision must show the person the words Match wrote.
     """
 
     outcome: str
     row_number: int | None
     same_as_requirement_index: int | None
+    question: str | None
 
 
 async def committed_rows(
@@ -104,9 +107,10 @@ async def propose_rows(
             }
             next_row_number += 1
 
-        for index, requirement in enumerate(requirements):
+        for index in range(len(requirements)):
+            settled = outcome_by_requirement[index]
             candidate = _the_candidate_to_ask_about(
-                outcome_by_requirement[index],
+                settled,
                 candidate_by_number,
                 row_by_requirement,
                 stating_requirement,
@@ -117,7 +121,7 @@ async def propose_rows(
             await raise_possible_match_decision(
                 connection,
                 run_id,
-                _merge_question(requirement, candidate),
+                settled.question,
                 proposed["id"],
                 candidate["id"],
             )
@@ -199,20 +203,6 @@ async def _clear_what_this_run_proposed_before(
         "DELETE FROM register_rows WHERE proposed_by_run_id = %s "
         "AND NOT is_committed",
         (run_id,),
-    )
-
-
-def _merge_question(
-    requirement: dict[str, Any],
-    candidate: dict[str, Any],
-) -> str:
-    # The sentence is the record: months later an audit must show what the
-    # person actually read when they answered, not a pointer to a row that may
-    # have moved on since.
-    return (
-        f"Merge '{requirement['summary']}' "
-        f"(from {requirement['source_file']}) into row "
-        f"#{candidate['row_number']} — {candidate['what_was_asked']}?"
     )
 
 

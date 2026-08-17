@@ -5,6 +5,8 @@ from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection
 
+from app.register.cells import COLUMN_HEADINGS
+
 
 POSSIBLE_MATCH_DECISION = "possible match"
 OBSERVATION_MATCH_DECISION = "observation match"
@@ -100,27 +102,63 @@ async def decisions_of_run(
     connection: AsyncConnection,
     run_id: UUID,
 ) -> list[dict[str, Any]]:
-    """Every decision this run raised, a finding's own rule/row/evidence included.
+    """Every decision this run raised, with the row and the change it is about.
 
     The screen shows a finding as three labelled parts and never a rule code
     (screen 4), which the flat `question` sentence alone cannot carry — so a
     finding decision is joined to its row in `findings` for `rule_text`,
-    `issue` and `evidence`, and to `register_rows` for the row number the
-    finding is against. Every other kind of decision carries these as `null`.
+    `issue` and `evidence`. `row_number` is the register row the decision is
+    about, whichever kind it is: a finding's own row, or the row a match would
+    attach to. The export gate is about no single row and carries null.
     """
     result = await connection.execute(
         "SELECT decisions.id, decisions.kind, decisions.question, "
         "decisions.proposed_register_row_id, "
         "decisions.candidate_register_row_id, decisions.outcome, "
         "decisions.decided_at, findings.rule_text, findings.issue, "
-        "findings.evidence, register_rows.row_number AS finding_row_number "
+        "findings.evidence, COALESCE(finding_rows.row_number, "
+        "candidate_rows.row_number) AS row_number "
         "FROM decisions "
         "LEFT JOIN findings ON findings.decision_key = decisions.id "
-        "LEFT JOIN register_rows ON register_rows.id = findings.register_row_id "
+        "LEFT JOIN register_rows AS finding_rows "
+        "ON finding_rows.id = findings.register_row_id "
+        "LEFT JOIN register_rows AS candidate_rows "
+        "ON candidate_rows.id = decisions.candidate_register_row_id "
         "WHERE decisions.run_id = %s ORDER BY decisions.kind, decisions.id",
         (run_id,),
     )
-    return list(await result.fetchall())
+    moves = await _pending_moves_of_run(connection, run_id)
+    return [
+        {**decision, "moved_cells": _cells_this_decision_would_write(moves, decision["id"])}
+        for decision in await result.fetchall()
+    ]
+
+
+async def _pending_moves_of_run(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> list[dict[str, Any]]:
+    result = await connection.execute(
+        "SELECT pending_moves FROM runs WHERE id = %s", (run_id,)
+    )
+    stored = await result.fetchone()
+    return stored["pending_moves"] if stored else []
+
+
+def _cells_this_decision_would_write(
+    moves: list[dict[str, Any]],
+    decision_id: UUID,
+) -> list[dict[str, str]]:
+    """What approving this decision writes, read from the move Commit applies.
+
+    Printed from the stored move rather than worked out a second time, so the
+    line a person reads and the cell that actually changes cannot disagree.
+    """
+    return [
+        {"cell": COLUMN_HEADINGS[move["cell"]], "value": move["value"]}
+        for move in moves
+        if move["decision_id"] == str(decision_id)
+    ]
 
 
 async def unanswered_decisions(

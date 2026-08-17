@@ -1,4 +1,6 @@
 const FINDING_KIND = "finding";
+const POSSIBLE_MATCH_KIND = "possible match";
+const OBSERVATION_MATCH_KIND = "observation match";
 
 // One component for every gate. The kind and the answer are read off the
 // decision the server froze, so a possible match, a conflict, a rule finding
@@ -33,10 +35,10 @@ export default function Question({ decision, reviewing, onAnswer, answering }) {
       {decision.kind === FINDING_KIND ? (
         <FindingBody decision={decision} />
       ) : (
-        <p className="m-0 max-w-prose px-5 py-5 text-[17px] leading-relaxed">
-          {decision.question}
-        </p>
+        <StoredQuestion question={decision.question} />
       )}
+
+      <WhatTheAnswersDo decision={decision} />
 
       {reviewing && (
         // An answer may change until finish-review (D02), so a decision the
@@ -57,6 +59,77 @@ export default function Question({ decision, reviewing, onAnswer, answering }) {
       )}
     </li>
   );
+}
+
+// One decision can cover several observations, and each of them carries its
+// own sentence. They are stacked as they were written, so each becomes its own
+// paragraph here — nothing joins them into a sentence nobody wrote.
+function StoredQuestion({ question }) {
+  return (
+    <div className="px-5 py-5">
+      {question.split("\n\n").map((paragraph, place) => (
+        <p
+          key={place}
+          className={`m-0 max-w-prose text-[17px] leading-relaxed ${
+            place === 0 ? "" : "mt-4"
+          }`}
+        >
+          {paragraph}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// What Approve and Reject will do is a fact the server knows, so it is fixed
+// text beside values the server computed — never part of the stored question,
+// which is frozen the moment it is raised and must not describe the buttons.
+function WhatTheAnswersDo({ decision }) {
+  const answers = whatEachAnswerDoes(decision);
+  if (answers === null) {
+    return null;
+  }
+  return (
+    <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-3 border-t border-line px-5 py-4 text-[15px]">
+      <dt className="eyebrow whitespace-nowrap">Approve</dt>
+      <dd className="m-0 max-w-prose">{answers.approve}</dd>
+      <dt className="eyebrow whitespace-nowrap">Reject</dt>
+      <dd className="m-0 max-w-prose">{answers.reject}</dd>
+    </dl>
+  );
+}
+
+// A possible match shows only the shape, because the new `Written down?` is
+// worked out inside Commit and not when the question is raised. An observation
+// match shows the values, because they were computed and stored before the
+// question was raised and that same stored move is what Commit applies.
+function whatEachAnswerDoes(decision) {
+  if (decision.kind === POSSIBLE_MATCH_KIND) {
+    return { approve: "one row", reject: "a separate row" };
+  }
+  if (decision.kind === OBSERVATION_MATCH_KIND) {
+    return {
+      approve: (
+        <>
+          row #{decision.row_number} records:
+          <ul className="m-0 mt-2 list-none p-0">
+            {decision.moved_cells.map((moved) => (
+              <li key={moved.cell}>{`${moved.cell}: ${moved.value}`}</li>
+            ))}
+          </ul>
+        </>
+      ),
+      reject: "nothing changes on the register",
+    };
+  }
+  if (decision.kind === FINDING_KIND) {
+    return {
+      approve: `the finding is attached to row #${decision.row_number} and appears in the register`,
+      reject:
+        "the finding stays in this run's record and never reaches the register",
+    };
+  }
+  return null;
 }
 
 // A finding in three labelled parts, and never a rule code: the rule's own

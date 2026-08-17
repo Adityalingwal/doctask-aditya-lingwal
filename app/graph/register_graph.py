@@ -646,6 +646,7 @@ async def _settle_against_the_register(
             _outcome_the_candidate_allows(outcome),
             outcome.row_number,
             outcome.same_as_requirement_index,
+            outcome.question,
         )
         for outcome in answer.outcomes
     }

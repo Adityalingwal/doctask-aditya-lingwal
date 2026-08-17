@@ -10,27 +10,12 @@ from app.examine.read_findings import (
     examine_as_exported,
     exported_finding,
 )
-from app.register.cells import CELL_NAMES
+from app.register.cells import CELL_NAMES, COLUMN_HEADINGS
 
 
-# Required, not decoration: without it a reader assumes the document was
-# discarded rather than read. It stops at "were still read" because an
-# embedded instruction can appear on any document type, including one that
-# states no requirement at all.
-REPORTED_NOT_FOLLOWED = (
-    "Reported, not followed. These documents were still read."
-)
 JSON_FORMAT = "json"
 MARKDOWN_FORMAT = "markdown"
 EXPORT_FORMATS = (JSON_FORMAT, MARKDOWN_FORMAT)
-# The stored column stays `in_writing`; only the heading a reader sees asks
-# the question in words a first-time reader does not have to decode.
-COLUMN_HEADINGS = {
-    "what_was_asked": "What was asked",
-    "in_writing": "Written down?",
-    "what_testing_found": "What testing found",
-    "status": "Status",
-}
 
 
 async def build_export(
@@ -78,16 +63,10 @@ async def build_export(
             exported_finding(finding)
         )
 
-    reported = await connection.execute(
-        "SELECT reported_instructions FROM runs WHERE id = %s", (run_id,)
-    )
-    run = await reported.fetchone()
-
     return {
         "project": {"id": str(project["id"]), "name": project["name"]},
         "run_id": str(run_id),
         "exported_at": exported_at,
-        "reported_instructions": run["reported_instructions"] if run else [],
         "columns": list(CELL_NAMES),
         "rows": [
             {
@@ -125,24 +104,7 @@ def export_as_markdown(export: dict[str, Any]) -> str:
             lines.append(_citation_line(citation))
         lines.append("")
 
-    return "\n".join(
-        lines
-        + _findings_lines(export["examine"])
-        + _reported_instruction_lines(export["reported_instructions"])
-    )
-
-
-def _reported_instruction_lines(reported: list[dict[str, Any]]) -> list[str]:
-    """The same section the JSON carries, so the two never say different things."""
-    if not reported:
-        return []
-    lines = ["", "## Reported instructions", "", REPORTED_NOT_FOLLOWED, ""]
-    for instruction in reported:
-        words = " ".join(instruction["quote"].split())
-        lines.append(
-            f"- {instruction['file']}, {instruction['place']}: \"{words}\""
-        )
-    return lines
+    return "\n".join(lines + _findings_lines(export["examine"]))
 
 
 def _rule_settings(rule: dict[str, Any]) -> str:

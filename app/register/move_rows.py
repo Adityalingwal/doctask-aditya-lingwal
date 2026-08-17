@@ -31,6 +31,10 @@ from app.review.review_queue import (
 TESTING_OBSERVATION = "testing observation"
 DELIVERY_EVIDENCE = "delivery evidence"
 SKIPPED_OBSERVATION_KIND = "observation"
+# One decision covers a row's whole list of observations, so its sentences are
+# stacked as paragraphs rather than joined into one. Joining them would show
+# the person words Match never wrote.
+QUESTIONS_STACKED_BY = "\n\n"
 
 
 class ProposedMoves(NamedTuple):
@@ -106,6 +110,10 @@ async def propose_moves(
     row_by_number = {row["row_number"]: row for row in rows}
 
     observations_by_row: dict[int, list[dict[str, Any]]] = {}
+    # Match writes one sentence per observation, and the decision below covers
+    # a whole row's list, so the sentences are kept beside the observations
+    # they were written for rather than on them.
+    questions_by_row: dict[int, list[str]] = {}
     ask_about: set[int] = set()
     unmatched: list[dict[str, str]] = []
     for outcome in answer.outcomes:
@@ -121,9 +129,16 @@ async def propose_moves(
         if outcome.outcome == POSSIBLE_MATCH or row["is_committed"]:
             ask_about.add(row["row_number"])
         observations_by_row.setdefault(row["row_number"], []).append(observation)
+        questions_by_row.setdefault(row["row_number"], []).append(outcome.question)
 
     return await _store_the_moves(
-        connection, run_id, row_by_number, observations_by_row, ask_about, unmatched
+        connection,
+        run_id,
+        row_by_number,
+        observations_by_row,
+        questions_by_row,
+        ask_about,
+        unmatched,
     )
 
 
@@ -132,6 +147,7 @@ async def _store_the_moves(
     run_id: UUID,
     row_by_number: dict[int, dict[str, Any]],
     observations_by_row: dict[int, list[dict[str, Any]]],
+    questions_by_row: dict[int, list[str]],
     ask_about: set[int],
     unmatched: list[dict[str, str]],
 ) -> ProposedMoves:
@@ -159,7 +175,7 @@ async def _store_the_moves(
                 decision_id = await raise_observation_match_decision(
                     connection,
                     run_id,
-                    _attach_question(row, observations_by_row[row_number]),
+                    QUESTIONS_STACKED_BY.join(questions_by_row[row_number]),
                     row["id"],
                 )
                 gated_row_numbers.append(row_number)
@@ -245,21 +261,6 @@ def _citation(observed: dict[str, Any]) -> dict[str, str]:
         "place": observed["place"],
         "source_words": observed["source_words"],
     }
-
-
-def _attach_question(
-    row: dict[str, Any],
-    observations: list[dict[str, Any]],
-) -> str:
-    # The sentence is the record: an audit must show what the person actually
-    # read when they answered, not a pointer to a row that has moved on since.
-    reported = "; ".join(
-        f"{one['summary']} (from {one['source_file']})" for one in observations
-    )
-    return (
-        f"Attach to row #{row['row_number']} — {row['what_was_asked']}: "
-        f"{reported}?"
-    )
 
 
 def _unmatched_entries(observations: list[dict[str, Any]]) -> list[dict[str, str]]:

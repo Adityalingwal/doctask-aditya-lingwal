@@ -62,6 +62,20 @@ RESTATED_QUOTE = "Operations must hear about every new intake form."
 
 POSSIBLE_MATCH_DECISION = "possible match"
 
+# The sentences Match itself writes. Both name the kind of document each
+# statement came from and ask the one thing that matters, and both reach the
+# card character for character — nothing here is composed by the code.
+UNSURE_BATCH_QUESTION = (
+    "This ask appears twice in this batch: raised in meeting notes as "
+    f"{SPOKEN_ASK}, and written in the client requirements document as "
+    f"{WRITTEN_ASK}. Is this the same ask?"
+)
+COMMITTED_ROW_QUESTION = (
+    f"This ask was raised in meeting notes ({MEETING_FILE}) — row 1, "
+    f"{SPOKEN_ASK}. It is now written in the client requirements document "
+    f"({REQUIREMENTS_FILE}) as {WRITTEN_ASK}. Is this the same ask?"
+)
+
 
 class Document(NamedTuple):
     source_file: str
@@ -291,13 +305,15 @@ def test_an_uncertain_batch_match_raises_a_decision_and_never_settles_itself(
         [[_requirements_document(), _meeting_note()]],
         {
             match_marker(): match_answer_within_batch(
-                [(NEW_ROW, None, None), (POSSIBLE_MATCH, None, 0)]
+                [(NEW_ROW, None, None), (POSSIBLE_MATCH, None, 0)],
+                questions=[None, UNSURE_BATCH_QUESTION],
             )
         },
     )[0]
 
     questions = _match_questions(outcome)
     assert len(questions) == 1
+    assert questions[0] == UNSURE_BATCH_QUESTION
     assert SPOKEN_ASK in questions[0]
     assert WRITTEN_ASK in questions[0]
     # The person approved it, so the two became one row carrying both sources.
@@ -434,7 +450,8 @@ def test_two_documents_in_separate_runs_still_reach_the_committed_row_gate(
             # The batch-specific marker comes first: the second run's Match
             # call is the only prompt naming the requirements document.
             match_marker_for_batch_with(REQUIREMENTS_FILE): match_answer_within_batch(
-                [(EXISTING_ROW, 1, None)]
+                [(EXISTING_ROW, 1, None)],
+                questions=[COMMITTED_ROW_QUESTION],
             ),
             match_marker(): match_answer_within_batch([(NEW_ROW, None, None)]),
         },
@@ -443,6 +460,7 @@ def test_two_documents_in_separate_runs_still_reach_the_committed_row_gate(
     assert _cell(first.rows[1], IN_WRITING) == IN_WRITING_NOT_KNOWN_YET
     questions = _match_questions(second)
     assert len(questions) == 1
+    assert questions[0] == COMMITTED_ROW_QUESTION
     assert SPOKEN_ASK in questions[0]
     # The person approved it, so one row carries both documents.
     assert sorted(second.rows) == [1]

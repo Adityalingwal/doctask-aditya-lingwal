@@ -32,6 +32,14 @@ FIRST_REQUIREMENT = "an email to the operations team on intake form submit"
 SECOND_REQUIREMENT = "a notification to operations when the intake form is sent"
 COMMITTED_ROW_NUMBER = 1
 PROPOSED_ROW_NUMBER = 2
+# Match is certain the two are one ask. It still writes the sentence, because
+# a confident match against a row already in the register is downgraded into
+# the same possible-match decision an uncertain one raises.
+CONFIDENT_MATCH_QUESTION = (
+    f"This ask was raised in meeting notes ({FIRST_FILE}) — row "
+    f"#{COMMITTED_ROW_NUMBER}, {FIRST_REQUIREMENT}. It is stated again in "
+    f"{SECOND_FILE} as {SECOND_REQUIREMENT}. Is this the same ask?"
+)
 
 
 def test_approved_possible_match_merges_into_the_existing_row(
@@ -47,7 +55,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                 # view repeats the first run's requirement, so the general Match
                 # marker matches both prompts.
                 match_marker_for_batch_with(SECOND_FILE): match_answer_existing_row(
-                    COMMITTED_ROW_NUMBER
+                    COMMITTED_ROW_NUMBER, CONFIDENT_MATCH_QUESTION
                 ),
                 match_marker(): match_answer(1),
                 examine_marker(): no_findings_answer(),
@@ -119,6 +127,9 @@ def test_approved_possible_match_merges_into_the_existing_row(
             engine.dispose()
 
     assert len(merge_decisions) == 1
+    # The model's own sentence reaches the card unchanged — nothing composed
+    # it from the row and the requirement after the fact.
+    assert merge_decisions[0]["question"] == CONFIDENT_MATCH_QUESTION
     assert FIRST_REQUIREMENT in merge_decisions[0]["question"]
     # The register keeps one row for one requirement, and its evidence is both
     # documents rather than the second document's alone.
@@ -151,7 +162,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
             script_path,
             {
                 match_marker_for_batch_with(SECOND_FILE): match_answer_existing_row(
-                    COMMITTED_ROW_NUMBER
+                    COMMITTED_ROW_NUMBER, CONFIDENT_MATCH_QUESTION
                 ),
                 match_marker(): match_answer(1),
                 examine_marker(): no_findings_answer(),
@@ -228,6 +239,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
                 ).one()
             engine.dispose()
 
+    assert match_decision["question"] == CONFIDENT_MATCH_QUESTION
     assert FIRST_REQUIREMENT in match_decision["question"]
     # A rejected match stays a row of its own — committed, never merged.
     assert proposal.is_committed is True
@@ -253,7 +265,7 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
             script_path,
             {
                 match_marker_for_batch_with(SECOND_FILE): match_answer_existing_row(
-                    COMMITTED_ROW_NUMBER
+                    COMMITTED_ROW_NUMBER, CONFIDENT_MATCH_QUESTION
                 ),
                 match_marker(): match_answer(1),
                 extract_marker(FIRST_FILE): extraction_answer(

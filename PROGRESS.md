@@ -6,39 +6,80 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
-## Snapshot — 2026-08-17, branch `register-becomes-four-cells`
+## Snapshot — 2026-08-17, branch `wording-and-prompts`
 
-Built, and each item run rather than type-checked. Every decision below was
-locked with Aditya on 2026-08-16; the superseded wording is in
-`documentation/decision-history.md`, "the register becomes four cells".
+Built and run rather than type-checked, committed and pushed; the branch is
+waiting for review and for Aditya's gates. No pull request is open.
 
-- **The row is four cells** — `What was asked` · `Written down?` ·
-  `What testing found` · `Status`. `Blocked on`, `First seen` and `Last moved`
-  are gone, with `app/register/document_dates.py`, Extract's `document_date`
-  and `blockers` lists, rule `R3`, and the `Blocked` status. The stored column
-  behind `Written down?` is still `in_writing`.
-- **`Handed over` replaces `Blocked` in the status check constraint.** A
-  handover summary with no testing behind it moves the row there, so the third
-  of four runs finally does something visible.
-- **A batch is read in workflow order** — meeting notes → client requirements →
-  handover summary → testing feedback — so which statement of an ask creates a
-  row is a fact about the documents, not about their file names.
-- **`Status` keeps every citation that still supports it.** The handover's
-  citation survives the move to `Done`; a superseded testing verdict does not.
-- **No rule is judged outside `config/rules.yaml`.** D1 deleted, D2 moved in as
-  `R5`, `app/examine/deliverable_checks.py` gone.
-- **Two formats, not four.** `.md` and `.pdf` are kept; `.docx` and `.txt`
-  leave with `app/ingest/read_docx.py`, `python-docx`, their tests and their
-  two written limitations. `sample-projects/northside-dental/client-requirements-v1.docx`
-  is now `.md`.
-- **The fourth document type is named `handover summary`.**
+- **The model writes the question a person reads**, on all three surfaces:
+  Match's requirement answer, Match's observation answer, and Examine's
+  finding. The three code-composed sentences are gone. What Approve and Reject
+  will do is code-owned fixed text beside server-computed values.
+- **The three prompts were rewritten**: the Examine prompt in full, and both
+  Match prompts gained the question section. `document_type` now reaches the
+  Match prompt from the stored extraction.
+- **A reported instruction left the export.** It still reaches a person
+  through `GET /runs/{id}` and the Reported tab, whose notice is now said once
+  above the cards. No migration was involved.
+- **Both suites green on this branch, no live key:** **216 Python passed**
+  (baseline 202) and **53 front-end passed across 32 files** (baseline 47
+  across 31). Details, including the recorded test-first baseline failures, are
+  under `## Completed` and `## Verification evidence`.
 
-**Not built, and it is a blocker for Aditya rather than a defect:** removing the
-downgrade of a confident match against a committed row. That decision rests on
-the export gate showing such a merge, and the gate does not — see
-`## Active blockers`.
+Everything before this branch — the four-cell row, `Handed over`, workflow
+order, rules living only in `config/rules.yaml`, two formats — is in
+`## Completed` under its own branch entry.
+
+**Still not built, and it is a blocker for Aditya rather than a defect:**
+removing the downgrade of a confident match against a committed row. That
+decision rests on the export gate showing such a merge, and the gate does not —
+see `## Active blockers`.
 
 ## Completed
+
+### The model writes the review question, and three prompts are rewritten (branch `wording-and-prompts`)
+
+From `main` at `1a03ceb`. Match's two answer models and Examine's `FoundIssue`
+each gained a `question`, and the three code-composed sentences in
+`propose_rows.py`, `move_rows.py` and `found_issue.py` are gone. The rule
+follows the data: a question is required wherever a Match answer names a
+register row — for either outcome, because a confident answer against a
+committed row is downgraded into a possible match upstream — and wherever the
+outcome is `possible match`; it is refused everywhere else. `MatchSettlement`
+carries the sentence from the graph to `propose_rows`. A grouped
+observation-match decision stores its observations' sentences in answer order,
+joined by one blank line, character for character. What Approve and Reject do
+is code-owned fixed text, delivered as `row_number` and `moved_cells` on the
+decision payload and rendered by `ui/src/Question.jsx`. The export no longer
+carries reported instructions; `GET /runs/{id}` still does, and no migration
+was needed. The Reported tab says its notice once above the cards, in the
+plural, and its empty state names what was looked for.
+
+**Test-first, and the baseline failures were recorded before any source
+changed.** On `1a03ceb` the eight new Match refusal cases in
+`tests/match/test_the_question_a_match_carries.py` and the two new Examine
+cases in `tests/examine/test_examine_answer.py` failed — **10 failed, 5
+passed** — and the six front-end cases across the two changed UI test files
+failed — **6 failed, 1 passed**. Every failure was a real assertion, not an
+import error.
+
+**Assumptions made here, so they are findable later.** The consequence block's
+field names (`row_number` widened from a finding's own row to the row any
+decision is about, and `moved_cells`) are this brief's choice, not a lock from
+an earlier one; `COLUMN_HEADINGS` moved from `app/register/export_register.py`
+to `app/register/cells.py` because the review payload now prints cell names
+too. The two test-helper questions in `tests/documents/register_documents.py`
+stand in for sentences the model writes at run time; no live-key run has yet
+shown what a real model writes into these fields.
+
+**Codex's one finding repaired in the foreground, on the same branch, after
+Aditya decided it.** The misplaced-question refusals tested the stripped value,
+so a blank non-null `question` slipped past where any non-null one must be
+refused. Both guards now test `question is not None`; the two tests were
+written first and seen failing on `DID NOT RAISE`
+(`test_a_new_row_carrying_a_blank_question_is_refused` and its observation
+twin). After the repair the Python suite printed **216 passed** and the
+front-end suite was not re-run — no front-end file changed in the repair.
 
 ### The status `No evidence yet` becomes `Nothing said yet` (branch `rename-status-nothing-said-yet`)
 
@@ -1035,6 +1076,9 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
+| `docker compose -p brief2wording run --rm app pytest` | 2026-08-17, `wording-and-prompts` branch | **214 passed**, real PostgreSQL, no live key. The baseline at `1a03ceb` printed 202; the twelve new tests are eight Match question refusals, two Examine question tests, the grouped-observation stacking test, and a re-run of the fixtures the required field touched |
+| `docker compose -p fgbrief2 run --rm app pytest` | 2026-08-17, `wording-and-prompts` branch, after the review repair | **216 passed**, real PostgreSQL, no live key. The two new tests are the blank-non-null-question refusals on both Match paths, written first and seen failing |
+| `npm --prefix ui test` | 2026-08-17, `wording-and-prompts` branch | **53 passed, 32 files**, no live key. The baseline printed 47 across 31 files; the new file covers the code-owned Approve/Reject block on all three kinds of card, and two cases were added to the Reported-tab file for the notice said once and the new empty state |
 | `docker compose -p fcfinal run --rm app pytest` | 2026-08-17, `register-becomes-four-cells` branch | **200 passed**, real PostgreSQL, no live key. The baseline in this worktree printed 195 |
 | `npm --prefix ui test` | 2026-08-17, `register-becomes-four-cells` branch | **46 passed, 30 files**, no live key. The baseline printed 44 across 29 files; the new file covers the `Written down?` heading and the four-cell row |
 | Migration `20260817_0017` forward and backward on real data | 2026-08-17, `register-becomes-four-cells` branch | Seeded at `20260816_0016` with one row per status including `Blocked`, each citing all seven cells. The upgrade refused naming row `#6` and rolled back whole (constraint, columns and citations all unchanged, read from `pg_get_constraintdef` and `information_schema`). After changing that row's status the upgrade dropped the three columns, deleted their citations and narrowed the constraint to the six statuses including `Handed over`; the downgrade restored the columns and `Blocked` without refusing; upgrading again reached the same shape |
