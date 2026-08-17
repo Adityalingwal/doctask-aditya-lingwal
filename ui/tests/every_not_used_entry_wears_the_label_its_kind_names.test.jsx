@@ -72,10 +72,12 @@ test("an entry whose kind the screen does not know wears no label at all", async
   cardsFor([kindThisScreenDoesNotKnow]);
   await openSection(/not used/i);
 
-  const [card] = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
+  const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
+  const card = cards.find((text) => text.includes(kindThisScreenDoesNotKnow.reason));
 
   // A wrong label is worse than none: the card still says the file and the
   // reason, and claims nothing about which kind of entry this is.
+  expect(card).toBeTruthy();
   expect(card).toContain(kindThisScreenDoesNotKnow.file);
   expect(card).toContain(kindThisScreenDoesNotKnow.reason);
   expect(card).not.toContain("Already read");
