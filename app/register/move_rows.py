@@ -217,8 +217,8 @@ def status_after(
     claim — so it is `Not delivered`.
 
     A handover with no testing behind it lands on `Handed over`. The three
-    states are distinct claims rather than shades of one: `No evidence yet`
-    means nobody has looked, `Handed over` means we say we built it, and
+    states are distinct claims rather than shades of one: `Nothing said yet`
+    means no document has spoken, `Handed over` means we say we built it, and
     `Done` means testing confirmed it behaves as asked.
     """
     labels = {one["label"] for one in testing}
