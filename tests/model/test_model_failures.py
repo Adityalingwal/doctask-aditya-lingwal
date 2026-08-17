@@ -80,7 +80,7 @@ def _run_over_two_documents(
     return run, list(proposed)
 
 
-def test_a_refused_key_fails_the_run_instead_of_skipping_every_document(
+def test_a_refused_key_fails_the_run_instead_of_leaving_every_document_unread(
     tmp_path: Path,
 ) -> None:
     failed, proposed = _run_over_two_documents(
@@ -93,10 +93,10 @@ def test_a_refused_key_fails_the_run_instead_of_skipping_every_document(
         "failed",
     )
 
-    # A wrong key is not a document problem: nothing is skipped and no empty
+    # A wrong key is not a document problem: no document goes unread and no empty
     # register is exported in place of the explanation.
     assert proposed == []
-    assert failed["skipped"] == []
+    assert failed["not_used"] == []
     assert failed["exported"] is False
     assert "check the OpenRouter key in your environment variables" in (
         failed["failure_reason"]
@@ -105,7 +105,7 @@ def test_a_refused_key_fails_the_run_instead_of_skipping_every_document(
     assert "This run will not restart by itself." in failed["failure_reason"]
 
 
-def test_a_timed_out_document_is_skipped_while_the_batch_continues(
+def test_a_timed_out_document_is_not_read_while_the_batch_continues(
     tmp_path: Path,
 ) -> None:
     quote = f"The client asked for {SECOND_REQUIREMENT}."
@@ -125,10 +125,10 @@ def test_a_timed_out_document_is_skipped_while_the_batch_continues(
     )
 
     assert proposed == [SECOND_REQUIREMENT]
-    skipped_documents = [
-        entry for entry in at_review["skipped"] if entry["kind"] == "document"
+    documents_not_read = [
+        entry for entry in at_review["not_used"] if entry["kind"] == "not read"
     ]
-    assert len(skipped_documents) == 1
-    assert skipped_documents[0]["file"] == FIRST_FILE
-    assert skipped_documents[0]["reason"] == "The model call failed for this file."
+    assert len(documents_not_read) == 1
+    assert documents_not_read[0]["file"] == FIRST_FILE
+    assert documents_not_read[0]["reason"] == "The model call failed for this file."
     assert at_review["failure_reason"] is None

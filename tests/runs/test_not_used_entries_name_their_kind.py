@@ -36,10 +36,11 @@ def test_a_not_used_entry_names_whether_the_file_was_already_read_not_read_or_dr
 ) -> None:
     """Each of the three weights of entry says which one it is, in `kind`.
 
-    A reader scanning the list cannot otherwise tell a routine second-run skip
-    from a requirement that fell out of the register, so the kind is driven
-    through the three paths that really create one: a quote that is not in its
-    file, an unrelated document, and a second run over a folder nobody touched.
+    A reader scanning the list cannot otherwise tell a file an earlier run had
+    already read from a requirement that fell out of the register, so the kind
+    is driven through the three paths that really create one: a quote that is
+    not in its file, an unrelated document, and a second run over a folder
+    nobody touched.
     """
     with temporary_project_folder("kind-per-entry") as (source_folder, folder_path):
         traced_quote = write_meeting_note(

@@ -51,7 +51,7 @@ ORIGINAL_NAME = "calendar-note.md"
 RENAMED_NAME = "calendar-note-v2.md"
 
 
-def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
+def test_a_document_extract_could_not_read_is_read_again_by_the_next_run(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("half-read") as (source_folder, source_folder_path):
@@ -120,9 +120,11 @@ def test_a_document_skipped_by_extract_is_read_again_by_the_next_run(
     # The document Extract could not read is not "already read", however well
     # the run that held it finished; the one that was read is not read twice.
     assert list(second_batch) == [UNREAD_FILE]
-    skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
-    assert [entry["file"] for entry in skipped_files] == [READ_FILE]
-    assert skipped_files[0]["reason"] == "Already read, and unchanged since."
+    already_read = [
+        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+    ]
+    assert [entry["file"] for entry in already_read] == [READ_FILE]
+    assert already_read[0]["reason"] == "Already read, and unchanged since."
 
 
 def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> None:
@@ -176,9 +178,11 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
                 application.stop()
 
     assert recorded_markers(call_log_path).count(extract_marker(READ_FILE)) == 1
-    skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
-    assert [entry["file"] for entry in skipped_files] == [READ_FILE]
-    assert skipped_files[0]["reason"] == (
+    already_read = [
+        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+    ]
+    assert [entry["file"] for entry in already_read] == [READ_FILE]
+    assert already_read[0]["reason"] == (
         "Read before — an edited or renamed file is not read again."
     )
 
@@ -237,9 +241,11 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
                 application.stop()
 
     assert recorded_markers(call_log_path).count(extract_marker(ORIGINAL_NAME)) == 1
-    skipped_files = [entry for entry in ended["skipped"] if entry["kind"] == "file"]
-    assert [entry["file"] for entry in skipped_files] == [RENAMED_NAME]
-    assert skipped_files[0]["reason"] == (
+    already_read = [
+        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+    ]
+    assert [entry["file"] for entry in already_read] == [RENAMED_NAME]
+    assert already_read[0]["reason"] == (
         "Read before — an edited or renamed file is not read again."
     )
     # No second set of rows: the register is exactly what the first run wrote.

@@ -39,7 +39,7 @@ INVENTED_TYPE = "sprint retrospective"
 HANDOVER_SUMMARY = "handover summary"
 
 
-def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continues(
+def test_a_document_type_outside_the_declared_set_is_not_read_and_the_run_continues(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("invented-type") as (source_folder, source_folder_path):
@@ -88,13 +88,13 @@ def test_a_document_type_outside_the_declared_set_is_skipped_and_the_run_continu
             finally:
                 application.stop()
 
-    skipped = [
+    not_used = [
         entry
-        for entry in finished["skipped"]
+        for entry in finished["not_used"]
         if entry.get("file") == INVENTED_TYPE_FILE
     ]
-    assert len(skipped) == 1
-    assert skipped[0]["reason"] == "The model gave an unknown document type."
+    assert len(not_used) == 1
+    assert not_used[0]["reason"] == "The model gave an unknown document type."
     # The invented type never became a row, and the run it shared a batch with
     # still exported the register.
     assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
@@ -172,7 +172,7 @@ def test_a_testing_feedback_document_never_creates_a_register_row(
     assert ended["exported"] is False
 
 
-def test_a_filled_list_the_type_may_not_use_skips_that_document_and_the_batch_continues(
+def test_a_filled_list_the_type_may_not_use_leaves_that_document_unread(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("wrong-list") as (source_folder, source_folder_path):
@@ -221,13 +221,13 @@ def test_a_filled_list_the_type_may_not_use_skips_that_document_and_the_batch_co
             finally:
                 application.stop()
 
-    skipped = [
-        entry for entry in finished["skipped"] if entry.get("file") == TESTING_FILE
+    not_used = [
+        entry for entry in finished["not_used"] if entry.get("file") == TESTING_FILE
     ]
-    assert len(skipped) == 1
+    assert len(not_used) == 1
     # The reason a person reads names what came back, not merely that
     # something did: without the type and the list there is nothing to act on.
-    assert skipped[0]["reason"] == (
+    assert not_used[0]["reason"] == (
         "The model read this as testing feedback and reported requirements, "
         "which that kind of document may not report."
     )

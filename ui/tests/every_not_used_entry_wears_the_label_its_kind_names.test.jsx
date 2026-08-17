@@ -59,8 +59,8 @@ test("every not-used entry wears the label its kind names", async () => {
   const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
   const cardFor = (entry) => cards.find((text) => text.includes(entry.file));
 
-  // The label is what tells a routine second-run skip apart from a
-  // requirement that fell out of the register.
+  // The label is what tells a file an earlier run had already read apart from
+  // a requirement that fell out of the register.
   expect(cardFor(alreadyRead)).toContain("Already read");
   expect(cardFor(notRead)).toContain("Not read");
   expect(cardFor(dropped)).toContain("Dropped");

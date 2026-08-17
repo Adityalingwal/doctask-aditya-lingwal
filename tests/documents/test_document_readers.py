@@ -72,13 +72,13 @@ def test_a_pdf_longer_than_the_page_limit_is_never_read(tmp_path: Path) -> None:
             finally:
                 application.stop()
 
-    skipped = _skipped_entry(ended, OVERSIZED_PDF)
-    assert skipped["reason"] == "21 pages — this system reads up to 20 pages."
+    not_used = _not_used_entry(ended, OVERSIZED_PDF)
+    assert not_used["reason"] == "21 pages — this system reads up to 20 pages."
     # Never read means never extracted and never paid for.
     assert recorded_markers(call_log_path) == []
 
 
-def test_an_encrypted_pdf_is_skipped_with_the_reason_and_the_batch_continues(
+def test_an_encrypted_pdf_is_not_read_and_the_reason_says_so_while_the_batch_continues(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("locked-scope") as (source_folder, source_folder_path):
@@ -124,8 +124,8 @@ def test_an_encrypted_pdf_is_skipped_with_the_reason_and_the_batch_continues(
 
             read_files = _documents_in(database_url)
 
-    skipped = _skipped_entry(finished, ENCRYPTED_PDF)
-    assert skipped["reason"] == (
+    not_used = _not_used_entry(finished, ENCRYPTED_PDF)
+    assert not_used["reason"] == (
         "This PDF is password-protected. Add an unprotected copy instead."
     )
     # Not an empty document row that later stages would read as "said nothing".
@@ -135,7 +135,7 @@ def test_an_encrypted_pdf_is_skipped_with_the_reason_and_the_batch_continues(
     ]
 
 
-def test_a_scanned_pdf_is_skipped_with_its_own_reason_rather_than_read_as_empty(
+def test_a_scanned_pdf_gets_its_own_reason_rather_than_being_read_as_empty(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("scanned-feedback-sheet") as (source_folder, source_folder_path):
@@ -166,8 +166,8 @@ def test_a_scanned_pdf_is_skipped_with_its_own_reason_rather_than_read_as_empty(
 
             read_files = _documents_in(database_url)
 
-    skipped = _skipped_entry(ended, SCANNED_PDF)
-    assert skipped["reason"] == (
+    not_used = _not_used_entry(ended, SCANNED_PDF)
+    assert not_used["reason"] == (
         "This PDF is scanned images, not text. Supply a text version."
     )
     assert read_files == []
@@ -229,8 +229,8 @@ def test_only_the_extensions_the_config_accepts_reach_a_reader(
 
     assert read_files == sorted([MARKDOWN_FILE, PDF_FILE])
     assert extract_marker(SPREADSHEET_FILE) not in recorded_markers(call_log_path)
-    skipped = _skipped_entry(finished, SPREADSHEET_FILE)
-    assert skipped["reason"] == (
+    not_used = _not_used_entry(finished, SPREADSHEET_FILE)
+    assert not_used["reason"] == (
         "Not a format this system reads. It reads .md and .pdf."
     )
     assert sorted(row["cells"]["what_was_asked"] for row in export["rows"]) == sorted(
@@ -238,7 +238,7 @@ def test_only_the_extensions_the_config_accepts_reach_a_reader(
     )
 
 
-def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
+def test_a_corrupt_pdf_is_not_read_and_the_batch_continues(
     tmp_path: Path,
 ) -> None:
     with temporary_project_folder("truncated-pdf") as (source_folder, source_folder_path):
@@ -281,8 +281,8 @@ def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
 
             read_files = _documents_in(database_url)
 
-    skipped = _skipped_entry(finished, PDF_FILE)
-    assert skipped["reason"] == "This PDF could not be opened — it is damaged, or not a PDF."
+    not_used = _not_used_entry(finished, PDF_FILE)
+    assert not_used["reason"] == "This PDF could not be opened — it is damaged, or not a PDF."
     # One damaged file loses its own document, never the rest of the batch.
     assert read_files == [MARKDOWN_FILE]
     assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
@@ -290,7 +290,7 @@ def test_a_corrupt_pdf_is_skipped_with_its_reason_and_the_batch_continues(
     ]
 
 
-def test_a_pdf_that_cannot_be_parsed_is_skipped_and_the_batch_continues(
+def test_a_pdf_that_cannot_be_parsed_is_not_read_and_the_batch_continues(
     tmp_path: Path,
 ) -> None:
     """A PDF sound enough for pypdf to count its pages, but whose content
@@ -335,8 +335,8 @@ def test_a_pdf_that_cannot_be_parsed_is_skipped_and_the_batch_continues(
 
             read_files = _documents_in(database_url)
 
-    skipped = _skipped_entry(finished, PDF_FILE)
-    assert skipped["reason"] == (
+    not_used = _not_used_entry(finished, PDF_FILE)
+    assert not_used["reason"] == (
         "This PDF's content could not be read — it is damaged. Supply a working copy."
     )
     # One unparseable file loses its own document, never the rest of the batch.
@@ -346,9 +346,9 @@ def test_a_pdf_that_cannot_be_parsed_is_skipped_and_the_batch_continues(
     ]
 
 
-def _skipped_entry(run: dict, source_file: str) -> dict:
-    entries = [entry for entry in run["skipped"] if entry.get("file") == source_file]
-    assert len(entries) == 1, f"expected one skip for {source_file}, got {entries}"
+def _not_used_entry(run: dict, source_file: str) -> dict:
+    entries = [entry for entry in run["not_used"] if entry.get("file") == source_file]
+    assert len(entries) == 1, f"expected one not-used entry for {source_file}, got {entries}"
     return entries[0]
 
 

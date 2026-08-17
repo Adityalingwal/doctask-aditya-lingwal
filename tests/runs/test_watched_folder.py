@@ -145,7 +145,7 @@ def test_the_watcher_starts_a_run_once_an_arriving_file_has_settled(
     # that turned up after the project was created starts a run.
     assert started_before_anything_arrived == []
     assert len(started) == 1
-    assert [entry["file"] for entry in at_review["skipped"]] == []
+    assert [entry["file"] for entry in at_review["not_used"]] == []
 
 
 def test_the_watcher_does_not_start_a_second_run_while_one_is_active(

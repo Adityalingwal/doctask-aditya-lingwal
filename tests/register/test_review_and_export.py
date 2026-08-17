@@ -251,7 +251,7 @@ def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
 
     # The paraphrase cannot be verified against the source, so no row carries it.
     assert list(proposed) == [REQUIREMENT]
-    dropped = [entry for entry in status["skipped"] if entry["kind"] == "requirement"]
+    dropped = [entry for entry in status["not_used"] if entry["kind"] == "dropped"]
     assert len(dropped) == 1
     assert dropped[0]["file"] == SOURCE_FILE
     assert dropped[0]["quote"] == paraphrased
