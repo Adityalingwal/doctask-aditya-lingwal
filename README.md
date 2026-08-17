@@ -38,7 +38,7 @@ slice, the incremental update slice, and the review screen are implemented:
   two rows are proposed and the reviewer is asked which is right.
 - A line inside a document addressed to the system is reported on the run and
   on the screen, and never followed — and that document is still read. It is
-  deliberately no part of the export, which is the register the client is sent.
+  deliberately not part of the export, which is the register the client is sent.
 - Examine judges the whole register against the rules the run froze and raises
   a finding as a question, never as an edit.
 - Startup resumes a run killed mid-flight from its durable checkpoint.

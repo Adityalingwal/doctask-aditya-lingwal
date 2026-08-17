@@ -8,35 +8,32 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## Snapshot — 2026-08-17, branch `wording-and-prompts`
 
-Built, and each item run rather than type-checked. Every decision below was
-locked with Aditya on 2026-08-16; the superseded wording is in
-`documentation/decision-history.md`, "the register becomes four cells".
+Built and run rather than type-checked, committed and pushed; the branch is
+waiting for review and for Aditya's gates. No pull request is open.
 
-- **The row is four cells** — `What was asked` · `Written down?` ·
-  `What testing found` · `Status`. `Blocked on`, `First seen` and `Last moved`
-  are gone, with `app/register/document_dates.py`, Extract's `document_date`
-  and `blockers` lists, rule `R3`, and the `Blocked` status. The stored column
-  behind `Written down?` is still `in_writing`.
-- **`Handed over` replaces `Blocked` in the status check constraint.** A
-  handover summary with no testing behind it moves the row there, so the third
-  of four runs finally does something visible.
-- **A batch is read in workflow order** — meeting notes → client requirements →
-  handover summary → testing feedback — so which statement of an ask creates a
-  row is a fact about the documents, not about their file names.
-- **`Status` keeps every citation that still supports it.** The handover's
-  citation survives the move to `Done`; a superseded testing verdict does not.
-- **No rule is judged outside `config/rules.yaml`.** D1 deleted, D2 moved in as
-  `R5`, `app/examine/deliverable_checks.py` gone.
-- **Two formats, not four.** `.md` and `.pdf` are kept; `.docx` and `.txt`
-  leave with `app/ingest/read_docx.py`, `python-docx`, their tests and their
-  two written limitations. `sample-projects/northside-dental/client-requirements-v1.docx`
-  is now `.md`.
-- **The fourth document type is named `handover summary`.**
+- **The model writes the question a person reads**, on all three surfaces:
+  Match's requirement answer, Match's observation answer, and Examine's
+  finding. The three code-composed sentences are gone. What Approve and Reject
+  will do is code-owned fixed text beside server-computed values.
+- **The three prompts were rewritten**: the Examine prompt in full, and both
+  Match prompts gained the question section. `document_type` now reaches the
+  Match prompt from the stored extraction.
+- **A reported instruction left the export.** It still reaches a person
+  through `GET /runs/{id}` and the Reported tab, whose notice is now said once
+  above the cards. No migration was involved.
+- **Both suites green on this branch, no live key:** **214 Python passed**
+  (baseline 202) and **53 front-end passed across 32 files** (baseline 47
+  across 31). Details, including the recorded test-first baseline failures, are
+  under `## Completed` and `## Verification evidence`.
 
-**Not built, and it is a blocker for Aditya rather than a defect:** removing the
-downgrade of a confident match against a committed row. That decision rests on
-the export gate showing such a merge, and the gate does not — see
-`## Active blockers`.
+Everything before this branch — the four-cell row, `Handed over`, workflow
+order, rules living only in `config/rules.yaml`, two formats — is in
+`## Completed` under its own branch entry.
+
+**Still not built, and it is a blocker for Aditya rather than a defect:**
+removing the downgrade of a confident match against a committed row. That
+decision rests on the export gate showing such a merge, and the gate does not —
+see `## Active blockers`.
 
 ## Completed
 
