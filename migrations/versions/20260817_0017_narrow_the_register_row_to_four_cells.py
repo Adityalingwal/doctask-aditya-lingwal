@@ -6,11 +6,14 @@ goes with `Blocked on`, which was the only cell that could say what the work
 was waiting for, and `Handed over` arrives in its place — a handover says the
 work exists, which is neither `No evidence yet` nor `Done`.
 
-Every stored row's fingerprint moves, because `fingerprint_of_cells` hashes the
-cell list and the list is now four names. That is expected and is not
-corruption. No fingerprint is recomputed here: the next run that touches a row
-writes the right one, and a migration that computes a hash would have to know
-the application's rules.
+No fingerprint is recomputed here, so **every stored fingerprint stays exactly
+as it was** while the value `fingerprint_of_cells` would now compute for the
+same row has changed, because it hashes the cell list and that list is now four
+names. A row stored before this migration therefore carries a seven-cell hash
+until something moves it. That is deliberate rather than corruption: the next
+run that touches a row writes the right one, and a migration that computes a
+hash would have to carry the application's rules. The cost is recorded as a
+limitation in `PROGRESS.md`.
 
 A row currently holding `Blocked` has no status it could honestly become, so
 `upgrade()` counts those rows, names them, and refuses — the shape

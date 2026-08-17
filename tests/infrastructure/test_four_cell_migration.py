@@ -64,12 +64,14 @@ def test_a_row_that_was_blocked_stops_the_migration_instead_of_being_rewritten()
         assert _cited_cells(database_url) == set(SEVEN_CELLS)
 
 
-def test_every_stored_fingerprint_moves_when_the_cell_list_narrows() -> None:
-    """The fingerprint hashes the cell list, so narrowing it moves every row.
+def test_the_migration_leaves_every_stored_fingerprint_exactly_as_it_was() -> None:
+    """Narrowing the cell list changes what the hash would be, not what is stored.
 
-    That is expected, not corruption — and the migration must leave the stored
-    value alone rather than compute one, because a migration that computes a
-    hash has to know the application's rules.
+    So a row stored before the migration ends up holding a seven-cell hash while
+    its four cells would now hash to something else. That is deliberate, not
+    corruption: the migration must leave the stored value alone rather than
+    compute one, because a migration that computes a hash has to carry the
+    application's rules.
     """
     with temporary_database(upgrade_to=BEFORE_THE_NARROWING) as database_url:
         _seed_a_row_per_status(database_url, include_blocked=False)

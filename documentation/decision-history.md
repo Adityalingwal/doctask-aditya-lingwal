@@ -4017,8 +4017,10 @@ downgraded.** Locked on 2026-08-16 as item 9 and deliberately left unbuilt on
 does not: `GET /runs/{id}` at `needs review` answers with `decisions`,
 `examine`, `skipped`, `reported_instructions`, `finished_stages` and
 `exported`, and carries no proposed row, no cell and no citation;
-`GET /runs/{id}/export` answers `409` until the run has committed. Removing the
-downgrade would also leave nothing to perform the merge, because
-`_merge_approved_matches` is driven only by an approved possible-match
-decision. The gate as it stands is not a guard over this, so the decision goes
-back to Aditya rather than being built around.
+`GET /runs/{id}/export` answers `409` until the run has committed. Removing only
+the downgrade would in fact change nothing: `_the_candidate_to_ask_about` raises
+the possible-match decision whenever the answer names a committed row, whatever
+the outcome, so the question would still be asked and an approval would still
+merge. Making the merge automatic needs the gate to show the merge first. The
+gate as it stands is not a guard over this, so the decision goes back to Aditya
+rather than being built around.

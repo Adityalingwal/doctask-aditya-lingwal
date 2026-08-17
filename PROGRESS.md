@@ -827,6 +827,37 @@ working claim only after its own implementation and proof land.
   the fallback fires on every full batch. It is harmless while the two state
   different asks, which is the case in both corpora, and undecided if they ever
   state the same one.
+- **A handover read after testing has already moved a row sends that row back
+  to `Handed over`, and drops the testing citation with it.** `status_after`
+  asks only whether *this batch* holds testing, never whether testing has ever
+  spoken. Unreachable in all three supported arrival orders and in both corpora,
+  each of which holds one handover and one testing document: it needs a handover
+  arriving in a batch later than the testing that already moved that row.
+  Found by the 2026-08-17 review and left deliberately.
+- **`Status` can keep a testing citation the cell's own value denies.** The
+  verdict being superseded is read off `What testing found`, and `Change
+  request` and `Unclear` move that cell without moving `Status`, so the two
+  diverge. It takes three testing documents across three runs with a change
+  request in the middle; neither corpus holds a second testing document. Found
+  by the same review and left deliberately.
+- **A document that lands a row on the status it already holds adds no
+  citation**, because a move whose value is unchanged is skipped before its
+  citations are settled. This is the one place the "every supporting citation,
+  no cap" rule does not hold. It needs a second handover, or a second testing
+  document repeating the first's verdict — neither corpus has one.
+- **Only the requirements half of a batch is ordered by document type.** Testing
+  observations and delivery evidence are still gathered in file-name order. No
+  status depends on it, since a status is decided from the set of labels; it
+  shows only in the order two testing documents' sentences are joined into
+  `What testing found`.
+- **A row stored before migration `20260817_0017` keeps a fingerprint computed
+  over seven cells** until something moves that row. Nothing in the application
+  compares a stored fingerprint with a recomputed one, so no behaviour depends
+  on it, and a comparison across runs still answers "unchanged" correctly; what
+  is wrong is that the export publishes a number that will not verify against
+  the four cells printed beside it. A fresh database never holds such a row.
+  Recomputing inside the migration was considered and refused: a migration that
+  computes a hash has to carry the application's rules.
 - A committed row keeps the `Written down?` sentence it was committed with, so a
   row committed before any client requirements document was read still says
   "no client requirements document has been read for this project" after one
@@ -835,16 +866,9 @@ working claim only after its own implementation and proof land.
   later document may re-answer.
 - The 20-page limit binds `.pdf` only; Markdown reports no page count and none
   is invented for it.
-- A `.docx` citation names a line of the extracted text, not a line Word
-  displays, so it cannot be jumped to inside Word; the quoted words are how the
-  passage is found. Naming the Word heading instead needs headings to leave the
-  reader without being written into the text — deferred to a later improvement,
-  not refused.
-- A quote spanning two `.docx` table cells is not found, because each cell is
-  its own line; that requirement is dropped with its reason.
-- A related additional document that lists requirements, in a run that never
-  exports, is not counted as already read, so the next run reads and pays for
-  it again. A related additional document that lists none is unaffected.
+- A handover summary that lists requirements, in a run that never exports, is
+  not counted as already read, so the next run reads and pays for it again. A
+  handover summary that lists none is unaffected.
 - One Extract call may repeat in the answer-to-checkpoint kill window.
 - A run that fails is not restarted by itself, and nothing it read counts as
   read — the next run started on that project reads its documents again.
@@ -855,16 +879,18 @@ working claim only after its own implementation and proof land.
 - A rejected finding stays suppressed if later evidence strengthens it.
 - A finding already approved onto a row is not re-examined by a later run; a
   rules change is applied the next time a run examines that register.
-- D1 and D2 were driven against seeded rows: every proposed row is written with
-  a `what_was_asked` citation, so D1 has nothing to catch. D2 ("no row is `Done`
-  without a testing outcome") is reachable from 2026-08-16 — a `Passed`
-  observation now sets a row `Done` and fills `what_testing_found` in the same
-  move, so a `Done` row without an outcome still needs seeding to produce.
-- R3 and R4 in `config/rules.yaml` could not fire before 2026-08-16, because
-  `what_testing_found` and `blocked_on` were constants. Both now move. **Not
-  yet confirmed by a run**: no run has been driven that leaves a row blocked
-  past `max_days`, or written without a testing outcome, and watched Examine
-  raise the finding. Neither rule's text or parameters changed.
+- The rule "no register row is `Done` without a testing outcome", which lived in
+  code as `D2` until 2026-08-17 and now lives in `config/rules.yaml`, still
+  needs a seeded row to produce: a `Passed` observation sets a row `Done` and
+  fills `What testing found` in the same move, so the two cannot ordinarily
+  disagree. `D1` ("every register row cites a source") is deleted rather than
+  moved — a row without a citation cannot be created, and `commit_register`
+  refuses one outright, which is stronger than a finding.
+- The elapsed-time rule that needed a document date left with the date cells on
+  2026-08-17. Of the rules that remain, **none has been confirmed firing in a
+  run**: no run has been driven that leaves a written requirement without a
+  testing outcome and watched Examine raise the finding. No surviving rule's
+  text or parameters changed.
 - Files arriving during Review wait; that run holds the project lock, and the
   watcher starts nothing behind it.
 - The watcher keeps what it last saw in memory, so restarting the application

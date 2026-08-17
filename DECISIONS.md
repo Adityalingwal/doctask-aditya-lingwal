@@ -404,8 +404,8 @@ Full locked pipeline:
 
 | Stage | Job | Model call | Current status |
 |---|---|---|---|
-| Ingest | Read files never read before, by name or content | No | Implemented and verified for all four formats |
-| Extract | One document: type/date/requirements/testing/blockers/instructions | One per document | Implemented and verified with scripted model |
+| Ingest | Read files never read before, by name or content | No | Implemented and verified for `.md` and `.pdf` |
+| Extract | One document: type/requirements/testing/delivery/instructions | One per document | Implemented and verified with scripted model |
 | Match | Whole batch against current register | One per batch | Implemented and verified with scripted model |
 | Examine | Whole register against frozen rules | One per register | Implemented and verified with scripted model |
 | Review | Present gated proposals and wait | No | Implemented and verified for slice-1 proposals |
@@ -489,8 +489,11 @@ match.
   was locked on 2026-08-16 on the understanding that the export gate shows such
   a merge. It does not: `GET /runs/{id}` at `needs review` carries no proposed
   row, no cell and no citation, and `GET /runs/{id}/export` answers `409` until
-  the run has committed. `_merge_approved_matches` is also driven only by an
-  approved possible-match decision, so nothing would perform the merge. The
+  the run has committed. Removing only the downgrade would in fact change
+  nothing: `_the_candidate_to_ask_about` raises the possible-match decision
+  whenever the answer names a committed row, whatever the outcome, so the
+  question would still be asked and an approval would still merge. Making the
+  merge automatic therefore needs the gate to show the merge first. The
   decision goes back to Aditya rather than being built around; history:
   `documentation/decision-history.md`, 2026-08-17.
 - **A match may only point backwards**, and a chain is followed: a requirement
