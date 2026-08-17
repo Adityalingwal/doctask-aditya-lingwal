@@ -369,7 +369,13 @@ def _refuse_a_misplaced_requirement_question(outcome: MatchOutcome) -> None:
             "no question in it — a person is asked before two requirements "
             "are treated as one ask, and there is no sentence to show them"
         )
-    if outcome.row_number is None and outcome.outcome != POSSIBLE_MATCH and asked:
+    # `is not None`, not the stripped value — a blank question is still a
+    # question written where none is put to anyone.
+    if (
+        outcome.row_number is None
+        and outcome.outcome != POSSIBLE_MATCH
+        and outcome.question is not None
+    ):
         _refuse(
             f"Match answered '{outcome.outcome}' for requirement {index} and "
             "still wrote a question, when no register row is named and "
@@ -427,7 +433,9 @@ def _refuse_an_unusable_observation_outcome(outcome: ObservationOutcome) -> None
             "asked before this batch's evidence reaches a register row, and "
             "there is no sentence to show them"
         )
-    if row_number is None and asked:
+    # `is not None`, not the stripped value — a blank question is still a
+    # question written where none is put to anyone.
+    if row_number is None and outcome.question is not None:
         _refuse(
             f"Match answered '{outcome.outcome}' for observation {index} and "
             "still wrote a question, when no register row is named and "

@@ -158,6 +158,43 @@ def test_a_confident_match_inside_this_batch_carrying_a_question_is_refused(
     assert "question" in str(refusal.value)
 
 
+def test_a_new_row_carrying_a_blank_question_is_refused(tmp_path: Path) -> None:
+    """A blank string is still a question written where none is put to anyone."""
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _match(
+            tmp_path,
+            [
+                {
+                    "requirement_index": 0,
+                    "outcome": "new row",
+                    "row_number": None,
+                    "question": "",
+                }
+            ],
+        )
+
+    assert "question" in str(refusal.value)
+
+
+def test_an_observation_about_no_register_row_carrying_a_blank_question_is_refused(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(IncompleteMatchAnswer) as refusal:
+        _match_observations(
+            tmp_path,
+            [
+                {
+                    "observation_index": 0,
+                    "outcome": "new row",
+                    "row_number": None,
+                    "question": "   ",
+                }
+            ],
+        )
+
+    assert "question" in str(refusal.value)
+
+
 @pytest.mark.parametrize("outcome", ["existing row", "possible match"])
 def test_an_observation_about_a_register_row_without_a_question_is_refused(
     tmp_path: Path,

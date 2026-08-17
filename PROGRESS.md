@@ -21,7 +21,7 @@ waiting for review and for Aditya's gates. No pull request is open.
 - **A reported instruction left the export.** It still reaches a person
   through `GET /runs/{id}` and the Reported tab, whose notice is now said once
   above the cards. No migration was involved.
-- **Both suites green on this branch, no live key:** **214 Python passed**
+- **Both suites green on this branch, no live key:** **216 Python passed**
   (baseline 202) and **53 front-end passed across 32 files** (baseline 47
   across 31). Details, including the recorded test-first baseline failures, are
   under `## Completed` and `## Verification evidence`.
@@ -71,6 +71,15 @@ to `app/register/cells.py` because the review payload now prints cell names
 too. The two test-helper questions in `tests/documents/register_documents.py`
 stand in for sentences the model writes at run time; no live-key run has yet
 shown what a real model writes into these fields.
+
+**Codex's one finding repaired in the foreground, on the same branch, after
+Aditya decided it.** The misplaced-question refusals tested the stripped value,
+so a blank non-null `question` slipped past where any non-null one must be
+refused. Both guards now test `question is not None`; the two tests were
+written first and seen failing on `DID NOT RAISE`
+(`test_a_new_row_carrying_a_blank_question_is_refused` and its observation
+twin). After the repair the Python suite printed **216 passed** and the
+front-end suite was not re-run — no front-end file changed in the repair.
 
 ### The status `No evidence yet` becomes `Nothing said yet` (branch `rename-status-nothing-said-yet`)
 
@@ -1068,6 +1077,7 @@ working claim only after its own implementation and proof land.
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
 | `docker compose -p brief2wording run --rm app pytest` | 2026-08-17, `wording-and-prompts` branch | **214 passed**, real PostgreSQL, no live key. The baseline at `1a03ceb` printed 202; the twelve new tests are eight Match question refusals, two Examine question tests, the grouped-observation stacking test, and a re-run of the fixtures the required field touched |
+| `docker compose -p fgbrief2 run --rm app pytest` | 2026-08-17, `wording-and-prompts` branch, after the review repair | **216 passed**, real PostgreSQL, no live key. The two new tests are the blank-non-null-question refusals on both Match paths, written first and seen failing |
 | `npm --prefix ui test` | 2026-08-17, `wording-and-prompts` branch | **53 passed, 32 files**, no live key. The baseline printed 47 across 31 files; the new file covers the code-owned Approve/Reject block on all three kinds of card, and two cases were added to the Reported-tab file for the notice said once and the new empty state |
 | `docker compose -p fcfinal run --rm app pytest` | 2026-08-17, `register-becomes-four-cells` branch | **200 passed**, real PostgreSQL, no live key. The baseline in this worktree printed 195 |
 | `npm --prefix ui test` | 2026-08-17, `register-becomes-four-cells` branch | **46 passed, 30 files**, no live key. The baseline printed 44 across 29 files; the new file covers the `Written down?` heading and the four-cell row |
