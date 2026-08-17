@@ -4177,3 +4177,47 @@ on` cell, the `Blocked` status and Extract's `blockers` list, so an observation
 of that kind can no longer arrive and the clause described a route the system
 does not have. The sentence now ends `"what testing found, or what was handed
 over."`
+
+## 2026-08-18 — the gate stops being a queued question, and a refused run is discarded
+
+**Superseded — the two-step review ending.** Entering Review raised the export
+decision (`ensure_export_decision`, called from the Review node) and parked it
+in the queue as `Add this run's changes to the register?`; the person approved
+or rejected it there, and a separate `Finish review` button then ended the
+review, at which point `export_was_approved` read the answer back and routed to
+Commit or to the refused ending. **Replaced by one press:** Review raises no
+export decision; once every other decision is answered, the review is ended by
+`Add this run's changes to the register` or `Discard this run's changes`, and
+`finish_review(engine, run_id, add_to_register)` writes the decision that press
+carried — question and answer together — inside the same `claim_review_finished`
+transaction, then continues the graph exactly as before.
+
+The reason: two steps for one intent. By the time the button was offered, the
+person had answered every individual question and seen each change on its own,
+and the gate was the only queue card whose answer did nothing until a second
+press. Reason for two buttons rather than one: saying no is how a run ends
+without committing, and without it a run nobody wants could never finish and
+would hold its project's lock for ever.
+
+The trade-off, accepted: the answer can no longer be changed between giving it
+and finishing, because the press is the decision. `export_was_approved`, the
+decision row's kind and storage, and the stored question sentence are all
+unchanged, so the audit still shows what the person answered. Nothing was
+backfilled: runs that finished under the two-step flow keep their decision rows
+and their questions untouched.
+
+**Superseded — the run status `export rejected`** (itself the 2026-08-15
+replacement for `closed without export`). **Renamed to `discarded`**, migration
+`20260817_0019`, on the rename pattern of `20260816_0014`: the constraint is
+dropped, stored rows are rewritten because `discarded` means exactly what
+`export rejected` meant, and the constraint is recreated with the new value.
+Neither partial unique index on `runs` names the value — read off a real
+database with `pg_get_constraintdef` and `pg_indexes` — so unlike
+`20260815_0012` no index was rebuilt. The reason: `export rejected` named
+machinery a person never sees, while the button they press says `Discard this
+run's changes` and the screen prints the stored status verbatim. The constant
+`CLOSED_WITHOUT_EXPORT` keeps its name, and no machinery — `export_json`,
+`GET /runs/{id}/export`, `build_export` — was renamed with it.
+
+**Superseded — the register header's `exported <date>`.** It now reads `last
+updated <date>`; `exported_at` and everything behind it are unchanged.
