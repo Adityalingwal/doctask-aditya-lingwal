@@ -30,7 +30,7 @@ slice, the incremental update slice, and the review screen are implemented:
   The first two create rows; the last two move rows that already exist and
   create none. They may arrive one per run or several together in one run, and
   a batch is read in that order whatever the files are named. A document that
-  arrives before the requirement it talks about is reported on the Skipped tab
+  arrives before the requirement it talks about is reported on the Not used tab
   rather than acted on.
 - One ask stated in two documents of one batch becomes **one** row citing both
   — the meeting note that raised it and the requirements document that wrote it
@@ -79,7 +79,7 @@ verdict is dropped, because it proves something the cell now denies.
 Attaching a document's evidence to a row that is already committed is asked
 about before it happens, and so is any link the system is unsure of. An
 observation about no requirement the register traces is reported on the
-Skipped tab rather than forced onto the nearest row.
+Not used tab rather than forced onto the nearest row.
 
 Testing feedback carries one of five labels — `Passed`, `Defect`, `Not found`,
 `Change request`, `Unclear`. `Not found` is what reaches the last two statuses:
@@ -139,13 +139,13 @@ never exercised.
 - **A requirement removed from a document does not remove its row.** Nothing
   in this system takes a committed row back.
 - **Replacing a document with an entirely different one under the same name
-  is skipped**, because that name has already been read. Give a new document
+  is not used**, because that name has already been read. Give a new document
   a new name.
 - **Sub-folders are not read.** Only files directly in the project's folder
   are.
 
 A file that is still in the folder and gets passed over says so: the run's
-`Skipped` section names it and gives the reason, so an edited, renamed or
+`Not used` section names it and gives the reason, so an edited, renamed or
 replaced document is never quietly ignored.
 
 Two of these are silent, and cannot be otherwise. A deleted document is no
@@ -176,19 +176,19 @@ resourcing, and CRM work are outside this domain.
 |---|---:|---:|---|
 | `.md` | Yes | **Yes** | Nearest heading |
 | `.pdf` | Yes | **Yes** | Page number |
-| `.docx`, `.txt`, `.xlsx`, `.pptx`, `.eml`, images | No | Skipped with reason | — |
+| `.docx`, `.txt`, `.xlsx`, `.pptx`, `.eml`, images | No | Not read, with reason | — |
 
 `config/formats.yaml` declares which extensions are accepted and the document
 page limit, currently 20 pages. A file whose extension is not listed there
 never reaches a reader, and startup warns if the file names a format no reader
 exists for.
 
-A document is skipped, with its reason recorded on the run, when it is longer
+A document is not read, with its reason recorded on the run, when it is longer
 than the page limit, when a PDF is encrypted, and when a PDF has no text layer
 because it was scanned. The page limit applies to PDFs, the only declared
 format that reports a page count. None of these is written to the `documents`
-table, so unlike a document that was read and finished with, a skipped one is
-not "already read" — the next run reads it again, and pays for it again if a
+table, so unlike a document that was read and finished with, one that was not
+read is not "already read" — the next run reads it again, and pays for it again if a
 model call was what failed.
 
 ## Run locally
@@ -267,7 +267,7 @@ To the right, one run's sections are read one at a time behind tabs:
 | Section | What it shows |
 |---|---|
 | Stages | Every stage of the run — done, working, not needed, or pending — and the reason it ended early or failed, against the stage it failed at |
-| Skipped | Each file or quote this run skipped, with the reason recorded on the run |
+| Not used | Each file or quote this run did not use, with the reason recorded on the run and a label saying which of the three it is — already read, not read, or dropped |
 | Needs your decision | Every question the run put to a person, its frozen wording and its answer, what Approve and Reject will each do, plus the rules the run was judged against, and the two buttons that end the review |
 | Reported, not followed | Every line in this run's documents that tried to give the system an instruction, with the file, the place and the document's own words |
 
@@ -387,7 +387,7 @@ the next run and never to one already under way or already finished. Point
 
 - The 20-page limit applies to PDFs only; the other formats report no page
   count and none is invented for them.
-- Scanned PDFs are skipped rather than read; there is no OCR.
+- Scanned PDFs are recorded as not read rather than read; there is no OCR.
 - Rules about elapsed time — "nothing stays blocked more than N days" — cannot
   be judged, because the register keeps no document dates.
 - Work stopped by something outside the provider's control is reported through

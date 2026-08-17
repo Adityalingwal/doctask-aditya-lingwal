@@ -13,7 +13,7 @@ export function runReply(overrides = {}) {
     project_id: projectId,
     status: "needs review",
     stage: "review",
-    skipped: [],
+    not_used: [],
     reported_instructions: [],
     ended_early_reason: null,
     failure_reason: null,

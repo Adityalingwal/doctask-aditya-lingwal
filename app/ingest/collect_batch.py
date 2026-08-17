@@ -11,15 +11,15 @@ from psycopg import AsyncConnection
 from app.extract.answer import UNRELATED_DOCUMENT
 from app.ingest.read_source_document import READER_EXTENSIONS, read_source_document
 from app.ingest.unreadable_document import DocumentUnreadable
+from app.runs.not_used_kinds import ALREADY_READ_KIND, NOT_READ_KIND
 
 
-SKIPPED_FILE_KIND = "file"
 UNREADABLE_FORMAT = "Not a format this system reads. It reads .md and .pdf."
 
 
 class CollectedBatch(NamedTuple):
     document_ids: list[UUID]
-    skipped: list[dict[str, str]]
+    not_used: list[dict[str, str]]
 
 
 async def collect_batch(
@@ -32,14 +32,16 @@ async def collect_batch(
 ) -> CollectedBatch:
     """Take every file this project has never read before, by name or content."""
     document_ids: list[UUID] = []
-    skipped: list[dict[str, str]] = []
+    not_used: list[dict[str, str]] = []
 
     # One transaction, so a killed process never leaves half a batch behind.
     async with connection.transaction():
         for path in sorted(_top_level_files(source_folder)):
             extension = path.suffix.lower()
             if extension not in accepted_extensions or extension not in READER_EXTENSIONS:
-                skipped.append(_skipped(path.name, UNREADABLE_FORMAT))
+                not_used.append(
+                    _not_used_entry(NOT_READ_KIND, path.name, UNREADABLE_FORMAT)
+                )
                 continue
 
             try:
@@ -47,11 +49,17 @@ async def collect_batch(
                     read_source_document, path, page_limit
                 )
             except DocumentUnreadable as unreadable:
-                skipped.append(_skipped(path.name, str(unreadable)))
+                not_used.append(
+                    _not_used_entry(NOT_READ_KIND, path.name, str(unreadable))
+                )
                 continue
             except OSError as error:
-                skipped.append(
-                    _skipped(path.name, f"Could not be opened ({error.strerror}).")
+                not_used.append(
+                    _not_used_entry(
+                        NOT_READ_KIND,
+                        path.name,
+                        f"Could not be opened ({error.strerror}).",
+                    )
                 )
                 continue
 
@@ -60,7 +68,11 @@ async def collect_batch(
                 connection, project_id, path.name, content_hash
             )
             if matched is not None:
-                skipped.append(_skipped(path.name, _already_read_reason(matched)))
+                not_used.append(
+                    _not_used_entry(
+                        ALREADY_READ_KIND, path.name, _already_read_reason(matched)
+                    )
+                )
                 continue
 
             document_ids.append(
@@ -69,7 +81,7 @@ async def collect_batch(
                 )
             )
 
-    return CollectedBatch(document_ids=document_ids, skipped=skipped)
+    return CollectedBatch(document_ids=document_ids, not_used=not_used)
 
 
 async def _write_document(
@@ -104,8 +116,8 @@ def _top_level_files(source_folder: Path) -> list[Path]:
     return [path for path in source_folder.iterdir() if path.is_file()]
 
 
-def _skipped(file_name: str, reason: str) -> dict[str, str]:
-    return {"kind": SKIPPED_FILE_KIND, "file": file_name, "reason": reason}
+def _not_used_entry(kind: str, file_name: str, reason: str) -> dict[str, str]:
+    return {"kind": kind, "file": file_name, "reason": reason}
 
 
 async def _already_read_by_name_or_content(

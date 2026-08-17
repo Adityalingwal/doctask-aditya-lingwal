@@ -41,7 +41,7 @@ EXPECTED_COLUMNS = {
         "started_at",
         "finished_at",
         "finished_stages",
-        "skipped",
+        "not_used",
         "ended_early_reason",
         "failure_reason",
         "export_json",

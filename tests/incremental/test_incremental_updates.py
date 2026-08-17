@@ -285,5 +285,5 @@ def test_a_changed_rules_file_re_examines_the_register_without_reading_a_documen
     assert [rule["id"] for rule in examined["rules"]] == ["R1", "R9"]
     assert after_rules_run[UNTOUCHED_ROW] == after_first_run[UNTOUCHED_ROW]
     assert ended["ended_early_reason"] == (
-        "Nothing was read — all 1 file was skipped. See the Skipped tab for why."
+        "Nothing was read — all 1 file was not used. See the Not used tab for why."
     )

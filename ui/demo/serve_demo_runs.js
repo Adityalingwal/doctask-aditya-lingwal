@@ -84,7 +84,7 @@ function demoRuns() {
         failure_reason:
           "OPENROUTER_API_KEY is empty — copy .env.example to .env and put an "
           + "OpenRouter API key in it, then start the run again.",
-        skipped: [
+        not_used: [
           {
             source_file: "northside-dental-brochure.pdf",
             reason: "read as an unrelated document, so it produced no requirement",

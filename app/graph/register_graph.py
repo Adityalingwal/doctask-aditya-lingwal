@@ -46,9 +46,10 @@ from app.register.propose_rows import MatchSettlement, committed_rows, propose_r
 from app.review.review_queue import export_was_approved
 from app.run_logging import log_run_event
 from app.runs.finished_stages import record_stage_finished
+from app.runs.not_used_kinds import NOT_READ_KIND
 from app.runs.run_records import (
+    append_not_used,
     append_reported_instructions,
-    append_skipped,
     enter_stage,
     read_project,
     read_run,
@@ -77,7 +78,6 @@ COMMIT_NODE = "commit"
 END_EARLY_NODE = "end_early"
 CLOSE_WITHOUT_EXPORT_NODE = "close_without_export"
 
-SKIPPED_DOCUMENT_KIND = "document"
 NO_FILES_FOUND = "No files were found in this folder."
 NOTHING_FOUND = "The documents were read, but none of them stated a requirement."
 NOTHING_MOVED = (
@@ -86,11 +86,11 @@ NOTHING_MOVED = (
 )
 
 
-def _nothing_read_reason(skipped_count: int) -> str:
-    file_word = "file was" if skipped_count == 1 else "files were"
+def _nothing_read_reason(not_used_count: int) -> str:
+    file_word = "file was" if not_used_count == 1 else "files were"
     return (
-        f"Nothing was read — all {skipped_count} {file_word} skipped. See "
-        "the Skipped tab for why."
+        f"Nothing was read — all {not_used_count} {file_word} not used. See "
+        "the Not used tab for why."
     )
 
 
@@ -98,7 +98,7 @@ class RunState(TypedDict, total=False):
     run_id: str
     project_id: str
     document_ids: list[str]
-    skipped_count: int
+    not_used_count: int
     next_document_index: int
     requirements_found: int
     observations_found: int
@@ -149,7 +149,7 @@ def build_register_graph(
                 accepted_extensions,
                 page_limit,
             )
-            await append_skipped(connection, run_id, batch.skipped)
+            await append_not_used(connection, run_id, batch.not_used)
             examine_changed_rules = (
                 not batch.document_ids
                 and bool(await committed_rows(connection, project_id))
@@ -163,13 +163,13 @@ def build_register_graph(
             logging.INFO,
             "ingest_finished",
             f"Ingest took {len(batch.document_ids)} document(s) into the batch "
-            f"and skipped {len(batch.skipped)}.",
+            f"and did not use {len(batch.not_used)}.",
             run_id,
-            skipped=batch.skipped,
+            not_used=batch.not_used,
         )
         return {
             "document_ids": [str(document_id) for document_id in batch.document_ids],
-            "skipped_count": len(batch.skipped),
+            "not_used_count": len(batch.not_used),
             "next_document_index": 0,
             "requirements_found": 0,
             "observations_found": 0,
@@ -195,9 +195,9 @@ def build_register_graph(
                 model_client, source_file, document["extracted_text"]
             )
         except UnrecognisedDocumentType as unrecognised:
-            skip_reason = "The model gave an unknown document type."
+            not_read_reason = "The model gave an unknown document type."
             log_reason = (
-                f"{source_file} was skipped: {unrecognised}. The other "
+                f"{source_file} was not read: {unrecognised}. The other "
                 "documents in the batch continue and the next run reads this "
                 "one again; if the type keeps coming back invented, name a "
                 "stronger model in config/model.yaml."
@@ -206,14 +206,14 @@ def build_register_graph(
                 logging.WARNING, "extract_document_type_unrecognised", log_reason, run_id
             )
             async with pool.connection() as connection:
-                await append_skipped(
+                await append_not_used(
                     connection,
                     run_id,
                     [
                         {
-                            "kind": SKIPPED_DOCUMENT_KIND,
+                            "kind": NOT_READ_KIND,
                             "file": source_file,
-                            "reason": skip_reason,
+                            "reason": not_read_reason,
                         }
                     ],
                 )
@@ -222,17 +222,17 @@ def build_register_graph(
         except ListTheDocumentTypeMayNotFill as not_allowed:
             # The prompt and the schema both state which lists a type may
             # fill, so this is a wrong answer rather than something to correct
-            # quietly. One document is skipped; the batch carries on.
+            # quietly. One document is not read; the batch carries on.
             # The stored reason names what came back: "something it may not
             # report" leaves the Delivery Owner nothing to act on, and the
             # detail lived only in the log line, which never reaches a screen.
-            skip_reason = (
+            not_read_reason = (
                 f"The model read this as {not_allowed.reported_type} and "
                 f"reported {not_allowed.list_name}, which that kind of "
                 "document may not report."
             )
             log_reason = (
-                f"{source_file} was skipped: {not_allowed}. The other "
+                f"{source_file} was not read: {not_allowed}. The other "
                 "documents in the batch continue and the next run reads this "
                 "one again."
             )
@@ -243,14 +243,14 @@ def build_register_graph(
                 run_id,
             )
             async with pool.connection() as connection:
-                await append_skipped(
+                await append_not_used(
                     connection,
                     run_id,
                     [
                         {
-                            "kind": SKIPPED_DOCUMENT_KIND,
+                            "kind": NOT_READ_KIND,
                             "file": source_file,
-                            "reason": skip_reason,
+                            "reason": not_read_reason,
                         }
                     ],
                 )
@@ -258,26 +258,26 @@ def build_register_graph(
             return {"next_document_index": index + 1}
         except Exception as error:
             # One document degrades the run; a broken setup stops it, because
-            # skipping every document would export an empty register instead
-            # of the practical explanation.
+            # leaving every document unread would export an empty register
+            # instead of the practical explanation.
             raise_if_configuration_failure(error)
-            skip_reason = "The model call failed for this file."
+            not_read_reason = "The model call failed for this file."
             log_reason = (
-                f"{source_file} was skipped after the model call failed "
+                f"{source_file} was not read after the model call failed "
                 f"({describe_unreadable_answer(error)}) — the other documents "
                 "in the batch continue, and the next run reads this document "
                 "again."
             )
-            _log(logging.ERROR, "extract_document_skipped", log_reason, run_id)
+            _log(logging.ERROR, "extract_document_not_read", log_reason, run_id)
             async with pool.connection() as connection:
-                await append_skipped(
+                await append_not_used(
                     connection,
                     run_id,
                     [
                         {
-                            "kind": SKIPPED_DOCUMENT_KIND,
+                            "kind": NOT_READ_KIND,
                             "file": source_file,
-                            "reason": skip_reason,
+                            "reason": not_read_reason,
                         }
                     ],
                 )
@@ -285,12 +285,12 @@ def build_register_graph(
             return {"next_document_index": index + 1}
 
         located = locate_extraction(answer, document["extracted_text"], source_file)
-        skipped = list(located.dropped)
+        not_used = list(located.dropped)
         requirements_found = len(located.extraction["requirements"])
         if answer.document_type == UNRELATED_DOCUMENT:
-            skipped.append(
+            not_used.append(
                 {
-                    "kind": SKIPPED_DOCUMENT_KIND,
+                    "kind": NOT_READ_KIND,
                     "file": source_file,
                     "reason": "This document is not related to this client or project.",
                 }
@@ -320,7 +320,7 @@ def build_register_graph(
                 "UPDATE documents SET extraction = %s WHERE id = %s",
                 (Jsonb(located.extraction), document_id),
             )
-            await append_skipped(connection, run_id, skipped)
+            await append_not_used(connection, run_id, not_used)
             await append_reported_instructions(connection, run_id, reported)
             await _finish_stage(connection, run_id, EXTRACT_STAGE)
 
@@ -375,7 +375,7 @@ def build_register_graph(
             # all four kinds of document arrive in one batch whenever a project
             # is added over a folder that already holds them.
             moves = await propose_moves(connection, model_client, run_id, project_id)
-            await append_skipped(connection, run_id, moves.unmatched)
+            await append_not_used(connection, run_id, moves.unmatched)
             await _finish_stage(connection, run_id, MATCH_STAGE)
 
         _log(
@@ -627,7 +627,7 @@ async def _settle_against_the_register(
     except Exception as error:
         raise_if_configuration_failure(error)
         # Match answers for the whole batch in one call, so there is no single
-        # document to skip the way Extract skips one.
+        # document to leave unread the way Extract leaves one.
         raise ModelCallFailed(
             "Match could not be answered for this batch "
             f"({describe_unreadable_answer(error)}) — no register row was "
@@ -694,8 +694,8 @@ def _early_reason(state: RunState) -> str:
         if state.get("observations_found") and not state.get("requirements_found"):
             return NOTHING_MOVED
         return NOTHING_FOUND
-    skipped_count = state.get("skipped_count", 0)
-    return _nothing_read_reason(skipped_count) if skipped_count else NO_FILES_FOUND
+    not_used_count = state.get("not_used_count", 0)
+    return _nothing_read_reason(not_used_count) if not_used_count else NO_FILES_FOUND
 
 
 def _observations_in(extraction: dict[str, Any]) -> int:

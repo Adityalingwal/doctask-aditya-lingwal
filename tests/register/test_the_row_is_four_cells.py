@@ -81,7 +81,7 @@ def test_a_document_stating_a_blocker_produces_no_blocker_anywhere(
 
     assert finished["extraction"].get("blockers", []) == []
     everything_shown = json.dumps(
-        [finished["export"], finished["run"]["skipped"], finished["run"]["examine"]]
+        [finished["export"], finished["run"]["not_used"], finished["run"]["examine"]]
     )
     assert BLOCKER_SUMMARY not in everything_shown
     assert "WhatsApp" not in everything_shown

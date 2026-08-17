@@ -26,6 +26,15 @@ const WAITING_FOR_REVIEW = "needs review";
 // nowhere as something to answer.
 const EXPORT_GATE_KIND = "export";
 
+// The label each kind of not-used entry wears, and the only source of one. A
+// kind this map does not hold renders with no label at all: a wrong label is
+// worse than none, and the server may learn a kind before this screen does.
+const NOT_USED_LABELS = {
+  "already read": "Already read",
+  "not read": "Not read",
+  dropped: "Dropped",
+};
+
 // The screen's own name. The register it shows keeps the name the decisions and
 // the exports give it; this is only what the person looking at it calls the
 // thing, and it lives in one place so it can be changed in one place.
@@ -315,7 +324,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const selectedProject =
     projects.find((project) => project.project_id === selectedProjectId) ?? null;
 
-  // A run panel has four tabs — Stages, Skipped, Decisions, Reported. The
+  // A run panel has four tabs — Stages, Not used, Decisions, Reported. The
   // register is not one of them: it is the project's own panel, opened from
   // the Register entry in the runs column, never from here (section 2.3).
   const sections =
@@ -330,13 +339,13 @@ export default function ReviewScreen({ runId: openedRunId }) {
             body: <Stages run={run} />,
           },
           {
-            id: "skipped",
+            id: "not-used",
             number: "02",
-            name: "Skipped",
-            tab: "Skipped",
-            tabCount: run.skipped.length === 0 ? null : String(run.skipped.length),
-            count: `${run.skipped.length} skipped`,
-            body: <Skipped skipped={run.skipped} />,
+            name: "Not used",
+            tab: "Not used",
+            tabCount: run.not_used.length === 0 ? null : String(run.not_used.length),
+            count: `${run.not_used.length} not used`,
+            body: <NotUsed entries={run.not_used} />,
           },
           {
             id: "decisions",
@@ -555,19 +564,25 @@ function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
   );
 }
 
-// Screen 5: the file name, then what happened — the `file`, `summary` and
-// `reason` labels themselves are never printed. A dropped quote is told apart
-// by carrying `summary` (a whole skipped document never does), so it shows
-// its file, the requirement that was dropped, and why — never `quote`, which
-// is the model's words, not the document's, and unverified besides.
-function Skipped({ skipped }) {
-  if (skipped.length === 0) {
-    return <p className="m-0 text-ink-soft">This run skipped nothing.</p>;
+// Screen 5: the kind's label, the file name, then what happened — the `file`,
+// `summary` and `reason` labels themselves are never printed. A dropped quote
+// is told apart by carrying `summary` (a whole document that was not read
+// never does), so it shows its file, the requirement that was dropped, and
+// why — never `quote`, which is the model's words, not the document's, and
+// unverified besides.
+function NotUsed({ entries }) {
+  if (entries.length === 0) {
+    return <p className="m-0 text-ink-soft">Nothing in this run went unused.</p>;
   }
   return (
     <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
-      {skipped.map((entry, place) => (
+      {entries.map((entry, place) => (
         <li key={place} className="border border-line bg-card px-4 py-3 text-sm">
+          {Object.hasOwn(NOT_USED_LABELS, entry.kind) && (
+            <p className="m-0 font-semibold text-ink-soft">
+              {NOT_USED_LABELS[entry.kind]}
+            </p>
+          )}
           {entry.summary !== undefined ? (
             <p className="m-0">
               <span className="font-mono font-semibold">{entry.file}</span>

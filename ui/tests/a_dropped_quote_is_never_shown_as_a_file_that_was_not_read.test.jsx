@@ -10,10 +10,10 @@ afterEach(() => {
 });
 
 // A whole document Ingest never read (`app/ingest/collect_batch.py`'s
-// `_skipped`): `kind`, `file` and `reason`, and nothing else — in particular,
-// no `summary`.
-const skippedDocument = {
-  kind: "file",
+// `_not_used_entry`): `kind`, `file` and `reason`, and nothing else — in
+// particular, no `summary`.
+const documentThatWasNotRead = {
+  kind: "not read",
   file: "budget.xlsx",
   reason: "Not a format this system reads. It reads .md, .pdf, .docx and .txt.",
 };
@@ -22,7 +22,7 @@ const skippedDocument = {
 // (`app/extract/read_document.py`): the same `file` key, plus `summary` —
 // which only a dropped entry carries.
 const droppedRequirement = {
-  kind: "requirement",
+  kind: "dropped",
   file: "12-march-scope.md",
   summary: "an SMS reminder before every appointment",
   quote: "the client wants a text message reminder before each appointment",
@@ -37,16 +37,16 @@ test("a dropped quote is never shown as a file that was not read", async () => {
       {
         method: "GET",
         path: `/runs/${runId}`,
-        reply: { body: runReply({ skipped: [skippedDocument, droppedRequirement] }) },
+        reply: { body: runReply({ not_used: [documentThatWasNotRead, droppedRequirement] }) },
       },
     ]),
   );
 
   render(<ReviewScreen runId={runId} />);
-  await openSection(/skipped/i);
+  await openSection(/not used/i);
 
   const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
-  const documentCard = cards.find((text) => text.includes(skippedDocument.reason));
+  const documentCard = cards.find((text) => text.includes(documentThatWasNotRead.reason));
   const droppedCard = cards.find((text) => text.includes(droppedRequirement.summary));
 
   // Both name their own file, but only the dropped quote's card also says
@@ -55,7 +55,7 @@ test("a dropped quote is never shown as a file that was not read", async () => {
   // dropped".
   expect(documentCard).toBeTruthy();
   expect(droppedCard).toBeTruthy();
-  expect(documentCard).toContain(skippedDocument.file);
+  expect(documentCard).toContain(documentThatWasNotRead.file);
   expect(documentCard).not.toContain(droppedRequirement.summary);
   expect(droppedCard).toContain(droppedRequirement.file);
   expect(droppedCard).toContain(droppedRequirement.summary);

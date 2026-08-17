@@ -30,7 +30,7 @@ async def require_run(connection: AsyncConnection, run_id: UUID) -> dict[str, An
 async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] | None:
     result = await connection.execute(
         "SELECT id, project_id, status, current_stage, started_at, finished_at, "
-        "skipped, ended_early_reason, failure_reason, export_json, "
+        "not_used, ended_early_reason, failure_reason, export_json, "
         "review_finished_at, examined_row_count, finished_stages, "
         "reported_instructions "
         "FROM runs WHERE id = %s",
@@ -126,7 +126,7 @@ async def append_reported_instructions(
 
     Extract is replayed from the start of its node on resume, so a blind
     append records the same instruction twice. The whole entry is compared,
-    every key, for the reason `append_skipped` compares whole entries: two
+    every key, for the reason `append_not_used` compares whole entries: two
     instructions from one file differ only in their words.
     """
     if not entries:
@@ -148,7 +148,7 @@ async def append_reported_instructions(
         )
 
 
-async def append_skipped(
+async def append_not_used(
     connection: AsyncConnection,
     run_id: UUID,
     entries: list[dict[str, str]],
@@ -156,26 +156,26 @@ async def append_skipped(
     """Add only the entries this run has not already recorded.
 
     LangGraph replays an interrupted node from its start on resume, so a
-    stage killed after it wrote its skip entries recomputes and hands them
-    here again. The whole entry is compared, every key — a dropped quote and
-    a whole skipped document do not share the same keys, and two different
-    requirements dropped from one file share every key but `summary` and
-    `quote`, so comparing a chosen few would treat them as duplicates and
-    drop a real one.
+    stage killed after it wrote its entries recomputes and hands them here
+    again. The whole entry is compared, every key — a dropped quote and a
+    whole document that was not read do not share the same keys, and two
+    different requirements dropped from one file share every key but
+    `summary` and `quote`, so comparing a chosen few would treat them as
+    duplicates and drop a real one.
     """
     if not entries:
         return
     async with connection.transaction():
         result = await connection.execute(
-            "SELECT skipped FROM runs WHERE id = %s FOR UPDATE",
+            "SELECT not_used FROM runs WHERE id = %s FOR UPDATE",
             (run_id,),
         )
         row = await result.fetchone()
-        already_stored = row["skipped"] if row else []
+        already_stored = row["not_used"] if row else []
         new_entries = [entry for entry in entries if entry not in already_stored]
         if not new_entries:
             return
         await connection.execute(
-            "UPDATE runs SET skipped = skipped || %s WHERE id = %s",
+            "UPDATE runs SET not_used = not_used || %s WHERE id = %s",
             (Jsonb(new_entries), run_id),
         )

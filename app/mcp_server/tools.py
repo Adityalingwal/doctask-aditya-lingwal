@@ -64,7 +64,7 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
 
     @server.tool(name="get_run_status")
     async def get_run_status_tool(run_id: UUID) -> dict[str, Any]:
-        """Read one run's durable status, stage, skips, decisions and findings."""
+        """Read one run's status, stage, what it did not use, decisions and findings."""
         async with application.state.pool.connection() as connection:
             return await read_run_status(connection, run_id)
 

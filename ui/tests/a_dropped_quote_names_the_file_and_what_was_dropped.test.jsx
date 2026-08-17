@@ -13,7 +13,7 @@ afterEach(() => {
 // file it came from, what was asked, the model's own (unverified) words, and
 // why it was dropped.
 const droppedRequirement = {
-  kind: "requirement",
+  kind: "dropped",
   file: "12-march-scope.md",
   summary: "an SMS reminder before every appointment",
   quote: "the client wants a text message reminder before each appointment",
@@ -28,13 +28,13 @@ test("a dropped quote names the file and what was dropped", async () => {
       {
         method: "GET",
         path: `/runs/${runId}`,
-        reply: { body: runReply({ skipped: [droppedRequirement] }) },
+        reply: { body: runReply({ not_used: [droppedRequirement] }) },
       },
     ]),
   );
 
   render(<ReviewScreen runId={runId} />);
-  await openSection(/skipped/i);
+  await openSection(/not used/i);
 
   const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
   const card = cards.find((text) => text.includes(droppedRequirement.summary));
