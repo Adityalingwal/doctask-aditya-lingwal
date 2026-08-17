@@ -578,7 +578,7 @@ function NotUsed({ entries }) {
     <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
       {entries.map((entry, place) => (
         <li key={place} className="border border-line bg-card px-4 py-3 text-sm">
-          {NOT_USED_LABELS[entry.kind] !== undefined && (
+          {Object.hasOwn(NOT_USED_LABELS, entry.kind) && (
             <p className="m-0 font-semibold text-ink-soft">
               {NOT_USED_LABELS[entry.kind]}
             </p>

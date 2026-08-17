@@ -36,6 +36,19 @@ const kindThisScreenDoesNotKnow = {
   file: "handover-summary.md",
   reason: "Something a later version of the server recorded.",
 };
+// Two kinds that collide with keys every plain JavaScript object inherits:
+// looked up on the label map, they find built-ins instead of undefined, so
+// only an own-key guard keeps them on the no-label path.
+const kindNamedLikeAnObjectBuiltIn = {
+  kind: "constructor",
+  file: "renamed-notes.md",
+  reason: "Something a later version of the server recorded.",
+};
+const kindNamedLikeThePrototypeKey = {
+  kind: "__proto__",
+  file: "old-scope.md",
+  reason: "Something a later version of the server recorded.",
+};
 
 function cardsFor(entries) {
   vi.stubGlobal(
@@ -83,4 +96,20 @@ test("an entry whose kind the screen does not know wears no label at all", async
   expect(card).not.toContain("Already read");
   expect(card).not.toContain("Not read");
   expect(card).not.toContain("Dropped");
+});
+
+test("a kind that collides with a built-in object key wears no label and does not break the screen", async () => {
+  cardsFor([kindNamedLikeAnObjectBuiltIn, kindNamedLikeThePrototypeKey]);
+  await openSection(/not used/i);
+
+  const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
+
+  for (const entry of [kindNamedLikeAnObjectBuiltIn, kindNamedLikeThePrototypeKey]) {
+    const card = cards.find((text) => text.includes(entry.file));
+    expect(card).toBeTruthy();
+    expect(card).toContain(entry.reason);
+    expect(card).not.toContain("Already read");
+    expect(card).not.toContain("Not read");
+    expect(card).not.toContain("Dropped");
+  }
 });
