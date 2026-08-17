@@ -18,7 +18,7 @@ from app.refusal import (
     UnusableRequest,
 )
 from app.register.export_register import JSON_FORMAT, MARKDOWN_FORMAT
-from app.register.read_export import read_export
+from app.register.read_export import read_register
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
@@ -141,17 +141,17 @@ async def finish_one_review(
     return await finish_review(_run_engine(request), run_id, payload.add_to_register)
 
 
-@router.get("/runs/{run_id}/export")
-async def read_one_export(
+@router.get("/projects/{project_id}/register")
+async def read_one_register(
     request: Request,
-    run_id: UUID,
-    export_format: str = Query(JSON_FORMAT, alias="format"),
+    project_id: UUID,
+    register_format: str = Query(JSON_FORMAT, alias="format"),
 ) -> Any:
     async with request.app.state.pool.connection() as connection:
-        exported = await read_export(connection, run_id, export_format)
-    if export_format == MARKDOWN_FORMAT:
-        return PlainTextResponse(exported)
-    return exported
+        register = await read_register(connection, project_id, register_format)
+    if register_format == MARKDOWN_FORMAT:
+        return PlainTextResponse(register)
+    return register
 
 
 def _refusal_response(

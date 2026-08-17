@@ -104,7 +104,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                     ]
                     approve_every_decision_and_finish_review(client, second_run)
                     wait_for_run_status(client, second_run, "done")
-                    export = client.get(f"/runs/{second_run}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 
@@ -227,7 +227,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
                         json={"add_to_register": True},
                     ).raise_for_status()
                     wait_for_run_status(client, second_run, "done")
-                    export = client.get(f"/runs/{second_run}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 
@@ -316,7 +316,7 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
                     wait_for_run_status(client, second_run, "needs review")
                     approve_every_decision_and_finish_review(client, second_run)
                     wait_for_run_status(client, second_run, "done")
-                    export = client.get(f"/runs/{second_run}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
                     status = client.get(f"/runs/{second_run}").json()
             finally:
                 application.stop()

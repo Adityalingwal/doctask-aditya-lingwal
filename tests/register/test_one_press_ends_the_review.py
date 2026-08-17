@@ -35,7 +35,7 @@ EXPORT_QUESTION = "Add this run's changes to the register?"
 @contextmanager
 def _run_at_review_with_one_finding(
     tmp_path: Path,
-) -> Iterator[tuple[ApplicationProcess, str, str]]:
+) -> Iterator[tuple[ApplicationProcess, str, str, str]]:
     """One run parked at Review with a finding waiting — a real question of its own.
 
     A finding rather than nothing at all, because the export gate is no longer
@@ -71,7 +71,7 @@ def _run_at_review_with_one_finding(
                         "/runs", json={"project_id": project_id}
                     ).json()["run_id"]
                     wait_for_run_status(client, run_id, "needs review")
-                yield application, database_url, run_id
+                yield application, database_url, project_id, run_id
             finally:
                 application.stop()
 
@@ -82,6 +82,7 @@ def test_entering_review_raises_no_export_decision_and_leaves_only_the_runs_own_
     with _run_at_review_with_one_finding(tmp_path) as (
         application,
         database_url,
+        _project_id,
         run_id,
     ):
         with application.client() as client:
@@ -107,6 +108,7 @@ def test_one_press_adding_this_runs_changes_commits_them_and_records_the_answer(
     with _run_at_review_with_one_finding(tmp_path) as (
         application,
         database_url,
+        project_id,
         run_id,
     ):
         with application.client() as client:
@@ -115,12 +117,12 @@ def test_one_press_adding_this_runs_changes_commits_them_and_records_the_answer(
                 f"/runs/{run_id}/finish-review", json={"add_to_register": True}
             )
             wait_for_run_status(client, run_id, "done")
-            export = client.get(f"/runs/{run_id}/export").json()
+            register = client.get(f"/projects/{project_id}/register").json()
 
         recorded = _export_decision(database_url, run_id)
 
     assert finished.status_code == 200
-    assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [REQUIREMENT]
+    assert [row["cells"]["what_was_asked"] for row in register["rows"]] == [REQUIREMENT]
     # The audit still shows what the person answered, on the question they read.
     assert recorded["kind"] == "export"
     assert recorded["question"] == EXPORT_QUESTION
@@ -134,6 +136,7 @@ def test_one_press_discarding_this_runs_changes_commits_nothing_and_ends_the_run
     with _run_at_review_with_one_finding(tmp_path) as (
         application,
         database_url,
+        project_id,
         run_id,
     ):
         with application.client() as client:
@@ -142,16 +145,17 @@ def test_one_press_discarding_this_runs_changes_commits_nothing_and_ends_the_run
                 f"/runs/{run_id}/finish-review", json={"add_to_register": False}
             )
             wait_for_run_status(client, run_id, "discarded")
-            export_attempt = client.get(f"/runs/{run_id}/export")
+            register_after_discard = client.get(f"/projects/{project_id}/register")
 
         recorded = _export_decision(database_url, run_id)
         committed = _committed_row_count(database_url, run_id)
 
     assert finished.status_code == 200
     assert committed == 0
-    # The export answers exactly as it does for any run that committed nothing.
-    assert export_attempt.status_code == 409
-    assert "exported nothing" in export_attempt.json()["detail"]
+    # The register answers exactly as it does when nothing has ever committed:
+    # the empty state, never an error.
+    assert register_after_discard.status_code == 200
+    assert register_after_discard.json()["rows"] == []
     assert recorded["question"] == EXPORT_QUESTION
     assert recorded["outcome"] == "rejected"
 
@@ -162,6 +166,7 @@ def test_finishing_a_review_without_saying_which_answer_names_the_cause_and_the_
     with _run_at_review_with_one_finding(tmp_path) as (
         application,
         _database_url,
+        _project_id,
         run_id,
     ):
         with application.client() as client:

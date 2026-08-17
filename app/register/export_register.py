@@ -11,20 +11,32 @@ from app.examine.read_findings import (
     exported_finding,
 )
 from app.register.cells import CELL_NAMES, COLUMN_HEADINGS
+from app.runs.statuses import DONE
 
 
 JSON_FORMAT = "json"
 MARKDOWN_FORMAT = "markdown"
-EXPORT_FORMATS = (JSON_FORMAT, MARKDOWN_FORMAT)
+REGISTER_FORMATS = (JSON_FORMAT, MARKDOWN_FORMAT)
+
+# The one sentence a register no run has committed to answers with — the same
+# words the screen shows, never an error and never an empty table.
+EMPTY_REGISTER_LINE = "Nothing has been added to this register yet."
 
 
-async def build_export(
+async def build_register_document(
     connection: AsyncConnection,
     project: dict[str, Any],
-    run_id: UUID,
-    exported_at: str,
 ) -> dict[str, Any]:
-    """The approved register as JSON — the record every other surface reads."""
+    """The project's committed register as JSON — the record every surface reads.
+
+    Read live from `register_rows` on every call: what used to be computed at
+    commit time and copied into a snapshot is computed at read time, so the
+    register has one truth. `exported_at` and `examine` come from the newest
+    `done` run — `finished_at` is written in the same transaction that commits
+    the rows, so it is exactly the moment the register last gained rows — and
+    both are null while no run has committed anything.
+    """
+    newest_done = await _newest_done_run(connection, project["id"])
     rows_result = await connection.execute(
         "SELECT id, row_number, fingerprint, "
         + ", ".join(CELL_NAMES)
@@ -56,7 +68,7 @@ async def build_export(
         )
 
     # A row carries every finding approved onto it, whichever run raised it;
-    # the examine block below is what this one run judged and found.
+    # the examine block below is what the newest committed run judged and found.
     findings_by_row: dict[UUID, list[dict[str, Any]]] = {}
     for finding in await approved_findings_of_project(connection, project["id"]):
         findings_by_row.setdefault(finding["register_row_id"], []).append(
@@ -65,8 +77,11 @@ async def build_export(
 
     return {
         "project": {"id": str(project["id"]), "name": project["name"]},
-        "run_id": str(run_id),
-        "exported_at": exported_at,
+        "exported_at": (
+            newest_done["finished_at"].isoformat()
+            if newest_done is not None
+            else None
+        ),
         "columns": list(CELL_NAMES),
         "rows": [
             {
@@ -78,33 +93,62 @@ async def build_export(
             }
             for row in rows
         ],
-        "examine": await examine_as_exported(connection, run_id),
+        "examine": (
+            await examine_as_exported(connection, newest_done["id"])
+            if newest_done is not None
+            else None
+        ),
     }
 
 
-def export_as_markdown(export: dict[str, Any]) -> str:
+async def _newest_done_run(
+    connection: AsyncConnection,
+    project_id: UUID,
+) -> dict[str, Any] | None:
+    result = await connection.execute(
+        "SELECT id, finished_at FROM runs "
+        "WHERE project_id = %s AND status = %s "
+        "ORDER BY finished_at DESC LIMIT 1",
+        (project_id, DONE),
+    )
+    return await result.fetchone()
+
+
+def register_as_markdown(register: dict[str, Any]) -> str:
     """Generated from the JSON record, never edited or stored separately."""
-    headings = [COLUMN_HEADINGS[name] for name in export["columns"]]
     lines = [
-        f"# Requirements-to-Delivery Register — {export['project']['name']}",
+        f"# Requirements-to-Delivery Register — {register['project']['name']}",
         "",
-        f"Exported from run {export['run_id']} at {export['exported_at']}.",
-        "",
-        "| # | " + " | ".join(headings) + " |",
-        "|---|" + "|".join(["---"] * len(headings)) + "|",
     ]
-    for row in export["rows"]:
-        cells = [_single_line(row["cells"][name]) for name in export["columns"]]
-        lines.append(f"| {row['row_number']} | " + " | ".join(cells) + " |")
+    if register["exported_at"] is not None:
+        lines += [f"Last updated {register['exported_at']}.", ""]
 
-    lines += ["", "## Citations", ""]
-    for row in export["rows"]:
-        lines.append(f"**Row {row['row_number']}** — {row['cells']['what_was_asked']}")
-        for citation in row["citations"]:
-            lines.append(_citation_line(citation))
-        lines.append("")
+    if register["rows"]:
+        headings = [COLUMN_HEADINGS[name] for name in register["columns"]]
+        lines += [
+            "| # | " + " | ".join(headings) + " |",
+            "|---|" + "|".join(["---"] * len(headings)) + "|",
+        ]
+        for row in register["rows"]:
+            cells = [
+                _single_line(row["cells"][name]) for name in register["columns"]
+            ]
+            lines.append(f"| {row['row_number']} | " + " | ".join(cells) + " |")
 
-    return "\n".join(lines + _findings_lines(export["examine"]))
+        lines += ["", "## Citations", ""]
+        for row in register["rows"]:
+            lines.append(
+                f"**Row {row['row_number']}** — {row['cells']['what_was_asked']}"
+            )
+            for citation in row["citations"]:
+                lines.append(_citation_line(citation))
+            lines.append("")
+    else:
+        lines += [EMPTY_REGISTER_LINE, ""]
+
+    if register["examine"] is None:
+        return "\n".join(lines)
+    return "\n".join(lines + _findings_lines(register["examine"]))
 
 
 def _rule_settings(rule: dict[str, Any]) -> str:

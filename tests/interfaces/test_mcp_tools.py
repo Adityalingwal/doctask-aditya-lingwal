@@ -31,7 +31,7 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 LOCKED_TOOLS = [
     "create_project",
     "finish_review",
-    "get_export",
+    "get_register",
     "get_run_status",
     "list_projects",
     "start_run",
@@ -71,7 +71,7 @@ def _application(
 def _run_at_review(
     application: ApplicationProcess,
     source_folder_path: str,
-) -> str:
+) -> tuple[str, str]:
     """One run driven through the API until it is parked at Review."""
     with application.client() as client:
         project_id = client.post(
@@ -84,14 +84,14 @@ def _run_at_review(
             == "needs review",
             "the run reaches Review",
         )
-    return run_id
+    return project_id, run_id
 
 
 def test_a_tool_and_its_endpoint_answer_one_operation_identically(
     tmp_path: Path,
 ) -> None:
     with _application(tmp_path) as (application, _database_url, _source_folder, source_folder_path):
-        run_id = _run_at_review(application, source_folder_path)
+        _project_id, run_id = _run_at_review(application, source_folder_path)
         # Relative and directly inside the projects root, so this genuinely
         # exercises the missing-folder refusal rather than the confinement
         # refusal an absolute `tmp_path`-based path would trigger instead.
@@ -158,11 +158,11 @@ def test_neither_door_creates_a_project_with_an_empty_folder(
     assert "" not in folders
 
 
-def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
+def test_no_tool_finishes_a_review_or_commits_what_nobody_approved(
     tmp_path: Path,
 ) -> None:
     with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
-        run_id = _run_at_review(application, source_folder_path)
+        project_id, run_id = _run_at_review(application, source_folder_path)
 
         # The finding is unanswered, so no ending may be taken; and a call
         # that does not say which ending is refused before anything is read.
@@ -174,32 +174,44 @@ def test_no_tool_finishes_a_review_or_exports_what_nobody_approved(
         without_an_answer = call_tool(
             application.base_url, "finish_review", {"run_id": run_id}
         )
-        exporting = call_tool(
-            application.base_url, "get_export", {"run_id": run_id, "export_format": "json"}
+        register = call_tool(
+            application.base_url,
+            "get_register",
+            {"project_id": project_id, "register_format": "json"},
         )
 
         engine = create_engine(database_url)
         with engine.connect() as connection:
             run = connection.execute(
                 text(
-                    "SELECT status, export_json, review_finished_at FROM runs "
+                    "SELECT status, review_finished_at FROM runs "
                     "WHERE id = :run_id"
                 ),
                 {"run_id": run_id},
             ).one()
+            committed_rows = connection.execute(
+                text(
+                    "SELECT count(*) FROM register_rows "
+                    "WHERE project_id = :project_id AND is_committed"
+                ),
+                {"project_id": project_id},
+            ).scalar_one()
         engine.dispose()
 
     assert finishing.refused is True
     assert without_an_answer.refused is True
-    assert exporting.refused is True
+    # The register is readable at any moment; while nothing is approved it
+    # answers the empty state rather than showing unapproved work.
+    assert register.refused is False
+    assert register.payload["rows"] == []
+    assert committed_rows == 0
     assert run.status == "needs review"
-    assert run.export_json is None
     assert run.review_finished_at is None
 
 
 def test_a_tool_reports_only_the_run_state_the_database_holds(tmp_path: Path) -> None:
     with _application(tmp_path) as (application, database_url, _source_folder, source_folder_path):
-        run_id = _run_at_review(application, source_folder_path)
+        _project_id, run_id = _run_at_review(application, source_folder_path)
         waiting = call_tool(application.base_url, "get_run_status", {"run_id": run_id})
         finding_decision = next(
             decision
@@ -223,7 +235,7 @@ def test_a_tool_reports_only_the_run_state_the_database_holds(tmp_path: Path) ->
         with engine.connect() as connection:
             run = connection.execute(
                 text(
-                    "SELECT status, current_stage, export_json FROM runs "
+                    "SELECT status, current_stage FROM runs "
                     "WHERE id = :run_id"
                 ),
                 {"run_id": run_id},
@@ -239,7 +251,7 @@ def test_a_tool_reports_only_the_run_state_the_database_holds(tmp_path: Path) ->
     assert answered.refused is False
     assert after_answer.payload["status"] == run.status
     assert after_answer.payload["stage"] == run.current_stage
-    assert after_answer.payload["exported"] is (run.export_json is not None)
+    assert after_answer.payload["exported"] is (run.status == "done")
     assert {
         decision["decision_id"]: decision["outcome"]
         for decision in after_answer.payload["decisions"]
@@ -260,8 +272,8 @@ def test_a_core_refusal_reaches_a_tool_caller_with_its_cause_and_its_fix(
         )
         unusable_format = call_tool(
             application.base_url,
-            "get_export",
-            {"run_id": unknown_run_id, "export_format": "spreadsheet"},
+            "get_register",
+            {"project_id": unknown_project_id, "register_format": "spreadsheet"},
         )
 
     assert unknown_project.refused is True
@@ -273,7 +285,7 @@ def test_a_core_refusal_reaches_a_tool_caller_with_its_cause_and_its_fix(
     assert "POST /runs" in unknown_run.text
 
     assert unusable_format.refused is True
-    assert "'spreadsheet' is not an export format" in unusable_format.text
+    assert "'spreadsheet' is not a register format" in unusable_format.text
     assert "json or markdown" in unusable_format.text
 
 

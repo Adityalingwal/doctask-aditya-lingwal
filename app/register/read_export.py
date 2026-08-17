@@ -5,33 +5,29 @@ from uuid import UUID
 
 from psycopg import AsyncConnection
 
-from app.refusal import NotPossibleNow, UnusableRequest
+from app.refusal import UnusableRequest
 from app.register.export_register import (
-    EXPORT_FORMATS,
     MARKDOWN_FORMAT,
-    export_as_markdown,
+    REGISTER_FORMATS,
+    build_register_document,
+    register_as_markdown,
 )
-from app.runs.run_records import require_run
+from app.runs.run_records import require_project
 
 
-async def read_export(
+async def read_register(
     connection: AsyncConnection,
-    run_id: UUID,
-    export_format: str,
+    project_id: UUID,
+    register_format: str,
 ) -> dict[str, Any] | str:
-    """The register one run exported, in the format the caller asked for."""
-    if export_format not in EXPORT_FORMATS:
+    """One project's register, read live from its committed rows."""
+    if register_format not in REGISTER_FORMATS:
         raise UnusableRequest(
-            f"'{export_format}' is not an export format — ask for "
-            f"{' or '.join(EXPORT_FORMATS)}."
+            f"'{register_format}' is not a register format — ask for "
+            f"{' or '.join(REGISTER_FORMATS)}."
         )
-    run = await require_run(connection, run_id)
-    if run["export_json"] is None:
-        raise NotPossibleNow(
-            "this run has exported nothing — the register is exported only "
-            "once the Delivery Owner adds this run's changes to it with POST "
-            f'/runs/{run_id}/finish-review {{"add_to_register": true}}.'
-        )
-    if export_format == MARKDOWN_FORMAT:
-        return export_as_markdown(run["export_json"])
-    return run["export_json"]
+    project = await require_project(connection, project_id)
+    register = await build_register_document(connection, project)
+    if register_format == MARKDOWN_FORMAT:
+        return register_as_markdown(register)
+    return register

@@ -93,7 +93,7 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 

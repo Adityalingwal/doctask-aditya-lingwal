@@ -9,6 +9,7 @@ from app.examine.read_findings import examine_under_review
 from app.review.review_queue import decisions_of_run
 from app.runs.finished_stages import ordered_finished_stages
 from app.runs.run_records import require_run
+from app.runs.statuses import DONE
 
 
 async def read_run_status(
@@ -43,5 +44,8 @@ async def read_run_status(
         ],
         "examine": await examine_under_review(connection, run),
         "finished_stages": ordered_finished_stages(run["finished_stages"]),
-        "exported": run["export_json"] is not None,
+        # The key name is machinery both doors already answer with; since the
+        # snapshot went, `done` is the fact it derives from — a run is
+        # `done` exactly when its changes were added to the register.
+        "exported": run["status"] == DONE,
     }

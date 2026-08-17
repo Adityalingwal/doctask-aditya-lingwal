@@ -84,7 +84,7 @@ def test_a_document_type_outside_the_declared_set_is_not_read_and_the_run_contin
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     finished = wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 
@@ -217,7 +217,7 @@ def test_a_filled_list_the_type_may_not_use_leaves_that_document_unread(
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     finished = wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 

@@ -99,16 +99,20 @@ def test_both_doors_add_this_runs_changes_to_the_register_alike(
         with application.client() as client:
             wait_for_run_status(client, over_http, "done")
             wait_for_run_status(client, through_mcp, "done")
-            endpoint_export = client.get(f"/runs/{over_http}/export").json()
-            tool_export = client.get(f"/runs/{through_mcp}/export").json()
+            endpoint_register = client.get(
+                f"/projects/{_project_of(client, over_http)}/register"
+            ).json()
+            tool_register = client.get(
+                f"/projects/{_project_of(client, through_mcp)}/register"
+            ).json()
 
         assert _without_run_id(tool_answer.payload) == _without_run_id(endpoint_answer)
         assert _export_answer(database_url, over_http) == _export_answer(
             database_url, through_mcp
         )
         assert _export_answer(database_url, over_http) == (EXPORT_QUESTION, "approved")
-        assert [row["cells"]["what_was_asked"] for row in endpoint_export["rows"]] == [
-            row["cells"]["what_was_asked"] for row in tool_export["rows"]
+        assert [row["cells"]["what_was_asked"] for row in endpoint_register["rows"]] == [
+            row["cells"]["what_was_asked"] for row in tool_register["rows"]
         ]
 
 
@@ -133,15 +137,22 @@ def test_both_doors_discard_this_runs_changes_alike(tmp_path: Path) -> None:
         with application.client() as client:
             wait_for_run_status(client, over_http, "discarded")
             wait_for_run_status(client, through_mcp, "discarded")
-            endpoint_export = client.get(f"/runs/{over_http}/export")
-            tool_export = client.get(f"/runs/{through_mcp}/export")
+            endpoint_register = client.get(
+                f"/projects/{_project_of(client, over_http)}/register"
+            )
+            tool_register = client.get(
+                f"/projects/{_project_of(client, through_mcp)}/register"
+            )
 
         assert _without_run_id(tool_answer.payload) == _without_run_id(endpoint_answer)
         assert _export_answer(database_url, over_http) == _export_answer(
             database_url, through_mcp
         )
         assert _export_answer(database_url, over_http) == (EXPORT_QUESTION, "rejected")
-        assert endpoint_export.status_code == tool_export.status_code == 409
+        # Neither project committed anything, so both registers answer the
+        # empty state — never an error.
+        assert endpoint_register.status_code == tool_register.status_code == 200
+        assert endpoint_register.json()["rows"] == tool_register.json()["rows"] == []
 
 
 def _run_at_review(client: Any, source_folder_path: str) -> str:
@@ -151,6 +162,10 @@ def _run_at_review(client: Any, source_folder_path: str) -> str:
     run_id = client.post("/runs", json={"project_id": project_id}).json()["run_id"]
     wait_for_run_status(client, run_id, "needs review")
     return run_id
+
+
+def _project_of(client: Any, run_id: str) -> str:
+    return client.get(f"/runs/{run_id}").json()["project_id"]
 
 
 def _without_run_id(payload: dict[str, Any]) -> dict[str, Any]:

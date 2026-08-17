@@ -172,7 +172,7 @@ def test_removing_a_watched_file_does_not_delete_the_rows_it_produced(
             shutil.copy(waiting_folder / SECOND_FILE, source_folder / SECOND_FILE)
             second_run = _exported_run(client, project_id)
             after_second_run = stored_rows(database_url, project_id)
-            export = client.get(f"/runs/{second_run}/export").json()
+            export = client.get(f"/projects/{project_id}/register").json()
 
     assert after_second_run[UNTOUCHED_ROW] == after_first_run[UNTOUCHED_ROW]
     assert [row["row_number"] for row in export["rows"]] == [
