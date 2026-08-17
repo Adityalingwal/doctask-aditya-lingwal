@@ -12,6 +12,7 @@ from app.extract.answer import UNRELATED_DOCUMENT
 from app.ingest.read_source_document import READER_EXTENSIONS, read_source_document
 from app.ingest.unreadable_document import DocumentUnreadable
 from app.runs.not_used_kinds import ALREADY_READ_KIND, NOT_READ_KIND
+from app.runs.statuses import DONE
 
 
 UNREADABLE_FORMAT = "Not a format this system reads. It reads .md and .pdf."
@@ -129,11 +130,14 @@ async def _already_read_by_name_or_content(
     """Which of this file's name or content an earlier, finished read matches.
 
     A document is finished with when Extract read it and nothing is left to
-    do with what it said: either that run exported its register, or the
-    document held nothing the register could ever take. Demanding an export
-    in the second case would send an unrelated document to the model again,
-    and pay for it, on every run for as long as the file sits in the folder.
-    The second half asks what Match asks of the same column.
+    do with what it said: either that run's changes were added to the
+    register — its status is `done`, which the commit node writes in the same
+    transaction that commits the rows, so neither fact exists without the
+    other — or the document held nothing the register could ever take.
+    Demanding a committed run in the second case would send an unrelated
+    document to the model again, and pay for it, on every run for as long as
+    the file sits in the folder. The second half asks what Match asks of the
+    same column.
 
     Either the name or the content alone is enough to count as already read —
     a document that failed extraction has no row here at all (`extraction IS
@@ -147,7 +151,7 @@ async def _already_read_by_name_or_content(
         "JOIN runs ON runs.id = documents.run_id "
         "WHERE runs.project_id = %s "
         "AND documents.extraction IS NOT NULL "
-        "AND (runs.export_json IS NOT NULL "
+        "AND (runs.status = %s "
         "OR documents.extraction ->> 'document_type' = %s "
         "OR jsonb_array_length(documents.extraction -> 'requirements') = 0) "
         "AND (documents.source_path = %s OR documents.content_hash = %s)",
@@ -155,6 +159,7 @@ async def _already_read_by_name_or_content(
             source_path,
             content_hash,
             project_id,
+            DONE,
             UNRELATED_DOCUMENT,
             source_path,
             content_hash,
