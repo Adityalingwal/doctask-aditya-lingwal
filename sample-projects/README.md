@@ -55,7 +55,7 @@ and comes back.
 | 3 | `meeting-notes-18-jun.md` | SMS is blocked, waiting on the clinic's SMS provider account | Meeting notes |
 | 4 | `testing-feedback-15-jul.pdf` | Booking works, the email reminder works, the schedule screen shows the wrong day | Testing feedback |
 | 5 | `handover-summary.md` | A delivery summary — belongs to this engagement but is none of the three primary types | **Related additional** |
-| 6 | `clinic-staff-leave-policy.pdf` | Nothing to do with this engagement — must be skipped with its reason recorded | **Unrelated** |
+| 6 | `clinic-staff-leave-policy.pdf` | Nothing to do with this engagement — must be recorded as not read, with its reason | **Unrelated** |
 
 **Formats are deliberately mixed.** `intake-portal` is entirely `.md`. This
 corpus uses `.md` and `.pdf`, so a second run reads both declared formats
@@ -64,7 +64,7 @@ rather than only the one the demo used.
 **The related additional and unrelated documents are both present on
 purpose.** The locked document-type handling requires the second-run test to
 include one of each: the related document is processed, the unrelated one is
-skipped with its reason recorded.
+recorded as not read, with its reason.
 
 ### All four rules fire, and the dates are spaced so they can
 
