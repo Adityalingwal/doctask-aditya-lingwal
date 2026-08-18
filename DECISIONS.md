@@ -230,8 +230,12 @@ extraction of it finished with nothing left to do — either that run's changes
 were added to the register (its status is `done`, tested directly since
 2026-08-18: the commit node writes the rows and the status in one
 transaction, so neither fact exists without the other), or the extraction
-showed the document was unrelated or held no requirement the register could
-take. That extraction must exist
+showed the document was unrelated (settled whatever its run did), or it held
+no requirement and its run ended `no changes`. A no-requirement document of a
+discarded or failed run is read again (decided 2026-08-18): its observations
+never landed, and settling it for ever would silently lose what testing or a
+handover said — the rule requirement-bearing documents already followed.
+That extraction must exist
 (`extraction IS NOT NULL`), so a document whose model call failed has none and
 is read again next run regardless of what its name or content would otherwise
 match.

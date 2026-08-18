@@ -1239,11 +1239,20 @@ working claim only after its own implementation and proof land.
 
 ## Next actions
 
-1. Decide what to do about the export gate and the confident-match downgrade
-   (blocker 1).
-2. Decide whether one bounded live-model run is worth making.
-3. Decide whether the already-read rule should settle a related additional
-   document the way it settles an unrelated one.
+1. Decide whether one bounded live-model run is worth making.
+
+Resolved 2026-08-18: the export-gate item is closed — the downgrade stays and
+the gate is not widened, decided 2026-08-17 and recorded under `## Active
+blockers`; the gate-preview half was decided out of the one-press-gate brief
+the same day.
+
+Resolved 2026-08-18: the already-read question is decided and built — an
+unrelated document settles whatever its run did, but a no-requirement
+document (testing feedback, a handover) of a discarded or failed run is read
+again, the same rule requirement-bearing documents follow.
+`test_a_testing_document_read_only_by_a_discarded_run_is_read_again` failed
+at the baseline (the third run never reached review — the file was settled
+for ever) and passes with the narrowed clause.
 
 Resolved 2026-08-18: the run logger now owns a stdout handler, configured
 once at startup — `tests/runs/test_run_events_reach_stdout.py` proves the

@@ -12,7 +12,7 @@ from app.extract.answer import UNRELATED_DOCUMENT
 from app.ingest.read_source_document import READER_EXTENSIONS, read_source_document
 from app.ingest.unreadable_document import DocumentUnreadable
 from app.runs.not_used_kinds import ALREADY_READ_KIND, NOT_READ_KIND
-from app.runs.statuses import DONE
+from app.runs.statuses import DONE, ENDED_WITHOUT_CHANGES
 
 
 UNREADABLE_FORMAT = "Not a format this system reads. It reads .md and .pdf."
@@ -133,11 +133,15 @@ async def _already_read_by_name_or_content(
     do with what it said: either that run's changes were added to the
     register — its status is `done`, which the commit node writes in the same
     transaction that commits the rows, so neither fact exists without the
-    other — or the document held nothing the register could ever take.
-    Demanding a committed run in the second case would send an unrelated
-    document to the model again, and pay for it, on every run for as long as
-    the file sits in the folder. The second half asks what Match asks of the
-    same column.
+    other — or the document held nothing the register could ever take. That
+    second case is two situations: an unrelated document is unrelated
+    whatever its run did, and a related document with no requirement settles
+    only when its run ended `no changes` — a discarded or failed run's
+    testing feedback or handover carried observations that never landed, so
+    the next run reads it again, exactly as it re-reads that run's
+    requirement-bearing documents. Demanding a committed run for an
+    unrelated document would send it to the model again, and pay for it, on
+    every run for as long as the file sits in the folder.
 
     Either the name or the content alone is enough to count as already read —
     a document that failed extraction has no row here at all (`extraction IS
@@ -153,7 +157,8 @@ async def _already_read_by_name_or_content(
         "AND documents.extraction IS NOT NULL "
         "AND (runs.status = %s "
         "OR documents.extraction ->> 'document_type' = %s "
-        "OR jsonb_array_length(documents.extraction -> 'requirements') = 0) "
+        "OR (jsonb_array_length(documents.extraction -> 'requirements') = 0 "
+        "AND runs.status = %s)) "
         "AND (documents.source_path = %s OR documents.content_hash = %s)",
         (
             source_path,
@@ -161,6 +166,7 @@ async def _already_read_by_name_or_content(
             project_id,
             DONE,
             UNRELATED_DOCUMENT,
+            ENDED_WITHOUT_CHANGES,
             source_path,
             content_hash,
         ),
