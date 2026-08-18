@@ -688,3 +688,81 @@ def test_two_observations_on_one_row_stack_their_questions_verbatim(
     assert asked[0]["question"] == (
         f"{FIRST_OBSERVATION_QUESTION}\n\n{SECOND_OBSERVATION_QUESTION}"
     )
+
+
+def test_a_handover_from_an_earlier_run_still_opposes_a_later_absence_report(
+    tmp_path: Path,
+) -> None:
+    """Never-do: a claim must never be dropped because it arrived in an
+    earlier batch.
+
+    Documents usually arrive one at a time, so the handover and the testing
+    that contradicts it land in different runs. Reading only this batch, the
+    absence report looks unopposed and the row settles on `Not delivered` —
+    while its own citations still carry the handover that says the work was
+    delivered. The conflict the register exists to surface disappears into a
+    verdict nobody made.
+    """
+    with temporary_project_folder("delivery-half") as (folder, source_folder_path):
+        _write_document(folder, MEETING_NOTES_FILE, MEETING_DATE, ASKED_QUOTE)
+        _write_document(folder, HANDOVER_FILE, HANDOVER_DATE, HANDOVER_QUOTE)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(MEETING_NOTES_FILE): _asks(
+                    [(ASKED, ASKED_QUOTE)], "meeting notes"
+                ),
+                extract_marker(HANDOVER_FILE): _handover(
+                    [("the notification was handed over", HANDOVER_QUOTE)]
+                ),
+                extract_marker(TESTING_FILE): _testing(
+                    [("there is no notification at all", "Not found", TESTING_QUOTE)]
+                ),
+                match_marker(): match_answer(1),
+                observation_marker(): observation_answer_of([1]),
+                examine_marker(): no_findings_answer(),
+            },
+        )
+
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects", json={"source_folder_path": source_folder_path}
+                    ).json()["project_id"]
+                    handed_over = _taken_through_review(client, project_id)
+                    _write_document(folder, TESTING_FILE, TESTING_DATE, TESTING_QUOTE)
+                    _taken_through_review(client, project_id)
+                    register = client.get(
+                        f"/projects/{project_id}/register"
+                    ).json()
+            finally:
+                application.stop()
+
+    assert handed_over["rows"][0]["cells"]["status"] == "Handed over"
+    row = register["rows"][0]
+    assert row["cells"]["status"] == "Disputed"
+    cited = {
+        citation["source_file"]
+        for citation in row["citations"]
+        if citation["cell"] == "status"
+    }
+    assert cited == {HANDOVER_FILE, TESTING_FILE}
+
+
+def _taken_through_review(client: Any, project_id: str) -> dict[str, Any]:
+    run_id = client.post("/runs", json={"project_id": project_id}).json()["run_id"]
+    wait_for_run_status(client, run_id, "needs review")
+    approve_every_decision(client, run_id)
+    client.post(
+        f"/runs/{run_id}/finish-review", json={"add_to_register": True}
+    ).raise_for_status()
+    wait_for_run_status(client, run_id, "done")
+    return client.get(f"/projects/{project_id}/register").json()

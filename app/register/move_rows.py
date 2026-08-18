@@ -167,7 +167,9 @@ async def _store_the_moves(
         )
         for row_number in sorted(observations_by_row):
             row = row_by_number[row_number]
-            cells = _cells_the_observations_move(observations_by_row[row_number])
+            cells = _cells_the_observations_move(
+                observations_by_row[row_number], row["status"]
+            )
             if not cells:
                 continue
             decision_id = None
@@ -199,6 +201,7 @@ async def _store_the_moves(
 
 def _cells_the_observations_move(
     observations: list[dict[str, Any]],
+    status_now: str,
 ) -> list[tuple[str, str, list[dict[str, str]]]]:
     """Which cells one row's observations move, and the evidence for each."""
     testing = [one for one in observations if one["kind"] == TESTING_OBSERVATION]
@@ -210,7 +213,11 @@ def _cells_the_observations_move(
             (WHAT_TESTING_FOUND, _joined(testing), _citations_of(testing))
         )
 
-    status = status_after(testing, bool(delivered))
+    # A handover read in an earlier run still claims the work was delivered.
+    # Documents usually arrive one at a time, and without this the same two
+    # documents oppose each other in one batch and quietly agree across two.
+    claimed = bool(delivered) or status_now == STATUS_HANDED_OVER
+    status = status_after(testing, claimed)
     if status is not None:
         moved.append((STATUS, status, _citations_of(testing + delivered)))
     return moved

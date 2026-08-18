@@ -6,6 +6,37 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-19, branch `live-run-repairs`
+
+Two more defects the live run exposed, both fixed test-first.
+
+- **A conflict was being dropped because the two documents arrived in
+  different runs.** `_cells_the_observations_move` read `delivery_claimed`
+  from this batch's observations alone, so a handover in run 4 and a testing
+  report of absence in run 5 settled the row on `Not delivered` — while the
+  row's own citations still carried the handover claiming delivery. The same
+  two documents in one batch gave `Disputed`. The row's standing
+  `Handed over` status now counts as the claim it is.
+  `test_a_handover_from_an_earlier_run_still_opposes_a_later_absence_report`
+  failed at the baseline on `assert 'Not delivered' == 'Disputed'`.
+- **Control characters the model writes no longer reach a cell.** A live
+  reply came back with U+0014 where an em dash had been sent, and it reached
+  the register's findings section and the screen. `call_the_model` strips C0
+  control characters — written either as themselves or as the JSON escape —
+  from every reply, keeping newline, tab and carriage return.
+  `test_a_control_character_the_model_wrote_never_reaches_a_cell` failed at
+  the baseline on the character surviving into the requirement's summary.
+
+**Both suites green, no live key: 253 Python passed** and **63 front-end
+passed across 36 files.**
+
+**Still open, deliberately not built here:** a row's `Written down?` keeps
+"no client requirements document has been read for this project" after one
+has been read that does not mention the ask. Refreshing it needs a new kind
+of move — an absence-backed cell change on a row no requirement landed on,
+with its own citation, audit entry and gate — which is a feature rather than
+a repair. Recorded under `## Known limitations`.
+
 ## Snapshot — 2026-08-18, branch `strict-schema-and-honest-early-exit`
 
 The first live-key run started and stopped on its first model call. Three
@@ -1199,6 +1230,21 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
+- **A row's `Written down?` can keep a claim the project has outgrown.** The
+  cell is computed when a requirement lands on the row, so a row no
+  requirement ever lands on keeps "Not known yet — no client requirements
+  document has been read for this project" after one has been read that does
+  not mention its ask. Seen live on the escalation row of the staged drives;
+  the paired drives never show it, because there the requirements document is
+  in the same batch that creates the row. Refreshing it means a new kind of
+  move — an absence-backed cell change on a row no requirement reached, with
+  its citation, audit entry and gate — so it is written down rather than
+  built around.
+- **The testing-outcome rule re-asks on every run until a testing document
+  arrives.** Six to seven identical questions per run, each rejected, each
+  returning next run. The rule is telling the truth each time; suppressing a
+  repeat risks hiding a finding that has become real, so the human gate
+  absorbs it.
 - **A file dropped into a brand-new project's folder before the watcher's
   first look at it starts no run by itself.** The watcher's first sight of a
   project records whatever the folder holds as the baseline, and that first
