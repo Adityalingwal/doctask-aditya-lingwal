@@ -1106,11 +1106,8 @@ merging and about `Written down?` still stands.
 
 ## In progress / next slices
 
-| Order | Work | Scope | Current state |
-|---|---|---|---|
-| 1 | Review screen redesign | Run list, section tabs, Tailwind tokens, demo server | Built on `review-screen-redesign`; documentation updated, awaiting merge |
-
-Every planned slice is built. What remains is the open fresh-clone and
+Nothing is in progress. Every planned slice is built and merged (the review
+screen redesign landed as PR #15). What remains is the open fresh-clone and
 image-only verification, and the first live-model run.
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
