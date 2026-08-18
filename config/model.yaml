@@ -1,5 +1,5 @@
 provider: openrouter
-model_id: openai/gpt-4.1-mini
+model_id: openai/gpt-4.1
 base_url: https://openrouter.ai/api/v1
 call:
   attempts: 2
