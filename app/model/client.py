@@ -22,6 +22,7 @@ API_KEY_ENVIRONMENT_VARIABLE = "OPENROUTER_API_KEY"
 OPENROUTER_CLIENT = "openrouter"
 SCRIPTED_CLIENT = "scripted"
 DEFAULT_DELAY_SECONDS = 0.0
+REASONING_EFFORT_SETTING = "reasoning_effort"
 
 
 def build_model_client(
@@ -62,6 +63,8 @@ def _build_openrouter_client(
         api_key=api_key,
         timeout=float(call_settings["timeout_seconds"]),
         max_retries=int(call_settings["attempts"]) - 1,
+        # Absent for a model that has no reasoning setting to give.
+        reasoning_effort=call_settings.get(REASONING_EFFORT_SETTING),
     )
 
 
