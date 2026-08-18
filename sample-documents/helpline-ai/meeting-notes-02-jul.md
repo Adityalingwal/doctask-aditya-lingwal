@@ -7,10 +7,13 @@
 
 First call with BrightCart about their customer-support product. BrightCart
 wants an AI system that can pick up phone calls to their support line and
-actually answer questions, not just route callers into a queue. They also
-want a chat bot on their website doing the same job, and the same bot
-available on WhatsApp, since a lot of their customers already message them
-there.
+actually answer questions, not just route callers into a queue.
+
+They also want a chat bot on their website doing the same job for customers
+who would rather type than call.
+
+Separately, they want that same support bot available on WhatsApp too, since
+a lot of their customers already message them there.
 
 The ops lead wants one dashboard where the team can see every call and every
 chat transcript in one place — right now transcripts are scattered across
@@ -28,8 +31,8 @@ whichever language the customer uses.
 Near the end of the call, the ops lead brought up one more thing almost as an
 afterthought: when a chat gets stuck and the bot can't help, it has to hand
 off to a real person. "We can't have customers stuck talking to a bot that
-doesn't know the answer," she said. Nobody wrote this down as a formal ask;
-it will be folded into the scope document.
+doesn't know the answer," she said. It came up only in conversation and was
+never written into a formal ask.
 
 The Software Provider Delivery Owner will turn this into a written scope and
 send it back for sign-off.
