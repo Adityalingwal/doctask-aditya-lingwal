@@ -17,7 +17,9 @@ FINDING_ATTACHED_ENTRY = "finding attached"
 # Newest first, and within one moment by row and then by cell: a run commits
 # in one transaction, so all of its entries carry that transaction's timestamp
 # and nothing but these two further keys can order them. A cell name is null
-# on an attachment, which is why it sorts last rather than first.
+# on an attachment, which is why it sorts last rather than first — and why
+# two attachments on one row in one run tie on all three keys, so the entry
+# id settles them; without it two reads could answer in two orders.
 #
 # A run's number is not stored anywhere. It is counted here exactly as
 # `app/projects/list_projects.py` counts it, so the history and the projects
@@ -35,7 +37,7 @@ HISTORY_QUERY = (
     "LEFT JOIN documents ON documents.id = audit.source_document_id "
     "WHERE register_rows.project_id = %s "
     "ORDER BY audit.created_at DESC, register_rows.row_number ASC, "
-    "audit.cell_name ASC NULLS LAST"
+    "audit.cell_name ASC NULLS LAST, audit.id ASC"
 )
 
 

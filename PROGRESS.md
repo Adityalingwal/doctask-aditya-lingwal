@@ -32,7 +32,19 @@ waiting for review and for Aditya's gates. No pull request is open.
 - **Both suites green on this branch, no live key:** **247 Python passed**
   (baseline 239 passed / 8 failed, every failure a new test or a deliberately
   updated count) and **63 front-end passed across 36 files** (baseline 60
-  passed / 3 failed).
+  passed / 3 failed). Re-run independently in the foreground after the
+  review: the same **247** and **63 across 36** were printed there.
+- **Codex's one finding (Medium) fixed in the foreground, on the branch,
+  after Aditya decided it (2026-08-18).** Two findings attached to one row
+  in one run tie on `created_at`, `row_number` and a null `cell_name`, so
+  two reads could order them two ways — against the locked newest-first
+  ordering. `HISTORY_QUERY` gained the final `audit.id ASC` key. The new
+  test (`test_two_findings_attached_to_one_row_in_one_run_keep_one_order`)
+  drives the two-attachment state and pins three consecutive reads equal;
+  it **passed pre-fix too** (`1 passed` recorded) — no honest test can
+  force PostgreSQL to flip a tied order on demand, so the determinism
+  rests on the total ordering, stated here the same way the REPEATABLE
+  READ guarantee is.
 
 Everything below is the position this branch started from.
 

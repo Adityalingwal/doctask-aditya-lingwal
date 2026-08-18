@@ -219,3 +219,45 @@ def test_the_register_document_carries_no_history(tmp_path: Path) -> None:
     assert register["rows"] != []
     assert "history" not in register
     assert "entries" not in register
+
+
+def test_two_findings_attached_to_one_row_in_one_run_keep_one_order(
+    tmp_path: Path,
+) -> None:
+    """Two attachments tie on time, row and cell; the entry id settles them.
+
+    No honest test can force PostgreSQL to flip a tied order on demand, so
+    this drives the two-attachment state the review named and pins that
+    repeated reads agree; the determinism itself rests on the ordering's
+    final `audit.id` key, stated in `read_history.py` rather than provoked.
+    """
+    first = one_finding()
+    second = one_finding(
+        rule_id="R4",
+        issue="No testing outcome has been read for this requirement.",
+        evidence=(
+            "Not known yet — no testing outcome has been read for this "
+            "requirement."
+        ),
+        question="Row 1 has no testing outcome read yet. Keep this finding?",
+    )
+    with _project(tmp_path, examine_answer([first, second])) as (
+        application,
+        _folder,
+        project_id,
+    ):
+        with application.client() as client:
+            _run_to_done(client, project_id)
+            reads = [
+                client.get(f"/projects/{project_id}/history").json()["entries"]
+                for _ in range(3)
+            ]
+
+    attached = _of_kind(reads[0], "finding attached")
+    assert len(attached) == 2
+    assert {entry["detail"] for entry in attached} == {
+        f"{first['rule_id']} — {first['issue']}",
+        f"{second['rule_id']} — {second['issue']}",
+    }
+    assert reads[1] == reads[0]
+    assert reads[2] == reads[0]

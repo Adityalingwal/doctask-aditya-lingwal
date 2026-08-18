@@ -462,8 +462,10 @@ cannot each assume a different one:
   a key in the register document: the register says what is true now, the
   history says how it got there, and the export carries only the former.
   Entries come newest first by `created_at`, then `row_number`, then
-  `cell_name` with nulls last, so one run's single-transaction writes can
-  never order two ways. **A row's birth is one entry, folded in the core
+  `cell_name` with nulls last, then the entry id — the final key added
+  after review, because two findings attached to one row in one run tie
+  on the first three — so one run's single-transaction writes can never
+  order two ways. **A row's birth is one entry, folded in the core
   function**: Commit writes one all-null-old cell change per cell, and a
   `(run, row)` whose cell changes are all of that shape becomes a single
   `row created` entry carrying `what_was_asked` and its document — so curl,
