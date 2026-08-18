@@ -412,6 +412,17 @@ cannot each assume a different one:
   already-read rule, tests `runs.status = 'done'` instead — semantically
   exact, because the rows and the status commit in one transaction. History:
   `documentation/decision-history.md`, 2026-08-18.
+- **A finding reaches the register only once its run ends `done` (review
+  finding, fixed 2026-08-18).** `approved_findings_of_project` also requires
+  the finding's run to be `done`: an approved finding on a run still at
+  review has not passed the add/discard gate, and a discarded run's finding
+  never will. Before the fix the query checked only the decision, so a
+  discarded run's finding could reach the display (on `main` it reached the
+  next commit's snapshot the same way — the leak predated the live read).
+- **The live read is one database snapshot.** `build_register_document`
+  wraps its queries in a `REPEATABLE READ` transaction, so a commit landing
+  mid-read cannot mix new rows with an older run's timestamp, citations or
+  findings.
 - JSON is the record; Markdown is generated from it. Markdown is never edited
   as a second truth.
 - **The register carries no reported instruction (2026-08-17).** It is what

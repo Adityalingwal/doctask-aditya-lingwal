@@ -23,9 +23,20 @@ waiting for review and for Aditya's gates. No pull request is open.
   anything else was touched.
 - **An empty register answers the empty state**, never a 409 and never an
   error, and the header timestamp is the newest `done` run's `finished_at`.
-- **Both suites green on this branch, no live key:** **235 Python passed**
-  (baseline 227) and **60 front-end passed across 34 files** (baseline 60
-  across 34 — existing files updated in place).
+- **Both review findings fixed on the branch, test-first (2026-08-18).**
+  Codex's High: an approved finding of an at-review or discarded run was
+  visible in the live register (the discarded half predated this branch —
+  `build_export` used the same unfiltered query); the query now requires the
+  finding's run to be `done`, and the two new tests in
+  `tests/register/test_a_finding_follows_its_runs_ending.py` failed at
+  baseline on exactly that leak (`2 failed`, both on the finding's issue
+  text). Codex's Medium: the multi-query read now runs inside one
+  `REPEATABLE READ` transaction — no honest test can force the race, so the
+  guarantee rests on the isolation level, stated here rather than tested.
+- **Both suites green on this branch, no live key:** **237 Python passed**
+  (baseline 227; 235 before the review fixes) and **60 front-end passed
+  across 34 files** (baseline 60 across 34 — existing files updated in
+  place).
 
 Details, including the recorded test-first baseline failures, are under
 `## Completed` and `## Verification evidence`.

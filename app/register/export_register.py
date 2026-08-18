@@ -36,6 +36,20 @@ async def build_register_document(
     the rows, so it is exactly the moment the register last gained rows — and
     both are null while no run has committed anything.
     """
+    # One REPEATABLE READ snapshot for every query below: the pool runs
+    # autocommit, so without this a commit landing between two of the reads
+    # could mix new rows with an older run's timestamp, citations or findings.
+    async with connection.transaction():
+        await connection.execute(
+            "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"
+        )
+        return await _read_register_document(connection, project)
+
+
+async def _read_register_document(
+    connection: AsyncConnection,
+    project: dict[str, Any],
+) -> dict[str, Any]:
     newest_done = await _newest_done_run(connection, project["id"])
     rows_result = await connection.execute(
         "SELECT id, row_number, fingerprint, "
