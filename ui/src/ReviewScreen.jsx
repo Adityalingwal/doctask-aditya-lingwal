@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 
 import AddProject from "./AddProject.jsx";
+import History from "./History.jsx";
 import ProjectList from "./ProjectList.jsx";
 import Question from "./Question.jsx";
 import Refusal from "./Refusal.jsx";
@@ -14,6 +15,7 @@ import screenConfig from "../config/screen.json";
 import {
   answerDecision,
   finishReview,
+  readHistory,
   readProjects,
   readRegister,
   readRun,
@@ -79,6 +81,14 @@ export default function ReviewScreen({ runId: openedRunId }) {
   // states: collapsing them made a project the server had already reported
   // as holding rows show an empty register until GET /export answered.
   const [registerRead, setRegisterRead] = useState(false);
+  // The register's history, read beside the register and never inside it.
+  // Null until the read answers: an empty list is the server saying this
+  // register has no history, and "not asked yet" may not be shown as that.
+  // Its refusal is its own for the reason the two above are: the history and
+  // the register are read on the same poll, at the same time, so one shared
+  // value would let either read wipe the other's live refusal.
+  const [history, setHistory] = useState(null);
+  const [historyRefusal, setHistoryRefusal] = useState(null);
   const [runsCollapsed, setRunsCollapsed] = useState(false);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [openSection, setOpenSection] = useState("stages");
@@ -114,6 +124,8 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setRunId(chosen);
     setRun(null);
     setExported(null);
+    setHistory(null);
+    setHistoryRefusal(null);
     setReadRefusal(null);
     setAnswerRefusal(null);
     window.history.replaceState(null, "", `/ui/?run=${encodeURIComponent(chosen)}`);
@@ -131,6 +143,8 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setRunId("");
     setRun(null);
     setExported(null);
+    setHistory(null);
+    setHistoryRefusal(null);
     setReadRefusal(null);
     setAnswerRefusal(null);
     window.history.replaceState(null, "", "/ui/");
@@ -145,6 +159,8 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setRunId("");
     setRun(null);
     setExported(null);
+    setHistory(null);
+    setHistoryRefusal(null);
     setReadRefusal(null);
     window.history.replaceState(null, "", "/ui/");
   }, []);
@@ -191,16 +207,39 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setRegisterRead(true);
   }, [registerOpen, selectedProjectId]);
 
+  // The same trigger and the same refresh the register read has, into state of
+  // its own — the grouping, the ordering and the wording of every entry are
+  // the core function's, so this only carries what it answered.
+  const readHistoryFromServer = useCallback(async () => {
+    if (!registerOpen) {
+      return;
+    }
+    const answered = await readHistory(selectedProjectId);
+    if (answered.unreachable) {
+      setUnreachable(true);
+      return;
+    }
+    setUnreachable(false);
+    setHistory(answered.ok ? answered.body : null);
+    setHistoryRefusal(answered.ok ? null : answered.refusal);
+  }, [registerOpen, selectedProjectId]);
+
   useEffect(() => {
     const readEverything = () => {
       readProjectsFromServer();
       readFromServer();
       readRegisterFromServer();
+      readHistoryFromServer();
     };
     readEverything();
     const polling = setInterval(readEverything, screenConfig.poll_interval_ms);
     return () => clearInterval(polling);
-  }, [readProjectsFromServer, readFromServer, readRegisterFromServer]);
+  }, [
+    readProjectsFromServer,
+    readFromServer,
+    readRegisterFromServer,
+    readHistoryFromServer,
+  ]);
 
   // Nothing the person clicked reaches the screen: the answer is sent, and what
   // is shown next is read back from the server that recorded it.
@@ -407,10 +446,15 @@ export default function ReviewScreen({ runId: openedRunId }) {
               <main ref={readingPane} className="pane min-w-0 px-6 pt-8 pb-24 sm:px-10">
                 {answerRefusal !== null && <Refusal text={answerRefusal} />}
                 {readRefusal !== null && <Refusal text={readRefusal} />}
+                {historyRefusal !== null && <Refusal text={historyRefusal} />}
 
                 {registerOpen ? (
                   <div className="max-w-5xl">
-                    <ProjectRegisterSection exported={exported} read={registerRead} />
+                    <ProjectRegisterSection
+                      exported={exported}
+                      read={registerRead}
+                      history={history}
+                    />
                   </div>
                 ) : run === null ? (
                   <p className="max-w-prose text-ink-soft">
@@ -694,7 +738,7 @@ function EndReviewButton({ label, answering, onClick }) {
 // discarded — every case in which no run has committed rows, which the
 // server answers as a register holding none — with one line, never an
 // empty table.
-function ProjectRegisterSection({ exported, read }) {
+function ProjectRegisterSection({ exported, read, history }) {
   const empty = exported === null || exported.rows.length === 0;
   return (
     <Section
@@ -717,6 +761,10 @@ function ProjectRegisterSection({ exported, read }) {
       ) : (
         <Register exported={exported} />
       )}
+      {/* Below the register's own sections, and only once the server has
+          answered — an empty list is this register having no history, which
+          is not the same claim as not having been asked yet. */}
+      {history !== null && <History entries={history.entries} />}
     </Section>
   );
 }

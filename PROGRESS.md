@@ -6,10 +6,47 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
-## Snapshot — 2026-08-18, branch `register-read-live`
+## Snapshot — 2026-08-18, branch `audit-history-read`
 
 Built and run rather than type-checked, committed and pushed; the branch is
 waiting for review and for Aditya's gates. No pull request is open.
+
+- **The audit trail became readable.** One core function, `read_history`
+  (`app/register/read_history.py`), read-only over `audit` — no migration, no
+  schema change, nothing new written. Three thin doors over it:
+  `GET /projects/{id}/history`, the `get_history` MCP tool, and a HISTORY
+  section at the bottom of the screen's Register panel. Both counts moved
+  seven → eight, which is why the two count-lock tests were updated.
+- **The register document did not change by one byte** — history is a read
+  of its own, and a never-do test asserts the register payload still carries
+  no `history` and no `entries` key.
+- **A row's birth is folded to one entry in the core function**, so curl, the
+  MCP tool and the screen are answered with the same list; the both-doors
+  test compares the two payloads under `json.dumps(sort_keys=True)`.
+- **Hand-driven on the live stack** (compose, scripted model, no key): two
+  runs over one project gave `row created` (run 1, meeting-note.md) and, above
+  it, the `status` and `what_testing_found` changes (run 2,
+  testing-feedback.md); the same JSON came back byte-identical through
+  `get_history`, and the screen showed the section, its NOTE chip and the
+  newest-first order.
+- **Both suites green on this branch, no live key:** **247 Python passed**
+  (baseline 239 passed / 8 failed, every failure a new test or a deliberately
+  updated count) and **63 front-end passed across 36 files** (baseline 60
+  passed / 3 failed). Re-run independently in the foreground after the
+  review: the same **247** and **63 across 36** were printed there.
+- **Codex's one finding (Medium) fixed in the foreground, on the branch,
+  after Aditya decided it (2026-08-18).** Two findings attached to one row
+  in one run tie on `created_at`, `row_number` and a null `cell_name`, so
+  two reads could order them two ways — against the locked newest-first
+  ordering. `HISTORY_QUERY` gained the final `audit.id ASC` key. The new
+  test (`test_two_findings_attached_to_one_row_in_one_run_keep_one_order`)
+  drives the two-attachment state and pins three consecutive reads equal;
+  it **passed pre-fix too** (`1 passed` recorded) — no honest test can
+  force PostgreSQL to flip a tied order on demand, so the determinism
+  rests on the total ordering, stated here the same way the REPEATABLE
+  READ guarantee is.
+
+Everything below is the position this branch started from.
 
 - **The register is read live, and the snapshot is gone.** One core function
   builds the register document from `register_rows` at read time;
@@ -52,6 +89,43 @@ decision rests on the export gate showing such a merge, and the gate does not �
 see `## Active blockers`.
 
 ## Completed
+
+### The audit trail becomes readable (branch `audit-history-read`)
+
+- **Test-first, recorded at the baseline commit `bdb360e`.** Python:
+  `8 failed, 239 passed`. The eight were the two count-lock tests updated to
+  say eight (offered seven, locked list said eight), five of the six new
+  history tests, and the new both-doors test (`get_history` not listed). The
+  sixth, `test_the_register_document_carries_no_history`, passed at baseline
+  by design — it guards the decision that the register document is untouched,
+  so it is a lock rather than a detector, and it still passes. Front end:
+  `3 failed, 60 passed across 36 files`, all three failing because the HISTORY
+  region did not exist.
+- **After the change:** Python `247 passed`, front end `63 passed across 36
+  files`.
+- Built: `app/register/read_history.py` (the one core function),
+  `GET /projects/{project_id}/history` in `app/api/routes.py`, the
+  `get_history` tool in `app/mcp_server/tools.py`, `readHistory` in
+  `ui/src/run_requests.js`, `ui/src/History.jsx`, and the section and its
+  own read/refusal state in `ui/src/ReviewScreen.jsx`. `CELL_HEADINGS` is now
+  exported from `ui/src/Register.jsx` and imported rather than copied.
+- Ordering is fixed in the query — newest `created_at`, then `row_number`,
+  then `cell_name` nulls last — because one run's entries all carry that
+  transaction's single timestamp. Run numbers use the same window function
+  `app/projects/list_projects.py` uses.
+- **Assumption recorded:** the brief said `LOCKED_TOOLS` should gain
+  `get_history` "in the server's registration order (after `get_register`)",
+  but `tests/interfaces/mcp_client.py` returns `sorted(...)` and the test
+  asserts list equality, so the entry sits in alphabetical position (before
+  `get_register`) while the tool itself is registered after `get_register` in
+  `app/mcp_server/tools.py`, as the brief separately requires.
+- **Assumption recorded:** the history read has its own refusal state rather
+  than sharing `readRefusal`. The run read and the register read may share one
+  because they are mutually exclusive; the history and register reads run on
+  the same poll, concurrently, so a shared value would let either wipe the
+  other's live refusal.
+- **Not built, deliberately:** revert/restore, register version snapshots,
+  filters, search, pagination, and a history export format.
 
 ### The register is read live, and the snapshot goes (branch `register-read-live`)
 

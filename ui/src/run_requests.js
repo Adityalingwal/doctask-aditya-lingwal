@@ -27,6 +27,13 @@ export async function readRegister(projectId) {
   );
 }
 
+// The register's own history, a read of its own: it is deliberately not part
+// of the register document, so it is asked for separately and carries no
+// format parameter.
+export async function readHistory(projectId) {
+  return await ask("GET", `/projects/${encodeURIComponent(projectId)}/history`);
+}
+
 export async function answerDecision(runId, decisionId, outcome) {
   return await ask("POST", `/runs/${encodeURIComponent(runId)}/decisions`, {
     decision_id: decisionId,

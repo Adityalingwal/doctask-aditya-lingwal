@@ -5,15 +5,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from tests.runs.application import (
-    ApplicationProcess,
-    approve_every_decision_and_finish_review,
-    temporary_database,
-    temporary_project_folder,
-    wait_for_run_status,
-    write_script,
-)
-from tests.interfaces.mcp_client import call_tool
 from tests.documents.register_documents import (
     examine_marker,
     extract_marker,
@@ -23,31 +14,24 @@ from tests.documents.register_documents import (
     no_findings_answer,
     write_meeting_note,
 )
+from tests.interfaces.mcp_client import call_tool
+from tests.runs.application import (
+    ApplicationProcess,
+    approve_every_decision_and_finish_review,
+    temporary_database,
+    temporary_project_folder,
+    wait_for_run_status,
+    write_script,
+)
 
 
 SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
 
-# The locked API surface: eight endpoints, no run-level export route beside
-# them. The register is the project's, read live — never a run's copy, and its
-# history is a read of its own rather than a key inside the register document.
-LOCKED_ROUTES = {
-    ("POST", "/projects"),
-    ("GET", "/projects"),
-    ("POST", "/runs"),
-    ("GET", "/runs/{run_id}"),
-    ("POST", "/runs/{run_id}/decisions"),
-    ("POST", "/runs/{run_id}/finish-review"),
-    ("GET", "/projects/{project_id}/register"),
-    ("GET", "/projects/{project_id}/history"),
-}
-
 
 @contextmanager
-def _application(
-    tmp_path: Path,
-) -> Iterator[tuple[ApplicationProcess, str]]:
-    with temporary_project_folder("both-doors-register") as (
+def _application(tmp_path: Path) -> Iterator[tuple[ApplicationProcess, str]]:
+    with temporary_project_folder("both-doors-history") as (
         source_folder,
         source_folder_path,
     ):
@@ -74,7 +58,7 @@ def _application(
                 application.stop()
 
 
-def test_the_http_door_and_the_get_register_tool_answer_byte_identical_payloads(
+def test_the_http_door_and_the_get_history_tool_answer_byte_identical_payloads(
     tmp_path: Path,
 ) -> None:
     with _application(tmp_path) as (application, source_folder_path):
@@ -90,28 +74,17 @@ def test_the_http_door_and_the_get_register_tool_answer_byte_identical_payloads(
             approve_every_decision_and_finish_review(client, run_id)
             wait_for_run_status(client, run_id, "done")
 
-            over_http = client.get(f"/projects/{project_id}/register").json()
+            over_http = client.get(f"/projects/{project_id}/history").json()
 
         through_mcp = call_tool(
-            application.base_url, "get_register", {"project_id": project_id}
+            application.base_url, "get_history", {"project_id": project_id}
         )
 
     assert through_mcp.refused is False
     assert through_mcp.payload == over_http
+    # The grouping and the ordering happen once, in the core function, so the
+    # two doors cannot drift into showing two different histories.
     assert json.dumps(through_mcp.payload, sort_keys=True) == json.dumps(
         over_http, sort_keys=True
     )
-    assert over_http["rows"] != []
-
-
-def test_the_api_offers_exactly_the_eight_locked_routes() -> None:
-    from app.api.routes import router
-
-    offered = {
-        (method, route.path)
-        for route in router.routes
-        for method in route.methods
-    }
-
-    assert offered == LOCKED_ROUTES
-    assert ("GET", "/runs/{run_id}/export") not in offered
+    assert over_http["entries"] != []

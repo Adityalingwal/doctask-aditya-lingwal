@@ -4350,3 +4350,67 @@ way to see that nothing opens it.
 until that project has a run that has exported" described the snapshot path;
 the panel now shows committed rows the moment they exist, and the empty line
 exactly while the project holds none.
+
+## The audit trail becomes readable, beside the register and not inside it (2026-08-18)
+
+**The ask.** The working notes (line 162) require the audit trail to be able
+to answer three questions: what changed, when, and because of which source
+document. The `audit` table had recorded all three since slice 1 — cell,
+before, after, run, source document, timestamp — and nothing read it: no
+route, no MCP tool, no screen section. This adds exactly that read.
+
+**What was chosen.** One core function, `read_history`
+(`app/register/read_history.py`), read-only over `audit`, behind three thin
+doors: `GET /projects/{project_id}/history`, the `get_history` MCP tool, and
+a HISTORY section at the bottom of the screen's Register panel. Both counts
+move seven → eight. No migration, no schema change, no change to what Commit
+records.
+
+**Rejected — history inside the register document or its export.** Adding a
+`history` key to `GET /projects/{id}/register` would have cost no new route.
+Refused: the register is what the client is sent, and it states what is true
+now. A record of how a cell got to its value is our working evidence, not
+part of the client's deliverable — the same reason the register carries no
+reported instruction. Putting it in the document would also have grown the
+Markdown export into two documents wearing one name. The section on screen
+carries a NOTE chip reading "Not part of the exported register." precisely so
+a reader seeing the two together does not assume otherwise.
+
+**Rejected — a per-run history tab.** The obvious home was beside a run's
+Stages and Decisions tabs. Refused: the audit trail is the *register's*, and
+the register is the project's, not any run's — the same reasoning that moved
+`GET /runs/{id}/export` to `GET /projects/{id}/register` a day earlier. A
+per-run tab would have shown one run's slice of a story that only reads as a
+story whole, and would have re-created the run-between-reader-and-register
+shape that decision removed.
+
+**Rejected — placements V1–V3.** A fourth column, a new top-level panel
+beside Register, and a per-row expander were each considered and lost to V4,
+the section at the bottom of the Register panel. A column and a panel both
+add navigation for something read occasionally; a per-row expander scatters
+one ordered story across the rows and makes "what happened in this project"
+unanswerable without opening every row.
+
+**Rejected — a per-row filter parameter.** `?row=3` is one line of SQL.
+Refused as unearned surface: with the register at this size the whole history
+is a short list, and a query parameter is a contract that has to be honoured
+by both doors and tested on both for as long as it exists. Filters, search
+and pagination are recorded as deliberately not built rather than deferred.
+
+**Rejected — folding a row's birth in the front end.** Commit writes one
+audit row per cell, so a new row arrives as four entries. Folding them where
+they are displayed was the smaller change. Refused because it would have made
+the MCP answer and the screen answer two different histories of one table —
+the drift this repository's "the UI and the MCP server call the same core
+function" rule exists to prevent. The fold is in `read_history`, and the
+both-doors test compares the two payloads under `json.dumps(sort_keys=True)`.
+
+**Ordering, and why it is fixed in the query.** Newest first by `created_at`,
+then `row_number` ascending, then `cell_name` ascending with nulls last. One
+run commits in a single transaction, so all of its entries carry one
+timestamp and nothing but the two further keys can separate them; without
+them two reads of an unchanged table could disagree. Run numbers are not
+stored — they are computed with the same `ROW_NUMBER() OVER (PARTITION BY
+runs.project_id ORDER BY runs.created_at)` window `app/projects/list_projects.py`
+uses, so the history and the projects list can never number one run
+differently.

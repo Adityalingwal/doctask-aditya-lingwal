@@ -31,6 +31,7 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 LOCKED_TOOLS = [
     "create_project",
     "finish_review",
+    "get_history",
     "get_register",
     "get_run_status",
     "list_projects",
@@ -289,7 +290,7 @@ def test_a_core_refusal_reaches_a_tool_caller_with_its_cause_and_its_fix(
     assert "json or markdown" in unusable_format.text
 
 
-def test_the_server_offers_only_the_seven_locked_tools(tmp_path: Path) -> None:
+def test_the_server_offers_only_the_eight_locked_tools(tmp_path: Path) -> None:
     with _application(tmp_path) as (application, _database_url, _source_folder, _source_folder_path):
         offered = tool_names(application.base_url)
 

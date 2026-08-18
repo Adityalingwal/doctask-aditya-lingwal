@@ -134,6 +134,55 @@ export function registerReply(overrides = {}) {
   };
 }
 
+// `GET /projects/{id}/history` (app/register/read_history.py): the three entry
+// shapes the core function folds the audit trail into, newest first. A row's
+// birth arrives already folded into one `row created` entry, so no test here
+// has to reproduce the four cell writes that stand behind it.
+export function historyReply(overrides = {}) {
+  return {
+    entries: [
+      {
+        kind: "cell change",
+        row_number: 1,
+        cell: "status",
+        old_value: "Nothing said yet",
+        new_value: "Done",
+        changed_at: "2026-03-27T09:30:00+00:00",
+        run_number: 2,
+        source_file: "testing-feedback-25-mar.md",
+      },
+      {
+        kind: "cell change",
+        row_number: 1,
+        cell: "in_writing",
+        old_value: "Not found in 12-march-scope.md.",
+        new_value: "Yes — written in 26-march-scope.md.",
+        changed_at: "2026-03-27T09:30:00+00:00",
+        run_number: 2,
+        source_file: "26-march-scope.md",
+      },
+      {
+        kind: "finding attached",
+        row_number: 1,
+        detail:
+          "R1 — the register row rests on a meeting note; no client "
+          + "requirements document states it in writing.",
+        changed_at: "2026-03-27T09:30:00+00:00",
+        run_number: 2,
+      },
+      {
+        kind: "row created",
+        row_number: 1,
+        what_was_asked: "Applicants upload supporting documents.",
+        changed_at: "2026-03-26T10:00:00+00:00",
+        run_number: 1,
+        source_file: "meeting-notes-10-mar.md",
+      },
+    ],
+    ...overrides,
+  };
+}
+
 // One project, its one run matching runReply()'s defaults so a test that
 // opens `runId` through the run door sees the same run listed here.
 export function projectReply(overrides = {}) {

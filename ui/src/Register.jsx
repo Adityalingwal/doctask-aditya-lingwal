@@ -5,7 +5,9 @@ import { dayMonthTime } from "./format_date.js";
 // words a person reads. An unknown key is shown as the server sent it rather
 // than turned into a heading nobody chose. The stored column is still
 // `in_writing`; only the heading asks the question in a reader's words.
-const CELL_HEADINGS = {
+// Exported because the history section names the same cells, and two copies of
+// this map are two places for a heading to be renamed in only one of them.
+export const CELL_HEADINGS = {
   what_was_asked: "What was asked",
   in_writing: "Written down?",
   what_testing_found: "What testing found",

@@ -14,7 +14,7 @@ slice, the incremental update slice, and the review screen are implemented:
 
 - PostgreSQL stores projects, runs, documents, register rows, citations,
   review decisions, findings, audit entries, and LangGraph checkpoints.
-- FastAPI exposes seven endpoints, and the same seven operations are MCP tools
+- FastAPI exposes eight endpoints, and the same eight operations are MCP tools
   served by the same process over the same core functions.
 - A run returns immediately, continues in the app process, and is polled.
 - A run reads only files it has never read before — new by name and by
@@ -210,7 +210,7 @@ docker compose up --build
 The API is at `http://localhost:8000`; `GET /health` returns
 `{"status":"healthy"}`. Startup creates the demo project over
 `sample-projects/intake-portal` — shown as **Intake Portal**, its derived
-name — if it is missing. The generated API schema at `/docs` shows the seven
+name — if it is missing. The generated API schema at `/docs` shows the eight
 operations:
 
 - `POST /projects`
@@ -220,6 +220,7 @@ operations:
 - `POST /runs/{id}/decisions`
 - `POST /runs/{id}/finish-review`
 - `GET /projects/{id}/register?format=json|markdown`
+- `GET /projects/{id}/history`
 
 ## The review screen
 
@@ -278,10 +279,21 @@ its citations and its approved findings, read live from `register_rows`
 through `GET /projects/{id}/register` — or, while the project holds no
 committed row, the line "Nothing has been added to this register yet."
 
+Under it, a **HISTORY** section reads the audit trail through
+`GET /projects/{id}/history`: what changed, when, and because of which
+document, newest first. A row's arrival is one line — `Row 1 · Row created`
+— rather than one line per cell, an approved finding is its own line, and a
+cell change reads `Row 1 · Status: Nothing said yet → Done` with the run
+number and the source file under it. A project whose trail is empty reads
+"No history yet." The section carries a **NOTE** chip reading "Not part of
+the exported register.", because it is not: the register export is the
+cells, their evidence and the findings, and this is the record of how they
+got there.
+
 The page polls `GET /projects` and `GET /runs/{id}` every **3 seconds**
 unconditionally — whatever is on screen, whatever a run's status is — and
-`GET /projects/{id}/register` on the same interval while the register panel
-is open; that interval lives in
+`GET /projects/{id}/register` and `GET /projects/{id}/history` on the same
+interval while the register panel is open; that interval lives in
 [`ui/config/screen.json`](ui/config/screen.json). This is
 deliberate: at this size the payload is a few kilobytes, and one
 unconditional read is easier to reason about than conditional refresh rules.
@@ -314,7 +326,7 @@ Last verified on the `folder-is-a-project-and-register-moves` branch: **40 passe
 
 ## Drive it from a machine
 
-The same seven operations are MCP tools, mounted in the running application at
+The same eight operations are MCP tools, mounted in the running application at
 `http://localhost:8000/mcp/` over the streamable-HTTP transport. Each tool
 calls the core function its endpoint calls, so one operation answers the same
 through either door — including its refusal, which arrives with the cause and
@@ -329,6 +341,7 @@ the practical fix the endpoint would have given.
 | `submit_decision` | `run_id`, `decision_id`, `outcome` (`approved` or `rejected`) |
 | `finish_review` | `run_id`, `add_to_register` — yes adds this run's changes to the register, no discards them |
 | `get_register` | `project_id`, `register_format` (`json` or `markdown`) |
+| `get_history` | `project_id` — what changed in the register, when, and from which document |
 
 A run is not one call here either: `start_run` returns a run id at once and
 `get_run_status` is polled until the run says it is done. Nothing commits
