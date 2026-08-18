@@ -4414,3 +4414,55 @@ stored — they are computed with the same `ROW_NUMBER() OVER (PARTITION BY
 runs.project_id ORDER BY runs.created_at)` window `app/projects/list_projects.py`
 uses, so the history and the projects list can never number one run
 differently.
+
+## The demo seed is removed, and the sample corpus becomes Helpline AI (2026-08-18)
+
+**Old wording (D14, "database and API").** "Startup seeds the demo project
+with one `create_project` call for `sample-projects/intake-portal`;
+get-or-create alone makes a restart safe." The project this created was
+named **Intake Portal**, derived from its folder. The demo-seed decision this
+superseded was itself already noted as superseded by "a folder is a
+project's identity" (2026-08-16) for the "is `projects` empty" check it used
+to make, but the seed call, its constant, and the project it created stayed
+live in code until this entry.
+
+**Old wording (D08, "one call, exact evidence, structural injection
+boundary").** The prompt-injection proof cited "the demo document that
+buries the hostile line" — `sample-projects/intake-portal/meeting-notes-20-mar.md`
+— driven through a real run by `tests/documents/test_document_instruction_is_reported.py`.
+
+**Why superseded.** The founder's next round of work is a bounded live-model
+run, and that run is meant to start from a clean screen: an operator creates
+the one project it needs by hand, not a project the application invented for
+a demo that predates this engagement. Keeping the old intake-portal and
+northside-dental corpora around after they stop being read by any test or
+decision would be dead weight with no reader. `ensure_demo_project`,
+`DEMO_PROJECT_FOLDER`, and their startup call are deleted from
+`app/projects/create_project.py` and `app/main.py`; `docker compose up` now
+starts with zero projects, and `GET /projects` lists nothing until one is
+created through `POST /projects` or the MCP `create_project` tool.
+
+**The corpus replacement.** `sample-projects/intake-portal/`,
+`sample-projects/northside-dental/`, and
+`sample-projects/write_northside_dental_binaries.py` are deleted, along with
+the tests that read them from disk
+(`tests/incremental/test_second_run_on_corpora.py`,
+`tests/documents/test_document_instruction_is_reported.py` — reported-instruction
+coverage stays live in `tests/runs/test_reported_instructions.py`, which
+builds its own document in a temporary folder). In their place,
+`sample-documents/helpline-ai/` holds four new documents for a fabricated
+client engagement — **Helpline AI**, client BrightCart, an AI customer-support
+product — carrying the same seven requirements the founder's brief expects,
+and the same four rule hooks (written-requirement, change-request,
+testing-outcome, and the guard rule that is expected to find nothing). This
+new corpus is staged into a project folder by hand, in batches, for the first
+live-model run; it is never driven through the pipeline by an automated test,
+since no scripted model fixtures exist for it. `sample-projects/helpline-ai/`
+is git-ignored so staged copies never dirty the tree.
+
+**Rejected — adapting the old corpus-driving tests to the new corpus.**
+Refused: those tests exist to prove pipeline behaviour against scripted model
+answers, and no scripted answers exist for Helpline AI — writing them would
+mean inventing model output rather than proving anything real. The new corpus
+has exactly one job, the live-model run; a second, unrelated job (proving
+pipeline behaviour with a scripted model) is not asked of it.

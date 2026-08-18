@@ -6,87 +6,80 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
-## Snapshot — 2026-08-18, branch `audit-history-read`
+## Snapshot — 2026-08-18, branch `helpline-ai-corpus`
 
 Built and run rather than type-checked, committed and pushed; the branch is
 waiting for review and for Aditya's gates. No pull request is open.
 
-- **The audit trail became readable.** One core function, `read_history`
-  (`app/register/read_history.py`), read-only over `audit` — no migration, no
-  schema change, nothing new written. Three thin doors over it:
-  `GET /projects/{id}/history`, the `get_history` MCP tool, and a HISTORY
-  section at the bottom of the screen's Register panel. Both counts moved
-  seven → eight, which is why the two count-lock tests were updated.
-- **The register document did not change by one byte** — history is a read
-  of its own, and a never-do test asserts the register payload still carries
-  no `history` and no `entries` key.
-- **A row's birth is folded to one entry in the core function**, so curl, the
-  MCP tool and the screen are answered with the same list; the both-doors
-  test compares the two payloads under `json.dumps(sort_keys=True)`.
-- **Hand-driven on the live stack** (compose, scripted model, no key): two
-  runs over one project gave `row created` (run 1, meeting-note.md) and, above
-  it, the `status` and `what_testing_found` changes (run 2,
-  testing-feedback.md); the same JSON came back byte-identical through
-  `get_history`, and the screen showed the section, its NOTE chip and the
-  newest-first order.
-- **Both suites green on this branch, no live key:** **247 Python passed**
-  (baseline 239 passed / 8 failed, every failure a new test or a deliberately
-  updated count) and **63 front-end passed across 36 files** (baseline 60
-  passed / 3 failed). Re-run independently in the foreground after the
-  review: the same **247** and **63 across 36** were printed there.
-- **Codex's one finding (Medium) fixed in the foreground, on the branch,
-  after Aditya decided it (2026-08-18).** Two findings attached to one row
-  in one run tie on `created_at`, `row_number` and a null `cell_name`, so
-  two reads could order them two ways — against the locked newest-first
-  ordering. `HISTORY_QUERY` gained the final `audit.id ASC` key. The new
-  test (`test_two_findings_attached_to_one_row_in_one_run_keep_one_order`)
-  drives the two-attachment state and pins three consecutive reads equal;
-  it **passed pre-fix too** (`1 passed` recorded) — no honest test can
-  force PostgreSQL to flip a tied order on demand, so the determinism
-  rests on the total ordering, stated here the same way the REPEATABLE
-  READ guarantee is.
+- **The old sample corpora and the startup demo seed are gone.**
+  `sample-projects/intake-portal/`, `sample-projects/northside-dental/`, and
+  `sample-projects/write_northside_dental_binaries.py` are deleted.
+  `ensure_demo_project`, `DEMO_PROJECT_FOLDER` and the `app/main.py` call that
+  used them are deleted from `app/projects/create_project.py` and
+  `app/main.py`; the `async with pool.connection()` block in `app/main.py`
+  that held only that call is removed too. `docker compose up` now starts
+  with **zero projects** — a project exists only once an operator creates one
+  by hand, through the screen's Add-project box or the MCP `create_project`
+  tool.
+- **Test-first, per the brief's protocol.** The never-do test
+  `tests/projects/test_startup_seeds_no_project.py`
+  (`test_startup_creates_no_project_of_its_own`) was written and run at `main`
+  `f6ca05d`, before any deletion: it **failed**, `GET /projects` listing the
+  demo project ("Intake Portal") that startup had just created. It passes
+  once `ensure_demo_project` and its call are gone.
+- **Old-corpus tests are deleted, not adapted.**
+  `tests/incremental/test_second_run_on_corpora.py` (2 tests) and
+  `tests/documents/test_document_instruction_is_reported.py` (1 test) read
+  the real corpora from disk and are deleted whole; no replacement
+  corpus-driving tests are written. Reported-instruction coverage stays live
+  in `tests/runs/test_reported_instructions.py`, which builds its own
+  document in a temporary folder — confirmed still green.
+  `tests/projects/test_create_project.py` and
+  `tests/interfaces/test_mcp_tools.py` were grepped for a test that exercises
+  `ensure_demo_project` or the demo seed specifically; neither file has one,
+  so neither file's test functions were touched (both carry stale comments
+  mentioning the demo seed that are out of this brief's scope).
+- **A new corpus for the coming live-key run: Helpline AI.** Four documents
+  under `sample-documents/helpline-ai/` — a fabricated engagement, client
+  BrightCart, an AI customer-support product for it — carrying the brief's
+  seven requirements at the client's own granularity, and the three rule
+  hooks the brief's design calls for (written-requirement, change-request,
+  testing-outcome); the fourth rule is expected to find nothing, by design.
+  The corpus's own README states the expected end-state table, labelled as
+  the live run's expected outcome, not an acceptance check for this branch.
+  `sample-projects/helpline-ai/` is git-ignored so staged copies never dirty
+  the tree; the corpus is staged into it by hand, in batches, and **never**
+  driven through the pipeline here — no scripted model fixtures exist for it.
+- **Documentation grepped and fixed**: root `README.md` (startup behaviour,
+  the included-demo-folder paragraph), `sample-projects/README.md` (rewritten
+  — starts empty, points at the staged corpus), `DECISIONS.md` (D14's
+  startup-seed wording, D08's and the acceptance summary's demo-document
+  citation, a known-limitation line naming the deleted corpora), and
+  `documentation/decision-history.md` (one dated entry: the old wording, why
+  superseded, the corpus replacement).
+- **Both suites green on this branch, no live key:** **246 Python passed**
+  and **63 front-end passed across 36 files** (untouched by this branch — no
+  `ui/` file was edited). Both counts are read from the printed summary.
+  **Inference, not verified:** `main` at `f6ca05d` most likely collected 248
+  (the `247` recorded in the prior snapshot was measured before that branch's
+  post-review fix added one more test); 248 − 3 (the two deleted files' tests)
+  + 1 (the new never-do test) = 246, matching what was printed here. The
+  baseline itself was not re-collected on this branch to confirm 248 directly.
+- **Boot check, hand-driven** (compose, no key): `GET /projects` answered
+  `{"projects": []}` on a fresh database; `mkdir`-ing a folder directly inside
+  `sample-projects/` and calling `POST /projects` over it answered
+  `{"created": true}`, and the project then appeared in `GET /projects`.
+  Torn down after.
+- **Observed, out of scope for this branch:** running the Python suite via
+  `docker compose run` leaves a restricted-permission leftover directory
+  under `sample-projects/` when `test_a_folder_outside_the_projects_root_is_refused`'s
+  `shutil.rmtree(..., ignore_errors=True)` cannot remove what it created —
+  pre-existing behaviour, unrelated to the corpus replacement; cleaned by
+  hand after each run in this session.
 
-Everything below is the position this branch started from.
-
-- **The register is read live, and the snapshot is gone.** One core function
-  builds the register document from `register_rows` at read time;
-  `GET /runs/{id}/export` became `GET /projects/{project_id}/register` and
-  `get_export` became `get_register` (both counts still seven); Commit
-  stops writing `runs.export_json` and migration `20260818_0021` drops the
-  column, proven forward and backward by hand.
-- **The trap went first.** `collect_batch`'s already-read rule — the
-  snapshot's one non-display reader — became `runs.status = 'done'` in its
-  own first commit, proven on both corpora and on a discarded run before
-  anything else was touched.
-- **An empty register answers the empty state**, never a 409 and never an
-  error, and the header timestamp is the newest `done` run's `finished_at`.
-- **Both review findings fixed on the branch, test-first (2026-08-18).**
-  Codex's High: an approved finding of an at-review or discarded run was
-  visible in the live register (the discarded half predated this branch —
-  `build_export` used the same unfiltered query); the query now requires the
-  finding's run to be `done`, and the two new tests in
-  `tests/register/test_a_finding_follows_its_runs_ending.py` failed at
-  baseline on exactly that leak (`2 failed`, both on the finding's issue
-  text). Codex's Medium: the multi-query read now runs inside one
-  `REPEATABLE READ` transaction — no honest test can force the race, so the
-  guarantee rests on the isolation level, stated here rather than tested.
-- **Both suites green on this branch, no live key:** **237 Python passed**
-  (baseline 227; 235 before the review fixes) and **60 front-end passed
-  across 34 files** (baseline 60 across 34 — existing files updated in
-  place).
-
-Details, including the recorded test-first baseline failures, are under
-`## Completed` and `## Verification evidence`.
-
-Everything before this branch — `not_used` and its kinds, the one-press
-review ending, `discarded`, the four-cell row, `Handed over`, workflow
-order, rules living only in `config/rules.yaml`, two formats — is in
-`## Completed` under its own branch entry.
-
-**Still not built, and it is a blocker for Aditya rather than a defect:**
-removing the downgrade of a confident match against a committed row. That
-decision rests on the export gate showing such a merge, and the gate does not —
-see `## Active blockers`.
+Everything below is the position this branch started from — the prior
+branch's own snapshot (`audit-history-read`) is archived in
+`documentation/progress-history.md`.
 
 ## Completed
 
@@ -1150,11 +1143,12 @@ working claim only after its own implementation and proof land.
 
 | Assumption / claim | Current basis | What closes it |
 |---|---|---|
-| Register stays around 15 rows/~250 tokens | Basis for no embedding shortlist | Run both complete synthetic projects |
+| Register stays around 15 rows/~250 tokens | Basis for no embedding shortlist | Run the Helpline AI corpus end to end |
 | Source documents are usually 5–10 pages | Small-team domain expectation | Measure actual corpora; revisit pgvector/chunking only if needed |
 | Real SDK exception classification matches tests | Typed `status_code`; only scripted/401 path observed | Live provider failure evidence |
 | SDK retry is close enough to locked policy | Two attempts/120s configured; SDK owns wait | Live timing and explicit retry evidence |
 | Default OpenRouter model is suitable | Configured but never called | Bounded live-model run |
+| The Helpline AI end-state table (`sample-documents/helpline-ai/README.md`) — 7 row statuses, 3 rule findings, 1 rule expected silent | Written from the brief's design against the corpus text; never run | The bounded live-model run over the staged Helpline AI corpus |
 
 ## Known limitations
 
