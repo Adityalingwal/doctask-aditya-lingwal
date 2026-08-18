@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TypedDict
 from uuid import UUID
@@ -481,25 +480,21 @@ def build_register_graph(
 
     async def commit(state: RunState) -> dict[str, Any]:
         run_id = UUID(state["run_id"])
-        project_id = UUID(state["project_id"])
         async with pool.connection() as connection:
-            project = await read_project(connection, project_id)
             async with connection.transaction():
                 await enter_stage(connection, run_id, COMMIT_STAGE)
-                result = await commit_register(
-                    connection,
-                    project,
-                    run_id,
-                    datetime.now(timezone.utc).isoformat(),
-                )
+                # The rows and the `done` status become true together: the
+                # already-read rule in collect_batch and the live register
+                # read both rest on this transaction boundary.
+                result = await commit_register(connection, run_id)
                 await set_run_status(connection, run_id, DONE)
             await _finish_stage(connection, run_id, COMMIT_STAGE)
 
         _log(
             logging.INFO,
             "commit_finished",
-            f"Commit made {len(result.committed_row_numbers)} row(s) permanent, "
-            f"moved {len(result.moved_row_numbers)} and exported the register.",
+            f"Commit made {len(result.committed_row_numbers)} row(s) permanent "
+            f"and moved {len(result.moved_row_numbers)} on the register.",
             run_id,
             committed_rows=result.committed_row_numbers,
             merged_rows=result.merged_row_numbers,

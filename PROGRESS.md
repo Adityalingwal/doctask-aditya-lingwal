@@ -6,35 +6,45 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
-## Snapshot — 2026-08-18, branch `skipped-becomes-not-used`
+## Snapshot — 2026-08-18, branch `register-read-live`
 
 Built and run rather than type-checked, committed and pushed; the branch is
 waiting for review and for Aditya's gates. No pull request is open.
 
-- **`skipped` is now `not_used` in all three places.** The column is
-  `runs.not_used` (migration `20260818_0020`, proven forward, backward and
-  forward again by hand with the stored jsonb byte-identical at every step),
-  the field both doors answer with is `not_used`, and the run panel's second
-  tab reads `Not used`.
-- **Every entry says which of three kinds it is** — `already read`,
-  `not read`, `dropped` — named once in `app/runs/not_used_kinds.py`,
-  replacing the four mismatched values that were there before. The screen maps
-  each kind to its label and shows no label at all for a kind it does not
-  recognise.
-- **No reason sentence changed by a character.** A dropped entry's `kind` says
-  `dropped` while its own sentence still names the quote's kind, so it reads
-  "so this requirement was dropped".
-- **Both suites green on this branch, no live key:** **227 Python passed**
-  (baseline 224) and **59 front-end passed across 34 files** (baseline 57
-  across 33).
+- **The register is read live, and the snapshot is gone.** One core function
+  builds the register document from `register_rows` at read time;
+  `GET /runs/{id}/export` became `GET /projects/{project_id}/register` and
+  `get_export` became `get_register` (both counts still seven); Commit
+  stops writing `runs.export_json` and migration `20260818_0021` drops the
+  column, proven forward and backward by hand.
+- **The trap went first.** `collect_batch`'s already-read rule — the
+  snapshot's one non-display reader — became `runs.status = 'done'` in its
+  own first commit, proven on both corpora and on a discarded run before
+  anything else was touched.
+- **An empty register answers the empty state**, never a 409 and never an
+  error, and the header timestamp is the newest `done` run's `finished_at`.
+- **Both review findings fixed on the branch, test-first (2026-08-18).**
+  Codex's High: an approved finding of an at-review or discarded run was
+  visible in the live register (the discarded half predated this branch —
+  `build_export` used the same unfiltered query); the query now requires the
+  finding's run to be `done`, and the two new tests in
+  `tests/register/test_a_finding_follows_its_runs_ending.py` failed at
+  baseline on exactly that leak (`2 failed`, both on the finding's issue
+  text). Codex's Medium: the multi-query read now runs inside one
+  `REPEATABLE READ` transaction — no honest test can force the race, so the
+  guarantee rests on the isolation level, stated here rather than tested.
+- **Both suites green on this branch, no live key:** **237 Python passed**
+  (baseline 227; 235 before the review fixes) and **60 front-end passed
+  across 34 files** (baseline 60 across 34 — existing files updated in
+  place).
 
 Details, including the recorded test-first baseline failures, are under
 `## Completed` and `## Verification evidence`.
 
-Everything before this branch — the one-press review ending, `discarded`, the
-four-cell row, `Handed over`, workflow order, rules living only in
-`config/rules.yaml`, two formats — is in `## Completed` under its own branch
-entry.
+Everything before this branch — `not_used` and its kinds, the one-press
+review ending, `discarded`, the four-cell row, `Handed over`, workflow
+order, rules living only in `config/rules.yaml`, two formats — is in
+`## Completed` under its own branch entry.
 
 **Still not built, and it is a blocker for Aditya rather than a defect:**
 removing the downgrade of a confident match against a committed row. That
@@ -42,6 +52,57 @@ decision rests on the export gate showing such a merge, and the gate does not �
 see `## Active blockers`.
 
 ## Completed
+
+### The register is read live, and the snapshot goes (branch `register-read-live`)
+
+From `main` at `f6aa015`, the trap first, then the live read, the migration,
+the screen, and documentation. Item C2 of the review checklist; history:
+`documentation/decision-history.md`, "The register is read live, and the
+snapshot goes (2026-08-18)".
+
+- [x] **The never-do tests were written and run at the baseline before any
+      code changed.** Six failed there for the right reason: the four in
+      `tests/register/test_the_register_is_read_live.py` because
+      `GET /projects/{id}/register` did not exist, and the two in
+      `tests/interfaces/test_register_reads_identically_from_both_doors.py`
+      on `Tool 'get_register' not listed` and on the route set still holding
+      `('GET', '/runs/{run_id}/export')`. The two in
+      `tests/incremental/test_read_once_follows_the_run_status.py` passed at
+      the baseline by design — they guard the swap rather than detect it —
+      and passed again after it.
+- [x] **The `collect_batch` swap, first and on its own commit:**
+      `runs.export_json IS NOT NULL` became `runs.status = 'done'`, after
+      re-verifying on `f6aa015` that the commit node writes the rows and the
+      status inside one `connection.transaction()`. Observed after the swap:
+      both corpora's second runs counted every document `not_used` with kind
+      `already read` and made no new Extract call; a document read only by a
+      `discarded` run was read again (two Extract calls recorded); the
+      transient-failure, edited, renamed, deleted, unrelated and
+      asked-for-nothing paths all behaved unchanged — 15 targeted tests
+      passed.
+- [x] **One core function serves the register live:**
+      `build_register_document` reads `register_rows WHERE is_committed`
+      with citations, approved findings, and the newest `done` run's examine
+      section and `finished_at` as `exported_at`; `read_register` serves
+      JSON and Markdown from it; the route and the MCP tool are thin
+      wrappers over it, byte-identical by test. A project with no committed
+      rows answers `200` with an empty register; the Markdown reads the
+      screen's own empty line.
+- [x] Migration `20260818_0021` drops `runs.export_json`; the downgrade
+      re-adds it nullable and empty and says the snapshots are not
+      reconstructible. `run_status`'s `exported` key derives from
+      `status == 'done'`; `list_projects` reports a `done` run's `row_count`
+      as the project's committed rows, counted live.
+- [x] The screen's Register panel makes one GET of the register route; the
+      walk over the project's runs, the `run.exported` read and the
+      `projectsRef` machinery died with it. The empty state keys on the
+      register holding no rows.
+- [x] Snapshot-contract expectations updated to the live contract — the
+      409-before-commit reads now expect `200` with an empty register, the
+      `exported` derivation follows the status, and every register read in
+      the suites goes through the project-level route. No already-read test
+      was weakened.
+- [x] Hand-driven against the live stack; see `## Verification evidence`.
 
 ### `skipped` becomes `not_used`, and every entry says its kind (branch `skipped-becomes-not-used`)
 
@@ -1001,7 +1062,11 @@ working claim only after its own implementation and proof land.
    **Still open after 2026-08-18.** The gate is now one press
    (`gate-becomes-one-button`), which changed when the decision is written and
    not what it shows: the buttons carry no preview of what will change, and
-   whether they should is the question that remains here.
+   whether they should is the question that remains here. The register
+   becoming a live read (`register-read-live`) changes nothing here either:
+   `build_export` is now `build_register_document`, the run-level export
+   route is gone, and the register read still serves committed rows only, so
+   the gate still shows no merge.
 2. **Development Compose mount is too broad for final proof.** `.:/workspace`
    is intentionally retained for iteration, exposes local `.env`, and lets
    local files override the image. Remove/narrow it and wipe stale dev DB
@@ -1136,11 +1201,6 @@ working claim only after its own implementation and proof land.
   README's "What this does not do, and why" for the full boundary and the
   workflow answer (save an edited document under a new name to have the
   revision read).
-- A project's register panel shows the empty line
-  ("Nothing has been added to this register yet.") until that project has a
-  run that has exported — a new project, a first run still working, or a
-  discarded run all read the same way, since none of them has moved
-  `row_count` off `null` yet.
 - The screen is built by Node, which the application image does not carry, and
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.
@@ -1191,6 +1251,10 @@ working claim only after its own implementation and proof land.
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
+| `docker compose -p brief5live run --rm app pytest` | 2026-08-18, `register-read-live` branch | **235 passed**, real PostgreSQL, no live key. The baseline at `f6aa015` printed 227; the eight new tests are the two read-once tests, the four live-register tests and the two both-doors register tests |
+| `npm --prefix ui test` | 2026-08-18, `register-read-live` branch | **60 passed, 34 files**, no live key. Same counts as the baseline — the register tests were updated in place to the one-GET register route and the rows-empty state |
+| Migration `20260818_0021` forward and backward on real data | 2026-08-18, `register-read-live` branch | On a scratch database at `20260818_0020`: `pg_get_constraintdef` over `pg_constraint` for `runs` showed only `ck_runs_status`, the FK and the PK; `pg_indexes` only the PK and the two partial unique indexes on `project_id`/`status`; no view exists — nothing names `export_json`. A seeded `done` run held a snapshot; the upgrade dropped the column and left the run intact; the downgrade re-added it `jsonb`, nullable, with the seeded run's snapshot NULL (empty, not reconstructed); upgrading again dropped it once more |
+| The live register driven by hand | 2026-08-18, `register-read-live` branch | One throwaway project under `sample-projects`, deleted after, scripted client, no key, buttons pressed in a real browser. Run 1 committed one row; the Register panel showed the live table — "1 row", "last updated" from the run's `finished_at`, cells, citation, rules. Run 2 over the unchanged folder ended `no changes` with the document `not_used` kind `already read`. A second document arrived; run 3 reached review and was ended with the Discard button — register unchanged, still 1 row, same timestamp. The watcher then auto-started run 4, which **read the discarded run's document again** (second Extract call in the log), and adding it moved the live panel to 2 rows with a new `last updated`; the queued run 5 then ended `no changes` with everything already read |
 | `docker compose -p brief3gate run --rm app pytest` | 2026-08-18, `gate-becomes-one-button` branch | **224 passed**, real PostgreSQL, no live key. The baseline at `963c3a7` printed 216; the eight new tests are the two migration tests, the four one-press tests and the two both-doors tests, all written and seen failing first |
 | `npm --prefix ui test` | 2026-08-18, `gate-becomes-one-button` branch | **57 passed, 33 files**, no live key. The baseline printed 53 across 32 files; the new file covers the gate never rendering as a question, the body each ending press sends, and a `discarded` run showing `discarded` |
 | Migration `20260817_0019` forward and backward on real data | 2026-08-18, `gate-becomes-one-button` branch | Seeded at `20260817_0018` with one run per status, each on its own project, including `export rejected`. Before the step, `pg_get_constraintdef` showed `ck_runs_status` naming `export rejected` and `pg_indexes` showed both partial unique indexes naming only `running`/`needs review` and `queued` — so no index needed rebuilding. The upgrade rewrote exactly that one run to `discarded` and recreated the constraint with the new value; inserting `export rejected` afterwards was refused by `ck_runs_status` and `discarded` was accepted; the downgrade restored both the rows and the old constraint; upgrading again reached the same shape |

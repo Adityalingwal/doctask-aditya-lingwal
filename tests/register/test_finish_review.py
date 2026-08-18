@@ -53,7 +53,7 @@ RULES_CONFIG_PATH = PROJECT_ROOT / "config" / "rules.yaml"
 @contextmanager
 def _run_ready_to_finish(
     tmp_path: Path,
-) -> Iterator[tuple[ApplicationProcess, str, str]]:
+) -> Iterator[tuple[ApplicationProcess, str, str, str]]:
     """One run at Review with every decision already approved."""
     with temporary_project_folder("ready-to-finish") as (source_folder, source_folder_path):
         quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
@@ -85,7 +85,7 @@ def _run_ready_to_finish(
                     ).json()["run_id"]
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision(client, run_id)
-                yield application, database_url, run_id
+                yield application, database_url, project_id, run_id
             finally:
                 application.stop()
 
@@ -94,6 +94,7 @@ def test_finish_review_is_accepted_once(tmp_path: Path) -> None:
     with _run_ready_to_finish(tmp_path) as (
         application,
         database_url,
+        project_id,
         run_id,
     ):
         base_url = application.base_url
@@ -107,7 +108,7 @@ def test_finish_review_is_accepted_once(tmp_path: Path) -> None:
 
         with application.client() as client:
             wait_for_run_status(client, run_id, "done")
-            export = client.get(f"/runs/{run_id}/export").json()
+            register = client.get(f"/projects/{project_id}/register").json()
 
         engine = create_engine(database_url)
         with engine.connect() as connection:
@@ -125,15 +126,16 @@ def test_finish_review_is_accepted_once(tmp_path: Path) -> None:
         engine.dispose()
 
     assert answers == [200, 409]
-    assert len(export["rows"]) == 1
+    assert len(register["rows"]) == 1
     assert committed_rows == 1
-    assert audit_entries == len(export["columns"])
+    assert audit_entries == len(register["columns"])
 
 
 def test_a_decision_cannot_change_after_finish_review(tmp_path: Path) -> None:
     with _run_ready_to_finish(tmp_path) as (
         application,
         _database_url,
+        _project_id,
         run_id,
     ):
         with application.client() as client:
@@ -175,6 +177,7 @@ def test_decision_refused_after_review_finished_even_if_status_regresses(
     with _run_ready_to_finish(tmp_path) as (
         application,
         database_url,
+        _project_id,
         run_id,
     ):
         with application.client() as client:

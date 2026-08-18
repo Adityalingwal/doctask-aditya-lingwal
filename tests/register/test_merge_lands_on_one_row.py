@@ -92,7 +92,7 @@ def test_an_approved_merge_leaves_no_cell_denying_the_row_s_own_evidence(
                     at_review = wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 
@@ -170,7 +170,7 @@ def test_a_merge_into_a_row_that_is_itself_merged_leaves_no_two_hop_marker(
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 

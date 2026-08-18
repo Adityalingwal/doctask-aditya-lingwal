@@ -5,9 +5,10 @@ import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
 import {
   decisionReply,
-  exportReply,
+  projectId,
   projectReply,
   projectsReply,
+  registerReply,
   runId,
   runReply,
   serverAnswering,
@@ -77,7 +78,7 @@ test("a run at review offers approve, reject and the two endings and no other ac
 // Register entry above a project's runs — not from a run's own tabs, which
 // no longer include one.
 test("the register panel offers no control at all and no cell that can be edited by hand", async () => {
-  const exported = exportReply();
+  const exported = registerReply();
   const exportedRun = { ...projectReply().runs[0], row_count: exported.rows.length };
 
   vi.stubGlobal(
@@ -95,7 +96,7 @@ test("the register panel offers no control at all and no cell that can be edited
           body: runReply({ status: "done", stage: "commit", decisions, exported: true }),
         },
       },
-      { method: "GET", path: `/runs/${runId}/export`, reply: { body: exported } },
+      { method: "GET", path: `/projects/${projectId}/register`, reply: { body: exported } },
     ]),
   );
 

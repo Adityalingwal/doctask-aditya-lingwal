@@ -20,7 +20,7 @@ from app.examine.frozen_rules import (
 from app.examine.record_findings import record_findings
 from app.examine.register_under_examination import register_under_examination
 from app.register.cells import CELL_NAMES, fingerprint_of_cells
-from app.register.export_register import export_as_markdown
+from app.register.export_register import register_as_markdown
 from app.runs.statuses import RUNNING
 from tests.runs.application import (
     ApplicationProcess,
@@ -47,7 +47,6 @@ SHIPPED_RULES = ("R1", "R2", "R4", "R5")
 R3_MAX_DAYS = 14
 EXPORT_WITH_A_RULE_CARRYING_A_SETTING = {
     "project": {"id": "p", "name": "Intake portal"},
-    "run_id": "r",
     "exported_at": "2026-08-17T00:00:00+00:00",
     "columns": list(CELL_NAMES),
     "rows": [],
@@ -67,7 +66,7 @@ EXPORT_WITH_A_RULE_CARRYING_A_SETTING = {
 
 def test_a_rule_reaches_the_export_with_the_setting_it_was_judged_against() -> None:
     """A rule's text alone does not say what it ran at, so its params go with it."""
-    markdown = export_as_markdown(EXPORT_WITH_A_RULE_CARRYING_A_SETTING)
+    markdown = register_as_markdown(EXPORT_WITH_A_RULE_CARRYING_A_SETTING)
 
     assert f"max_days: {R3_MAX_DAYS}" in markdown
 
@@ -100,7 +99,7 @@ rules:
 def _run_at_review(
     tmp_path: Path,
     examine: dict[str, Any],
-) -> Iterator[tuple[ApplicationProcess, str, str]]:
+) -> Iterator[tuple[ApplicationProcess, str, str, str]]:
     """One run driven through the API, with Examine scripted, parked at Review."""
     with temporary_project_folder("run-at-review") as (source_folder, source_folder_path):
         quote = write_meeting_note(source_folder, SOURCE_FILE, REQUIREMENT)
@@ -135,7 +134,7 @@ def _run_at_review(
                         == "needs review",
                         "the run reaches Review",
                     )
-                yield application, database_url, run_id
+                yield application, database_url, project_id, run_id
             finally:
                 application.stop()
 
@@ -160,7 +159,7 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     with _run_at_review(
         tmp_path,
         examine_answer([]),
-    ) as (application, database_url, run_id):
+    ) as (application, database_url, project_id, run_id):
         with application.client() as client:
             waiting = client.get(f"/runs/{run_id}").json()
             client.post(
@@ -171,9 +170,9 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
                 "the clean run commits",
             )
-            export = client.get(f"/runs/{run_id}/export").json()
+            export = client.get(f"/projects/{project_id}/register").json()
             markdown = client.get(
-                f"/runs/{run_id}/export", params={"format": "markdown"}
+                f"/projects/{project_id}/register", params={"format": "markdown"}
             ).text
 
         engine = create_engine(database_url)
@@ -210,7 +209,7 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
     with _run_at_review(
         tmp_path,
         examine_answer([one_finding()]),
-    ) as (application, database_url, run_id):
+    ) as (application, database_url, project_id, run_id):
         with application.client() as client:
             waiting = client.get(f"/runs/{run_id}").json()
             finding_decision = _decision_of_kind(waiting, "finding")
@@ -228,7 +227,9 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
                 f"/runs/{run_id}/finish-review",
                 json={"add_to_register": True},
             )
-            export_attempt = client.get(f"/runs/{run_id}/export")
+            register_while_at_review = client.get(
+                f"/projects/{project_id}/register"
+            )
 
             _answer(client, run_id, finding_decision["decision_id"], "approved")
             client.post(
@@ -239,9 +240,9 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
                 "the run with an approved finding commits",
             )
-            export = client.get(f"/runs/{run_id}/export").json()
+            export = client.get(f"/projects/{project_id}/register").json()
             markdown = client.get(
-                f"/runs/{run_id}/export", params={"format": "markdown"}
+                f"/projects/{project_id}/register", params={"format": "markdown"}
             ).text
 
         engine = create_engine(database_url)
@@ -266,7 +267,10 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
     assert finding_decision is not None
     assert refusal.status_code == 409
     assert finding_decision["decision_id"] in refusal.json()["detail"]
-    assert export_attempt.status_code == 409
+    # Nothing has committed, so the register answers the empty state, and the
+    # unanswered finding is nowhere in it.
+    assert register_while_at_review.status_code == 200
+    assert register_while_at_review.json()["rows"] == []
 
     assert export["rows"][0]["findings"][0]["rule_id"] == "R1"
     assert export["rows"][0]["findings"][0]["issue"] == R1_ISSUE
@@ -289,7 +293,7 @@ def test_a_rejected_finding_stays_in_the_run_and_never_reaches_the_export(
     with _run_at_review(
         tmp_path,
         examine_answer([one_finding()]),
-    ) as (application, database_url, run_id):
+    ) as (application, database_url, project_id, run_id):
         with application.client() as client:
             waiting = client.get(f"/runs/{run_id}").json()
             _answer(
@@ -306,9 +310,9 @@ def test_a_rejected_finding_stays_in_the_run_and_never_reaches_the_export(
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
                 "the run with a rejected finding commits",
             )
-            export = client.get(f"/runs/{run_id}/export").json()
+            export = client.get(f"/projects/{project_id}/register").json()
             markdown = client.get(
-                f"/runs/{run_id}/export", params={"format": "markdown"}
+                f"/projects/{project_id}/register", params={"format": "markdown"}
             ).text
 
         engine = create_engine(database_url)

@@ -56,7 +56,6 @@ WORDS_THE_SYSTEM_MUST_NOT_REPEAT = (
 )
 FIRST_ROW = 1
 WHAT_WAS_ASKED_CELL = 0
-NOT_EXPORTED_YET = 409
 
 
 def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
@@ -103,12 +102,14 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
                     ).json()["run_id"]
 
                     at_review = wait_for_run_status(client, run_id, "needs review")
-                    refused_export = client.get(f"/runs/{run_id}/export")
+                    register_before_commit = client.get(
+                        f"/projects/{project_id}/register"
+                    )
                     approve_every_decision_and_finish_review(client, run_id)
                     wait_for_run_status(client, run_id, "done")
-                    exported = client.get(f"/runs/{run_id}/export").json()
+                    exported = client.get(f"/projects/{project_id}/register").json()
                     exported_markdown = client.get(
-                        f"/runs/{run_id}/export", params={"format": "markdown"}
+                        f"/projects/{project_id}/register", params={"format": "markdown"}
                     ).text
 
                 documents = documents_of_run(database_url, run_id)
@@ -149,7 +150,10 @@ def test_an_instruction_buried_in_a_document_is_reported_and_never_acted_on(
 
     # Not obeyed: nothing was approved, nothing exported before the human, and
     # the instruction reached the Delivery Owner as no proposed action at all.
-    assert refused_export.status_code == NOT_EXPORTED_YET
+    # Nothing is committed while the review waits, so the register answers
+    # the empty state and carries nothing the instruction could have reached.
+    assert register_before_commit.status_code == 200
+    assert register_before_commit.json()["rows"] == []
     assert at_review["exported"] is False
     assert at_review["decisions"] == []
     for decision in at_review["decisions"]:

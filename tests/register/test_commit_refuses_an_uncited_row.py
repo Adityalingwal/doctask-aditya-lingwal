@@ -44,9 +44,7 @@ async def _commit_a_row_citing_nothing() -> None:
                 await _insert_proposed_row(
                     connection, project["id"], run_id
                 )
-                await commit_register(
-                    connection, project, run_id, "2026-08-16T00:00:00+00:00"
-                )
+                await commit_register(connection, run_id)
         finally:
             await pool.close()
 

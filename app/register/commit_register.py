@@ -4,7 +4,6 @@ from typing import Any, NamedTuple
 from uuid import UUID
 
 from psycopg import AsyncConnection
-from psycopg.types.json import Jsonb
 
 from app.examine.read_findings import findings_of_run
 from app.register.audit_entries import write_attachment, write_cell_change
@@ -15,7 +14,6 @@ from app.register.cells import (
     in_writing_says_yes,
 )
 from app.register.move_rows import apply_moves
-from app.register.export_register import build_export
 from app.review.review_queue import (
     APPROVED,
     POSSIBLE_MATCH_DECISION,
@@ -27,20 +25,19 @@ class CommitResult(NamedTuple):
     committed_row_numbers: list[int]
     merged_row_numbers: list[int]
     moved_row_numbers: list[int]
-    export: dict[str, Any]
 
 
 async def commit_register(
     connection: AsyncConnection,
-    project: dict[str, Any],
     run_id: UUID,
-    exported_at: str,
 ) -> CommitResult:
-    """Settle this run's proposals, write their history, and produce the export.
+    """Settle this run's proposals and write their history.
 
-    The caller runs this inside one transaction: rows, fingerprints, audit
-    history and the export become permanent together or not at all, because a
-    register committed without its history would be lying about itself.
+    The caller runs this inside one transaction: rows, fingerprints and audit
+    history become permanent together or not at all, because a register
+    committed without its history would be lying about itself. Nothing is
+    copied anywhere — every reader reads the register live from
+    `register_rows`.
     """
     merged_row_numbers = await _merge_approved_matches(connection, run_id)
     document_id_by_file = await _documents_of_run(connection, run_id)
@@ -86,16 +83,10 @@ async def commit_register(
         committed_row_numbers.append(row["row_number"])
 
     await _write_attachment_audit(connection, run_id)
-    export = await build_export(connection, project, run_id, exported_at)
-    await connection.execute(
-        "UPDATE runs SET export_json = %s WHERE id = %s",
-        (Jsonb(export), run_id),
-    )
     return CommitResult(
         committed_row_numbers=committed_row_numbers,
         merged_row_numbers=merged_row_numbers,
         moved_row_numbers=moved_row_numbers,
-        export=export,
     )
 
 

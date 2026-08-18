@@ -142,9 +142,9 @@ def _one_run_stating_a_blocker(tmp_path: Path) -> dict[str, Any]:
                     at_review = wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
                     markdown = client.get(
-                        f"/runs/{run_id}/export", params={"format": "markdown"}
+                        f"/projects/{project_id}/register", params={"format": "markdown"}
                     ).text
             finally:
                 application.stop()

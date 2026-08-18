@@ -90,15 +90,21 @@ def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> N
                     lambda: _status_of(base_url, run_id, DONE),
                     "the run reports it is done",
                 )
-                exported = call_tool(
+                register = call_tool(
                     base_url,
-                    "get_export",
-                    {"run_id": run_id, "export_format": "json"},
+                    "get_register",
+                    {
+                        "project_id": created.payload["project_id"],
+                        "register_format": "json",
+                    },
                 )
                 as_markdown = call_tool(
                     base_url,
-                    "get_export",
-                    {"run_id": run_id, "export_format": "markdown"},
+                    "get_register",
+                    {
+                        "project_id": created.payload["project_id"],
+                        "register_format": "markdown",
+                    },
                 )
             finally:
                 application.stop()
@@ -111,8 +117,8 @@ def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> N
     }
     assert finished.payload == {"run_id": run_id, "status": "review finished"}
     assert committed["exported"] is True
-    assert [row["cells"]["what_was_asked"] for row in exported.payload["rows"]] == [
+    assert [row["cells"]["what_was_asked"] for row in register.payload["rows"]] == [
         REQUIREMENT
     ]
-    assert exported.payload["run_id"] == run_id
+    assert register.payload["project"]["id"] == created.payload["project_id"]
     assert REQUIREMENT in as_markdown.payload

@@ -118,7 +118,7 @@ def test_an_encrypted_pdf_is_not_read_and_the_reason_says_so_while_the_batch_con
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     finished = wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 
@@ -221,7 +221,7 @@ def test_only_the_extensions_the_config_accepts_reach_a_reader(
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     finished = wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 
@@ -275,7 +275,7 @@ def test_a_corrupt_pdf_is_not_read_and_the_batch_continues(
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     finished = wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 
@@ -329,7 +329,7 @@ def test_a_pdf_that_cannot_be_parsed_is_not_read_and_the_batch_continues(
                     wait_for_run_status(client, run_id, "needs review")
                     approve_every_decision_and_finish_review(client, run_id)
                     finished = wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
 

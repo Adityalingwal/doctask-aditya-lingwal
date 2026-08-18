@@ -20,10 +20,10 @@ export async function readRun(runId) {
   return await ask("GET", `/runs/${encodeURIComponent(runId)}`);
 }
 
-export async function readExport(runId) {
+export async function readRegister(projectId) {
   return await ask(
     "GET",
-    `/runs/${encodeURIComponent(runId)}/export?format=${JSON_FORMAT}`,
+    `/projects/${encodeURIComponent(projectId)}/register?format=${JSON_FORMAT}`,
   );
 }
 

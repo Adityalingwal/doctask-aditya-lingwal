@@ -30,13 +30,27 @@ async def require_run(connection: AsyncConnection, run_id: UUID) -> dict[str, An
 async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] | None:
     result = await connection.execute(
         "SELECT id, project_id, status, current_stage, started_at, finished_at, "
-        "not_used, ended_early_reason, failure_reason, export_json, "
+        "not_used, ended_early_reason, failure_reason, "
         "review_finished_at, examined_row_count, finished_stages, "
         "reported_instructions "
         "FROM runs WHERE id = %s",
         (run_id,),
     )
     return await result.fetchone()
+
+
+async def require_project(
+    connection: AsyncConnection,
+    project_id: UUID,
+) -> dict[str, Any]:
+    """The project a caller named, or the refusal every door reports for it."""
+    project = await read_project(connection, project_id)
+    if project is None:
+        raise UnknownId(
+            f"no project has id {project_id} — create one with POST /projects "
+            "and use the id it returns."
+        )
+    return project
 
 
 async def read_project(

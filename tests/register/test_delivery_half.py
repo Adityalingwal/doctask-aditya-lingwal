@@ -167,7 +167,7 @@ def _run_once(
                         json={"add_to_register": True},
                     ).raise_for_status()
                     wait_for_run_status(client, run_id, "done")
-                    export = client.get(f"/runs/{run_id}/export").json()
+                    export = client.get(f"/projects/{project_id}/register").json()
             finally:
                 application.stop()
             rows = _stored_cells(database_url, project_id)

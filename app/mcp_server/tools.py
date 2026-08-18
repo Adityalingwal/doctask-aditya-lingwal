@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from app.projects.create_project import create_project
 from app.projects.list_projects import read_project_list
 from app.register.export_register import JSON_FORMAT
-from app.register.read_export import read_export
+from app.register.read_export import read_register
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
@@ -22,8 +22,9 @@ MCP_PATH = "/mcp"
 MCP_INSTRUCTIONS = (
     "Drive the Requirements-to-Delivery Register: create a project, start a "
     "run, poll its status, answer each decision it raises, finish the review, "
-    "then read the export. A run is not one call — start_run returns a run id "
-    "and get_run_status is polled until the run reports it is done."
+    "then read the project's register. A run is not one call — start_run "
+    "returns a run id and get_run_status is polled until the run reports it "
+    "is done."
 )
 
 
@@ -101,14 +102,14 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
         """
         return await finish_review(_run_engine(application), run_id, add_to_register)
 
-    @server.tool(name="get_export")
-    async def get_export_tool(
-        run_id: UUID,
-        export_format: str = JSON_FORMAT,
+    @server.tool(name="get_register")
+    async def get_register_tool(
+        project_id: UUID,
+        register_format: str = JSON_FORMAT,
     ) -> Any:
-        """Read the register one run exported, as json or as markdown."""
+        """Read one project's register, live from its committed rows, as json or as markdown."""
         async with application.state.pool.connection() as connection:
-            return await read_export(connection, run_id, export_format)
+            return await read_register(connection, project_id, register_format)
 
     return server
 

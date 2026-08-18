@@ -8,6 +8,7 @@ from psycopg import AsyncConnection
 
 from app.refusal import ProjectsUnavailable
 from app.runs.finished_stages import ordered_finished_stages
+from app.runs.statuses import DONE
 
 
 PROJECTS_ROOT_KEY = "projects_root"
@@ -26,8 +27,12 @@ async def read_project_list(
     A run's own `started_at` is sent as `null` when it has not started, never
     substituted with `created_at`, and the list carries no cap. `stage` and
     `row_count` are carried alongside `status` because the project card and
-    the run row (L4/L6) show a live run's stage strip and an exported run's
+    the run row (L4/L6) show a live run's stage strip and a `done` run's
     row count, neither of which the flat status word alone can answer.
+    `row_count` is the project's committed rows counted live from
+    `register_rows`, carried on each `done` run: the register is the
+    project's, so a run that committed reports what the register holds now,
+    not a copy of what it held that day.
     """
     result = await connection.execute(
         "SELECT projects.id AS project_id, projects.name AS project_name, "
@@ -37,13 +42,17 @@ async def read_project_list(
         "runs.current_stage AS run_current_stage, "
         "runs.started_at AS run_started_at, runs.created_at AS run_created_at, "
         "runs.finished_stages AS run_finished_stages, "
-        "jsonb_array_length(runs.export_json -> 'rows') AS run_row_count, "
+        "CASE WHEN runs.status = %s THEN "
+        "(SELECT count(*) FROM register_rows "
+        "WHERE register_rows.project_id = projects.id "
+        "AND register_rows.is_committed) END AS run_row_count, "
         "(SELECT count(*) FROM decisions WHERE decisions.run_id = runs.id "
         "AND decisions.outcome IS NULL) AS waiting_decisions, "
         "ROW_NUMBER() OVER (PARTITION BY runs.project_id ORDER BY "
         "runs.created_at ASC) AS run_number "
         "FROM projects LEFT JOIN runs ON runs.project_id = projects.id "
-        "ORDER BY projects.created_at ASC, runs.created_at DESC"
+        "ORDER BY projects.created_at ASC, runs.created_at DESC",
+        (DONE,),
     )
     rows = await result.fetchall()
     projects_root, available_folders = _available_folders(

@@ -187,7 +187,7 @@ def _one_reviewed_run(
     return RunOutcome(
         decisions=at_review["decisions"],
         rows=stored_rows(database_url, project_id),
-        export=client.get(f"/runs/{run_id}/export").json(),
+        export=client.get(f"/projects/{project_id}/register").json(),
     )
 
 

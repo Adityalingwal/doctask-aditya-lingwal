@@ -3,14 +3,14 @@
 An agentic system that reads software requirements-to-delivery documents and
 builds a grounded **Requirements-to-Delivery Register**. Each row traces one
 client requirement through written scope and testing. Exact source evidence and
-a human approval gate prevent unsupported rows from being exported.
+a human approval gate prevent unsupported rows from reaching the register.
 
 ## Current working scope
 
 Slice 1, the formats and types slice, the rules and findings slice, the MCP
 slice, the incremental update slice, and the review screen are implemented:
 
-`Document folder → Ingest → Extract → Match → Examine → Review → Commit → JSON/Markdown export`
+`Document folder → Ingest → Extract → Match → Examine → Review → Commit → the register, read live as JSON or Markdown`
 
 - PostgreSQL stores projects, runs, documents, register rows, citations,
   review decisions, findings, audit entries, and LangGraph checkpoints.
@@ -22,8 +22,8 @@ slice, the incremental update slice, and the review screen are implemented:
   fingerprint included.
 - Each project's folder is watched, and a file that arrives there starts a run
   by itself once the folder has settled.
-- Review decisions are one proposal at a time; export is unavailable until
-  approved.
+- Review decisions are one proposal at a time; nothing reaches the register
+  until approved.
 - One browser page at `/ui` shows a run and answers its gates.
 - Four kinds of document are read, in the order the work happens: **meeting
   notes → client requirements document → handover summary → testing feedback**.
@@ -38,15 +38,15 @@ slice, the incremental update slice, and the review screen are implemented:
   two rows are proposed and the reviewer is asked which is right.
 - A line inside a document addressed to the system is reported on the run and
   on the screen, and never followed — and that document is still read. It is
-  deliberately not part of the export, which is the register the client is sent.
+  deliberately not part of the register, which is what the client is sent.
 - Examine judges the whole register against the rules the run froze and raises
   a finding as a question, never as an edit.
 - Startup resumes a run killed mid-flight from its durable checkpoint.
 - Automated tests use a scripted model and no live API key.
 
 No live hosted-model run has been completed yet. Current proof is for the
-orchestration, persistence, validation, review, and export paths using the
-scripted client.
+orchestration, persistence, validation, review, and register-read paths using
+the scripted client.
 
 ## The register's cells, its statuses, and what moves them
 
@@ -98,12 +98,12 @@ Examine runs once per run, between Match and Review, in a single model call for
 the whole register. Each finding names its rule, the row it is about, what it
 found, and the evidence — and becomes a question the Delivery Owner answers.
 Approving one attaches it to the row; rejecting one keeps it in the run record
-and out of the export. A finding never edits a cell, and attaching one does not
+and off the register. A finding never edits a cell, and attaching one does not
 change the row's fingerprint, which covers the four cells only.
 
-A run with nothing wrong says so: `GET /runs/{id}` and both exports name the
-rules that ran and how many rows they ran against, alongside an empty findings
-list.
+A run with nothing wrong says so: `GET /runs/{id}` and the register, in both
+its formats, name the rules that ran and how many rows they ran against,
+alongside an empty findings list.
 
 ## The watched folder
 
@@ -157,8 +157,8 @@ that finds no new document says only that.
 
 When no document has changed but the rules in `config/rules.yaml` have, the run
 skips Extract and Match and examines the existing register against the new
-rules. It is the same run, routed differently, and it ends at the same export
-gate.
+rules. It is the same run, routed differently, and it ends at the same
+review-ending gate.
 
 ## Domain
 
@@ -219,7 +219,7 @@ operations:
 - `GET /runs/{id}`
 - `POST /runs/{id}/decisions`
 - `POST /runs/{id}/finish-review`
-- `GET /runs/{id}/export?format=json|markdown`
+- `GET /projects/{id}/register?format=json|markdown`
 
 ## The review screen
 
@@ -251,16 +251,17 @@ whether the folder actually exists or sits inside the configured projects
 root, is the server's, shown under "Could not create this project" exactly
 as it answered.
 
-The middle column lists the selected project's own **Register** — the row
-count of its newest run that has exported, if any — above that project's
+The middle column lists the selected project's own **Register** — its live
+committed row count, once any run has committed — above that project's
 runs, newest first: run number, when it started, and either its live stage
-strip, its status, or its row count once it has exported. The column
+strip, its status, or — on a run that ended `done` — the register's current
+committed row count. The column
 collapses to a narrow strip (keeping the open run's number, or "Register",
 visible) so the reading pane can take the full width while it is being read.
 Opening a run writes it into the address as `/ui/?run=<run id>`, so a link to
 one run is a link that can be kept; no run id is ever typed. Opening the
-register clears whatever run was open — its export and both refusals — so a
-previous run's decisions never sit beside it.
+register clears whatever run was open, and both refusals, so a previous
+run's decisions never sit beside it.
 
 To the right, one run's sections are read one at a time behind tabs:
 
@@ -273,12 +274,15 @@ To the right, one run's sections are read one at a time behind tabs:
 
 Opening the project's own **Register** entry (middle column) shows the same
 right-hand panel, with the project's whole committed register — its cells,
-its citations and its approved findings — or, before any run has ever
-exported, the line "Nothing has been added to this register yet."
+its citations and its approved findings, read live from `register_rows`
+through `GET /projects/{id}/register` — or, while the project holds no
+committed row, the line "Nothing has been added to this register yet."
 
 The page polls `GET /projects` and `GET /runs/{id}` every **3 seconds**
-unconditionally — whatever is on screen, whatever a run's status is; that
-interval lives in [`ui/config/screen.json`](ui/config/screen.json). This is
+unconditionally — whatever is on screen, whatever a run's status is — and
+`GET /projects/{id}/register` on the same interval while the register panel
+is open; that interval lives in
+[`ui/config/screen.json`](ui/config/screen.json). This is
 deliberate: at this size the payload is a few kilobytes, and one
 unconditional read is easier to reason about than conditional refresh rules.
 If a poll cannot reach the application at all, a strip under the header says
@@ -324,12 +328,12 @@ the practical fix the endpoint would have given.
 | `get_run_status` | `run_id` |
 | `submit_decision` | `run_id`, `decision_id`, `outcome` (`approved` or `rejected`) |
 | `finish_review` | `run_id`, `add_to_register` — yes adds this run's changes to the register, no discards them |
-| `get_export` | `run_id`, `export_format` (`json` or `markdown`) |
+| `get_register` | `project_id`, `register_format` (`json` or `markdown`) |
 
 A run is not one call here either: `start_run` returns a run id at once and
-`get_run_status` is polled until the run says it is done. Nothing commits or
-exports until `finish_review` is called with `add_to_register` true; called
-with false, the run ends `discarded` and the register is unchanged.
+`get_run_status` is polled until the run says it is done. Nothing commits
+until `finish_review` is called with `add_to_register` true; called with
+false, the run ends `discarded` and the register is unchanged.
 
 Any MCP client that speaks streamable HTTP can point at that URL. With the
 official Python SDK:
@@ -397,8 +401,8 @@ the next run and never to one already under way or already finished. Point
   they ever state the same one.
 - Rules are supplied by editing `config/rules.yaml`; the screen, the API and
   the MCP tools can read which rules ran but cannot add or change one.
-- A handover summary that lists requirements, in a run that never exports, is
-  read again by the next run.
+- A handover summary that lists requirements, in a run that never ends
+  `done`, is read again by the next run.
 - Run events below `WARNING` are dropped as the application is shipped, because
   uvicorn's logging configuration gives the run logger no handler; warnings and
   errors still reach the container's output.

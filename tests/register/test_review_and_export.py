@@ -34,7 +34,7 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 def _application_at_review(
     tmp_path: Path,
     examine: dict[str, Any] | None = None,
-) -> Iterator[tuple[ApplicationProcess, str, str]]:
+) -> Iterator[tuple[ApplicationProcess, str, str, str]]:
     """One run driven through the API until it is parked at Review.
 
     `examine` decides whether the run reaches Review with a question of its
@@ -74,7 +74,7 @@ def _application_at_review(
                         == "needs review",
                         "the run reaches Review",
                     )
-                yield application, database_url, run_id
+                yield application, database_url, project_id, run_id
             finally:
                 application.stop()
 
@@ -83,6 +83,7 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
     with _application_at_review(tmp_path) as (
         application,
         database_url,
+        project_id,
         run_id,
     ):
         with application.client() as client:
@@ -108,9 +109,9 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
                 lambda: client.get(f"/runs/{run_id}").json()["status"] == "done",
                 "the approved run commits",
             )
-            export = client.get(f"/runs/{run_id}/export").json()
+            register = client.get(f"/projects/{project_id}/register").json()
             markdown = client.get(
-                f"/runs/{run_id}/export", params={"format": "markdown"}
+                f"/projects/{project_id}/register", params={"format": "markdown"}
             ).text
 
         engine = create_engine(database_url)
@@ -136,11 +137,11 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
             )
         engine.dispose()
 
-    assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [REQUIREMENT]
-    assert export["rows"][0]["cells"]["status"] == "Nothing said yet"
+    assert [row["cells"]["what_was_asked"] for row in register["rows"]] == [REQUIREMENT]
+    assert register["rows"][0]["cells"]["status"] == "Nothing said yet"
     what_was_asked_citation = next(
         citation
-        for citation in export["rows"][0]["citations"]
+        for citation in register["rows"][0]["citations"]
         if citation["cell"] == "what_was_asked"
     )
     assert what_was_asked_citation["source_file"] == SOURCE_FILE
@@ -149,7 +150,7 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
     assert REQUIREMENT in markdown
     assert len(committed_fingerprints) == 1
     assert committed_fingerprints[0]
-    assert sorted(audited_cells) == sorted(export["columns"])
+    assert sorted(audited_cells) == sorted(register["columns"])
 
 
 def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> None:
@@ -159,6 +160,7 @@ def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> No
     ) as (
         application,
         _database_url,
+        project_id,
         run_id,
     ):
         with application.client() as client:
@@ -174,7 +176,7 @@ def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> No
                 json={"add_to_register": True},
             )
             after_refusal = client.get(f"/runs/{run_id}").json()
-            export_attempt = client.get(f"/runs/{run_id}/export")
+            register_while_at_review = client.get(f"/projects/{project_id}/register")
 
     assert unanswered
     assert refusal.status_code == 409
@@ -183,7 +185,10 @@ def test_finish_review_refused_while_a_decision_is_pending(tmp_path: Path) -> No
         assert decision["question"] in refusal.json()["detail"]
     assert after_refusal["status"] == "needs review"
     assert after_refusal["exported"] is False
-    assert export_attempt.status_code == 409
+    # Nothing has committed, so the register answers the empty state — never
+    # an error, and never the rows the unfinished review would add.
+    assert register_while_at_review.status_code == 200
+    assert register_while_at_review.json()["rows"] == []
 
 
 def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(

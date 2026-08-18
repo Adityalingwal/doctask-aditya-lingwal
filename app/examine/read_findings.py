@@ -7,6 +7,7 @@ from psycopg import AsyncConnection
 
 from app.examine.frozen_rules import frozen_rules_of_run
 from app.review.review_queue import APPROVED
+from app.runs.statuses import DONE
 
 
 # A finding follows its row through a merge, so both the id and the number it
@@ -129,11 +130,18 @@ async def approved_findings_of_project(
     connection: AsyncConnection,
     project_id: UUID,
 ) -> list[dict[str, Any]]:
-    """Every finding a person approved onto a row of this project's register."""
+    """Every finding a person approved onto a row of this project's register.
+
+    Only findings of runs that ended `done` count: an approved finding on a
+    run still at review has not passed the add/discard gate, and one on a
+    discarded run never will — the register is only what was added to it.
+    """
     return await _findings_matching(
         connection,
-        "WHERE register_rows.project_id = %s AND decisions.outcome = %s",
-        (project_id, APPROVED),
+        "WHERE register_rows.project_id = %s AND decisions.outcome = %s "
+        "AND EXISTS (SELECT 1 FROM runs "
+        "WHERE runs.id = findings.run_id AND runs.status = %s)",
+        (project_id, APPROVED, DONE),
     )
 
 

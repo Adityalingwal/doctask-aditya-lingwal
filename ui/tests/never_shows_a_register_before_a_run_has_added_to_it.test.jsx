@@ -1,10 +1,17 @@
-// Never-do test for section 2.4: before any run has exported, the project's
-// Register panel shows the empty line, never an empty table.
+// Never-do test for section 2.4: while a project holds no committed rows,
+// the server answers the empty register and the project's Register panel
+// shows the empty line, never an empty table.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
-import { projectReply, projectsReply, serverAnswering } from "./server_replies.js";
+import {
+  projectId,
+  projectReply,
+  projectsReply,
+  registerReply,
+  serverAnswering,
+} from "./server_replies.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -33,6 +40,13 @@ test("never_shows_a_register_before_a_run_has_added_to_it", async () => {
         method: "GET",
         path: "/projects",
         reply: { body: projectsReply({ projects: [neverExported] }) },
+      },
+      {
+        method: "GET",
+        path: `/projects/${projectId}/register`,
+        reply: {
+          body: registerReply({ rows: [], exported_at: null, examine: null }),
+        },
       },
     ]),
   );

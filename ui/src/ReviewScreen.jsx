@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 
@@ -14,8 +14,8 @@ import screenConfig from "../config/screen.json";
 import {
   answerDecision,
   finishReview,
-  readExport,
   readProjects,
+  readRegister,
   readRun,
 } from "./run_requests.js";
 
@@ -97,7 +97,6 @@ export default function ReviewScreen({ runId: openedRunId }) {
       setProjectsRefusal(answered.refusal);
       return;
     }
-    projectsRef.current = answered.body.projects;
     setProjects(answered.body.projects);
     setProjectsRoot(answered.body.projects_root);
     setAvailableFolders(answered.body.available_folders);
@@ -171,59 +170,17 @@ export default function ReviewScreen({ runId: openedRunId }) {
     // left and middle columns follow it rather than what was clicked.
     setSelectedProjectId(answered.body.project_id);
     setReadRefusal(null);
-    if (!answered.body.exported) {
-      setExported(null);
-      return;
-    }
-    const register = await readExport(runId);
-    if (register.unreachable) {
-      setUnreachable(true);
-      return;
-    }
-    setExported(register.ok ? register.body : null);
-    if (!register.ok) {
-      setReadRefusal(register.refusal);
-    }
   }, [runId]);
 
-  // No new endpoint and no new core function (section 2.2): the register a
-  // project's panel shows is read the same two ways the screen already
-  // reads everything else — GET /projects (already loaded, runs newest
-  // first, each carrying row_count once it has exported) to find the most
-  // recent run that has exported, then GET /runs/{id}/export for that run's
-  // register.
-  //
-  // `projects` is read through a ref, updated on every render, rather than
-  // closed over directly: `GET /projects` answers with a new array every
-  // poll, and if this callback depended on `projects` itself it would be
-  // rebuilt every poll too — the polling effect below depends on this
-  // callback, so tearing it down and setting it up again would immediately
-  // call `readProjectsFromServer()` again, which answers with yet another
-  // new array, rebuilding the callback again. `registerOpen` and
-  // `selectedProjectId` stay real dependencies: they are cheap primitives
-  // that only change when a person navigates, so depending on them directly
-  // is what makes opening the register (or switching project while it is
-  // open) read it immediately, the same way `readFromServer` depending on
-  // `runId` makes opening a run read immediately — without waiting for the
-  // next poll tick.
-  const projectsRef = useRef(projects);
-  projectsRef.current = projects;
-
+  // The register is the project's own reading, served live from its
+  // committed rows by one route — GET /projects/{id}/register. There is no
+  // walk over the project's runs any more: no run sits between the panel
+  // and the register it shows.
   const readRegisterFromServer = useCallback(async () => {
     if (!registerOpen) {
       return;
     }
-    const project = projectsRef.current.find(
-      (candidate) => candidate.project_id === selectedProjectId,
-    );
-    const latestExportedRun = project?.runs.find((run) => run.row_count !== null) ?? null;
-    if (latestExportedRun === null) {
-      setExported(null);
-      setReadRefusal(null);
-      setRegisterRead(true);
-      return;
-    }
-    const register = await readExport(latestExportedRun.run_id);
+    const register = await readRegister(selectedProjectId);
     if (register.unreachable) {
       setUnreachable(true);
       return;
@@ -235,11 +192,8 @@ export default function ReviewScreen({ runId: openedRunId }) {
   }, [registerOpen, selectedProjectId]);
 
   useEffect(() => {
-    // The register read depends on what GET /projects just said, so it waits
-    // for that answer rather than reading the previous poll's snapshot and
-    // showing a register one interval out of date.
-    const readEverything = async () => {
-      await readProjectsFromServer();
+    const readEverything = () => {
+      readProjectsFromServer();
       readFromServer();
       readRegisterFromServer();
     };
@@ -734,19 +688,20 @@ function EndReviewButton({ label, answering, onClick }) {
   );
 }
 
-// The project's own panel (section 2.3): the same register component a run
-// used to show under its own Register tab, reused here rather than
-// duplicated. The empty state (section 2.4) covers a new project, a first
-// run still working, and a run whose changes were discarded — every case in
-// which this project has never exported — with one line, never an empty
-// table.
+// The project's own panel (section 2.3): the register read live from the
+// project's committed rows. The empty state (section 2.4) covers a new
+// project, a first run still working, and a run whose changes were
+// discarded — every case in which no run has committed rows, which the
+// server answers as a register holding none — with one line, never an
+// empty table.
 function ProjectRegisterSection({ exported, read }) {
+  const empty = exported === null || exported.rows.length === 0;
   return (
     <Section
       number=""
       name="Register"
       headingId="project-register-heading"
-      count={read && exported !== null ? `${exported.rows.length} rows` : null}
+      count={read && !empty ? `${exported.rows.length} rows` : null}
     >
       {!read ? (
         // Until the read answers this screen knows nothing about this
@@ -755,7 +710,7 @@ function ProjectRegisterSection({ exported, read }) {
         <p className="m-0 max-w-prose text-sm text-ink-soft">
           Reading this register…
         </p>
-      ) : exported === null ? (
+      ) : empty ? (
         <p className="m-0 max-w-prose text-sm text-ink-soft">
           Nothing has been added to this register yet.
         </p>
