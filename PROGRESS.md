@@ -1084,6 +1084,17 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
+- **A file dropped into a brand-new project's folder before the watcher's
+  first look at it starts no run by itself.** The watcher's first sight of a
+  project records whatever the folder holds as the baseline, and that first
+  sight lands at its next poll — up to `poll_seconds` after the project is
+  created. A file landing in that window (after the creation-time run
+  collected its batch, before the baseline is taken) waits for the next run,
+  whichever way it starts; it is never lost, because a batch collects every
+  file not yet read. Decided 2026-08-18 with Aditya: shrink the window by
+  config (`poll_seconds` 10 → 4, `quiet_seconds` 30 → 10) rather than persist
+  a creation-time folder baseline, which would take a migration; revisit only
+  if a live run or demo actually hits the window.
 - `Disputed` is reached only when the handover and the testing feedback that
   contradict each other are read in the **same batch**. `status_after` decides
   it from the delivery evidence this batch supplied, and nothing stores the

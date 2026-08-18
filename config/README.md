@@ -15,7 +15,7 @@ watcher reacts, is an edit here, never a code change.
 
 ## Editing `watcher.yaml`
 
-The shipped values are `poll_seconds: 10` and `quiet_seconds: 30`. Both must be
+The shipped values are `poll_seconds: 4` and `quiet_seconds: 10`. Both must be
 numbers above zero; anything else stops the application at startup, naming the
 key and what is wrong with it.
 
