@@ -992,6 +992,11 @@ a symlink after creation is not re-checked.
   Ingest goes straight to Examine, so Extract and Match never execute; reading
   the answer off `runs.stage` alone would call them finished the moment the
   run reached a later stage. `finished_stages` records only what actually ran.
+- **The run logger owns its stdout handler (2026-08-18).**
+  `configure_run_logging` attaches it once at startup, at INFO, with
+  propagation off so no host root handler prints an event twice. Without it
+  Python prints nothing below WARNING, so the promised JSON lines never
+  reached `docker compose logs`.
 - **Status:** Complete. Logging is JSON-line stdout with `run_id` on every
   event; no timing, cost, or usage data exists anywhere in the application.
 

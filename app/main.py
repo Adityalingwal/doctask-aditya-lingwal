@@ -19,7 +19,7 @@ from app.mcp_server.tools import MCP_PATH, build_mcp_server
 from app.model.client import build_model_client
 from app.projects.create_project import ensure_demo_project
 from app.review_screen.serve_screen import serve_review_screen
-from app.run_logging import log_run_event
+from app.run_logging import configure_run_logging, log_run_event
 from app.runs.run_lifecycle import RunEngine, resume_unfinished_runs
 from app.runs.watch_source_folders import load_watcher_settings, watch_source_folders
 from app.startup import (
@@ -54,6 +54,7 @@ def database_url_from_environment() -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    configure_run_logging()
     database_url = database_url_from_environment()
     await asyncio.to_thread(migrate_database, PROJECT_ROOT, database_url)
     await asyncio.to_thread(

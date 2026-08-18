@@ -1242,10 +1242,14 @@ working claim only after its own implementation and proof land.
 1. Decide what to do about the export gate and the confident-match downgrade
    (blocker 1).
 2. Decide whether one bounded live-model run is worth making.
-3. Decide whether the run logger should be given its own stdout handler, so the
-   INFO run events D16 describes reach a reader outside a test.
-4. Decide whether the already-read rule should settle a related additional
+3. Decide whether the already-read rule should settle a related additional
    document the way it settles an unrelated one.
+
+Resolved 2026-08-18: the run logger now owns a stdout handler, configured
+once at startup — `tests/runs/test_run_events_reach_stdout.py` proves the
+JSON line reaches stdout with its `run_id`, exactly once even if startup
+configures twice. Before the change an INFO run event printed nothing
+(demonstrated by hand at the baseline: captured stdout was empty).
 
 ## Verification evidence
 
