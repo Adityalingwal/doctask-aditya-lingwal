@@ -32,11 +32,18 @@ def _tightened(schema: Any) -> Any:
     must be required and every object must refuse what it did not declare. A
     `default` is how Pydantic writes "this key may be missing", so it goes —
     an absent key is not something the boundary should have to guess about.
+
+    A `$ref` also travels alone. Pydantic writes a field's `description`
+    beside the reference it generates for an enum, and the provider refuses
+    the whole schema over it, so the reference keeps nothing but itself.
     """
     if isinstance(schema, list):
         return [_tightened(entry) for entry in schema]
     if not isinstance(schema, dict):
         return schema
+
+    if "$ref" in schema:
+        return {"$ref": schema["$ref"]}
 
     tightened = {
         name: _tightened(value)

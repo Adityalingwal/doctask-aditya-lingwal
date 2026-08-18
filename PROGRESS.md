@@ -6,6 +6,45 @@ exact pre-compaction source is
 [`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-18, branch `strict-schema-and-honest-early-exit`
+
+The first live-key run started and stopped on its first model call. Three
+defects, each found by running rather than by reading, each fixed test-first:
+
+- **The key never reached the container.** `docker-compose.yml` read
+  `OPENROUTER_API_KEY` from `.env` for its own substitution but passed it into
+  no service, so a fresh clone following `README.md` had the key on the host
+  and none inside the app. Observed directly:
+  `'OPENROUTER_API_KEY' in os.environ` printed `False` in the container, and
+  `True` after the fix. Fixed on `main` as `6908375`, with
+  `tests/infrastructure/test_the_model_key_reaches_the_app.py` failing at the
+  baseline on exactly that missing forward.
+- **The provider refused our strict schema outright.** OpenAI strict mode
+  rejects a `$ref` carrying any sibling keyword, and Pydantic writes a field's
+  `description` beside the `$ref` it generates for an enum. The live 400 read
+  `Invalid schema for response_format 'ExtractionAnswer': context=('properties',
+  'label'), $ref cannot have keywords {'description'}`. Exactly two places
+  generated one — `ExtractionAnswer.document_type` and
+  `QuotedTestingObservation.label`. `_tightened` now returns a lone `$ref`.
+  The field descriptions on those two enums are lost to the provider; the
+  prompt's own type table and the enum values still carry the meaning.
+- **A run reported reading documents it never read.** With every document
+  failing at Extract, `_early_reason` still answered "The documents were read,
+  but none of them stated a requirement", because it branched on the documents
+  Ingest collected rather than on the documents Extract actually read. The
+  state now carries `documents_read`, and a run that read nothing says
+  "Nothing was read — all N files were not used. See the Not used tab for
+  why." This is the no-bluff rule, caught live.
+
+**The failure contract itself behaved correctly** and needed no change: the
+400 degraded one document instead of killing the run, the file was recorded
+`not read` with its reason, and the run ended `no changes` saying the next run
+reads it again.
+
+**Both suites green on this branch, no live key: 249 Python passed** (246 on
+`main` plus the key test and the two new never-do tests) and **63 front-end
+passed across 36 files**.
+
 ## Snapshot — 2026-08-18, branch `helpline-ai-corpus`
 
 Built and run rather than type-checked, committed and pushed.

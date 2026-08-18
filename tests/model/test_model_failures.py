@@ -132,3 +132,31 @@ def test_a_timed_out_document_is_not_read_while_the_batch_continues(
     assert documents_not_read[0]["file"] == FIRST_FILE
     assert documents_not_read[0]["reason"] == "The model call failed for this file."
     assert at_review["failure_reason"] is None
+
+
+def test_a_run_whose_every_document_failed_never_says_the_documents_were_read(
+    tmp_path: Path,
+) -> None:
+    """Never-do: a run must never report work it did not do.
+
+    Both documents fail at the model call, so nothing was read at all. Saying
+    "the documents were read, but none of them stated a requirement" claims a
+    read that never happened and sends the reader looking for a requirement
+    instead of at the failure in the Not used tab.
+    """
+    ended, proposed = _run_over_two_documents(
+        tmp_path,
+        {
+            extract_marker(FIRST_FILE): model_call_failure("Provider returned 400"),
+            extract_marker(SECOND_FILE): model_call_failure("Provider returned 400"),
+        },
+        "no changes",
+    )
+
+    assert proposed == []
+    assert "The documents were read" not in ended["ended_early_reason"]
+    assert ended["ended_early_reason"] == (
+        "Nothing was read — all 2 files were not used. See the Not used tab "
+        "for why."
+    )
+    assert len(ended["not_used"]) == 2
