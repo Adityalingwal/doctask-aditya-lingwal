@@ -25,9 +25,9 @@ asking us where their follow-up text is.
 WhatsApp is nowhere to be found. We messaged the BrightCart WhatsApp number
 several times over the week and never got a response from the bot.
 
-The transcripts dashboard shows chat transcripts fine and they're easy to
-search, but call transcripts are missing entirely — the dashboard only shows
-the chats, not the calls.
+The transcripts dashboard is delivered but incomplete. Chat transcripts show
+up fine and are easy to search; the call transcripts side of it is not
+finished yet, which the handover had already told us to expect.
 
 The human escalation is missing entirely. There is no "talk to a human"
 button anywhere in the chat widget, and no chat we could not resolve was ever
