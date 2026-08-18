@@ -43,3 +43,7 @@ handoff/
 # The scripted client's call log. Tests write it under a temporary directory;
 # this keeps a stray one at the repository root out of a commit.
 debug-model-calls.jsonl
+
+# Staged demo copies for the Helpline AI corpus — created by hand from
+# sample-documents/helpline-ai/ during the live-key run, never committed.
+sample-projects/helpline-ai/

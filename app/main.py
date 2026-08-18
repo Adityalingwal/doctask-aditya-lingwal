@@ -17,7 +17,6 @@ from app.graph.register_graph import build_register_graph
 from app.ingest.read_source_document import READER_EXTENSIONS
 from app.mcp_server.tools import MCP_PATH, build_mcp_server
 from app.model.client import build_model_client
-from app.projects.create_project import ensure_demo_project
 from app.review_screen.serve_screen import serve_review_screen
 from app.run_logging import configure_run_logging, log_run_event
 from app.runs.run_lifecycle import RunEngine, resume_unfinished_runs
@@ -91,9 +90,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             DEFAULT_RULES_CONFIG_PATH,
         ),
     )
-
-    async with pool.connection() as connection:
-        await ensure_demo_project(connection, PROJECT_ROOT, PROJECTS_CONFIG_PATH)
 
     engine = app.state.run_engine
     watching: asyncio.Task | None = None

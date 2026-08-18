@@ -208,9 +208,10 @@ docker compose up --build
 ```
 
 The API is at `http://localhost:8000`; `GET /health` returns
-`{"status":"healthy"}`. Startup creates the demo project over
-`sample-projects/intake-portal` — shown as **Intake Portal**, its derived
-name — if it is missing. The generated API schema at `/docs` shows the eight
+`{"status":"healthy"}`. Startup creates no project of its own — `GET
+/projects` lists nothing until an operator creates one, over a folder that
+already sits directly inside `sample-projects/`, with `POST /projects` or the
+screen's Add-project box. The generated API schema at `/docs` shows the eight
 operations:
 
 - `POST /projects`
@@ -322,7 +323,7 @@ Its own tests run without Docker and without a key:
 npm --prefix ui test
 ```
 
-Last verified on the `folder-is-a-project-and-register-moves` branch: **40 passed**.
+Last verified on the `helpline-ai-corpus` branch: **63 passed across 36 files**.
 
 ## Drive it from a machine
 
@@ -365,8 +366,9 @@ The test suite drives the tools exactly this way; see
 `tests/interfaces/mcp_client.py`.
 
 The application currently reads project folders from inside the repository.
-The included demo folder is `sample-projects/intake-portal`; a second synthetic
-project in mixed formats is `sample-projects/northside-dental`.
+`sample-projects/` starts empty; a corpus for the first live-model run is
+staged in by hand from `sample-documents/helpline-ai/` — see that folder's
+README for what it is and the staged-copy procedure.
 
 The application listens on `127.0.0.1` only by default; to expose it beyond
 this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
@@ -378,10 +380,10 @@ this machine, change `APP_HOST` and the `app` service's `ports:` mapping in
 docker compose run --rm app pytest
 ```
 
-Last verified on the `folder-is-a-project-and-register-moves` branch: **138
-passed**, real PostgreSQL, no live model key. Fresh-clone and image-only
-verification remain open release checks; this is a verified
-development-worktree command, not yet a fresh-machine claim.
+Last verified on the `helpline-ai-corpus` branch: **246 passed**, real
+PostgreSQL, no live model key. Fresh-clone and image-only verification
+remain open release checks; this is a verified development-worktree command,
+not yet a fresh-machine claim.
 
 ## Configuration
 

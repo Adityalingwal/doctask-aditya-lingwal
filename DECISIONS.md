@@ -219,9 +219,10 @@ export is always gated.
   `test_a_changed_rules_file_re_examines_the_register_without_reading_a_document`.
 - **Unchanged-row proof:** a second run leaves every row its documents did not
   affect byte-identical — cells, citations and fingerprint. **Implemented and
-  verified** on both synthetic corpora by
-  `tests/incremental/test_second_run_on_corpora.py` and
-  `tests/incremental/test_incremental_updates.py`.
+  verified** by `tests/incremental/test_incremental_updates.py`. A second
+  proof, `tests/incremental/test_second_run_on_corpora.py`, drove the two
+  synthetic corpora and was removed with them on 2026-08-18
+  (`documentation/decision-history.md`); the guarantee itself is unchanged.
 
 ### Read-once rule
 
@@ -535,15 +536,20 @@ match.
 - **Injection:** Document text is data, never system authority. It has no code
   path to approve, commit, or export. The model may report suspicious text;
   detection is not guaranteed and no brittle phrase list is built.
-- **Implemented and verified** — 2026-08-14, by
-  `tests/documents/test_document_instruction_is_reported.py`, which drives the
-  demo document that buries the hostile line through a real run: the line is
-  stored as an embedded instruction placed in that document and logged against
-  the run, and it creates no row, changes no cell, and reaches the Delivery
-  Owner as no proposed action. It **is** reported to a person on purpose — the
-  run's own column, `GET /runs/{id}` and a fourth tab beside
-  Not used — because information nobody can see is not a report. Nothing was
-  committed until a person approved it.
+- **Implemented and verified** — 2026-08-14. The proof was originally
+  `tests/documents/test_document_instruction_is_reported.py`, driven against
+  the intake-portal demo document that buried the hostile line; that document
+  and test are deleted with the old corpora (2026-08-18 — history: "The demo
+  seed is removed, and the sample corpus becomes Helpline AI"). The
+  same guarantee is now proven by test fixtures that build their own document
+  in a temporary folder — `tests/runs/test_reported_instructions.py` — and the
+  buried-instruction fixtures elsewhere in `tests/`: the line is stored as an
+  embedded instruction placed in that document and logged against the run,
+  and it creates no row, changes no cell, and reaches the Delivery Owner as no
+  proposed action. It **is** reported to a person on purpose — the run's own
+  column, `GET /runs/{id}` and a fourth tab beside Not used — because
+  information nobody can see is not a report. Nothing was committed until a
+  person approved it.
 - **What that proof does not cover:** the model is scripted, so this shows the
   pipeline has no path from document text to an approval, a commit or an
   export. Whether a live model spots the line is the detection the decision
@@ -851,10 +857,14 @@ projects over it, each with its own register, lock and watcher. For the same
 reason `projects_root` itself must be a relative folder inside the repository
 — an absolute root is refused where the file is read, because the dropdown
 offers `<root>/<folder>` while creation refuses every absolute path, and the
-two must not be configurable into disagreeing. Startup seeds the demo project
-with one `create_project` call for `sample-projects/intake-portal`;
-get-or-create alone makes a restart safe. A `POST /projects` that created
-nothing answers `200`, not `201`. **Implemented and verified** in slice-1
+two must not be configurable into disagreeing. **No project is seeded at
+startup (2026-08-18, superseding the demo seed — history: "The demo seed is
+removed, and the sample corpus becomes Helpline AI")**: `sample-projects/`
+starts empty, and a project
+exists only once an operator creates one by hand, through `POST /projects` or
+the MCP `create_project` tool; get-or-create alone still makes a restart
+safe. A `POST /projects` that created nothing answers `200`, not `201`.
+**Implemented and verified** in slice-1
 scope. **Limitation:** confinement is checked when a project is created, not
 again when its folder is later read; nothing but `create_project` writes that
 column, so no unconfined path can reach the database, but a folder replaced by
@@ -1040,8 +1050,9 @@ a symlink after creation is not re-checked.
 - Slice 1 is complete: `.md` Ingest → Extract → Match → Review → Commit,
   PostgreSQL, its six endpoints, human gate, export, and real-process resume.
 - The formats and types slice is built: four readers, the page limit, the
-  document-type enum and its buckets, per-format citation places, and both
-  synthetic corpora.
+  document-type enum and its buckets, and per-format citation places. The two
+  synthetic corpora that exercised it were removed 2026-08-18 for the
+  Helpline AI corpus.
 - The rules and findings slice is built: Examine, the `findings` table, rules
   frozen per run, and the attachment audit event. Every rule lives in
   `config/rules.yaml`.
@@ -1049,7 +1060,8 @@ a symlink after creation is not re-checked.
   same core functions the endpoints call.
 - The incremental update slice is built: the watched folder, the read-once
   rule keyed by name or content, the rules-only route, and the byte-identical
-  unchanged-row proof on both corpora. It added no tool.
+  unchanged-row proof, carried today by
+  `tests/incremental/test_incremental_updates.py`. It added no tool.
 - The reliability slice is built, and it is proof rather than construction: the
   concurrency and injection tests were written against the lock, the queue and
   the Extract path exactly as the earlier slices left them, and none of them
@@ -1074,7 +1086,7 @@ a symlink after creation is not re-checked.
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
 | 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
 | 7 | Automated proof | Key-free full suite with real paths | 130 Python and 13 front-end tests verified; later minima remain |
-| 8 | No document authority | Hostile document cannot approve/commit/export | Verified on the demo document that buries the line |
+| 8 | No document authority | Hostile document cannot approve/commit/export | Verified by test fixtures that build their own buried-instruction document (D08) |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Verified for both halves |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Verified with the scripted client; no provider cost measured |
 
@@ -1110,8 +1122,8 @@ a symlink after creation is not re-checked.
 
 - No live model call has run; provider quality, exception shapes, latency, and
   cost are unverified.
-- Register-size and short-document assumptions remain unmeasured on full demo
-  and second-run corpora.
+- Register-size and short-document assumptions remain unmeasured on a full
+  corpus; no live-model run has exercised one yet.
 - The page limit binds `.pdf` only; no other declared format reports pages.
 - A handover summary that lists requirements, in a run that never ends
   `done`, is read again by the next run.
