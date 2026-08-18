@@ -98,6 +98,7 @@ class RunState(TypedDict, total=False):
     project_id: str
     document_ids: list[str]
     not_used_count: int
+    documents_read: int
     next_document_index: int
     requirements_found: int
     observations_found: int
@@ -343,6 +344,7 @@ def build_register_graph(
         )
         return {
             "next_document_index": index + 1,
+            "documents_read": state.get("documents_read", 0) + 1,
             "requirements_found": state.get("requirements_found", 0)
             + requirements_found,
             "observations_found": state.get("observations_found", 0)
@@ -685,11 +687,15 @@ def _early_reason(state: RunState) -> str:
     # where several of its requirements state one ask, so it never ends here.
     # What can is a batch whose observations were about no row the register
     # traces, and a batch that said nothing at all.
-    if state.get("document_ids"):
+    if state.get("documents_read"):
         if state.get("observations_found") and not state.get("requirements_found"):
             return NOTHING_MOVED
         return NOTHING_FOUND
-    not_used_count = state.get("not_used_count", 0)
+    # Nothing was read: every file either never reached Extract or failed
+    # there, and each one says why in the Not used tab.
+    not_used_count = state.get("not_used_count", 0) + len(
+        state.get("document_ids", [])
+    )
     return _nothing_read_reason(not_used_count) if not_used_count else NO_FILES_FOUND
 
 

@@ -5,7 +5,9 @@ import json
 from typing import Any
 
 from app.extract.answer import DOCUMENT_TYPES, ExtractionAnswer, TESTING_LABELS
+from app.examine.examine_register import ExamineAnswer
 from app.extract.read_document import read_one_document
+from app.match.match_requirements import MatchAnswer, ObservationAnswer
 from app.model.answer_schema import strict_answer_format
 from app.model.scripted_client import ScriptedChatModel
 
@@ -85,3 +87,35 @@ def test_the_answer_still_parses_without_a_live_key() -> None:
 
     assert answer.document_type == "testing feedback"
     assert answer.testing_observations[0].label == "Passed"
+
+
+def test_no_reference_in_the_schema_carries_a_keyword_beside_it() -> None:
+    """Never-do: the schema must never be one the provider refuses outright.
+
+    OpenAI's strict mode rejects a `$ref` that carries any sibling keyword,
+    and Pydantic writes a field's `description` beside the `$ref` it generates
+    for an enum. Sent as-is the call fails with HTTP 400 before a document is
+    ever read, which is what happened on the first live run.
+    """
+    for answer_model in (ExtractionAnswer, MatchAnswer, ObservationAnswer, ExamineAnswer):
+        schema = strict_answer_format(answer_model)["json_schema"]["schema"]
+        for path, node in _references_in(schema):
+            assert set(node) == {"$ref"}, (
+                f"{answer_model.__name__} at {path} sends "
+                f"{sorted(set(node) - {'$ref'})} beside a $ref — strict mode "
+                "refuses the whole schema, so drop the siblings when the "
+                "schema is tightened."
+            )
+
+
+def _references_in(node: Any, path: str = "") -> list[tuple[str, dict[str, Any]]]:
+    found: list[tuple[str, dict[str, Any]]] = []
+    if isinstance(node, dict):
+        if "$ref" in node:
+            found.append((path or "/", node))
+        for name, value in node.items():
+            found.extend(_references_in(value, f"{path}/{name}"))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found.extend(_references_in(value, f"{path}[{index}]"))
+    return found
