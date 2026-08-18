@@ -119,3 +119,37 @@ def _references_in(node: Any, path: str = "") -> list[tuple[str, dict[str, Any]]
         for index, value in enumerate(node):
             found.extend(_references_in(value, f"{path}[{index}]"))
     return found
+
+
+def test_a_control_character_the_model_wrote_never_reaches_a_cell() -> None:
+    """Never-do: text the model wrote must never carry a control character
+    into the register.
+
+    Observed on the first live run: an em dash sent to the model came back as
+    U+0014 inside its own sentence, which then reached the register's findings
+    and the screen. Newlines and tabs are ordinary text and stay.
+    """
+    answer = asyncio.run(
+        read_one_document(
+            _scripted_client(
+                {
+                    "document_type": "meeting notes",
+                    "requirements": [
+                        {
+                            "summary": "A weekly report \x14 counts only.",
+                            "quote": "They asked for a weekly report",
+                        }
+                    ],
+                    "testing_observations": [],
+                    "delivery_evidence": [],
+                    "embedded_instructions": [],
+                }
+            ),
+            "meeting-notes.md",
+            "They asked for a weekly report of what came in.",
+        )
+    )
+
+    summary = answer.requirements[0].summary
+    assert "\x14" not in summary
+    assert summary == "A weekly report  counts only."
