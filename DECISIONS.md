@@ -454,6 +454,29 @@ cannot each assume a different one:
   stored rather than as rendered. An approved merge moves citations onto the
   candidate row without moving its fingerprint, because a citation is not a
   cell.
+- **The audit trail is readable, and it is not part of the register (locked
+  and built 2026-08-18).** `read_history` (`app/register/read_history.py`) is
+  one core function behind `GET /projects/{id}/history`, the `get_history`
+  MCP tool and the screen's HISTORY section — read-only over `audit`, no
+  migration and no change to what Commit records. It is deliberately **not**
+  a key in the register document: the register says what is true now, the
+  history says how it got there, and the export carries only the former.
+  Entries come newest first by `created_at`, then `row_number`, then
+  `cell_name` with nulls last, so one run's single-transaction writes can
+  never order two ways. **A row's birth is one entry, folded in the core
+  function**: Commit writes one all-null-old cell change per cell, and a
+  `(run, row)` whose cell changes are all of that shape becomes a single
+  `row created` entry carrying `what_was_asked` and its document — so curl,
+  MCP and the screen are answered with the same list rather than each
+  grouping for itself. An approved finding is its own `finding attached`
+  entry, naming no cell and no document because it has neither. A project
+  with no trail answers `200` and no entries, shown as `No history yet.` —
+  never an error. Run numbers are computed exactly as
+  `app/projects/list_projects.py` computes them, so the two surfaces cannot
+  number one run differently. History:
+  `documentation/decision-history.md`, 2026-08-18.
+  **Not built, deliberately:** revert or restore, register version snapshots,
+  filters, search, pagination, and any history export format.
 
 ## Pipeline
 
@@ -764,7 +787,7 @@ Eight domain tables: `projects`, `runs`, `documents`, `register_rows`,
 checkpoint tables in the same PostgreSQL. Alembic migrations exist from the
 first table.
 
-Seven slice-1 API endpoints:
+Eight slice-1 API endpoints:
 
 | Endpoint | Job |
 |---|---|
@@ -775,6 +798,7 @@ Seven slice-1 API endpoints:
 | `POST /runs/{id}/decisions` | Answer one decision UUID |
 | `POST /runs/{id}/finish-review` | Validate/claim review completion |
 | `GET /projects/{project_id}/register` | The project's register, live from its committed rows, JSON or Markdown |
+| `GET /projects/{project_id}/history` | The project's register history, read from `audit`: what changed, when, and from which document (§ history read below); JSON only |
 
 **The list of what a run did not use is called `not_used`, in all three places
 (locked 2026-08-17, superseding `skipped` in the column, the payload field and
@@ -836,9 +860,9 @@ a symlink after creation is not re-checked.
 
 ### D15 — MCP and React
 
-- MCP mirrors the seven endpoints 1:1: `create_project`, `list_projects`,
+- MCP mirrors the eight endpoints 1:1: `create_project`, `list_projects`,
   `start_run`, `get_run_status`, `submit_decision`, `finish_review`,
-  `get_register`. `finish_review` takes `run_id` and `add_to_register` — yes
+  `get_register`, `get_history`. `finish_review` takes `run_id` and `add_to_register` — yes
   adds this run's changes to the register, no discards them — the same
   argument the endpoint takes, into the same core function.
 - It mounts in the FastAPI process at `/mcp` and calls the same core functions
@@ -1129,7 +1153,7 @@ ideas from resurfacing without duplicating their full prose here.
 | Five register statuses; the seven-cell row | D05 four cells and six statuses including `Handed over` |
 | Location always derived without caveat | D05/D08 exact-word locator with repeated-word limitation |
 | Empty-input Ingest always ends | D03/D07 rules-only route to Examine |
-| Five/six API endpoints; flat `GET /runs` run list | D14 seven endpoints including `GET /projects`, every project with its runs nested |
+| Five/six API endpoints; flat `GET /runs` run list | D14 eight endpoints including `GET /projects`, every project with its runs nested |
 | `done` as generic terminal state | D13 honest `failed`/`no changes`/`discarded` |
 | Status-only already-read check | D03 extraction + export/unrelated/no-requirement rule |
 | Already-read matched by name AND content; requirement withdrawal | D03 read-once rule matched by name OR content; withdrawal removed |
