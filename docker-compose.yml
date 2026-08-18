@@ -20,6 +20,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://postgres@db:5432/register
       PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Empty default on purpose: the application starts without a key and
+      # refuses runs with a reason, which the test suites rely on.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # Inside the container the app must bind every interface or the
       # published port below is unreachable; that port is itself
       # loopback-qualified, so the application is still not reachable from
