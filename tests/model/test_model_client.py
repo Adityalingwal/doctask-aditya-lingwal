@@ -96,3 +96,51 @@ def test_unknown_model_client_names_both_supported_clients() -> None:
 
     assert "openrouter" in str(refusal.value)
     assert SCRIPTED_CLIENT in str(refusal.value)
+
+
+def test_the_client_asks_for_the_reasoning_effort_the_configuration_names(
+    tmp_path: Path,
+) -> None:
+    """A reasoning model's effort is a configuration value, not a code change.
+
+    Trading answer quality against cost is exactly the kind of knob an
+    evaluator changes without touching code, so it lives in `config/model.yaml`
+    beside the model id.
+    """
+    configured = tmp_path / "model.yaml"
+    configured.write_text(
+        "provider: openrouter\n"
+        "model_id: openai/gpt-5.6-terra\n"
+        "base_url: https://openrouter.ai/api/v1\n"
+        "call:\n"
+        "  attempts: 2\n"
+        "  timeout_seconds: 120\n"
+        "  reasoning_effort: high\n",
+        encoding="utf-8",
+    )
+
+    client = build_model_client(configured, {API_KEY_ENVIRONMENT_VARIABLE: "test-key"})
+
+    assert client.reasoning_effort == "high"
+    assert client.model_name == "openai/gpt-5.6-terra"
+
+
+def test_a_configuration_naming_no_reasoning_effort_sends_none(
+    tmp_path: Path,
+) -> None:
+    """A model with no reasoning setting must not be sent an effort it cannot
+    take — the key is optional, and its absence means "do not ask"."""
+    configured = tmp_path / "model.yaml"
+    configured.write_text(
+        "provider: openrouter\n"
+        "model_id: openai/gpt-4.1\n"
+        "base_url: https://openrouter.ai/api/v1\n"
+        "call:\n"
+        "  attempts: 2\n"
+        "  timeout_seconds: 120\n",
+        encoding="utf-8",
+    )
+
+    client = build_model_client(configured, {API_KEY_ENVIRONMENT_VARIABLE: "test-key"})
+
+    assert client.reasoning_effort is None
