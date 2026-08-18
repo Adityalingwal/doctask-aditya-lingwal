@@ -219,9 +219,10 @@ export is always gated.
   `test_a_changed_rules_file_re_examines_the_register_without_reading_a_document`.
 - **Unchanged-row proof:** a second run leaves every row its documents did not
   affect byte-identical — cells, citations and fingerprint. **Implemented and
-  verified** on both synthetic corpora by
-  `tests/incremental/test_second_run_on_corpora.py` and
-  `tests/incremental/test_incremental_updates.py`.
+  verified** by `tests/incremental/test_incremental_updates.py`. A second
+  proof, `tests/incremental/test_second_run_on_corpora.py`, drove the two
+  synthetic corpora and was removed with them on 2026-08-18
+  (`documentation/decision-history.md`); the guarantee itself is unchanged.
 
 ### Read-once rule
 
@@ -1049,8 +1050,9 @@ a symlink after creation is not re-checked.
 - Slice 1 is complete: `.md` Ingest → Extract → Match → Review → Commit,
   PostgreSQL, its six endpoints, human gate, export, and real-process resume.
 - The formats and types slice is built: four readers, the page limit, the
-  document-type enum and its buckets, per-format citation places, and both
-  synthetic corpora.
+  document-type enum and its buckets, and per-format citation places. The two
+  synthetic corpora that exercised it were removed 2026-08-18 for the
+  Helpline AI corpus.
 - The rules and findings slice is built: Examine, the `findings` table, rules
   frozen per run, and the attachment audit event. Every rule lives in
   `config/rules.yaml`.
@@ -1058,7 +1060,8 @@ a symlink after creation is not re-checked.
   same core functions the endpoints call.
 - The incremental update slice is built: the watched folder, the read-once
   rule keyed by name or content, the rules-only route, and the byte-identical
-  unchanged-row proof on both corpora. It added no tool.
+  unchanged-row proof, carried today by
+  `tests/incremental/test_incremental_updates.py`. It added no tool.
 - The reliability slice is built, and it is proof rather than construction: the
   concurrency and injection tests were written against the lock, the queue and
   the Extract path exactly as the earlier slices left them, and none of them

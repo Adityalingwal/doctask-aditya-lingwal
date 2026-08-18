@@ -8,8 +8,19 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## Snapshot — 2026-08-18, branch `helpline-ai-corpus`
 
-Built and run rather than type-checked, committed and pushed; the branch is
-waiting for review and for Aditya's gates. No pull request is open.
+Built and run rather than type-checked, committed and pushed.
+
+- **Reviewed (Fable 5, review-only — Codex is retired, its limits exhausted)
+  and the one Medium finding fixed in the foreground after Aditya decided it
+  (2026-08-18):** `DECISIONS.md` still cited the deleted
+  `test_second_run_on_corpora.py` and "both synthetic corpora",
+  present-tense, as the standing unchanged-row proof; the three stale
+  citations now name `tests/incremental/test_incremental_updates.py` as the
+  surviving proof and date the corpus removal. Documentation-only fix — no
+  code or test changed, so the foreground suite runs stand.
+- **Both suites re-run independently in the foreground after the review:**
+  **246 Python passed** and **63 front-end passed across 36 files**, read
+  from the suites' own printed summaries.
 
 - **The old sample corpora and the startup demo seed are gone.**
   `sample-projects/intake-portal/`, `sample-projects/northside-dental/`, and
