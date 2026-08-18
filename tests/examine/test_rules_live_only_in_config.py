@@ -45,8 +45,16 @@ def test_no_rule_is_judged_outside_config_rules_yaml(tmp_path: Path) -> None:
     assert reported["at_review"]["findings"] == []
     assert reported["exported"]["findings"] == []
     assert "R1" in reported["markdown"]
+    # The title line carries the project name, derived from a random test
+    # folder — a hex suffix starting "d1"/"d2" capitalises into the very
+    # code this assertion hunts for, failing the test by coincidence.
+    body_without_title = "\n".join(
+        line
+        for line in reported["markdown"].splitlines()
+        if not line.startswith("# Requirements-to-Delivery Register")
+    )
     for named_in_code in ("D1", "D2"):
-        assert named_in_code not in reported["markdown"]
+        assert named_in_code not in body_without_title
 
 
 def test_no_rule_in_config_rules_yaml_asks_for_a_document_date() -> None:
