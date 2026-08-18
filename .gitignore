@@ -46,4 +46,4 @@ debug-model-calls.jsonl
 
 # Staged demo copies for the Helpline AI corpus — created by hand from
 # sample-documents/helpline-ai/ during the live-key run, never committed.
-sample-projects/helpline-ai/
+sample-projects/*/
