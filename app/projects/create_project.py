@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,10 +10,8 @@ from psycopg.errors import UniqueViolation
 
 from app.projects.list_projects import read_projects_root
 from app.refusal import UnusableRequest
-from app.run_logging import log_run_event
 
 
-DEMO_PROJECT_FOLDER = "sample-projects/intake-portal"
 _NAME_WORD_SPLIT = re.compile(r"[-_]+")
 
 
@@ -87,40 +84,12 @@ async def create_project(
         # Another caller's create_project() won the race between the read
         # above and this insert — re-read rather than fail, so two callers
         # creating the same project at the same moment both reach its one id.
-        # This is not speculative: the HTTP endpoint, the MCP tool and the
-        # startup demo seed all reach this function independently, so two of
-        # them can race over one folder without either being a bug on its own.
+        # This is not speculative: the HTTP endpoint and the MCP tool both
+        # reach this function independently, so two of them can race over one
+        # folder without either being a bug on its own.
         existing = await _project_over(connection, folder)
         return CreatedProject(existing, created=False)
     return CreatedProject(project_id, created=True)
-
-
-async def ensure_demo_project(
-    connection: AsyncConnection,
-    project_root: Path,
-    projects_config_path: Path,
-) -> UUID | None:
-    """Make `docker compose up` alone enough to have something to run on.
-
-    Get-or-create already makes a restart safe — a database that already
-    holds a project over the demo folder gets its existing id back, not a
-    second row — so this is nothing more than that one call, named for what
-    it is used for at startup.
-    """
-    created = await create_project(
-        connection, DEMO_PROJECT_FOLDER, project_root, projects_config_path
-    )
-    if not created.created:
-        return None
-    log_run_event(
-        logging.INFO,
-        "demo_project_created",
-        f"Created the demo project reading {DEMO_PROJECT_FOLDER}; start a run "
-        "against it with POST /runs.",
-        None,
-        project_id=str(created.project_id),
-    )
-    return created.project_id
 
 
 async def _project_over(
@@ -141,9 +110,9 @@ def _confined_folder(
 ) -> tuple[Path, str]:
     """The real folder a caller named, and the one spelling this system stores.
 
-    Nothing legitimate ever sends an absolute path — the dropdown and the
-    demo seed both send `sample-projects/<folder>` — so an absolute path is
-    refused outright rather than resolved and checked; that also covers `/`
+    Nothing legitimate ever sends an absolute path — the dropdown always
+    sends `sample-projects/<folder>` — so an absolute path is refused
+    outright rather than resolved and checked; that also covers `/`
     and `/workspace` naming something real but outside the root. `..` is
     refused the same way. What is left is resolved with `Path.resolve()`
     (which also collapses a symlink) and must sit directly inside the
