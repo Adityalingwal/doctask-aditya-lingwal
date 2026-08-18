@@ -10,6 +10,7 @@ from app.projects.create_project import create_project
 from app.projects.list_projects import read_project_list
 from app.register.export_register import JSON_FORMAT
 from app.register.read_export import read_register
+from app.register.read_history import read_history
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
@@ -29,7 +30,7 @@ MCP_INSTRUCTIONS = (
 
 
 def build_mcp_server(application: FastAPI) -> FastMCP:
-    """The seven endpoints as seven tools over the same core functions they call.
+    """The eight endpoints as eight tools over the same core functions they call.
 
     The tools close over the running application, so they share its connection
     pool and its run engine instead of holding a second copy of either.
@@ -110,6 +111,12 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
         """Read one project's register, live from its committed rows, as json or as markdown."""
         async with application.state.pool.connection() as connection:
             return await read_register(connection, project_id, register_format)
+
+    @server.tool(name="get_history")
+    async def get_history_tool(project_id: UUID) -> dict[str, Any]:
+        """Read what changed in one project's register, when, and from which document."""
+        async with application.state.pool.connection() as connection:
+            return await read_history(connection, project_id)
 
     return server
 

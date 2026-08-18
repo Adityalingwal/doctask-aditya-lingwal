@@ -19,6 +19,7 @@ from app.refusal import (
 )
 from app.register.export_register import JSON_FORMAT, MARKDOWN_FORMAT
 from app.register.read_export import read_register
+from app.register.read_history import read_history
 from app.review.finish_review import finish_review
 from app.review.review_queue import APPROVED, REJECTED
 from app.review.submit_decision import submit_decision
@@ -152,6 +153,15 @@ async def read_one_register(
     if register_format == MARKDOWN_FORMAT:
         return PlainTextResponse(register)
     return register
+
+
+@router.get("/projects/{project_id}/history")
+async def read_one_history(
+    request: Request,
+    project_id: UUID,
+) -> dict[str, Any]:
+    async with request.app.state.pool.connection() as connection:
+        return await read_history(connection, project_id)
 
 
 def _refusal_response(
