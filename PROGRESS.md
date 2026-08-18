@@ -1112,6 +1112,18 @@ working claim only after its own implementation and proof land.
   the fallback fires on every full batch. It is harmless while the two state
   different asks, which is the case in both corpora, and undecided if they ever
   state the same one.
+- **A violation that persists across runs raises its question again on every
+  run.** Examine judges the whole register each run — necessary, because a
+  rule verdict follows the row's current cells (a row failing "every written
+  requirement must have a testing outcome" stops failing it the moment the
+  testing feedback arrives), so no row is ever "already examined" for good.
+  The cost is not compute (one register-sized call either way) but noise: a
+  row that stays in violation is re-found, and the person is asked the same
+  question run after run. Decided 2026-08-18 with Aditya: leave the design,
+  watch this in the bounded live-model run; if question spam is real there,
+  the fix is a small dedup in `record_findings` — same rule, same row with an
+  unchanged fingerprint, already answered → raise no new question — never
+  hiding rows from Examine. Not observed — no live model has run.
 - **A finding's `evidence` is never checked against the row it names.** Examine
   refuses an answer naming a rule or a row it was not given, but the `evidence`
   string is only checked for being non-empty — nothing looks for those words in
