@@ -21,7 +21,7 @@ CELL_NAMES = (
 # cells rather than with either surface.
 COLUMN_HEADINGS = {
     WHAT_WAS_ASKED: "What was asked",
-    IN_WRITING: "Written down?",
+    IN_WRITING: "Written down",
     WHAT_TESTING_FOUND: "What testing found",
     STATUS: "Status",
 }

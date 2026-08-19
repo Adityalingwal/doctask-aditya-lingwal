@@ -47,7 +47,7 @@ Run 2 (the requirements document) raised six possible-match questions; each
 pairing was checked against the register before approving, and all six were
 correct.
 
-Known limitation seen again, as documented: row 7's `Written down?` still reads
+Known limitation seen again, as documented: row 7's `Written down` still reads
 "no client requirements document has been read for this project".
 
 ## Drive B — Terra @ high, same single staging (`sample-projects/terra-single`)
@@ -81,7 +81,7 @@ Rules: only the testing-outcome rule fired (8 findings). No written-requirement
 finding, because by the time Examine ran on batch 2 row 7 already stood at
 `Disputed` rather than `Handed over`.
 
-Row 7's `Written down?` here reads "Not found in client-requirements-v1.md" —
+Row 7's `Written down` here reads "Not found in client-requirements-v1.md" —
 the documented limitation does not appear when the requirements document is in
 the same batch that creates the row.
 

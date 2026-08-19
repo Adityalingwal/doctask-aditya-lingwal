@@ -99,7 +99,7 @@ function WhatTheAnswersDo({ decision }) {
   );
 }
 
-// A possible match shows only the shape, because the new `Written down?` is
+// A possible match shows only the shape, because the new `Written down` is
 // worked out inside Commit and not when the question is raised. An observation
 // match shows the values, because they were computed and stored before the
 // question was raised and that same stored move is what Commit applies.

@@ -52,7 +52,7 @@ the scripted client.
 
 A row has four cells, each carrying its own citations:
 
-`What was asked` · `Written down?` · `What testing found` · `Status`
+`What was asked` · `Written down` · `What testing found` · `Status`
 
 Every row starts at `Nothing said yet` and moves only on what a document says.
 

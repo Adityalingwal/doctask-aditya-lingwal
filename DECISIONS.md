@@ -170,7 +170,7 @@ export is always gated.
   carries `row_number` — the register row the decision is about, whichever
   kind it is — and `moved_cells`, read from the very `pending_moves` entry
   Commit applies. A possible match shows only the shape (`one row` /
-  `a separate row`), because the new `Written down?` is worked out inside
+  `a separate row`), because the new `Written down` is worked out inside
   Commit; an observation match shows the values, because they were stored
   before the question was raised.
 - **A finding's answer lives only here.** `findings` carries the `decision_key`
@@ -326,11 +326,11 @@ is quietly emptied. Its buckets are:
 
 Four cells, each with its own citations:
 
-`What was asked` · `Written down?` · `What testing found` · `Status`
+`What was asked` · `Written down` · `What testing found` · `Status`
 
 The register answers one question — was this asked for, and did we deliver it
 — and every cell that does not serve it is weight the reader carries for
-nothing. The stored column behind `Written down?` is still `in_writing`.
+nothing. The stored column behind `Written down` is still `in_writing`.
 Migration `20260817_0017` dropped the other three cells, and `20260817_0018`
 renamed `No evidence yet` to `Nothing said yet` so it stops reading as the
 sibling of its opposite `Not delivered`; history: 2026-08-17.
@@ -367,7 +367,7 @@ cannot each assume a different one:
   found` with no handover behind it is `Not delivered`, because silence
   contradicts nothing. Without this label neither status could ever be written.
 - Unknown cells say why they are unknown; they are never blank or guessed.
-- **`Written down?` is answered against every client requirements document the
+- **`Written down` is answered against every client requirements document the
   *project* has read**, not this run's batch. A document is read once for a
   project's whole life, so a run-scoped answer would put "no client
   requirements document has been read" back on every row a later run proposes.
@@ -591,7 +591,7 @@ match.
   may name one that created no row of its own, and the evidence lands on the
   row at the end of that chain. Pointing forward is refused, never reordered.
 - The row a within-batch match lands on keeps the **earlier** requirement's
-  `What was asked` and recomputes `Written down?` across every requirement on
+  `What was asked` and recomputes `Written down` across every requirement on
   it. The batch is read in workflow order (D04), so "earlier" means stated
   earlier in the work rather than named earlier in the alphabet.
 - Every requirement index must return exactly once with a valid outcome, and
@@ -625,7 +625,7 @@ match.
 - **An approved merge brings the surviving row's cells up to the evidence it
   just gained**, which reverses the slice-1 rule that a merge moved citations
   and never a cell. Only the cell the arriving requirement can speak to
-  moves: `Written down?`, which otherwise keeps denying a requirements document
+  moves: `Written down`, which otherwise keeps denying a requirements document
   the row now cites. It holds one claim, so its old citation goes with its old
   value. On an
   already-committed row this writes the before-and-after audit entry and moves

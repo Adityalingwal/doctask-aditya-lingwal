@@ -28,7 +28,7 @@ Two more defects the live run exposed, both fixed test-first.
 **Both suites green, no live key: 253 Python passed** and **63 front-end
 passed across 36 files.**
 
-**Still open, deliberately not built here:** a row's `Written down?` keeps
+**Still open, deliberately not built here:** a row's `Written down` keeps
 "no client requirements document has been read for this project" after one
 has been read that does not mention the ask. Refreshing it needs a new kind
 of move — an absence-backed cell change on a row no requirement landed on,
@@ -463,7 +463,7 @@ tests across 29 files**.
 - **Part 1** — `CELL_NAMES` narrowed to four; migration `20260817_0017` drops
   `blocked_on`, `first_seen` and `last_moved`, deletes the citations naming
   them, and swaps `Blocked` for `Handed over` in `ck_register_rows_status`. The
-  export and the screen head the cell `Written down?` while the stored column
+  export and the screen head the cell `Written down` while the stored column
   stays `in_writing`.
 - **Part 3** — `status_after` returns `Handed over` for delivery evidence with
   no testing behind it.
@@ -526,8 +526,8 @@ requirements document as `.md`.
 ### One ask stated in two documents becomes one row (branch `match-within-batch-duplicates`)
 
 Written before the register became four cells. `In writing?` is now
-`Written down?` and `First seen` no longer exists; what this branch built about
-merging and about `Written down?` still stands.
+`Written down` and `First seen` no longer exists; what this branch built about
+merging and about `Written down` still stands.
 
 - [x] Match may match a requirement against an earlier requirement of the same
       batch, answered as `same_as_requirement_index`. A confident within-batch
@@ -1225,7 +1225,7 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
-- **A row's `Written down?` can keep a claim the project has outgrown.** The
+- **A row's `Written down` can keep a claim the project has outgrown.** The
   cell is computed when a requirement lands on the row, so a row no
   requirement ever lands on keeps "Not known yet — no client requirements
   document has been read for this project" after one has been read that does
@@ -1337,7 +1337,7 @@ working claim only after its own implementation and proof land.
   the four cells printed beside it. A fresh database never holds such a row.
   Recomputing inside the migration was considered and refused: a migration that
   computes a hash has to carry the application's rules.
-- A committed row keeps the `Written down?` sentence it was committed with, so a
+- A committed row keeps the `Written down` sentence it was committed with, so a
   row committed before any client requirements document was read still says
   "no client requirements document has been read for this project" after one
   arrives. Rewriting rows a new document did not affect is exactly what the
@@ -1475,7 +1475,7 @@ configures twice. Before the change an INFO run event printed nothing
 | `docker compose -p fgbrief2 run --rm app pytest` | 2026-08-17, `wording-and-prompts` branch, after the review repair | **216 passed**, real PostgreSQL, no live key. The two new tests are the blank-non-null-question refusals on both Match paths, written first and seen failing |
 | `npm --prefix ui test` | 2026-08-17, `wording-and-prompts` branch | **53 passed, 32 files**, no live key. The baseline printed 47 across 31 files; the new file covers the code-owned Approve/Reject block on all three kinds of card, and two cases were added to the Reported-tab file for the notice said once and the new empty state |
 | `docker compose -p fcfinal run --rm app pytest` | 2026-08-17, `register-becomes-four-cells` branch | **200 passed**, real PostgreSQL, no live key. The baseline in this worktree printed 195 |
-| `npm --prefix ui test` | 2026-08-17, `register-becomes-four-cells` branch | **46 passed, 30 files**, no live key. The baseline printed 44 across 29 files; the new file covers the `Written down?` heading and the four-cell row |
+| `npm --prefix ui test` | 2026-08-17, `register-becomes-four-cells` branch | **46 passed, 30 files**, no live key. The baseline printed 44 across 29 files; the new file covers the `Written down` heading and the four-cell row |
 | Migration `20260817_0017` forward and backward on real data | 2026-08-17, `register-becomes-four-cells` branch | Seeded at `20260816_0016` with one row per status including `Blocked`, each citing all seven cells. The upgrade refused naming row `#6` and rolled back whole (constraint, columns and citations all unchanged, read from `pg_get_constraintdef` and `information_schema`). After changing that row's status the upgrade dropped the three columns, deleted their citations and narrowed the constraint to the six statuses including `Handed over`; the downgrade restored the columns and `Blocked` without refusing; upgrading again reached the same shape |
 | Both corpora, two arrival orders each | 2026-08-17, `register-becomes-four-cells` branch | Intake portal one-per-run and in pairs ended with the identical five-row register; Northside Dental likewise, with `Status` on rows 1, 3 and 5 citing both `handover-summary.md` and `testing-feedback-15-jul.pdf`. The Northside corpus ran with its requirements document as `.md`. Driven by a throwaway script, deleted after the run |
 | Export gate for a merge into a committed row | 2026-08-17, `register-becomes-four-cells` branch | Driven by a throwaway test, deleted after the run: at `needs review` the gate shows the two questions and nothing of the row — no cells and no citations — and `GET /runs/{id}/export` answers `409`. Recorded as blocker 1 |

@@ -64,7 +64,7 @@ def test_the_export_and_the_screen_both_read_written_down_not_in_writing(
     finished = _one_run_stating_a_blocker(tmp_path)
 
     assert "in_writing" in finished["export"]["rows"][0]["cells"]
-    assert "Written down?" in finished["markdown"]
+    assert "Written down" in finished["markdown"]
     assert "In writing?" not in finished["markdown"]
 
 

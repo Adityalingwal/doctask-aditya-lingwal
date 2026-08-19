@@ -44,7 +44,7 @@ test("the register heads the written-down cell with the question it asks", async
   const register = await openRegister(registerReply());
 
   expect(
-    within(register).getByRole("columnheader", { name: "Written down?" }),
+    within(register).getByRole("columnheader", { name: "Written down" }),
   ).toBeTruthy();
   expect(register.textContent).not.toContain("In writing?");
   // The server still sends the stored column key; only the heading moved.
@@ -58,7 +58,7 @@ test("the register shows the four cells and no heading for a cell that left", as
     within(register)
       .getAllByRole("columnheader")
       .map((heading) => heading.textContent),
-  ).toEqual(["#", "What was asked", "Written down?", "What testing found", "Status"]);
+  ).toEqual(["#", "What was asked", "Written down", "What testing found", "Status"]);
   for (const gone of ["Blocked on", "First seen", "Last moved"]) {
     expect(register.textContent).not.toContain(gone);
   }

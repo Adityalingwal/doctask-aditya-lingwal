@@ -68,7 +68,7 @@ test("the history says what changed, when, and which document changed it", async
   expect(lines[0]).toContain(statusMove.old_value);
   expect(lines[0]).toContain(statusMove.new_value);
   // The reader's own heading for the cell, never the stored column key.
-  expect(lines[1]).toContain("Written down?");
+  expect(lines[1]).toContain("Written down");
   expect(lines[1]).toContain(writtenMove.old_value);
   expect(lines[1]).toContain(writtenMove.new_value);
   expect(section.textContent).not.toContain("in_writing");

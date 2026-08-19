@@ -9,7 +9,7 @@ import { dayMonthTime } from "./format_date.js";
 // this map are two places for a heading to be renamed in only one of them.
 export const CELL_HEADINGS = {
   what_was_asked: "What was asked",
-  in_writing: "Written down?",
+  in_writing: "Written down",
   what_testing_found: "What testing found",
   status: "Status",
 };
