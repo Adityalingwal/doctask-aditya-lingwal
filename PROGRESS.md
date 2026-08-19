@@ -1,9 +1,7 @@
 # PROGRESS.md — current project dashboard
 
-Current status only. Detailed dated narrative is archived in
-[`documentation/progress-history.md`](documentation/progress-history.md); the
-exact pre-compaction source is
-[`documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/PROGRESS-pre-compaction-2026-08-13-2e14c91.md).
+Current status only. Completed narrative that has fallen out of this file
+stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## Snapshot — 2026-08-19, branch `live-run-repairs`
@@ -136,8 +134,8 @@ Built and run rather than type-checked, committed and pushed.
   — starts empty, points at the staged corpus), `DECISIONS.md` (D14's
   startup-seed wording, D08's and the acceptance summary's demo-document
   citation, a known-limitation line naming the deleted corpora), and
-  `documentation/decision-history.md` (one dated entry: the old wording, why
-  superseded, the corpus replacement).
+  one dated `DECISIONS.md` entry (the old wording, why superseded, the corpus
+  replacement).
 - **Both suites green on this branch, no live key:** **246 Python passed**
   and **63 front-end passed across 36 files** (untouched by this branch — no
   `ui/` file was edited). Both counts are read from the printed summary.
@@ -158,9 +156,8 @@ Built and run rather than type-checked, committed and pushed.
   pre-existing behaviour, unrelated to the corpus replacement; cleaned by
   hand after each run in this session.
 
-Everything below is the position this branch started from — the prior
-branch's own snapshot (`audit-history-read`) is archived in
-`documentation/progress-history.md`.
+Everything below is the position this branch started from; the prior
+branch's own snapshot (`audit-history-read`) is in this file's Git history.
 
 ## Completed
 
@@ -204,9 +201,8 @@ branch's own snapshot (`audit-history-read`) is archived in
 ### The register is read live, and the snapshot goes (branch `register-read-live`)
 
 From `main` at `f6aa015`, the trap first, then the live read, the migration,
-the screen, and documentation. Item C2 of the review checklist; history:
-`documentation/decision-history.md`, "The register is read live, and the
-snapshot goes (2026-08-18)".
+the screen, and documentation. Item C2 of the review checklist; superseded
+entry: "The register is read live, and the snapshot goes (2026-08-18)".
 
 - [x] **The never-do tests were written and run at the baseline before any
       code changed.** Six failed there for the right reason: the four in
@@ -405,8 +401,8 @@ One rename, from `main` at `13e1eca`. The value, the constant
 `STATUS_NO_EVIDENCE_YET` (now `STATUS_NOTHING_SAID_YET`), its two use sites, the
 literals in nine test files, `DECISIONS.md`, `README.md`, and a new migration
 `20260817_0018`. The dead `Blocker` entry left `DECISIONS.md`'s locked
-vocabulary in the same work. `documentation/decision-history.md` carries the
-superseded wording, the rejected alternatives and the reasoning for both.
+vocabulary in the same work. The superseded wording, the rejected
+alternatives and the reasoning for both are in `DECISIONS.md`'s Git history.
 
 **Test-first, and the baseline failures were recorded before the rename.**
 `test_a_row_nothing_has_spoken_about_starts_at_nothing_said_yet` failed on
@@ -574,8 +570,8 @@ merging and about `Written down?` still stands.
       dates, the replaced cell's old citation goes with its old value, and an
       already-committed row gets its before-and-after audit entry with its
       fingerprint moved. This **reverses the slice-1 rule** that a merge moved
-      citations and never a cell; `documentation/decision-history.md` carries
-      the superseded wording and the narrower alternative that was rejected.
+      citations and never a cell; the superseded wording and the narrower
+      alternative that was rejected are in `DECISIONS.md`'s Git history.
       **A merge marker is never two hops from the row holding the evidence** —
       each merge re-points every row already merged into its proposal, because
       `read_findings.py` resolves exactly one hop and a two-hop chain would
@@ -625,15 +621,14 @@ merging and about `Written down?` still stands.
 - [x] Rules-only route: Ingest straight to Examine when only the rules changed.
 - [x] Both corpora driven through a first and a second run inside the suite.
 - [x] Withdrawal, built here (migrations `20260814_0007`/`0008`), was removed
-      2026-08-15 on `read-each-document-once` — see that entry below and
-      `documentation/decision-history.md`.
+      2026-08-15 on `read-each-document-once` — see that entry below.
 
 ### Requirement withdrawal removed; a document is read once, by name or content (branch `read-each-document-once`)
 
 - [x] Never-do tests written and run at the `main` baseline `826534e` before
       any implementation; editing and renaming an already-read document both
-      failed there, four others passed as regression guards. Full detail:
-      `documentation/progress-history.md`, 2026-08-15.
+      failed there, four others passed as regression guards. Full detail is
+      in this file's Git history, 2026-08-15.
 - [x] `app/ingest/collect_batch.py`'s already-read check: `AND` to a
       parenthesised `OR`, with a skip reason naming which of name or content
       matched. `app/register/withdraw_rows.py` deleted; its two routing-edge
@@ -672,7 +667,7 @@ merging and about `Written down?` still stands.
       that happened to contain "waiting for review" as prose rather than the
       status value (a prompt-injection fixture sentence, a `wait_until`
       description, and a code comment) — caught by the first post-rename test
-      run and hand-corrected; see `documentation/decision-history.md`.
+      run and hand-corrected.
 - [x] `GET /projects` and MCP tool `list_projects` replace `GET /runs` and
       `list_runs` (removed, not kept beside), both calling
       `app/projects/list_projects.py`'s one core function: every project with
@@ -1530,10 +1525,9 @@ configures twice. Before the change an INFO run event printed nothing
 
 ## Documentation history policy
 
-- Current status is rewritten here; completed dated narrative moves to
-  `documentation/progress-history.md`, newest first.
+- Current status is rewritten here; completed dated narrative is dropped once
+  it stops describing the present, and stays reachable in this file's Git
+  history.
 - Never repeat decision rationale here; link to the current decision instead.
-- When a blocker resolves, move its resolution and evidence to history and
-  remove it from the active list.
-- Exact pre-compaction hashes and inventory mapping live in the compaction
-  manifest under `documentation/archive/history/`.
+- When a blocker resolves, record its resolution and evidence here briefly,
+  then drop it from the active list once nothing depends on it.

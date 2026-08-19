@@ -468,9 +468,5 @@ the next run and never to one already under way or already finished. Point
 
 - [`DECISIONS.md`](DECISIONS.md) — compact current decisions and limitations.
 - [`PROGRESS.md`](PROGRESS.md) — current status, blockers, and next actions.
-- [`documentation/decision-history.md`](documentation/decision-history.md) —
-  detailed append-only decision history.
-- [`documentation/progress-history.md`](documentation/progress-history.md) —
-  completed progress narrative.
 - `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md`
   — interpreted brief requirements, separate from our decisions.

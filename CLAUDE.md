@@ -13,10 +13,10 @@ every session.
    — our interpretation of the brief.
 3. `DECISIONS.md` — compact current product decisions and status labels.
 4. `PROGRESS.md` — current position, open work, assumptions, blockers, and proof.
-5. `documentation/decision-history.md` and
-   `documentation/progress-history.md` — relevant superseded or completed
-   context; do not load them end to end by default.
-6. `README.md` — the current user-facing description.
+5. `README.md` — the current user-facing description.
+6. The Git history of `DECISIONS.md` and `PROGRESS.md` — superseded wording and
+   completed narrative; read one entry when history affects the work, never the
+   whole log.
 
 Claude auto-memory is historical context, not project truth. If memory conflicts
 with the live repository, follow the source priority above, report the stale
@@ -26,8 +26,8 @@ memory, and correct it only after the live files are verified.
 
 - Before changing anything, inspect Git status plus staged and unstaged diffs.
 - Read the current-status section and relevant checklist in `PROGRESS.md`.
-- Read the relevant current section in `DECISIONS.md`; open only the matching
-  entry in `documentation/decision-history.md` when history affects the work.
+- Read the relevant current section in `DECISIONS.md`; reach for that file's
+  Git history only when a superseded wording actually affects the work.
 - Continue from the relevant open item; do not silently reopen or reinterpret a
   locked decision.
 - If the brief, current decisions, and requested work disagree, stop and ask
@@ -47,12 +47,11 @@ memory, and correct it only after the live files are verified.
 ## Keeping project knowledge current
 
 - Follow the documentation-maintenance rules imported from `TASK.md`.
-- When a decision changes, append the old wording, rationale, and supersession
-  link to `documentation/decision-history.md`, then update root
-  `DECISIONS.md` to current truth.
-- After work completes, update root `PROGRESS.md` and move completed dated
-  narrative to `documentation/progress-history.md`; do not turn either file
-  into a second decision log.
+- When a decision changes, update root `DECISIONS.md` to current truth and say
+  in the entry what it replaced and on what date; the old wording stays in that
+  file's Git history and is never copied into a second file.
+- After work completes, update root `PROGRESS.md`, dropping narrative that has
+  stopped describing the present; do not turn it into a second decision log.
 - If a genuinely reusable repository working rule is discovered, discuss it
   with Aditya first. Once agreed, add or update it in `TASK.md`; do not promote a
   one-off correction or preference into a permanent rule.

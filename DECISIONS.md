@@ -1,10 +1,9 @@
 # DECISIONS.md — current canonical decisions
 
 This file answers **what is true now and why**. It is intentionally compact.
-Detailed reasoning, rejected alternatives, and the original append-only
-Decision Log live in [`documentation/decision-history.md`](documentation/decision-history.md).
-Exact pre-compaction source is preserved in
-[`documentation/archive/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md`](documentation/archive/history/DECISIONS-pre-compaction-2026-08-13-2e14c91.md).
+Detailed reasoning, rejected alternatives, and every superseded wording live
+in this file's own Git history — `git log -p DECISIONS.md` reaches all of it,
+including the append-only Decision Log this file replaced.
 
 The task requirements are interpreted separately in
 `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md`.
@@ -13,8 +12,9 @@ Do not turn our choices into brief claims.
 ## How to maintain this file
 
 - Root `DECISIONS.md` contains current truth only.
-- Before changing a decision, append its old form, rationale, date, and
-  supersession link to `documentation/decision-history.md`; then update root.
+- Before changing a decision, say in the entry what it replaced and on what
+  date; the old wording stays in this file's Git history and is not copied
+  into a second file.
 - Keep exact mapping tables where identity matters. Otherwise use: **Decision,
   Why, Must preserve, Evidence, Limitation/open, History**.
 - Code, migrations, tests, and observed runs outrank a stale status sentence.
@@ -221,8 +221,8 @@ export is always gated.
   affect byte-identical — cells, citations and fingerprint. **Implemented and
   verified** by `tests/incremental/test_incremental_updates.py`. A second
   proof, `tests/incremental/test_second_run_on_corpora.py`, drove the two
-  synthetic corpora and was removed with them on 2026-08-18
-  (`documentation/decision-history.md`); the guarantee itself is unchanged.
+  synthetic corpora and was removed with them on 2026-08-18; the guarantee
+  itself is unchanged.
 
 ### Read-once rule
 
@@ -253,8 +253,8 @@ match.
   person had seen. That capability (withdrawal) never ran against a live
   model, so this phase removes it along with the re-reading that fed it,
   rather than carry an unproven capability in the riskiest part of the system.
-  See `documentation/decision-history.md`, "Read-once rule replaces re-reading
-  a changed document, and withdrawal is removed".
+  Superseded 2026-08-16: "Read-once rule replaces re-reading a changed
+  document, and withdrawal is removed".
 - **Evidence/status:** Implemented and verified by change-detection tests for
   transient failure, an edited document, a renamed document, a deleted
   document, an unrelated document, and a document that asks for nothing.
@@ -272,8 +272,8 @@ match.
 
 The two kept formats cover the two shapes a citation place can take — a
 heading and a page. `.docx` and `.txt` were removed on 2026-08-17 with their
-readers, tests, corpus document and dependency; history:
-`documentation/decision-history.md`, "the register becomes four cells".
+readers, tests, corpus document and dependency; superseded entry: "the
+register becomes four cells".
 
 Format is checked before type. Type is a Pydantic enum at the model boundary,
 and which lists each type may fill is stated in the prompt and carried in the
@@ -333,8 +333,7 @@ The register answers one question — was this asked for, and did we deliver it
 nothing. The stored column behind `Written down?` is still `in_writing`.
 Migration `20260817_0017` dropped the other three cells, and `20260817_0018`
 renamed `No evidence yet` to `Nothing said yet` so it stops reading as the
-sibling of its opposite `Not delivered`; history:
-`documentation/decision-history.md`, 2026-08-17.
+sibling of its opposite `Not delivered`; history: 2026-08-17.
 
 Statuses are fixed in code and in a database check constraint:
 
@@ -416,7 +415,7 @@ cannot each assume a different one:
   gained rows. The snapshot's one non-display reader, `collect_batch`'s
   already-read rule, tests `runs.status = 'done'` instead — semantically
   exact, because the rows and the status commit in one transaction. History:
-  `documentation/decision-history.md`, 2026-08-18.
+  2026-08-18.
 - **A finding reaches the register only once its run ends `done` (review
   finding, fixed 2026-08-18).** `approved_findings_of_project` also requires
   the finding's run to be `done`: an approved finding on a run still at
@@ -434,7 +433,7 @@ cannot each assume a different one:
   the client is sent, and a note about our own reading of a document is not
   part of it. `runs.reported_instructions` stays, and the run panel's
   Reported tab still reads it from `GET /runs/{id}` — no migration was
-  involved. History: `documentation/decision-history.md`, 2026-08-17.
+  involved. History: 2026-08-17.
 - Commit atomically writes approved rows, cell-level audit, and fingerprints.
   A fingerprint covers the four cells only, excluding attachments.
 - Audit answers: which cell/attachment, before, after, run, and source.
@@ -476,8 +475,7 @@ cannot each assume a different one:
   with no trail answers `200` and no entries, shown as `No history yet.` —
   never an error. Run numbers are computed exactly as
   `app/projects/list_projects.py` computes them, so the two surfaces cannot
-  number one run differently. History:
-  `documentation/decision-history.md`, 2026-08-18.
+  number one run differently. History: 2026-08-18.
   **Not built, deliberately:** revert or restore, register version snapshots,
   filters, search, pagination, and any history export format.
 
@@ -588,7 +586,7 @@ match.
   question would still be asked and an approval would still merge. Making the
   merge automatic therefore needs the gate to show the merge first. The
   decision goes back to Aditya rather than being built around; history:
-  `documentation/decision-history.md`, 2026-08-17.
+  2026-08-17.
 - **A match may only point backwards**, and a chain is followed: a requirement
   may name one that created no row of its own, and the evidence lands on the
   row at the end of that chain. Pointing forward is refused, never reordered.
@@ -612,7 +610,7 @@ match.
   `propose_rows`; nothing composes a sentence any more. A grouped
   observation-match decision stores its observations' sentences in answer
   order, joined by one blank line, character for character. History:
-  `documentation/decision-history.md`, 2026-08-17.
+  2026-08-17.
 - Each requirement reaches the Match prompt with its `document_type`, taken
   from the stored extraction and never guessed from a file name, so the
   question can name the kind of document each statement came from.
@@ -633,7 +631,7 @@ match.
   already-committed row this writes the before-and-after audit entry and moves
   the fingerprint, exactly as an approved move does — a changed cell that left
   the fingerprint still would be the register lying about itself. History:
-  `documentation/decision-history.md`, 2026-08-16.
+  2026-08-16.
 - **Evidence/status:** Implemented and verified by coverage, duplicate-index,
   missing-candidate, merge, rejection, and node-rerun tests, by ten
   within-batch tests in `tests/match/test_within_batch_duplicates.py`, and by
@@ -664,7 +662,7 @@ match.
   empty question is refused beside an empty issue or evidence. The sentence is
   stored unchanged, states the rule in its own words, and carries no rule code
   — the person reading it has never seen the rules file. History:
-  `documentation/decision-history.md`, 2026-08-17.
+  2026-08-17.
 - Configuration is frozen per run. A fingerprint covers parsed rules, ignoring
   comments/whitespace. Per-rule change detection is deliberately not built;
   a rules change re-examines the whole small register in one model call.
@@ -829,9 +827,8 @@ it.
 
 `GET /runs` (every run, flat, newest first) is replaced by `GET /projects`,
 not kept beside it — two list shapes for the same data was exactly the drift
-this repository's conventions forbid. Superseded wording:
-`documentation/decision-history.md`, "The screen becomes projects, and
-inside each project its runs."
+this repository's conventions forbid. Superseded wording: "The screen becomes
+projects, and inside each project its runs."
 
 **A folder is a project's identity (locked 2026-08-16, superseding the demo
 seed's own "is `projects` empty" check and the claim that `projects.name`
@@ -887,8 +884,8 @@ a symlink after creation is not re-checked.
   days old and changes the HTTP stack it depends on; `fastmcp` would put a
   second server framework beside FastAPI.
 - **The screen is three columns (L1–L10, locked 2026-08-15, superseding the
-  single run list — see `documentation/decision-history.md`):** projects
-  (20rem), one selected project's runs (13rem, collapsible to a strip that
+  single run list):** projects (16rem), one selected project's runs (12rem,
+  collapsible to a strip that
   keeps the open run's number visible), and the open run's detail, read one
   at a time behind tabs. One question component serves every gate; it
   branches only on a `finding`, which is shown as rule, row and evidence
@@ -1018,8 +1015,7 @@ a symlink after creation is not re-checked.
   the `runs.stage_timings`, `runs.token_usage`, `runs.estimated_cost_usd` and
   `runs.cost_unknown_reason` columns (migration `20260814_0010`), the
   `usage_metadata` read in `app/model/call_the_model.py`, and
-  `rates_usd_per_token` in `config/model.yaml` are all gone. History in
-  `documentation/decision-history.md`.
+  `rates_usd_per_token` in `config/model.yaml` are all gone.
 - **What replaced it: `runs.finished_stages`.** A jsonb object keyed by stage
   name only (`{"ingest": true, "extract": true, ...}`), written where each
   stage's pass ends with the same `||` merge the dropped `stage_timings` used,
@@ -1112,8 +1108,8 @@ a symlink after creation is not re-checked.
 1. Task 2 orchestration: high-level `create_agent` versus raw StateGraph.
 2. Nothing open here: the screen's layout and visual treatment were settled
    on 2026-08-14 with the run list and the Tailwind tokens, and resettled
-   2026-08-15 into the three-column projects-and-runs shape (D15,
-   `documentation/decision-history.md`) — item 5 below is resolved by it.
+   2026-08-15 into the three-column projects-and-runs shape (D15) — item 5
+   below is resolved by it.
 3. Whether real document sizes justify pgvector retrieval or Extract fan-out.
 4. Exact later-slice storage choices where this file explicitly leaves them
    open; do not invent them before their slice.
@@ -1180,5 +1176,5 @@ ideas from resurfacing without duplicating their full prose here.
 | The export carrying `reported_instructions` | D05 the run payload and the Reported tab carry it; the register does not |
 | Run-level export snapshot (`runs.export_json`, `GET /runs/{id}/export`, `get_export`, the 409-before-commit contract) | D05/D14/D15 the register is read live from `register_rows` through `GET /projects/{project_id}/register` and `get_register` |
 
-For full chronology, alternatives, trade-offs, evidence language, and all 93
-original Decision Log rows, use `documentation/decision-history.md`.
+For the full chronology, the alternatives, the trade-offs and all 93 original
+Decision Log rows, read this file's Git history: `git log -p DECISIONS.md`.

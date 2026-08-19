@@ -16,11 +16,9 @@ Built for the SuperDocs Round 2 engineering task, Task 1.
 | File | What it holds |
 |---|---|
 | `DECISIONS.md` | Compact current canonical decisions, statuses, limitations, and open choices. **Read this before writing code.** |
-| `documentation/decision-history.md` | Append-only decision chronology, superseded wording, alternatives, and detailed rationale. Read the relevant entry when changing a decision. |
 | `documentation/superdocs-engineering-task/superdocs-round2-working-notes.md` | What the brief requires, interpreted. Their asks, not our choices. |
 | `documentation/superdocs-engineering-task/SuperDocs-Task-Engineer.pdf` | The original brief. Wins over any interpretation. |
 | `PROGRESS.md` | Current dashboard: built, pending, assumptions, blockers, next actions, and verification. |
-| `documentation/progress-history.md` | Completed dated progress narrative and resolved blockers. |
 
 If a decision looks wrong, stop and discuss it rather than silently choosing
 differently.
@@ -43,18 +41,18 @@ differently.
 
 - Root `DECISIONS.md` shows only current truth. Add or update the existing
   D-family in compact bullets: decision, why, must preserve, evidence/status,
-  limitation/open point, and history link. Create a new family only for a new
-  subject. Keep detailed alternatives and provenance once in
-  `documentation/decision-history.md`; before replacing a decision, append its
-  old wording, reason, date, and replacement there. Never rewrite history.
+  and limitation/open point. Create a new family only for a new subject. Before
+  replacing a decision, say in the entry what it replaced and on what date; the
+  old wording stays in the file's Git history and is never copied into a second
+  file. Never rewrite Git history.
 - Record a decision only if someone could reverse it without knowing why, a
   real alternative was rejected, or the founder might ask why it was done. Do
   not record what the code already shows, what had no alternative, or an
   obvious simplification — writing those up reads as padding.
 - Keep `PROGRESS.md`'s dashboard structure and update entries in place. Each
   active item states status, evidence, and next action briefly; completed dated
-  narrative and resolved blockers move to `documentation/progress-history.md`,
-  newest first.
+  narrative and resolved blockers are dropped once they stop describing the
+  present, and stay reachable in the file's Git history.
 - `README.md` describes only verified current user-facing behaviour, setup,
   commands, formats, and limitations; it is not a plan or history archive.
 - The original PDF brief is never superseded by our documents. If they conflict,
