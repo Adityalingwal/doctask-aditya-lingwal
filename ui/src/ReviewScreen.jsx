@@ -405,8 +405,8 @@ export default function ReviewScreen({ runId: openedRunId }) {
           <div
             className={`grid h-full min-h-0 grid-cols-1 ${
               runsCollapsed
-                ? "lg:grid-cols-[20rem_3rem_1fr]"
-                : "lg:grid-cols-[20rem_13rem_1fr]"
+                ? "lg:grid-cols-[16rem_3rem_1fr]"
+                : "lg:grid-cols-[16rem_12rem_1fr]"
             }`}
           >
             <ProjectList
@@ -692,7 +692,8 @@ function EndReview({ reviewing, unanswered, answering, onFinish }) {
   if (!reviewing) {
     return (
       <p className="mt-8 text-sm text-ink-soft">
-        This run is not at review, so nothing can be answered on it now.
+        This run is not waiting for an answer, so its decisions can be read
+        here but not changed.
       </p>
     );
   }
