@@ -1256,12 +1256,6 @@ working claim only after its own implementation and proof land.
   config (`poll_seconds` 10 → 4, `quiet_seconds` 30 → 10) rather than persist
   a creation-time folder baseline, which would take a migration; revisit only
   if a live run or demo actually hits the window.
-- `Disputed` is reached only when the handover and the testing feedback that
-  contradict each other are read in the **same batch**. `status_after` decides
-  it from the delivery evidence this batch supplied, and nothing stores the
-  fact that a handover once claimed delivery — so a handover read in an earlier
-  run leaves a later "not there" verdict landing on `Not delivered` instead.
-  Closing it needs a stored claim on the row, not a wider read.
 - **Rules about elapsed time cannot be judged.** "Nothing stays blocked more
   than N days" has nothing to count from: the register keeps no document dates,
   and Extract no longer asks for one.
@@ -1284,7 +1278,11 @@ working claim only after its own implementation and proof land.
   watch this in the bounded live-model run; if question spam is real there,
   the fix is a small dedup in `record_findings` — same rule, same row with an
   unchanged fingerprint, already answered → raise no new question — never
-  hiding rows from Examine. Not observed — no live model has run.
+  hiding rows from Examine. **Watched in the live run 2026-08-19 and real**:
+  every staged drive re-asked the testing-outcome rule on each run — six or
+  seven questions per run early on, settling to two once the testing feedback
+  arrived. Each was rejected and each returned. The dedup is now a real option
+  rather than a guess, and is still not built.
 - **A finding's `evidence` is never checked against the row it names.** Examine
   refuses an answer naming a rule or a row it was not given, but the `evidence`
   string is only checked for being non-empty — nothing looks for those words in
@@ -1294,7 +1292,12 @@ working claim only after its own implementation and proof land.
   document, nothing here verifies the copy. **Decided 2026-08-17 not to add the
   check**: rejecting the whole answer over one imperfect copy is worse than the
   fault, and this is to be closed by strengthening the Examine prompt instead.
-  Not observed — no live model has run.
+  **Seen in the live run 2026-08-19, in its mild form.** The three drives
+  wrote three distinct evidence strings: two were the row's own cell word for
+  word, and the third read "no testing outcome has been read" where the cell
+  reads "Not known yet — no testing outcome has been read for this
+  requirement." Nothing false reached the screen, but nothing checked the copy
+  either — which is the fault this entry names.
 - **A confident match against a committed row still raises a question, one per
   overlapping ask.** It appears only when documents arrive one per run: the
   meeting note's asks are committed by the first run, so every ask the client
@@ -1423,7 +1426,21 @@ working claim only after its own implementation and proof land.
 
 ## Next actions
 
-1. Decide whether one bounded live-model run is worth making.
+1. Consolidate the repository's documentation before the write-up — the two
+   decision files and the two progress files are more than a reader of a
+   one-page write-up and an architecture diagram needs. Not yet decided what
+   is kept.
+2. Clear the throwaway state the live run left: `.gitignore:49` is widened to
+   `sample-projects/*/`, seventeen drive folders sit under `sample-projects/`,
+   and the `helplinelive` stack still holds fifteen projects of drive data.
+   The stack is deliberately left up until the demo recording is done.
+
+Resolved 2026-08-19: the live-model run is made, and the testing it was for is
+complete — three staged drives (Luna single and Terra single through MCP, Luna
+combo through the screen), each reaching all seven expected statuses. See
+`## Verification evidence`. The full drive-by-drive record is kept at
+`documentation/superdocs-engineering-task/live-run-record.md` as raw material
+for the Task 4 write-up, and is meant to be deleted once that write-up exists.
 
 Resolved 2026-08-18: the export-gate item is closed — the downgrade stays and
 the gate is not widened, decided 2026-08-17 and recorded under `## Active
@@ -1448,6 +1465,9 @@ configures twice. Before the change an INFO run event printed nothing
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
+| The live model run, staged by hand | 2026-08-19, `main` at `7720623` | Three drives on the Helpline AI corpus, `openai/gpt-5.6-luna` and `openai/gpt-5.6-terra` at `reasoning_effort: high`. Each reached **all seven expected statuses**, including `Disputed` on the human-escalation row, whose audit trail reads `Nothing said yet` → `Handed over` → `Disputed` across three separate runs — the cross-batch conflict PR #38 fixed, confirmed on live data rather than in tests alone. Luna raised the written-requirement finding on that row and Terra never did; the two agreed on every status. The change-request rule raised no finding in any drive: the SMS ask is reported as a dropped observation, because no row traces it. **A merged fix is not live until the application process restarts** — the first drive returned six of seven against modules the container had imported before PR #38 reached disk |
+| `docker compose -p helplinelive exec -T app pytest` | 2026-08-20, `main` at `69ecaec` | **253 passed**, real PostgreSQL, no live key, run inside the live stack |
+| `npm --prefix ui test` | 2026-08-20, `main` at `69ecaec` | **66 passed across 38 files**, no live key. The baseline printed 63 across 36; the three new tests cover the read-only wording and the decision card's shared label column, and all three fail at the branch point |
 | `docker compose -p brief5live run --rm app pytest` | 2026-08-18, `register-read-live` branch | **235 passed**, real PostgreSQL, no live key. The baseline at `f6aa015` printed 227; the eight new tests are the two read-once tests, the four live-register tests and the two both-doors register tests |
 | `npm --prefix ui test` | 2026-08-18, `register-read-live` branch | **60 passed, 34 files**, no live key. Same counts as the baseline — the register tests were updated in place to the one-GET register route and the rows-empty state |
 | Migration `20260818_0021` forward and backward on real data | 2026-08-18, `register-read-live` branch | On a scratch database at `20260818_0020`: `pg_get_constraintdef` over `pg_constraint` for `runs` showed only `ck_runs_status`, the FK and the PK; `pg_indexes` only the PK and the two partial unique indexes on `project_id`/`status`; no view exists — nothing names `export_json`. A seeded `done` run held a snapshot; the upgrade dropped the column and left the run intact; the downgrade re-added it `jsonb`, nullable, with the seeded run's snapshot NULL (empty, not reconstructed); upgrading again dropped it once more |
