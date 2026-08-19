@@ -38,7 +38,12 @@ export default function RunColumn({
           </p>
         )}
         {openRun === null && registerOpen && (
-          <p className="mt-4 font-mono text-xs text-ink-soft">Register</p>
+          // The collapsed rail is 3rem wide and a run's mark is two characters,
+          // so this word is the one label that cannot fit across it. Turned on
+          // its side it stays whole rather than being cut off mid-word.
+          <p className="mt-4 font-mono text-xs text-ink-soft [writing-mode:vertical-rl]">
+            Register
+          </p>
         )}
       </div>
     );

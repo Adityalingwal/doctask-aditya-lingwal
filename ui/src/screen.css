@@ -107,6 +107,17 @@
     color: var(--color-ink-soft);
   }
 
+  /* Every labelled block inside one decision card shares this label column,
+     so the values line up down the whole card. Sized to the longest label the
+     card writes — "Row NN breaks it" — rather than to whichever labels one
+     block happens to hold, which is what left the two blocks starting their
+     values at different places. */
+  .decision-lines {
+    display: grid;
+    grid-template-columns: 10rem 1fr;
+    column-gap: 1.25rem;
+  }
+
   /* The name of a section, which should carry as much weight as the numbers
      under it. */
   .section-name {

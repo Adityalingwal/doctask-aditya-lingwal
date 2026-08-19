@@ -90,10 +90,10 @@ function WhatTheAnswersDo({ decision }) {
     return null;
   }
   return (
-    <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-3 border-t border-line px-5 py-4 text-[15px]">
-      <dt className="eyebrow whitespace-nowrap">Approve</dt>
+    <dl className="decision-lines m-0 gap-y-3 border-t border-line px-5 py-4 text-[15px]">
+      <dt className="eyebrow">Approve</dt>
       <dd className="m-0 max-w-prose">{answers.approve}</dd>
-      <dt className="eyebrow whitespace-nowrap">Reject</dt>
+      <dt className="eyebrow">Reject</dt>
       <dd className="m-0 max-w-prose">{answers.reject}</dd>
     </dl>
   );
@@ -137,14 +137,14 @@ function whatEachAnswerDoes(decision) {
 // R1, no D1, anywhere on this screen (screen 4).
 function FindingBody({ decision }) {
   return (
-    <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-4 px-5 py-5">
-      <dt className="eyebrow whitespace-nowrap">Rule</dt>
+    <dl className="decision-lines m-0 gap-y-4 px-5 py-5">
+      <dt className="eyebrow">Rule</dt>
       <dd className="m-0 max-w-prose text-[15px] leading-relaxed">
         {decision.rule_text}
       </dd>
-      <dt className="eyebrow whitespace-nowrap">Row {decision.row_number} breaks it</dt>
+      <dt className="eyebrow">Row {decision.row_number} breaks it</dt>
       <dd className="m-0 max-w-prose text-[15px] leading-relaxed">{decision.issue}</dd>
-      <dt className="eyebrow whitespace-nowrap">Evidence</dt>
+      <dt className="eyebrow">Evidence</dt>
       <dd className="m-0 max-w-prose text-[15px] leading-relaxed">{decision.evidence}</dd>
     </dl>
   );
