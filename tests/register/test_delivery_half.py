@@ -26,7 +26,7 @@ from tests.runs.application import (
     write_script,
 )
 
-from app.register.cells import CELL_NAMES
+from app.register.cells import CELL_NAMES, COLUMN_HEADINGS
 
 
 MEETING_NOTES_FILE = "meeting-notes-10-mar.md"
@@ -254,11 +254,26 @@ def _audit_cell_changes(
     return changed
 
 
-def _citations_on(export: dict, row_number: int, cell: str) -> list[dict]:
+def _evidence_on(export: dict, row_number: int, cell: str) -> list[dict]:
+    """Every piece of evidence the register says one cell rests on.
+
+    The register names its cells by the headings the table shows, so the
+    column key a test reads is translated once, here.
+    """
+    heading = COLUMN_HEADINGS[cell]
     for row in export["rows"]:
         if row["row_number"] == row_number:
-            return [one for one in row["citations"] if one["cell"] == cell]
+            return [
+                entry for entry in row["evidence"] if heading in entry["cells"]
+            ]
     return []
+
+
+def _cited_files(export: dict, row_number: int, cell: str) -> list[str]:
+    return [
+        entry["source_line"].split(",")[0]
+        for entry in _evidence_on(export, row_number, cell)
+    ]
 
 
 def test_a_passed_observation_moves_the_status_to_done_with_its_citation(
@@ -284,9 +299,9 @@ def test_a_passed_observation_moves_the_status_to_done_with_its_citation(
     assert finished.rows[1]["status"] == "Done"
     assert finished.rows[1]["what_testing_found"] == "the notification reaches the team"
     # The status is a claim, so it carries the words that support it.
-    cited = _citations_on(finished.export, 1, "status")
-    assert [one["source_file"] for one in cited] == [TESTING_FILE]
-    assert cited[0]["source_words"] == TESTING_QUOTE
+    cited = _evidence_on(finished.export, 1, "status")
+    assert _cited_files(finished.export, 1, "status") == [TESTING_FILE]
+    assert cited[0]["quote"] == TESTING_QUOTE
 
 
 def test_a_change_request_never_moves_the_status(tmp_path: Path) -> None:
@@ -343,7 +358,7 @@ def test_a_row_no_document_speaks_about_stays_requested_with_no_citation(
     assert finished.rows[2]["what_testing_found"] == "Not mentioned"
     # `Requested` names no document, so nothing is cited behind it.
     # `Not delivered` is the opposite claim and always carries a citation.
-    assert _citations_on(finished.export, 2, "status") == []
+    assert _evidence_on(finished.export, 2, "status") == []
 
 
 def test_a_handover_with_no_testing_behind_it_moves_the_row_to_handed_over(
@@ -373,10 +388,7 @@ def test_a_handover_with_no_testing_behind_it_moves_the_row_to_handed_over(
     # a run that read it must leave a mark.
     assert finished.rows[1]["status"] == "Handed over"
     assert finished.rows[1]["what_testing_found"].startswith("Not known yet")
-    assert [
-        citation["source_file"]
-        for citation in _citations_on(finished.export, 1, "status")
-    ] == [HANDOVER_FILE]
+    assert _cited_files(finished.export, 1, "status") == [HANDOVER_FILE]
 
 
 def test_a_row_created_and_moved_in_the_same_batch_ends_with_both_its_evidence(
@@ -520,10 +532,7 @@ def test_not_delivered_still_needs_a_document_that_looked_and_did_not_find_it(
     # reporting it absent contradicts nothing. `Not delivered` is a positive
     # claim, so unlike `Requested` it names the document that made it.
     assert finished.rows[1]["status"] == "Not delivered"
-    assert [
-        citation["source_file"]
-        for citation in _citations_on(finished.export, 1, "status")
-    ] == [TESTING_FILE]
+    assert _cited_files(finished.export, 1, "status") == [TESTING_FILE]
 
 
 def test_a_handover_claiming_delivery_against_testing_reporting_missing_is_disputed(
@@ -765,9 +774,9 @@ def test_a_handover_from_an_earlier_run_still_opposes_a_later_absence_report(
     row = register["rows"][0]
     assert row["cells"]["status"] == "Disputed"
     cited = {
-        citation["source_file"]
-        for citation in row["citations"]
-        if citation["cell"] == "status"
+        entry["source_line"].split(",")[0]
+        for entry in row["evidence"]
+        if "Status" in entry["cells"]
     }
     assert cited == {HANDOVER_FILE, TESTING_FILE}
 

@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 test("an_empty_history_reads_no_history_yet", async () => {
-  const exported = registerReply({ rows: [], exported_at: null, examine: null });
+  const exported = registerReply({ rows: [], exported_at: null, rules: null });
   const project = projectReply();
 
   vi.stubGlobal(

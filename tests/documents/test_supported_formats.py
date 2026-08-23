@@ -77,9 +77,11 @@ def test_a_markdown_file_still_reads_and_still_cites_its_nearest_heading(
     finished = one_run_over_four_extensions
 
     assert finished["documents_read"] == sorted([MARKDOWN_FILE, PDF_FILE])
-    places = _citation_places(finished["export"])
-    assert places[MARKDOWN_FILE] == MARKDOWN_PLACE
-    assert places[PDF_FILE] == "page 1"
+    source_lines = _source_lines(finished["export"])
+    assert source_lines[MARKDOWN_FILE] == (
+        f'{MARKDOWN_FILE}, under "{MARKDOWN_PLACE}"'
+    )
+    assert source_lines[PDF_FILE] == f"{PDF_FILE}, page 1"
 
 
 def _drive_one_run(tmp_path: Path) -> Iterator[dict[str, Any]]:
@@ -147,12 +149,13 @@ def _skipped_reason(run: dict[str, Any], source_file: str) -> str:
     return entries[0]["reason"]
 
 
-def _citation_places(export: dict[str, Any]) -> dict[str, str]:
-    places: dict[str, str] = {}
+def _source_lines(export: dict[str, Any]) -> dict[str, str]:
+    """Each cited file, and the one line every surface names its place in."""
+    lines: dict[str, str] = {}
     for row in export["rows"]:
-        for citation in row["citations"]:
-            places[citation["source_file"]] = citation["place"]
-    return places
+        for entry in row["evidence"]:
+            lines[entry["source_line"].split(",")[0]] = entry["source_line"]
+    return lines
 
 
 def _documents_in(database_url: str) -> list[str]:

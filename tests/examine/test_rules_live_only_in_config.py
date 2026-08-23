@@ -43,7 +43,8 @@ def test_no_rule_is_judged_outside_config_rules_yaml(tmp_path: Path) -> None:
     assert [rule["id"] for rule in reported["at_review"]["rules"]] == ["R1"]
     assert [rule["id"] for rule in reported["exported"]["rules"]] == ["R1"]
     assert reported["at_review"]["findings"] == []
-    assert reported["exported"]["findings"] == []
+    # A register nothing was found wrong with carries no findings key at all.
+    assert all("findings" not in row for row in reported["exported_rows"])
     # The file names the rule by its own words: whoever opens it has never
     # seen the rules file, so a rule id would name nothing to them (S16).
     assert "Anything built must have a written requirement." in reported["markdown"]
@@ -116,7 +117,8 @@ def _run_against(tmp_path: Path, rules_file: str) -> dict[str, Any]:
                     ).text
                 return {
                     "at_review": at_review["examine"],
-                    "exported": exported["examine"],
+                    "exported": exported["rules"],
+                    "exported_rows": exported["rows"],
                     "markdown": markdown,
                 }
             finally:

@@ -13,6 +13,7 @@ from tests.documents.register_documents import (
     write_document_stating,
 )
 from tests.register.stored_register import extraction_of_document
+from app.register.cells import COLUMN_HEADINGS
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -48,9 +49,13 @@ def test_a_committed_row_has_exactly_the_four_cells_and_no_more(
     assert export["columns"] == FOUR_CELLS
     for row in export["rows"]:
         assert set(row["cells"]) == set(FOUR_CELLS)
-    assert {citation["cell"] for row in export["rows"] for citation in row["citations"]} <= set(
-        FOUR_CELLS
-    )
+    cited_cells = {
+        cell
+        for row in export["rows"]
+        for entry in row["evidence"]
+        for cell in entry["cells"]
+    }
+    assert cited_cells <= set(COLUMN_HEADINGS.values())
 
 
 def test_the_export_and_the_screen_both_read_written_down_not_in_writing(

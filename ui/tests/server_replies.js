@@ -207,25 +207,7 @@ export function registerReply(overrides = {}) {
           what_testing_found: "Upload failed for files over 10 MB.",
           status: "Partial",
         },
-        citations: [
-          {
-            cell: "what_was_asked",
-            source_file: "12-march-scope.md",
-            place: "Section 2 — Applicant portal",
-            source_words: "applicants must be able to upload supporting documents",
-            absence_statement: null,
-          },
-          {
-            cell: "in_writing",
-            source_file: "26-march-scope.md",
-            place: null,
-            source_words: null,
-            absence_statement:
-              "26-march-scope.md was read, and it does not mention this ask.",
-          },
-        ],
-        // The shape every surface is moving to: one entry per thing a
-        // document said, and the cells it supports.
+        // One entry per thing a document said, and the cells it supports.
         evidence: [
           {
             source_line: '12-march-scope.md, under "Section 2 — Applicant portal"',
@@ -250,13 +232,6 @@ export function registerReply(overrides = {}) {
       rules: [
         { id: "R1", text: "Every requirement must have a written scope entry." },
       ],
-    },
-    examine: {
-      rules: [
-        { id: "R1", text: "Every requirement must have a written scope entry." },
-      ],
-      rows_examined: 1,
-      findings: [],
     },
     ...overrides,
   };

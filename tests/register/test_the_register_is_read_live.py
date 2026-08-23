@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import create_engine, text
 
@@ -23,6 +24,7 @@ from tests.documents.register_documents import (
     no_findings_answer,
     write_meeting_note,
 )
+from app.register.cells import COLUMN_HEADINGS
 from tests.register.stored_register import stored_rows
 
 
@@ -93,16 +95,17 @@ def test_the_register_read_returns_exactly_what_register_rows_holds(
             == stored_row.cells
         )
         assert row["fingerprint"] == stored_row.fingerprint
+        # The evidence a reader is shown is the stored citations grouped by the
+        # words themselves, so what it names must be exactly what is stored.
         assert sorted(
-            (
-                citation["cell"],
-                citation["source_file"],
-                citation["place"],
-                citation["source_words"],
-                citation["absence_statement"],
-            )
-            for citation in row["citations"]
-        ) == sorted(stored_row.citations)
+            (COLUMN_HEADINGS[cell], entry["quote"], entry["absence"])
+            for entry in row["evidence"]
+            for cell in _cells_of(entry, stored_row)
+        ) == sorted(
+            (COLUMN_HEADINGS[cell], source_words, absence_statement)
+            for cell, _file, _place, source_words, absence_statement
+            in stored_row.citations
+        )
 
 
 def test_a_project_with_no_committed_rows_answers_the_empty_state_not_an_error(
@@ -119,7 +122,11 @@ def test_a_project_with_no_committed_rows_answers_the_empty_state_not_an_error(
     register = as_json.json()
     assert register["rows"] == []
     assert register["exported_at"] is None
-    assert register["examine"] is None
+    assert register["rules"] is None
+    # The old aggregate block left the JSON once the screen read `evidence`,
+    # `findings` and `rules` instead (S16).
+    assert "examine" not in register
+    assert all("citations" not in row for row in register["rows"])
 
     assert as_markdown.status_code == 200
     assert EMPTY_REGISTER_LINE in as_markdown.text
@@ -140,7 +147,7 @@ def test_markdown_and_json_carry_the_same_register_content(tmp_path: Path) -> No
     assert REQUIREMENT in markdown
     assert register["project"]["name"] in markdown
     assert f"Last updated {register['exported_at']}." in markdown
-    for rule in register["examine"]["rules"]:
+    for rule in register["rules"]["rules"]:
         assert rule["text"] in markdown
 
 
@@ -161,3 +168,9 @@ def test_the_register_timestamp_is_the_newest_done_runs_finished_at(
         engine.dispose()
 
     assert register["exported_at"] == finished_at.isoformat()
+
+
+def _cells_of(entry: dict[str, Any], stored_row: Any) -> list[str]:
+    """The stored column keys behind one evidence entry's headings."""
+    by_heading = {heading: cell for cell, heading in COLUMN_HEADINGS.items()}
+    return [by_heading[heading] for heading in entry["cells"]]

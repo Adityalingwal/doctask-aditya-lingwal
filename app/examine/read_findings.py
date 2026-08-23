@@ -71,28 +71,6 @@ async def examine_under_review(
     )
 
 
-async def examine_as_exported(
-    connection: AsyncConnection,
-    run_id: UUID,
-) -> dict[str, Any]:
-    """The rules that ran, how much they ran against, and what they found.
-
-    An empty findings list is the honest result D10 asks for, and it is only
-    honest because the rules and the row count sit beside it.
-    """
-    examined = await connection.execute(
-        "SELECT examined_row_count FROM runs WHERE id = %s",
-        (run_id,),
-    )
-    findings = await findings_of_run(connection, run_id, approved_only=True)
-    return await _examine_summary(
-        connection,
-        run_id,
-        (await examined.fetchone())["examined_row_count"],
-        [exported_finding(finding) for finding in findings],
-    )
-
-
 def exported_finding(finding: dict[str, Any]) -> dict[str, Any]:
     return {
         "row_number": finding["row_number"],

@@ -4,6 +4,69 @@ Current status only. Completed narrative that has fallen out of this file
 stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-24, branch `brief-2-screen`
+
+The screen half of the demo-run repairs: after this branch the review screen
+shows what the backend already built, and composes no sentence of its own.
+
+- **A run is three tabs** — `Run`, `Skipped`, `Reported instructions`, each
+  wearing a count only above zero. The Run tab reads top to bottom: the stage
+  strip (the Review box says "waiting for you", later stages of an ended run
+  say "not started"), the ended-early sentence, the waiting block with both
+  endings — Add disabled while a decision is unanswered and the count on the
+  line — then the decisions, then the rules. The section numbers, the Decisions
+  tab and the two hardcoded sentences are gone.
+- **A decision card renders the backend's own blocks.** `question` is split on
+  the blank lines it was built with, and which block is which is read off the
+  parts (`rule_text`, `issue`, `quotes`) rather than off what a block says, so
+  no sentence is parsed or rebuilt. `Question.jsx` writes none of its own; the
+  chosen answer keeps the accent, and both stay live until the review ends.
+- **The Skipped tab is three groups by kind**, one line per entry, and an
+  observation that reached no row is titled by what it says. A place is named
+  only where the server sent one.
+- **The register page is two tabs, and a row opens a panel.** `Register · n`
+  and `History · n runs`; the first column is `Row`; a row with findings wears
+  a `1 finding` mark beside its status and a clean row wears none. The panel
+  carries the four cells, the evidence in payload order with the cells each
+  quote supports, the findings keyed on `finding_id` with the run that raised
+  them, and that row's own history, collapsed. History is grouped under the run
+  that changed the register, and the run heading names no file.
+- **Both side columns collapse to a rail** that still opens the register and
+  every run; a run's mark is its plain number. Every clickable thing carries a
+  pointer, a hover state and a pressed state.
+- **The address names what is on screen**: `?project=<id>&run=<id>`, written by
+  one effect, read back on load in all three shapes.
+- **`citations` and `examine` left the register JSON** (`export_register.py`),
+  with `examine_as_exported` removed as the orphan it became. The Markdown
+  export already read only the new fields.
+
+**Both suites green, no live key: PYTHON_COUNT Python passed** and
+**114 front-end passed across 48 files**. The four demo documents have not been
+re-driven on a clean database since Brief 1a; that is still the foreground step
+after this branch merges.
+
+**Assumptions made on this branch, so they are findable later.**
+- With the register panel open the address carries `?project=<id>` alone. Item
+  9 names the two shapes a run and a project take and says nothing about the
+  register, and a third shape would need a word for the register in the query
+  that nothing else uses.
+- The Add-project button reads "Create project" only for a folder the server
+  has actually reported as holding no file. Before a folder is chosen, and for
+  a folder `has_files_by_folder` says nothing about, it reads "Create and start
+  run" — the ordinary ending, rather than a guess about an unknown folder.
+- The consequence sentences beside Approve and Reject are the last block of
+  `question` with the backend's own `Approve → ` / `Reject → ` marker taken
+  off, rather than being rebuilt from `if_approved`. The marker is a constant
+  of `app/review/decision_text.py`; rebuilding would have meant writing the two
+  sentences a finding and an evidence-only merge carry, which `if_approved`
+  does not hold.
+- Item 32 is proven structurally rather than by measurement: jsdom does no
+  layout, so the test asserts that both labels and both consequence sentences
+  are children of one grid, which is what makes them align at any width.
+- The `#`-before-a-digit sweep over the screen walks `ui/src` and skips
+  `screen.css`, the one file that is nothing but colours; hex colours are taken
+  out of every other file before the search.
+
 ## Snapshot — 2026-08-24, branch `brief-1b-sentences-payload-export`
 
 The reading half of the demo-run repairs: after this branch every sentence a
@@ -40,12 +103,6 @@ passed across 38 files**. The four demo documents have not been re-driven on a
 clean database since; that is the foreground step after this branch merges.
 
 **Assumptions made on this branch, so they are findable later.**
-- The screen still shows the words it showed before this branch — the `Not
-  used` tab name, its own Approve/Reject wording in `Question.jsx`, no
-  `source_line` on a skipped entry, `citations` rather than `evidence`. This
-  branch changed `ui/src` only as far as the screen keeps running on the new
-  payload; every screen change is Brief 2's (items 12, 22/30, 35/38, 33), and
-  the review's three `ui/src` findings were settled that way on 2026-08-24.
 - The locked sketches of the three decision shapes are aligned for a
   monospace reader. The stored text normalises that: blocks separated by a
   blank line, single spaces after `→` and after each colon, two spaces
@@ -63,8 +120,7 @@ clean database since; that is the foreground step after this branch merges.
 - An absence entry in `evidence` carries `source_line: null`: a silence has no
   place to point at, and the sentence names the file.
 - The folder list carries `has_files_by_folder` beside `available_folders`
-  rather than a flag inside each entry, because `ui/src/AddProject.jsx` still
-  reads plain paths and is Brief 2's to change.
+  rather than a flag inside each entry.
 - The Markdown Rules section still prints a rule's `params` beside its text;
   a rule naming a limit cannot be read without its value. No shipped rule has
   params today.
@@ -124,12 +180,12 @@ against a live model since; the expected end state is in
   (`tests/examine/rules_files.py`) — item 24 allows a missing field to mean
   "always applies".
 - The register JSON's `findings` entries gained `raised_by_run` and
-  `finding_id`; what the screen does with them is Brief 2's.
+  `finding_id`.
 - A `done` run from before this branch has `rules_applied` null, so its
   findings no longer show on the register (History keeps them). A fresh
   database never has such a run.
-- The register JSON's `examine` block (newest run's aggregate) is still
-  there, its `rules` now from `rules_applied`; Brief 2 removes it.
+- The register JSON's `examine` block and per-row `citations` list left the
+  JSON on the screen branch, once nothing read them.
 
 ## Snapshot — 2026-08-19, branch `live-run-repairs`
 

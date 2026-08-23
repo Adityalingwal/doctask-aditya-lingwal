@@ -53,7 +53,7 @@ test("the project's register panel says nothing has been added yet rather than s
         method: "GET",
         path: `/projects/${projectId}/register`,
         reply: {
-          body: registerReply({ rows: [], exported_at: null, examine: null }),
+          body: registerReply({ rows: [], exported_at: null, rules: null }),
         },
       },
     ]),

@@ -196,20 +196,20 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     )
     assert waiting["examine"]["rows_examined"] == 1
     assert waiting["examine"]["findings"] == []
-    assert [rule["id"] for rule in export["examine"]["rules"]] == list(
+    assert [rule["id"] for rule in export["rules"]["rules"]] == list(
         RULE_IDS_THAT_ALWAYS_APPLY
     )
-    assert export["examine"]["rows_examined"] == 1
-    assert export["examine"]["findings"] == []
+    assert export["rules"]["rows_examined"] == 1
+    assert all("findings" not in row for row in export["rows"])
     # A clean register prints no Findings block at all (item 43); the rules
     # that produced that result are still named, by their own words, without
     # which "nothing found" says nothing.
     assert "**Findings**" not in markdown
     assert "No findings" not in markdown
-    for rule in export["examine"]["rules"]:
+    for rule in export["rules"]["rules"]:
         assert rule["text"] in markdown
         assert rule["id"] not in markdown
-    assert all(rule.get("params") is None for rule in export["examine"]["rules"])
+    assert all(rule.get("params") is None for rule in export["rules"]["rules"])
 
 
 def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
@@ -283,7 +283,7 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
 
     assert export["rows"][0]["findings"][0]["rule_id"] == "R1"
     assert export["rows"][0]["findings"][0]["issue"] == R1_ISSUE
-    assert export["examine"]["findings"][0]["row_number"] == 1
+    assert export["rows"][0]["findings"][0]["row_number"] == 1
     assert R1_ISSUE in markdown
 
     # A finding attaches to a row; the fingerprint covers the seven cells only,
@@ -350,7 +350,6 @@ def test_a_rejected_finding_stays_in_the_run_and_never_reaches_the_export(
 
     # Item 43: the field exists only when findings exist — never an empty list.
     assert "findings" not in export["rows"][0]
-    assert export["examine"]["findings"] == []
     assert R1_ISSUE not in markdown
     assert attachment_audit == 0
     # Rejected excludes it from the register and keeps it in the run for good.

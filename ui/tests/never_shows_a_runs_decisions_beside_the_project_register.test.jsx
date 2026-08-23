@@ -57,7 +57,7 @@ test("never_shows_a_runs_decisions_beside_the_project_register", async () => {
       {
         method: "GET",
         path: `/projects/${projectId}/register`,
-        reply: { body: { rows: [], columns: [], examine: { rules: [], rows_examined: 0, findings: [] }, exported_at: "2026-03-27T10:00:00+00:00", project: { name: withTwoRuns.name } } },
+        reply: { body: { rows: [], columns: [], rules: null, exported_at: "2026-03-27T10:00:00+00:00", project: { name: withTwoRuns.name } } },
       },
     ]),
   );

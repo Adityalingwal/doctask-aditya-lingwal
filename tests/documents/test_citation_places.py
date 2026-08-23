@@ -97,11 +97,15 @@ def test_a_citation_names_only_a_place_the_reader_actually_produced(
             finally:
                 application.stop()
 
-    place_by_file = {
-        citation["source_file"]: citation["place"]
+    # The place is read back through the one line every surface prints it in
+    # (`app/ingest/source_line.py`): a PDF names a page, Markdown a heading.
+    source_lines = {
+        entry["source_line"].split(",")[0]: entry["source_line"]
         for row in export["rows"]
-        for citation in row["citations"]
-        if citation["cell"] == "what_was_asked"
+        for entry in row["evidence"]
+        if "What was asked" in entry["cells"]
     }
-    assert place_by_file[PDF_FILE] == "page 3"
-    assert place_by_file[MARKDOWN_FILE] == MARKDOWN_PLACE
+    assert source_lines[PDF_FILE] == f"{PDF_FILE}, page 3"
+    assert source_lines[MARKDOWN_FILE] == (
+        f'{MARKDOWN_FILE}, under "{MARKDOWN_PLACE}"'
+    )

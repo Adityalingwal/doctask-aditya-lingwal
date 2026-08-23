@@ -11,8 +11,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # refusal, a failure reason, a prompt's worked example and the export. Every
 # sentence this repository writes is checked in one place.
 #
-# Brief 2 adds `ui/dist` to this list once `RunColumn.jsx` stops writing `#1`;
-# the built bundle is the one surface still carrying it.
+# The screen's own half of this sweep is
+# `ui/tests/no_number_this_screen_writes_is_prefixed_with_a_hash.test.jsx`,
+# which walks `ui/src` for the same thing: `ui/dist` is git-ignored and built
+# on demand, so a check over committed files cannot reach the bundle.
 A_HASH_BEFORE_A_DIGIT = re.compile(r"#\d")
 MARKDOWN_FIXTURE = PROJECT_ROOT / "tests/register/fixtures/register.md"
 

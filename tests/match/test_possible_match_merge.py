@@ -170,7 +170,8 @@ def test_approved_possible_match_merges_into_the_existing_row(
     assert [row["row_number"] for row in export["rows"]] == [COMMITTED_ROW_NUMBER]
     assert export["rows"][0]["cells"]["what_was_asked"] == FIRST_REQUIREMENT
     cited_files = {
-        citation["source_file"] for citation in export["rows"][0]["citations"]
+        entry["source_line"].split(",")[0]
+        for entry in export["rows"][0]["evidence"]
     }
     assert cited_files == {FIRST_FILE, SECOND_FILE}
     # The proposal is kept and marked, so the decision still points at what the
@@ -364,9 +365,9 @@ def test_a_finding_raised_while_a_match_is_unanswered_names_the_row_it_will_join
     assert len(exported_row["findings"]) == 1
     assert exported_row["findings"][0]["row_number"] == COMMITTED_ROW_NUMBER
     assert exported_row["findings"][0]["raised_by_run"] == 2
-    assert [
-        finding["row_number"] for finding in export["examine"]["findings"]
-    ] == [COMMITTED_ROW_NUMBER]
+    # The run's own block still reports what that run judged and found; the
+    # register itself now says so through the row's `findings` alone.
+    assert "examine" not in export
     assert [
         finding["row_number"] for finding in status["examine"]["findings"]
     ] == [COMMITTED_ROW_NUMBER]

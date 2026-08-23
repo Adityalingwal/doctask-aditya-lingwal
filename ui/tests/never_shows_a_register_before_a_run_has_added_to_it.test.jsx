@@ -45,7 +45,7 @@ test("never_shows_a_register_before_a_run_has_added_to_it", async () => {
         method: "GET",
         path: `/projects/${projectId}/register`,
         reply: {
-          body: registerReply({ rows: [], exported_at: null, examine: null }),
+          body: registerReply({ rows: [], exported_at: null, rules: null }),
         },
       },
     ]),
