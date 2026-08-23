@@ -32,7 +32,7 @@ const droppedRequirement = {
     + "are not in the file.",
 };
 
-test("a dropped quote is never shown as a file that was not read", async () => {
+test("an unattached quote is never shown as a file that was not read", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([

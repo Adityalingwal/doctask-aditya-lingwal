@@ -95,6 +95,9 @@ def test_the_register_read_returns_exactly_what_register_rows_holds(
             == stored_row.cells
         )
         assert row["fingerprint"] == stored_row.fingerprint
+        # The per-row `citations` list left the JSON once the screen read
+        # `evidence` instead; a populated row is where re-adding it would show.
+        assert "citations" not in row
         # The evidence a reader is shown is the stored citations grouped by the
         # words themselves, so what it names must be exactly what is stored.
         assert sorted(

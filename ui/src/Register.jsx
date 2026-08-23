@@ -54,7 +54,7 @@ export default function Register({ exported, history }) {
               <tr
                 key={row.row_number}
                 onClick={() => setOpenRowNumber(row.row_number)}
-                className="cursor-pointer border-b border-line last:border-b-0 hover:bg-signal/15"
+                className="cursor-pointer border-b border-line last:border-b-0 hover:bg-signal/15 active:bg-signal/30"
               >
                 <th
                   scope="row"

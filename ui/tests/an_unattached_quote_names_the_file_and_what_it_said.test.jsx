@@ -23,7 +23,7 @@ const droppedRequirement = {
     + "are not in the file.",
 };
 
-test("a dropped quote names the file and what was dropped", async () => {
+test("an unattached quote names the file and what it said", async () => {
   vi.stubGlobal(
     "fetch",
     serverAnswering([

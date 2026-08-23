@@ -4,7 +4,7 @@
 // `app/review/decision_text.py` actually builds — the whole text and the parts
 // beside it, written out separately, so a screen that rebuilt one from the
 // other could not pass.
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
@@ -128,9 +128,32 @@ test("no card writes a hash in front of a row number", async () => {
   expect(document.body.textContent).not.toMatch(/#\d/);
 });
 
-test("the answer the server recorded is the one wearing the accent", async () => {
-  const decision = decisionReply();
-  screenShowing([decision], [decisionReply({ outcome: "approved" })]);
+test("the accent moves to whichever answer the server has recorded", async () => {
+  // The server is the only thing that decides which answer stands, so it
+  // answers `approved` until the reject is posted and `rejected` after.
+  let recorded = "approved";
+  vi.stubGlobal(
+    "fetch",
+    serverAnswering([
+      { method: "GET", path: "/projects", reply: { body: projectsReply() } },
+      {
+        method: "GET",
+        path: `/runs/${runId}`,
+        reply: () => ({
+          body: runReply({ decisions: [decisionReply({ outcome: recorded })] }),
+        }),
+      },
+      {
+        method: "POST",
+        path: `/runs/${runId}/decisions`,
+        reply: () => {
+          recorded = "rejected";
+          return { body: {} };
+        },
+      },
+    ]),
+  );
+  render(<ReviewScreen projectId="" runId={runId} />);
   const card = await cardFor("Is this the same ask as row 2?");
 
   const approve = within(card).getByRole("button", { name: "Approve" });
@@ -140,7 +163,16 @@ test("the answer the server recorded is the one wearing the accent", async () =>
   // The other answer stays live: an answer may be changed until the review is
   // finished, so the screen never closes a window the server leaves open.
   expect(reject.disabled).toBe(false);
+
   fireEvent.click(reject);
+  await waitFor(() => {
+    expect(
+      within(card).getByRole("button", { name: "Reject" }).className,
+    ).toContain("bg-signal");
+  });
+  expect(
+    within(card).getByRole("button", { name: "Approve" }).className,
+  ).not.toContain("bg-signal");
 });
 
 test("both answers and their consequence text share one grid", async () => {
