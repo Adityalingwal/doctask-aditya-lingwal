@@ -24,7 +24,7 @@ cannot do is listed under [What it does not do](#what-it-does-not-do).
 The four sample documents in `sample-documents/helpline-ai/` contain seven
 requirements. Reading all four produces this register:
 
-| # | What was asked | Written down | What testing found | Status |
+| Row | What was asked | Written down | What testing found | Status |
 |---|---|---|---|---|
 | 1 | BrightCart wants an AI system that answers support-line calls. | Yes | The voice agent answered questions correctly every time it was tested. | `Done` |
 | 3 | BrightCart wants the support bot available on WhatsApp. | Yes | The WhatsApp bot could not be found or reached during testing. | `Not delivered` |
@@ -32,29 +32,34 @@ requirements. Reading all four produces this register:
 | 6 | Support must work in Hindi and English. | Yes | Not mentioned | `Requested` |
 | 7 | Chats the bot cannot resolve must reach a real person. | Not mentioned | Human escalation was absent from the delivered system. | `Disputed` |
 
-The register above is the short view. Behind every cell sits the quote it was
-built from. Row 7 is the one worth opening, so here it is in full:
+The table above is the short view. Below it the file writes out every row's
+evidence: one line per thing a document said, naming where it was said, the
+words themselves, and the cells they support. Where a document was read and
+said nothing about the row, the line says that instead. Row 7 is the one
+worth opening, so here it is as the file writes it:
 
 ```
-Row 7 — Chats the bot cannot resolve must reach a real person.
+## Row 7 — Chats the bot cannot resolve must reach a real person.
 
-  What was asked   meeting-notes-02-jul.md · Discussion
-                   "when a chat gets stuck and the bot can't help, it has
-                    to hand off to a real person."
+**Evidence**
 
-  Written down     Not mentioned
-                   client-requirements-v1.md was read, and it does not
-                   mention this ask.
-
-  Status           handover-summary.md · What was handed over
-                   "We also built a 'talk to a human' handover: when the
-                    bot can't resolve a chat, it now hands the conversation
-                    across to a live agent."
-
-  Status           testing-feedback-12-aug.md · What we found
-                   "The human escalation is missing entirely. There is no
-                    'talk to a human' button anywhere in the chat widget."
+- meeting-notes-02-jul.md, under "Discussion": "when a chat gets stuck and
+  the bot can't help, it has to hand off to a real person." — What was asked
+- client-requirements-v1.md was read, and it does not mention this ask.
+  — Written down
+- handover-summary.md, under "What was handed over": "We also built a 'talk
+  to a human' handover: when the bot can't resolve a chat, it now hands the
+  conversation across to a live agent." — Status
+- testing-feedback-12-aug.md, under "What we found": "The human escalation
+  is missing entirely. There is no 'talk to a human' button anywhere in the
+  chat widget." — Status
 ```
+
+A row a rule found something on also gets a **Findings** list — the rule in
+its own words, the run that raised it, and what that run found. A row nothing
+was found on gets no such list at all. The file closes with a **Rules**
+section naming the rules the newest run actually applied, so an empty
+findings list is read beside what produced it.
 
 Two documents, opposite claims. The handover says it was built. Testing says it
 is not there. So the status cell holds both quotes, and the row reads
@@ -162,17 +167,18 @@ To watch a full run, make an empty folder:
 mkdir sample-projects/helpline-ai
 ```
 
-On the screen, press **Add project +**, pick that folder, and press **Create
-and start run**. The folder is empty, so this first run finds nothing and says
-so. Now copy the first document in:
+On the screen, press **Add project +** and pick that folder. The folder has no
+files in it, so there is nothing to run yet: the project is created and no run
+starts. Now copy the first document in:
 
 ```bash
 cp sample-documents/helpline-ai/meeting-notes-02-jul.md sample-projects/helpline-ai/
 ```
 
-Nobody has to press anything. The folder is watched, and about fifteen seconds
-after the file stops changing, a run starts by itself. You will see its progress
-move through Ingest, Extract, Match and Examine, and then stop at Review.
+Nobody has to press anything. The folder is watched every 2s, and once the file
+has stopped changing for 5s the first run starts by itself. You will see its
+progress move through Ingest, Extract, Match and Examine, and then stop at
+Review.
 
 It stops there because it needs you. Open the **Decisions** tab and answer the
 questions this run raised. Then press **Add this run's changes to the register**.
@@ -272,7 +278,7 @@ first. On the right, one run, split across four tabs:
 | Tab | What it shows |
 |---|---|
 | Stages | Each step of the run — done, working, skipped or waiting — and why a run stopped early or failed |
-| Not used | Every file and quote this run did not use, and the reason: already read, not read, or dropped |
+| Not used | Every file and quote this run did not use, and the reason: read before, not read, or not attached to any row |
 | Decisions | Every question this run raised, what Approve and Reject will each do, and the two buttons that end the review |
 | Reported | Any line in a document that tried to give the system an instruction. It is shown to you and never followed. |
 
@@ -296,10 +302,10 @@ over streamable HTTP.
 | `create_project` | `source_folder_path` — creates it, or returns the existing one. The name comes from the folder. |
 | `list_projects` | *(none)* — every project, with its runs |
 | `start_run` | `project_id` |
-| `get_run_status` | `run_id` |
+| `get_run_status` | `run_id` — each decision as one whole text and as the parts it was built from |
 | `submit_decision` | `run_id`, `decision_id`, `outcome` (`approved` / `rejected`) |
 | `finish_review` | `run_id`, `add_to_register` |
-| `get_register` | `project_id`, `register_format` (`json` / `markdown`) |
+| `get_register` | `project_id`, `register_format` (`json` / `markdown`) — each row carries its `evidence` |
 | `get_history` | `project_id` — what changed, when, and from which document |
 
 A run is not a single call. `start_run` returns an id straight away, and you
@@ -322,7 +328,7 @@ files. None of it requires changing code.
 | `config/formats.yaml` | Which file extensions are read, and the page limit |
 | `config/model.yaml` | Which model to call, and its endpoint, retries, timeout and reasoning effort |
 | `config/projects.yaml` | The folder that the Add-project dropdown lists |
-| `config/watcher.yaml` | How often a folder is checked (4s) and how long it must be quiet before a run starts (10s) |
+| `config/watcher.yaml` | How often a folder is checked (2s) and how long it must be quiet before a run starts (5s) |
 | `ui/config/screen.json` | How often the screen refreshes |
 
 A run takes a copy of the rules when it starts. Editing the file affects the
@@ -368,6 +374,13 @@ The rest of the limits:
   nothing catches it.
 - **A rejected finding does not come back** if later evidence would make it
   stronger. An approved one is not looked at again.
+- **A handover only ever moves a row to `Handed over`.** A handover that says
+  the work is partly there still reads `Handed over`, because `Partial` is
+  testing's word for what testing found. Testing moves the row when it runs.
+- **A rule never runs against something that reached no row.** A testing note
+  asking for new behaviour that matched no requirement is shown on the
+  **Skipped tab** and no rule is applied to it. A rule sees register rows
+  only.
 - **A failed run does not restart itself**, and nothing it read counts as read.
   The next run reads those documents again from the start.
 - **A run waiting at Review blocks its project.** Files that arrive meanwhile

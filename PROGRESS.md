@@ -4,6 +4,73 @@ Current status only. Completed narrative that has fallen out of this file
 stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-24, branch `brief-1b-sentences-payload-export`
+
+The reading half of the demo-run repairs: after this branch every sentence a
+person meets on a decision, an evidence line, the Skipped tab or the Markdown
+export is written by the backend from stored data, in one vocabulary.
+
+- **The backend builds every decision sentence** (`app/review/decision_text.py`).
+  `question` has left both Match answer models and the Examine `FoundIssue`
+  model with the refusals that guarded it; the whole text a person reads is
+  frozen in `decisions.question` and the same text taken apart in
+  `decisions.parts` (migration `20260823_0025`). The one exception is a
+  finding's issue line, which stays the model's because only the rule can say
+  what breaking it looks like.
+- **One source line everywhere** (`app/ingest/source_line.py`): `<file>, under
+  "<Heading>"` / `<file>, before the first heading` / `<file>, page <n>`, with
+  `, says:` appended by a decision. A quote found twice names its first place
+  only; `locate_quote` no longer stores a comma-joined list.
+- **`not_used` is `skipped`** (migration `20260823_0024`), on the column, the
+  payload and the MCP tool, with kinds `read before` / `not read` / `not
+  attached`. An entry that reached no row carries its own source line, or
+  `null` where the words were never in the file.
+- **The register read carries `evidence`**: citations merged by quote, each
+  naming the cells it supports, ordered by when the evidence arrived. The
+  Markdown export is rendered from that field alone — `Row` heading, per-row
+  Evidence, Findings only when there are some, and a closing Rules section —
+  with no rule id and no `#` before a number anywhere.
+- **An empty folder makes a project and starts no run**, refused identically
+  through `POST /runs`, the MCP tool and the watcher; the folder list says
+  which folders hold a file.
+- **The watcher polls every 2s and waits 5s of quiet.**
+
+**Both suites green, no live key: 296 Python passed** and **66 front-end
+passed across 38 files**. The four demo documents have not been re-driven on a
+clean database since; that is the foreground step after this branch merges.
+
+**Assumptions made on this branch, so they are findable later.**
+- The locked sketches of the three decision shapes are aligned for a
+  monospace reader. The stored text normalises that: blocks separated by a
+  blank line, single spaces after `→` and after each colon, two spaces
+  between two cells that change on one line. `tests/register/test_review_
+  question_wording.py` is the canonical form.
+- `if_approved` is always a list of `{cell, value}` and is empty where
+  approving writes no cell; `if_rejected` is always one sentence. A
+  possible-match approval that writes nothing says the row stays as it is and
+  the ask's evidence joins it.
+- A possible-match reject line names the proposed row's own `Written down`
+  value, which is `Not known yet` when only a meeting note states the ask.
+- The `Register row N` / `Row N (proposed by this run)` split is the
+  possible-match decision's alone (S24). An observation match and a finding
+  say `Register row N`, as their locks show.
+- An absence entry in `evidence` carries `source_line: null`: a silence has no
+  place to point at, and the sentence names the file.
+- The folder list carries `has_files_by_folder` beside `available_folders`
+  rather than a flag inside each entry, because `ui/src/AddProject.jsx` still
+  reads plain paths and is Brief 2's to change.
+- The Markdown Rules section still prints a rule's `params` beside its text;
+  a rule naming a limit cannot be read without its value. No shipped rule has
+  params today.
+- Item 39's plain-text prompt rendering was **not** done: three test markers
+  (`MATCH_BATCH_MARKER`, `EXAMINE_ROW_MARKER`, `EMPTY_REGISTER_MARKER`) are
+  built on the JSON rendering, so it is not the few-line change the brief
+  allowed for. It is moot as a bug — no model-written sentence reaches a
+  screen any more.
+- `RunEngine` gained `project_root`, because the empty-folder check resolves
+  a project's folder relative to the repository and all three doors reach the
+  one function.
+
 ## Snapshot — 2026-08-23, branch `brief-1a-pipeline-and-schema`
 
 The pipeline half of the demo-run repairs: after this branch the register's
@@ -56,7 +123,7 @@ against a live model since; the expected end state is in
   findings no longer show on the register (History keeps them). A fresh
   database never has such a run.
 - The register JSON's `examine` block (newest run's aggregate) is still
-  there, its `rules` now from `rules_applied`; Brief 1b removes it.
+  there, its `rules` now from `rules_applied`; Brief 2 removes it.
 
 ## Snapshot — 2026-08-19, branch `live-run-repairs`
 
