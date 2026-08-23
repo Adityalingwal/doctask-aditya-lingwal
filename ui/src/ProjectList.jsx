@@ -114,7 +114,7 @@ function ProjectMark({ project, open, onOpen }) {
       onClick={() => onOpen(project.project_id)}
       className={`flex w-8 cursor-pointer flex-col items-center border py-1 font-mono text-xs active:translate-y-px ${
         open
-          ? "border-line-strong bg-card font-semibold text-ink"
+          ? "border-line-strong bg-card font-semibold text-ink hover:bg-signal/25"
           : "border-transparent text-ink-soft hover:border-line-strong hover:bg-card hover:text-ink"
       }`}
     >
@@ -138,7 +138,7 @@ function ProjectCard({ project, open, onOpen }) {
         }}
         className={`block cursor-pointer border-b border-line px-4 py-4 ${
           open
-            ? "border-l-4 border-l-ink bg-card pl-3"
+            ? "border-l-4 border-l-ink bg-card pl-3 hover:bg-signal/15"
             : "hover:bg-signal/25 active:bg-signal/40"
         }`}
       >
