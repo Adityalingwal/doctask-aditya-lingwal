@@ -223,7 +223,8 @@ export function registerReply(overrides = {}) {
             cells: ["Written down"],
           },
         ],
-        findings: [],
+        // A clean row carries no findings key at all (item 43) — the fixture
+        // models the register JSON exactly as the backend builds it.
       },
     ],
     rules: {

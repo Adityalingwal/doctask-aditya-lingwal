@@ -143,9 +143,8 @@ test("a row nothing was found wrong with is never marked", async () => {
   const exported = registerReply();
   const { panel, drawer } = await openTheRow(exported);
 
-  // The payload carries no findings key at all on a clean row.
-  expect(Object.hasOwn(exported.rows[0], "findings")).toBe(true);
-  expect(exported.rows[0].findings).toEqual([]);
+  // The payload carries no findings key at all on a clean row (item 43).
+  expect(Object.hasOwn(exported.rows[0], "findings")).toBe(false);
   expect(panel.textContent).not.toContain("finding");
   expect(drawer.textContent).not.toContain("Findings");
   expect(drawer.textContent).not.toContain("0 findings");

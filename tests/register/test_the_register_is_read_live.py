@@ -24,6 +24,7 @@ from tests.documents.register_documents import (
     no_findings_answer,
     write_meeting_note,
 )
+from app.ingest.source_line import source_line
 from app.register.cells import COLUMN_HEADINGS
 from tests.register.stored_register import stored_rows
 
@@ -101,12 +102,23 @@ def test_the_register_read_returns_exactly_what_register_rows_holds(
         # The evidence a reader is shown is the stored citations grouped by the
         # words themselves, so what it names must be exactly what is stored.
         assert sorted(
-            (COLUMN_HEADINGS[cell], entry["quote"], entry["absence"])
+            (
+                COLUMN_HEADINGS[cell],
+                entry["source_line"],
+                entry["quote"],
+                entry["absence"],
+            )
             for entry in row["evidence"]
             for cell in _cells_of(entry, stored_row)
         ) == sorted(
-            (COLUMN_HEADINGS[cell], source_words, absence_statement)
-            for cell, _file, _place, source_words, absence_statement
+            (
+                COLUMN_HEADINGS[cell],
+                # An absence names no place, so its entry carries no line.
+                source_line(file, place) if source_words is not None else None,
+                source_words,
+                absence_statement,
+            )
+            for cell, file, place, source_words, absence_statement
             in stored_row.citations
         )
 
