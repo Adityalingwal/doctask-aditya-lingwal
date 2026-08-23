@@ -40,10 +40,23 @@ cells, findings and history say what the documents actually support.
 - **One definition of "read"** (`app/ingest/read_once.py`), shared by Ingest,
   the rule gate and the absence move.
 
-**Both suites green, no live key: 271 Python passed** and **66 front-end
-passed across 38 files.** The corpus has not been driven against a live model
-on this branch; the expected end state is in
+**Both suites green, no live key: 272 Python passed** and **66 front-end
+passed across 38 files** (merged as PR #40). The corpus has not been driven
+against a live model since; the expected end state is in
 `sample-documents/helpline-ai/README.md`.
+
+**Assumptions made on this branch, so they are findable later.**
+- The tests that drive a batch of meeting notes and still expect a rule to be
+  checked use a rules file with no `applies_when`
+  (`tests/examine/rules_files.py`) — item 24 allows a missing field to mean
+  "always applies".
+- The register JSON's `findings` entries gained `raised_by_run` and
+  `finding_id`; what the screen does with them is Brief 2's.
+- A `done` run from before this branch has `rules_applied` null, so its
+  findings no longer show on the register (History keeps them). A fresh
+  database never has such a run.
+- The register JSON's `examine` block (newest run's aggregate) is still
+  there, its `rules` now from `rules_applied`; Brief 1b removes it.
 
 ## Snapshot — 2026-08-19, branch `live-run-repairs`
 
