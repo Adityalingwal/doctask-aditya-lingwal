@@ -15,6 +15,8 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from app.extract.answer import (
+    CLIENT_REQUIREMENTS_DOCUMENT,
+    TESTING_FEEDBACK,
     UNRELATED_DOCUMENT,
     ListTheDocumentTypeMayNotFill,
     UnrecognisedDocumentType,
@@ -104,6 +106,7 @@ class RunState(TypedDict, total=False):
     next_document_index: int
     requirements_found: int
     observations_found: int
+    absence_kinds_read: int
     moved_rows: int
     examine_changed_rules: bool
     proposed_rows: int
@@ -175,6 +178,7 @@ def build_register_graph(
             "next_document_index": 0,
             "requirements_found": 0,
             "observations_found": 0,
+            "absence_kinds_read": 0,
             "examine_changed_rules": examine_changed_rules,
         }
 
@@ -351,6 +355,8 @@ def build_register_graph(
             + requirements_found,
             "observations_found": state.get("observations_found", 0)
             + _observations_in(located.extraction),
+            "absence_kinds_read": state.get("absence_kinds_read", 0)
+            + _speaks_to_a_cell_by_silence(answer.document_type.value),
         }
 
     async def match(state: RunState) -> dict[str, Any]:
@@ -707,13 +713,25 @@ def _route_after_extract(state: RunState) -> str:
         return EXTRACT_NODE
     # A batch of nothing but testing feedback and a handover summary states no
     # requirement and still has work to do: it moves rows an earlier run made.
-    if state.get("requirements_found") or state.get("observations_found"):
+    if (
+        state.get("requirements_found")
+        or state.get("observations_found")
+        or state.get("absence_kinds_read")
+    ):
         return MATCH_NODE
     return END_EARLY_NODE
 
 
 def _route_after_match(state: RunState) -> str:
-    if state.get("proposed_rows") or state.get("moved_rows"):
+    # A document's silence about a row is a change too: a requirements document
+    # or a testing report that was read and mentions nothing still moves every
+    # row it does not mention to `Not mentioned`, and a person approves that at
+    # the gate like any other change.
+    if (
+        state.get("proposed_rows")
+        or state.get("moved_rows")
+        or state.get("absence_kinds_read")
+    ):
         return EXAMINE_NODE
     return END_EARLY_NODE
 
@@ -737,6 +755,17 @@ def _early_reason(state: RunState) -> str:
         state.get("document_ids", [])
     )
     return _nothing_read_reason(not_used_count) if not_used_count else NO_FILES_FOUND
+
+
+def _speaks_to_a_cell_by_silence(document_type: str) -> int:
+    """Whether reading this kind of document can move a cell by saying nothing.
+
+    A client requirements document answers `Written down` and a testing report
+    answers `What testing found`, for every row — including the rows neither of
+    them mentions. A meeting note and a handover answer no cell by silence, and
+    an unrelated document was never about this project at all.
+    """
+    return int(document_type in (CLIENT_REQUIREMENTS_DOCUMENT, TESTING_FEEDBACK))
 
 
 def _observations_in(extraction: dict[str, Any]) -> int:
