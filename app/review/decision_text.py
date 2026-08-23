@@ -57,8 +57,19 @@ def proposed_row_label(row_number: int) -> str:
 def quote_block(source_file: str, source_place: str, quote: str) -> dict[str, str]:
     return {
         "source_line": source_line(source_file, source_place),
-        "quote": quote,
+        # A quote spanning two paragraphs keeps its words and loses its blank
+        # lines: a blank line is the text's own block boundary, and one inside
+        # a quote would shift every block the screen counts after it. The
+        # committed citation keeps the document's exact words; this is the
+        # decision card's copy only.
+        "quote": _without_blank_lines(quote),
     }
+
+
+def _without_blank_lines(quote: str) -> str:
+    return LINES_JOINED_BY.join(
+        line for line in (line.strip() for line in quote.splitlines()) if line
+    )
 
 
 def possible_match_text(
