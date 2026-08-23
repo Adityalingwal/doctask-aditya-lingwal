@@ -85,7 +85,7 @@ test("a citation whose quoted words the server did not send is never shown as a 
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(register.textContent).toContain("12-march-scope.md");
-  expect(register.textContent).toContain("asks for nothing here");
+  expect(register.textContent).toContain("does not mention this ask");
   expect(register.textContent).not.toContain('""');
   expect(register.textContent).not.toContain("null");
 });
