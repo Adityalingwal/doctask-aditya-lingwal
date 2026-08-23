@@ -273,14 +273,25 @@ the same refusal when something is not allowed.
 
 `http://localhost:8000/ui/` has three columns. On the left, every project and
 what it is doing. In the middle, that project's register and its runs, newest
-first. On the right, one run, split across four tabs:
+first. Either side column collapses to a narrow rail that still opens
+everything it held. Choosing a project opens its newest run at once, and the
+address carries what is on screen — `/ui/?project=<id>&run=<id>` — so a link to
+one run is a link you can keep.
+
+On the right, one run, across three tabs:
 
 | Tab | What it shows |
 |---|---|
-| Stages | Each step of the run — done, working, skipped or waiting — and why a run stopped early or failed |
-| Not used | Every file and quote this run did not use, and the reason: read before, not read, or not attached to any row |
-| Decisions | Every question this run raised, what Approve and Reject will each do, and the two buttons that end the review |
-| Reported | Any line in a document that tried to give the system an instruction. It is shown to you and never followed. |
+| Run | Each step of the run, why it stopped early or failed, what it is waiting for, every question it raised, and the rules it judged against |
+| Skipped | Every file and quote this run did not use, and the reason: read before, not read, or not attached to any row |
+| Reported instructions | Any line in a document that tried to give the system an instruction. It is shown to you and never followed. |
+
+The Register entry above the runs opens the project's own register instead, in
+the same panel, across two tabs: **Register**, the table of rows with a mark
+beside any row a rule found something on, and **History**, what changed in the
+register, grouped under the run that changed it. Clicking a row opens a panel
+beside the table with that row's four cells in full, the evidence each rests on,
+its findings, and its own history. Close it with ×, Escape, or a click outside.
 
 The screen refreshes every three seconds and only shows what the server has
 confirmed. When you answer a question, the answer is sent and then the run is
@@ -349,7 +360,7 @@ never saw. So instead:
 - Files inside sub-folders are not read. Only files sitting directly in the
   project's folder are.
 
-Any file that gets skipped is listed on the **Not used** tab with the reason.
+Any file that gets skipped is listed on the **Skipped** tab with the reason.
 Two cases cannot be listed: a deleted file is no longer there to find, and a
 sub-folder is not a file.
 

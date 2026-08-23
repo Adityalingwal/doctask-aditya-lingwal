@@ -109,14 +109,14 @@ def test_an_approved_merge_leaves_no_cell_denying_the_row_s_own_evidence(
     assert surviving["cells"]["in_writing"] == IN_WRITING_YES
     # The cell that changed keeps exactly the citation supporting what it now
     # says, never the one that supported the sentence it no longer holds.
-    in_writing_citations = [
-        citation
-        for citation in surviving["citations"]
-        if citation["cell"] == "in_writing"
+    written_down_evidence = [
+        entry
+        for entry in surviving["evidence"]
+        if "Written down" in entry["cells"]
     ]
-    assert [citation["source_file"] for citation in in_writing_citations] == [
-        REQUIREMENTS_FILE
-    ]
+    assert [
+        entry["source_line"].split(",")[0] for entry in written_down_evidence
+    ] == [REQUIREMENTS_FILE]
 
 
 def test_a_merge_into_a_row_that_is_itself_merged_leaves_no_two_hop_marker(
@@ -185,5 +185,8 @@ def test_a_merge_into_a_row_that_is_itself_merged_leaves_no_two_hop_marker(
 
     assert two_hop == 0
     assert len(export["rows"]) == 1
-    cited_files = {citation["source_file"] for citation in export["rows"][0]["citations"]}
+    cited_files = {
+        entry["source_line"].split(",")[0]
+        for entry in export["rows"][0]["evidence"]
+    }
     assert cited_files == {MEETING_NOTE, REQUIREMENTS_FILE, third_file}

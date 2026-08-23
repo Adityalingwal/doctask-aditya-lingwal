@@ -18,6 +18,10 @@ import {
 const OPEN_RUN = "0f3f0f6a-4f8a-4a4a-9c1e-3f6b2d5a7c11";
 const OTHER_RUN = "99999999-8888-4777-8666-555544443333";
 
+// The one line of a possible-match decision that asks the question, out of
+// the several blocks the backend built the whole text from.
+const THE_QUESTION_LINE = "Is this the same ask as row 2?";
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -70,16 +74,16 @@ test("never_shows_the_previous_runs_decisions_after_opening_another_run", async 
     return new Promise(() => {});
   });
 
-  render(<ReviewScreen runId={OPEN_RUN} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={OPEN_RUN} />);
+  await openSection(/^run/i);
   await waitFor(() => {
-    expect(screen.getByText(/Applicant document upload/)).toBeTruthy();
+    expect(screen.getByText(THE_QUESTION_LINE)).toBeTruthy();
   });
 
-  fireEvent.click(screen.getByText("#2"));
+  fireEvent.click(screen.getByText("2"));
 
   await waitFor(() => {
-    expect(screen.queryByText(/Applicant document upload/)).toBeNull();
+    expect(screen.queryByText(THE_QUESTION_LINE)).toBeNull();
   });
   expect(screen.queryByRole("button", { name: /approve/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /finish review/i })).toBeNull();

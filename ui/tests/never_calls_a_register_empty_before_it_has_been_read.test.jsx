@@ -63,7 +63,7 @@ test("never_calls_a_register_empty_before_it_has_been_read", async () => {
   };
   vi.stubGlobal("fetch", held);
 
-  render(<ReviewScreen runId="" />);
+  render(<ReviewScreen projectId="" runId="" />);
 
   fireEvent.click(await screen.findByText("Acme intake portal"));
   fireEvent.click(await screen.findByRole("link", { name: /Register/i }));

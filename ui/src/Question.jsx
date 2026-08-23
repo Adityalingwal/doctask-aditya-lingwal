@@ -1,18 +1,26 @@
-const FINDING_KIND = "finding";
-const POSSIBLE_MATCH_KIND = "possible match";
-const OBSERVATION_MATCH_KIND = "observation match";
+const APPROVED = "approved";
+const REJECTED = "rejected";
 
-// One component for every gate. The kind and the answer are read off the
-// decision the server froze, so a possible match, a conflict, a rule finding
-// and the export gate render through this same code with no branch on which
-// of them it is — except a finding's own body (screen 4), which the flat
-// `question` sentence cannot carry without a rule code in it.
-//
-// The accent is on the left edge of a decision nobody has answered yet, and it
-// is the only accent in the card: Approve and Reject look identical, because a
-// screen that makes one answer louder is answering for the person.
+// The two markers `app/review/decision_text.py` writes in front of each
+// consequence sentence. The sentence after the marker is the server's; this
+// screen puts it in the column beside the button rather than repeating the
+// word the button already says.
+const APPROVE_MARKER = "Approve → ";
+const REJECT_MARKER = "Reject → ";
+
+const BLOCKS_SEPARATED_BY = "\n\n";
+const LINES_SEPARATED_BY = "\n";
+
+/**
+ * One decision card. Every sentence on it was written by the backend and is
+ * carried in `question`, blocks separated by a blank line; the parts beside it
+ * say what each block is, so this file can lay them out without reading a
+ * single one (S21). The only joining it does is the row block's cell values,
+ * which are data rather than wording.
+ */
 export default function Question({ decision, reviewing, onAnswer, answering }) {
   const unanswered = decision.outcome === null;
+  const blocks = decisionBlocks(decision);
   return (
     <li
       className={`border border-line bg-card ${
@@ -32,131 +40,142 @@ export default function Question({ decision, reviewing, onAnswer, answering }) {
         </p>
       </div>
 
-      {decision.kind === FINDING_KIND ? (
-        <FindingBody decision={decision} />
-      ) : (
-        <StoredQuestion question={decision.question} />
-      )}
+      <div className="px-5 py-5">
+        {decision.row !== null && <RowBlock row={decision.row} />}
 
-      <WhatTheAnswersDo decision={decision} />
+        {blocks.rule !== null && (
+          <p className="m-0 mt-5 max-w-prose text-[15px] leading-relaxed">
+            {blocks.rule}
+          </p>
+        )}
+        {blocks.issue !== null && (
+          <p className="m-0 mt-3 max-w-prose text-[15px] leading-relaxed">
+            {blocks.issue}
+          </p>
+        )}
 
-      {reviewing && (
-        // An answer may change until finish-review (D02), so a decision the
-        // server already recorded keeps both buttons while the run is at
-        // review; the screen never closes a window the server leaves open.
-        <p className="m-0 flex gap-3 border-t border-line px-5 py-4">
-          <AnswerButton
-            label="Approve"
-            answering={answering}
-            onClick={() => onAnswer(decision.decision_id, "approved")}
-          />
-          <AnswerButton
-            label="Reject"
-            answering={answering}
-            onClick={() => onAnswer(decision.decision_id, "rejected")}
-          />
+        {blocks.quotes.map((quote, place) => (
+          <div key={place} className="mt-5">
+            <p className="eyebrow m-0">{quote.sourceLine}</p>
+            <p className="m-0 mt-1.5 max-w-prose border-l-2 border-line-strong pl-4 text-[15px]">
+              {quote.words}
+            </p>
+          </div>
+        ))}
+
+        <p className="m-0 mt-6 max-w-prose text-[17px] leading-relaxed">
+          {blocks.question}
         </p>
-      )}
+      </div>
+
+      {/* One grid for both answers, so each label and the sentence beside it
+          start on the same line however long either of them runs. */}
+      <dl className="decision-lines m-0 items-baseline gap-y-3 border-t border-line px-5 py-4 text-[15px]">
+        <dt className="m-0">
+          {reviewing ? (
+            <AnswerButton
+              label="Approve"
+              chosen={decision.outcome === APPROVED}
+              answering={answering}
+              onClick={() => onAnswer(decision.decision_id, APPROVED)}
+            />
+          ) : (
+            <span className="eyebrow">Approve</span>
+          )}
+        </dt>
+        <dd className="m-0 max-w-prose">{blocks.approve}</dd>
+        <dt className="m-0">
+          {reviewing ? (
+            <AnswerButton
+              label="Reject"
+              chosen={decision.outcome === REJECTED}
+              answering={answering}
+              onClick={() => onAnswer(decision.decision_id, REJECTED)}
+            />
+          ) : (
+            <span className="eyebrow">Reject</span>
+          )}
+        </dt>
+        <dd className="m-0 max-w-prose">{blocks.reject}</dd>
+      </dl>
     </li>
   );
 }
 
-// One decision can cover several observations, and each of them carries its
-// own sentence. They are stacked as they were written, so each becomes its own
-// paragraph here — nothing joins them into a sentence nobody wrote.
-function StoredQuestion({ question }) {
+/**
+ * The stored text, cut back into the blocks it was built from.
+ *
+ * Which block is which is read off the parts — a rule line exists exactly when
+ * `rule_text` does, an issue line exactly when `issue` does, and there are as
+ * many quote blocks as `quotes` — never by looking at what a block says. No
+ * sentence is parsed, matched or rebuilt: each is handed on whole.
+ */
+function decisionBlocks(decision) {
+  const blocks = decision.question.split(BLOCKS_SEPARATED_BY);
+  let next = 1;
+  const rule = decision.rule_text === null ? null : blocks[next++];
+  const issue = decision.issue === null ? null : blocks[next++];
+  const quotes = blocks
+    .slice(next, next + decision.quotes.length)
+    .map(quoteBlock);
+  const [approve, reject] = blocks[blocks.length - 1].split(LINES_SEPARATED_BY);
+  return {
+    rule,
+    issue,
+    quotes,
+    question: blocks[next + decision.quotes.length],
+    approve: withoutMarker(approve, APPROVE_MARKER),
+    reject: withoutMarker(reject, REJECT_MARKER),
+  };
+}
+
+// A quote block is the line naming where the words are, then the words. Split
+// so the two can be set apart from each other; neither is changed.
+function quoteBlock(block) {
+  const lines = block.split(LINES_SEPARATED_BY);
+  return { sourceLine: lines[0], words: lines.slice(1).join(LINES_SEPARATED_BY) };
+}
+
+function withoutMarker(line, marker) {
+  return line.startsWith(marker) ? line.slice(marker.length) : line;
+}
+
+// The row the decision is about, as the register's own table shows it: the
+// label the backend chose — a committed row and one this same run proposed do
+// not read the same (S24) — above its four cells under their full column
+// names.
+function RowBlock({ row }) {
   return (
-    <div className="px-5 py-5">
-      {question.split("\n\n").map((paragraph, place) => (
-        <p
-          key={place}
-          className={`m-0 max-w-prose text-[17px] leading-relaxed ${
-            place === 0 ? "" : "mt-4"
-          }`}
-        >
-          {paragraph}
-        </p>
-      ))}
+    <div className="border border-line bg-paper px-4 py-3">
+      <p className="eyebrow m-0 mb-2">{row.label}</p>
+      <dl className="decision-lines m-0 gap-y-1 text-[15px]">
+        {Object.entries(row.cells).map(([heading, value]) => (
+          <div key={heading} className="contents">
+            <dt className="text-ink-soft">{heading}</dt>
+            <dd className="m-0">{value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
 
-// What Approve and Reject will do is a fact the server knows, so it is fixed
-// text beside values the server computed — never part of the stored question,
-// which is frozen the moment it is raised and must not describe the buttons.
-function WhatTheAnswersDo({ decision }) {
-  const answers = whatEachAnswerDoes(decision);
-  if (answers === null) {
-    return null;
-  }
-  return (
-    <dl className="decision-lines m-0 gap-y-3 border-t border-line px-5 py-4 text-[15px]">
-      <dt className="eyebrow">Approve</dt>
-      <dd className="m-0 max-w-prose">{answers.approve}</dd>
-      <dt className="eyebrow">Reject</dt>
-      <dd className="m-0 max-w-prose">{answers.reject}</dd>
-    </dl>
-  );
-}
-
-// A possible match shows only the shape, because the new `Written down` is
-// worked out inside Commit and not when the question is raised. An observation
-// match shows the values, because they were computed and stored before the
-// question was raised and that same stored move is what Commit applies.
-function whatEachAnswerDoes(decision) {
-  if (decision.kind === POSSIBLE_MATCH_KIND) {
-    return { approve: "one row", reject: "a separate row" };
-  }
-  if (decision.kind === OBSERVATION_MATCH_KIND) {
-    return {
-      approve: (
-        <>
-          row #{decision.row_number} records:
-          <ul className="m-0 mt-2 list-none p-0">
-            {decision.if_approved.map((moved) => (
-              <li key={moved.cell}>{`${moved.cell}: ${moved.value}`}</li>
-            ))}
-          </ul>
-        </>
-      ),
-      reject: "nothing changes on the register",
-    };
-  }
-  if (decision.kind === FINDING_KIND) {
-    return {
-      approve: `the finding is attached to row #${decision.row_number} and appears in the register`,
-      reject:
-        "the finding stays in this run's record and never reaches the register",
-    };
-  }
-  return null;
-}
-
-// A finding in three labelled parts, and never a rule code: the rule's own
-// words, the row and what it did to break the rule, and the evidence — no
-// R1, no D1, anywhere on this screen (screen 4).
-function FindingBody({ decision }) {
-  return (
-    <dl className="decision-lines m-0 gap-y-4 px-5 py-5">
-      <dt className="eyebrow">Rule</dt>
-      <dd className="m-0 max-w-prose text-[15px] leading-relaxed">
-        {decision.rule_text}
-      </dd>
-      <dt className="eyebrow">Row {decision.row_number} breaks it</dt>
-      <dd className="m-0 max-w-prose text-[15px] leading-relaxed">{decision.issue}</dd>
-      <dt className="eyebrow">Evidence</dt>
-      <dd className="m-0 max-w-prose text-[15px] leading-relaxed">{decision.evidence}</dd>
-    </dl>
-  );
-}
-
-function AnswerButton({ label, answering, onClick }) {
+// The answer the server has recorded is the one wearing the accent, and it
+// keeps wearing it while the run is at review — an answer may be changed
+// until the review is finished (D02), so the other button stays live rather
+// than going quiet the moment one is pressed.
+function AnswerButton({ label, chosen, answering, onClick }) {
   return (
     <button
       type="button"
       disabled={answering}
+      aria-pressed={chosen}
       onClick={onClick}
-      className="edge-shadow-sm border border-line-strong bg-card px-5 py-2 font-mono text-sm font-semibold hover:bg-paper disabled:opacity-40"
+      className={`edge-shadow-sm w-full cursor-pointer border px-5 py-2 font-mono text-sm font-semibold active:translate-x-px active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40 ${
+        chosen
+          ? "border-signal-edge bg-signal text-ink hover:bg-signal/70"
+          : "border-line-strong bg-card hover:bg-paper"
+      }`}
     >
       {label}
     </button>

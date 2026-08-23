@@ -36,7 +36,7 @@ test("the starting status is marked for attention and a settled one is not", asy
     ]),
   );
 
-  render(<ReviewScreen runId="" />);
+  render(<ReviewScreen projectId="" runId="" />);
   fireEvent.click(await screen.findByText(project.name));
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
   const register = await screen.findByRole("region", { name: /register/i });

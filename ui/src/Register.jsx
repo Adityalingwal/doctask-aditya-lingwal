@@ -1,3 +1,6 @@
+import { useState } from "react";
+
+import RowDrawer from "./RowDrawer.jsx";
 import screenConfig from "../config/screen.json";
 import { dayMonthTime } from "./format_date.js";
 
@@ -5,8 +8,9 @@ import { dayMonthTime } from "./format_date.js";
 // words a person reads. An unknown key is shown as the server sent it rather
 // than turned into a heading nobody chose. The stored column is still
 // `in_writing`; only the heading asks the question in a reader's words.
-// Exported because the history section names the same cells, and two copies of
-// this map are two places for a heading to be renamed in only one of them.
+// Exported because the history section and the row panel name the same cells,
+// and two copies of this map are two places for a heading to be renamed in
+// only one of them.
 export const CELL_HEADINGS = {
   what_was_asked: "What was asked",
   in_writing: "Written down",
@@ -16,7 +20,15 @@ export const CELL_HEADINGS = {
 
 const STATUS_CELL = "status";
 
-export default function Register({ exported }) {
+/**
+ * The register as a table, and one row at a time in the panel it opens. The
+ * rules a run judged against are not here: they belong to the run that ran
+ * them, and the Run tab keeps them (item 15).
+ */
+export default function Register({ exported, history }) {
+  const [openRowNumber, setOpenRowNumber] = useState(null);
+  const openRow =
+    exported.rows.find((row) => row.row_number === openRowNumber) ?? null;
   return (
     <>
       <p className="eyebrow m-0 mb-4">
@@ -28,7 +40,7 @@ export default function Register({ exported }) {
           <thead>
             <tr className="border-b border-line-strong">
               <th scope="col" className="eyebrow px-4 py-3 text-left">
-                #
+                Row
               </th>
               {exported.columns.map((column) => (
                 <th key={column} scope="col" className="eyebrow px-3 py-2 text-left">
@@ -39,7 +51,11 @@ export default function Register({ exported }) {
           </thead>
           <tbody>
             {exported.rows.map((row) => (
-              <tr key={row.row_number} className="border-b border-line last:border-b-0">
+              <tr
+                key={row.row_number}
+                onClick={() => setOpenRowNumber(row.row_number)}
+                className="cursor-pointer border-b border-line last:border-b-0 hover:bg-signal/15 active:bg-signal/30"
+              >
                 <th
                   scope="row"
                   className="px-4 py-3.5 text-left align-top font-mono text-sm font-normal text-ink-soft"
@@ -49,7 +65,10 @@ export default function Register({ exported }) {
                 {exported.columns.map((column) => (
                   <td key={column} className="px-4 py-3.5 align-top">
                     {column === STATUS_CELL ? (
-                      <StatusChip status={row.cells[column]} />
+                      <>
+                        <StatusChip status={row.cells[column]} />
+                        <FindingMark findings={row.findings} />
+                      </>
                     ) : (
                       row.cells[column]
                     )}
@@ -61,37 +80,30 @@ export default function Register({ exported }) {
         </table>
       </div>
 
-      <h3 className="eyebrow mt-8 mb-3">Evidence</h3>
-      <div className="grid gap-3">
-        {exported.rows.map((row) => (
-          <div key={row.row_number} className="border border-line bg-card px-5 py-4">
-            <h4 className="eyebrow m-0 mb-2">Row {row.row_number}</h4>
-            <ul className="m-0 flex list-none flex-col gap-3 p-0">
-              {row.citations.map((citation, place) => (
-                <li key={place}>
-                  <Citation citation={citation} />
-                </li>
-              ))}
-            </ul>
-            {(row.findings ?? []).length > 0 && (
-              <ul className="m-0 mt-3 flex list-none flex-col gap-2 border-t border-line p-0 pt-3">
-                {(row.findings ?? []).map((finding) => (
-                  <li
-                    key={finding.rule_id}
-                    className="border-l-4 border-caution py-1 pl-4"
-                  >
-                    {findingLine(finding)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <h3 className="eyebrow mt-8 mb-3">Rules and findings</h3>
-      <Examine examine={exported.examine} />
+      {openRow !== null && (
+        <RowDrawer
+          row={openRow}
+          columns={exported.columns}
+          history={history}
+          onClose={() => setOpenRowNumber(null)}
+        />
+      )}
     </>
+  );
+}
+
+// Item 43: the mark exists only where findings do. A clean row carries no
+// `findings` key at all, so nothing is counted and nothing is drawn — never
+// "0 findings". What each finding says lives in the panel, not in the cell.
+function FindingMark({ findings }) {
+  const raised = (findings ?? []).length;
+  if (raised === 0) {
+    return null;
+  }
+  return (
+    <span className="mt-1.5 block font-mono text-xs text-caution">
+      {raised} finding{raised === 1 ? "" : "s"}
+    </span>
   );
 }
 
@@ -116,9 +128,9 @@ export function Examine({ examine }) {
         </p>
       ) : (
         <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
-          {examine.findings.map((finding, place) => (
+          {examine.findings.map((finding) => (
             <li
-              key={place}
+              key={finding.finding_id}
               className="border-l-4 border-caution bg-card py-2 pl-4"
             >
               {findingLine(finding)}
@@ -145,34 +157,11 @@ function StatusChip({ status }) {
   );
 }
 
-// A citation is never shown without the file it came from: a quote carries the
-// place the reader derived, and an absence carries the statement instead. The
-// two are drawn differently because they are different claims — one says a
-// document said this, the other says a document stopped saying it.
-function Citation({ citation }) {
-  const quoted = citation.source_words !== null;
-  const cellHeading = CELL_HEADINGS[citation.cell] ?? citation.cell;
-  return (
-    <>
-      <p className="eyebrow m-0">
-        {cellHeading} · {citation.source_file}
-        {quoted && citation.place !== null ? ` · ${citation.place}` : ""}
-      </p>
-      {quoted ? (
-        <p className="m-0 mt-1.5 border-l-2 border-line-strong pl-4">
-          &ldquo;{citation.source_words}&rdquo;
-        </p>
-      ) : (
-        <p className="m-0 mt-1.5 border-l-2 border-line pl-4 text-ink-soft italic">
-          {citation.absence_statement}
-        </p>
-      )}
-    </>
-  );
-}
-
+// The issue sentence is the backend's; the row prefix is the same data join
+// history lines use. The evidence is not repeated here — the decision card
+// already shows it in full.
 function findingLine(finding) {
-  return `Row ${finding.row_number} — ${finding.issue} (${finding.evidence})`;
+  return `Row ${finding.row_number} · ${finding.issue}`;
 }
 
 // A rule's own parameters, folded into its sentence: a rule whose text names

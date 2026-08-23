@@ -12,6 +12,10 @@ import {
   serverAnswering,
 } from "./server_replies.js";
 
+// The one line of a possible-match decision that asks the question, out of
+// the several blocks the backend built the whole text from.
+const THE_QUESTION_LINE = "Is this the same ask as row 2?";
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -42,8 +46,8 @@ test("a refused answer leaves the decision unanswered on screen and shows the se
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/^run/i);
   const approve = await screen.findByRole("button", { name: /^approve$/i });
 
   await act(async () => {
@@ -53,7 +57,7 @@ test("a refused answer leaves the decision unanswered on screen and shows the se
   await waitFor(() => {
     expect(screen.getByText(/review has already finished/i)).toBeTruthy();
   });
-  const question = screen.getByText(decision.question).closest("li");
+  const question = screen.getByText(THE_QUESTION_LINE).closest("li");
   expect(question.textContent).toMatch(/unanswered/i);
   expect(question.textContent).not.toMatch(/approved/i);
 });
@@ -87,8 +91,8 @@ test("an answered decision reads back the outcome the server returned, not the b
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/^run/i);
   const approve = await screen.findByRole("button", { name: /^approve$/i });
 
   await act(async () => {
@@ -96,9 +100,9 @@ test("an answered decision reads back the outcome the server returned, not the b
   });
 
   await waitFor(() => {
-    const question = screen.getByText(decision.question).closest("li");
+    const question = screen.getByText(THE_QUESTION_LINE).closest("li");
     expect(question.textContent).toMatch(/rejected/i);
   });
-  const question = screen.getByText(decision.question).closest("li");
+  const question = screen.getByText(THE_QUESTION_LINE).closest("li");
   expect(question.textContent).not.toMatch(/approved/i);
 });

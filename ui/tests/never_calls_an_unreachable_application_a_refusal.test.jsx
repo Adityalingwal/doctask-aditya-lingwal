@@ -31,8 +31,8 @@ test("never_calls_an_unreachable_application_a_refusal", async () => {
     };
   });
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/^run/i);
   const approve = await screen.findByRole("button", { name: /approve/i });
 
   fireEvent.click(approve);

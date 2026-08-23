@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 test("an_empty_history_reads_no_history_yet", async () => {
-  const exported = registerReply({ rows: [], exported_at: null, examine: null });
+  const exported = registerReply({ rows: [], exported_at: null, rules: null });
   const project = projectReply();
 
   vi.stubGlobal(
@@ -42,10 +42,13 @@ test("an_empty_history_reads_no_history_yet", async () => {
     ]),
   );
 
-  render(<ReviewScreen runId="" />);
+  render(<ReviewScreen projectId="" runId="" />);
   fireEvent.click(await screen.findByText(project.name));
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
-  const section = await screen.findByRole("region", { name: /history/i });
+  // The history is the register panel's second tab (item 15), so it is opened
+  // the way a person opens it.
+  fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
+  const section = await screen.findByRole("tabpanel", { name: /history/i });
 
   expect(within(section).getByText("No history yet.")).toBeTruthy();
   expect(within(section).queryByRole("alert")).toBeNull();

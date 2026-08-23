@@ -27,14 +27,14 @@ test("a refusal about one run is gone once another run is read successfully", as
     ]),
   );
 
-  render(<ReviewScreen runId={UNKNOWN_RUN} />);
+  render(<ReviewScreen projectId="" runId={UNKNOWN_RUN} />);
   await screen.findByRole("alert");
 
   // The run is changed the way a person changes it: opening its project from
   // the left column, then the run itself from the column beside it.
   fireEvent.click(await screen.findByRole("link", { name: /Acme intake portal/i }));
-  fireEvent.click(await screen.findByRole("link", { name: /#1/ }));
-  await screen.findByRole("region", { name: /stages/i });
+  fireEvent.click(await screen.findByRole("link", { name: /^1/ }));
+  await screen.findByRole("region", { name: /^run$/i });
 
   // The server answered for this run and refused nothing, so the refusal it
   // gave about the other one must not still be on the screen beside it.

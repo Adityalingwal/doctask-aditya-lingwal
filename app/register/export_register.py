@@ -7,7 +7,6 @@ from psycopg import AsyncConnection
 
 from app.examine.read_findings import (
     approved_findings_of_project,
-    examine_as_exported,
     finding_on_the_register,
     rules_that_ran,
 )
@@ -33,7 +32,7 @@ async def build_register_document(
 
     Read live from `register_rows` on every call: what used to be computed at
     commit time and copied into a snapshot is computed at read time, so the
-    register has one truth. `exported_at` and `examine` come from the newest
+    register has one truth. `exported_at` and `rules` come from the newest
     `done` run — `finished_at` is written in the same transaction that commits
     the rows, so it is exactly the moment the register last gained rows — and
     both are null while no run has committed anything.
@@ -85,8 +84,8 @@ async def _read_register_document(
         )
 
     # A row carries what each rule found the last time that rule ran — which
-    # may be nothing at all; the examine block below is what the newest
-    # committed run judged and found.
+    # may be nothing at all; the `rules` section below names which rules the
+    # newest committed run judged this register against.
     findings_by_row: dict[UUID, list[dict[str, Any]]] = {}
     for finding in await approved_findings_of_project(connection, project["id"]):
         findings_by_row.setdefault(finding["register_row_id"], []).append(
@@ -106,14 +105,6 @@ async def _read_register_document(
                 "row_number": row["row_number"],
                 "fingerprint": row["fingerprint"],
                 "cells": {name: row[name] for name in CELL_NAMES},
-                # `citations` is the shape `ui/src/Register.jsx` still reads;
-                # `evidence` is the shape every surface moves to. Both are
-                # answered until the screen has moved.
-                "citations": [
-                    {name: value for name, value in citation.items()
-                     if name != "created_at"}
-                    for citation in citations_by_row.get(row["id"], [])
-                ],
                 "evidence": _evidence_of_row(citations_by_row.get(row["id"], [])),
                 # Item 43: the field exists only when findings exist — a
                 # machine caller never sees "0 findings" spelled as [].
@@ -127,11 +118,6 @@ async def _read_register_document(
         ],
         "rules": (
             await _rules_the_newest_run_applied(connection, newest_done)
-            if newest_done is not None
-            else None
-        ),
-        "examine": (
-            await examine_as_exported(connection, newest_done["id"])
             if newest_done is not None
             else None
         ),

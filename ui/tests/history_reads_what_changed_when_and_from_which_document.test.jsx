@@ -49,10 +49,13 @@ async function openHistory(history) {
     ]),
   );
 
-  render(<ReviewScreen runId="" />);
+  render(<ReviewScreen projectId="" runId="" />);
   fireEvent.click(await screen.findByText(project.name));
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
-  return await screen.findByRole("region", { name: /history/i });
+  // The history is the register panel's second tab (item 15), so it is opened
+  // the way a person opens it.
+  fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
+  return await screen.findByRole("tabpanel", { name: /history/i });
 }
 
 test("the history says what changed, when, and which document changed it", async () => {
@@ -60,9 +63,11 @@ test("the history says what changed, when, and which document changed it", async
   const section = await openHistory(history);
   const [statusMove, writtenMove, attached, born] = history.entries;
 
-  const lines = within(section)
-    .getAllByRole("listitem")
-    .map((item) => item.textContent);
+  // Entries sit inside the run heading they belong under (item 17), so the
+  // lines a reader reads are the innermost ones.
+  const lines = [...section.querySelectorAll("li li")].map(
+    (item) => item.textContent,
+  );
 
   expect(lines[0]).toContain(`Row ${statusMove.row_number}`);
   expect(lines[0]).toContain(statusMove.old_value);
@@ -73,19 +78,19 @@ test("the history says what changed, when, and which document changed it", async
   expect(lines[1]).toContain(writtenMove.new_value);
   expect(section.textContent).not.toContain("in_writing");
 
-  expect(lines[2]).toContain("Finding attached");
   expect(lines[2]).toContain(attached.detail);
 
   expect(lines[3]).toContain("Row created");
   expect(lines[3]).toContain(born.what_was_asked);
 
-  // When, and because of which document.
-  expect(lines[0]).toContain("Run 2");
+  // Which document, on the entry's own line; when and which run, on the
+  // heading the entry sits under (S13).
   expect(lines[0]).toContain(statusMove.source_file);
-  expect(lines[3]).toContain("Run 1");
   expect(lines[3]).toContain(born.source_file);
+  expect(section.textContent).toContain("Run 2");
+  expect(section.textContent).toContain("Run 1");
   // The moment, in the one date shape the whole screen uses.
-  expect(lines[3]).toContain(dayMonthTime(born.changed_at));
+  expect(section.textContent).toContain(dayMonthTime(born.changed_at));
   // An attachment came from no document, so its line names none.
   expect(lines[2]).not.toContain(".md");
 

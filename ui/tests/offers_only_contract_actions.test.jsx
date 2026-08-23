@@ -5,6 +5,7 @@ import ReviewScreen from "../src/ReviewScreen.jsx";
 import { openSection } from "./open_section.js";
 import {
   decisionReply,
+  observationMatchReply,
   projectId,
   projectReply,
   projectsReply,
@@ -30,14 +31,7 @@ const ALLOWED_BUTTONS = [
 // never offered as a question, so a run at review shows only its own.
 const decisions = [
   decisionReply({ outcome: "approved" }),
-  decisionReply({
-    decision_id: "3d5f7b91-2222-4c33-9444-555566667777",
-    kind: "observation match",
-    question:
-      "The 26 March scope no longer asks for supporting document upload. "
-      + "Record that against row 1?",
-    outcome: "approved",
-  }),
+  observationMatchReply({ outcome: "approved" }),
 ];
 
 test("a run at review offers approve, reject and the two endings and no other action", async () => {
@@ -53,8 +47,8 @@ test("a run at review offers approve, reject and the two endings and no other ac
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/^run/i);
   await screen.findByRole("button", { name: /add this run's changes to the register/i });
 
   // Scoped to the reading pane: the screen's own chrome — Add project,
@@ -100,11 +94,11 @@ test("the register panel offers no control at all and no cell that can be edited
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
+  render(<ReviewScreen projectId="" runId={runId} />);
 
   // The run has left review, so the server refuses an answer to any of its
   // decisions; the section that would carry them offers none.
-  await openSection(/decisions/i);
+  await openSection(/^run/i);
   expect(screen.queryByRole("button", { name: /^approve$|^reject$/i })).toBeNull();
 
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));

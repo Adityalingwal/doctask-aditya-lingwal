@@ -38,6 +38,36 @@ export function stageStates(stage, status, finishedStages) {
   });
 }
 
+const REVIEW_STAGE = "review";
+const WAITING_FOR_REVIEW = "needs review";
+
+// What each state is called on the strip. `pending` is this file's own name
+// for the state; on screen it reads "not started", because a run that has
+// already ended is never going to start those stages later (item 4). A stage
+// the graph skipped keeps its own separate wording.
+const STATE_WORDS = {
+  done: "done",
+  working: "working",
+  failed: "failed",
+  "not needed": "not needed",
+  pending: "not started",
+};
+
+// The Review box is the one stage that waits for a person rather than working
+// at something, and "working" there sent readers looking for progress that
+// was never going to arrive (item 12). Label only: the state itself is
+// unchanged, so the small strips and the six marks are untouched.
+function stateWord(stage, status) {
+  if (
+    stage.name === REVIEW_STAGE
+    && stage.state === "working"
+    && status === WAITING_FOR_REVIEW
+  ) {
+    return "waiting for you";
+  }
+  return STATE_WORDS[stage.state] ?? stage.state;
+}
+
 // Screen 3: the identifier lines this strip used to print above itself — run,
 // project, status — are gone. Both ids stay in the address bar, and the
 // status is already on the project card and the run's tab badge.
@@ -47,7 +77,11 @@ export default function Stages({ run }) {
     <>
       <ol className="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-3 lg:grid-cols-6">
         {states.map((stage) => (
-          <StageBox key={stage.name} stage={stage} />
+          <StageBox
+            key={stage.name}
+            stage={stage}
+            word={stateWord(stage, run.status)}
+          />
         ))}
       </ol>
 
@@ -69,7 +103,7 @@ export default function Stages({ run }) {
   );
 }
 
-function StageBox({ stage }) {
+function StageBox({ stage, word }) {
   const box = {
     done: "border-line-strong bg-card",
     working: "border-signal-edge bg-signal/25",
@@ -81,7 +115,7 @@ function StageBox({ stage }) {
   return (
     <li className={`border ${box} px-4 py-3`}>
       <p className="eyebrow m-0 text-ink">{stage.name}</p>
-      <p className="m-0 mt-1.5 font-mono text-xs text-ink-soft">{stage.state}</p>
+      <p className="m-0 mt-1.5 font-mono text-xs text-ink-soft">{word}</p>
       {stage.state === "working" && (
         <span className="signal-slide mt-2 block h-1 w-full border border-signal-edge" />
       )}

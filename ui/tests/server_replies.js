@@ -25,13 +25,36 @@ export function runReply(overrides = {}) {
   };
 }
 
+// The whole text and the parts it was taken apart into, both written out
+// literally rather than one built from the other: a fixture that assembled
+// the text from the parts would let the screen's own joining pass its own
+// test. `tests/register/test_review_question_wording.py` is the canonical
+// form these follow.
+const ROW_TWO_CELLS = {
+  "What was asked": "Applicants upload supporting documents.",
+  "Written down": "Not known yet",
+  "What testing found": "Not known yet",
+  Status: "Requested",
+};
+
 export function decisionReply(overrides = {}) {
   return {
     decision_id: "2c4e6a80-1111-4b22-8333-444455556666",
     kind: "possible match",
     question:
-      "Is 'Applicants upload documents' the same requirement as row 2, "
-      + "'Applicant document upload'?",
+      "Register row 2\n"
+      + "What was asked: Applicants upload supporting documents.\n"
+      + "Written down: Not known yet\n"
+      + "What testing found: Not known yet\n"
+      + "Status: Requested\n"
+      + "\n"
+      + '26-march-scope.md, under "Applicant portal", says:\n'
+      + '"applicants must be able to upload supporting documents"\n'
+      + "\n"
+      + "Is this the same ask as row 2?\n"
+      + "\n"
+      + "Approve → Row 2 changes: Written down: Yes\n"
+      + "Reject → A new row is created for this ask, with Written down: Yes.",
     outcome: null,
     // Only a "finding" decision carries these; every other kind sends null,
     // the same honesty rule the server itself follows.
@@ -44,33 +67,111 @@ export function decisionReply(overrides = {}) {
     // move Commit itself applies; `row` and `quotes` are the parts the whole
     // `question` text above was built from.
     row_number: 2,
-    row: null,
-    quotes: [],
-    if_approved: [],
-    if_rejected: null,
+    row: { row_number: 2, label: "Register row 2", cells: ROW_TWO_CELLS },
+    quotes: [
+      {
+        source_line: '26-march-scope.md, under "Applicant portal"',
+        quote: "applicants must be able to upload supporting documents",
+      },
+    ],
+    if_approved: [{ cell: "Written down", value: "Yes" }],
+    if_rejected: "A new row is created for this ask, with Written down: Yes.",
     ...overrides,
   };
 }
 
-// A finding decision (screen 4): the rule's own words, the row and what it
-// did to break the rule, and the evidence — never a rule code.
+// Two observations about one row are one decision carrying two quote blocks
+// under one question (item 42), and the approve line names only the cells
+// Commit will actually write.
+export function observationMatchReply(overrides = {}) {
+  return decisionReply({
+    decision_id: "3d5f7b91-2222-4c33-8444-555566667777",
+    kind: "observation match",
+    question:
+      "Register row 2\n"
+      + "What was asked: Applicants upload supporting documents.\n"
+      + "Written down: Yes\n"
+      + "What testing found: Not known yet\n"
+      + "Status: Requested\n"
+      + "\n"
+      + 'testing-feedback-25-mar.md, under "What we found", says:\n'
+      + '"the reminder goes out a day early"\n'
+      + "\n"
+      + 'testing-feedback-25-mar.md, under "What we found", says:\n'
+      + '"upload failed for files over 10 MB"\n'
+      + "\n"
+      + "Is this about row 2?\n"
+      + "\n"
+      + "Approve → Row 2 changes: What testing found: the reminder goes out a "
+      + "day early  Status: Partial\n"
+      + "Reject → Row 2 stays as it is.",
+    row: {
+      row_number: 2,
+      label: "Register row 2",
+      cells: { ...ROW_TWO_CELLS, "Written down": "Yes" },
+    },
+    quotes: [
+      {
+        source_line: 'testing-feedback-25-mar.md, under "What we found"',
+        quote: "the reminder goes out a day early",
+      },
+      {
+        source_line: 'testing-feedback-25-mar.md, under "What we found"',
+        quote: "upload failed for files over 10 MB",
+      },
+    ],
+    if_approved: [
+      { cell: "What testing found", value: "the reminder goes out a day early" },
+      { cell: "Status", value: "Partial" },
+    ],
+    if_rejected: "Row 2 stays as it is.",
+    ...overrides,
+  });
+}
+
+// A finding decision (screen 4): the rule's own words and the model's issue
+// line, wrapped by the backend — never a rule code, and no quote block at all.
 export function findingDecisionReply(overrides = {}) {
   return decisionReply({
     decision_id: "7a1b2c3d-4444-4e55-8666-777788889999",
     kind: "finding",
     question:
-      "Anything built must have a written requirement; a verbal mention is "
-      + "not enough. Row #4 — SMS reminders before an appointment — was "
-      + "asked for in the meeting, but no written requirement names it. "
-      + "Attach this finding to row #4?",
+      "Register row 4\n"
+      + "What was asked: SMS reminders before an appointment.\n"
+      + "Written down: Not mentioned\n"
+      + "What testing found: Not known yet\n"
+      + "Status: Requested\n"
+      + "\n"
+      + "Rule: Anything built must have a written requirement; a verbal "
+      + "mention is not enough.\n"
+      + "\n"
+      + "26-march-scope.md was read, and it says nothing about this "
+      + "requirement.\n"
+      + "\n"
+      + "Does row 4 break this rule?\n"
+      + "\n"
+      + "Approve → The finding is added to row 4.\n"
+      + "Reject → The finding is not added.",
     rule_text:
       "Anything built must have a written requirement; a verbal mention is "
       + "not enough.",
     row_number: 4,
+    row: {
+      row_number: 4,
+      label: "Register row 4",
+      cells: {
+        "What was asked": "SMS reminders before an appointment.",
+        "Written down": "Not mentioned",
+        "What testing found": "Not known yet",
+        Status: "Requested",
+      },
+    },
     issue:
-      "WhatsApp notification was asked for in the meeting but no written "
-      + "requirement names it.",
-    evidence: "\"same notification sent over WhatsApp\" — meeting-notes-10-mar.md",
+      "26-march-scope.md was read, and it says nothing about this requirement.",
+    evidence: "Not mentioned",
+    quotes: [],
+    if_approved: [],
+    if_rejected: "The finding is not added.",
     ...overrides,
   });
 }
@@ -106,25 +207,7 @@ export function registerReply(overrides = {}) {
           what_testing_found: "Upload failed for files over 10 MB.",
           status: "Partial",
         },
-        citations: [
-          {
-            cell: "what_was_asked",
-            source_file: "12-march-scope.md",
-            place: "Section 2 — Applicant portal",
-            source_words: "applicants must be able to upload supporting documents",
-            absence_statement: null,
-          },
-          {
-            cell: "in_writing",
-            source_file: "26-march-scope.md",
-            place: null,
-            source_words: null,
-            absence_statement:
-              "26-march-scope.md was read, and it does not mention this ask.",
-          },
-        ],
-        // The shape every surface is moving to: one entry per thing a
-        // document said, and the cells it supports.
+        // One entry per thing a document said, and the cells it supports.
         evidence: [
           {
             source_line: '12-march-scope.md, under "Section 2 — Applicant portal"',
@@ -140,7 +223,8 @@ export function registerReply(overrides = {}) {
             cells: ["Written down"],
           },
         ],
-        findings: [],
+        // A clean row carries no findings key at all (item 43) — the fixture
+        // models the register JSON exactly as the backend builds it.
       },
     ],
     rules: {
@@ -150,13 +234,26 @@ export function registerReply(overrides = {}) {
         { id: "R1", text: "Every requirement must have a written scope entry." },
       ],
     },
-    examine: {
-      rules: [
-        { id: "R1", text: "Every requirement must have a written scope entry." },
-      ],
-      rows_examined: 1,
-      findings: [],
-    },
+    ...overrides,
+  };
+}
+
+// One finding as `app/examine/read_findings.py`'s `finding_on_the_register`
+// answers with it: keyed on its own id, and naming the run that raised it.
+// The key is absent from a row nothing was found wrong with, which is why no
+// fixture row carries an empty list.
+export function findingOnTheRegister(overrides = {}) {
+  return {
+    finding_id: "5f6e7d8c-9999-4aaa-8bbb-cccccccccccc",
+    raised_by_run: 2,
+    row_number: 1,
+    rule_id: "R1",
+    rule_text: "Every requirement must have a written scope entry.",
+    issue:
+      "26-march-scope.md was read, and it says nothing about this "
+      + "requirement.",
+    evidence: "Not mentioned",
+    question: "Does row 1 break this rule?",
     ...overrides,
   };
 }
@@ -191,9 +288,9 @@ export function historyReply(overrides = {}) {
       {
         kind: "finding attached",
         row_number: 1,
-        detail:
-          "R1 — the register row rests on a meeting note; no client "
-          + "requirements document states it in writing.",
+        // `app/register/commit_register.py` writes the rule's own words after
+        // one word of its own — never a rule id (item 48).
+        detail: "Finding: Every requirement must have a written scope entry.",
         changed_at: "2026-03-27T09:30:00+00:00",
         run_number: 2,
       },
@@ -245,6 +342,12 @@ export function projectsReply(overrides = {}) {
       "sample-projects/intake-portal",
       "sample-projects/northside-dental",
     ],
+    // Whether each of those folders holds a file the system could read: an
+    // empty folder makes a project and starts no run (locked change (a)).
+    has_files_by_folder: {
+      "sample-projects/intake-portal": true,
+      "sample-projects/northside-dental": true,
+    },
     ...overrides,
   };
 }

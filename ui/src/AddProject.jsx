@@ -6,20 +6,29 @@ import { createProject, startRun } from "./run_requests.js";
 const NO_FOLDER_CHECK = "Choose the folder to watch.";
 const NO_FOLDER_LEFT = "No folder left to add.";
 
+// An empty folder makes a project and starts no run, refused identically
+// through the endpoint, the MCP tool and the watcher (locked change (a)). The
+// button says which of the two is about to happen, so nobody presses "start"
+// and is then told there was nothing to start.
+const CREATE_ONLY = "Create project";
+const CREATE_AND_RUN = "Create and start run";
+
 // The box L8's button opens: folder, and nothing else — there is no name
 // field, because a project's name is derived from its folder, in core, never
 // supplied here (D-family for folder-is-a-project). It checks only that a
 // folder is chosen (L9) — every other rule, including whether the folder
 // actually exists, stays the server's, and is shown exactly as it answered,
 // under "Could not create this project" rather than "the server refused"
-// (screen 2). What it tells its parent is one thing, the id of the run the
-// server started; the parent decides what happens next (L5), the same as the
-// start-a-run form it replaces.
+// (screen 2). What it tells its parent is one thing — the run the server
+// started, or the project it created with no run — and the parent decides
+// what happens next (L5).
 export default function AddProject({
   projectsRoot,
   availableFolders,
+  hasFilesByFolder,
   projects,
   onStarted,
+  onCreated,
   onClose,
   onUnreachable,
 }) {
@@ -37,6 +46,12 @@ export default function AddProject({
   // holds and every project's own `source_folder_path`.
   const takenFolders = new Set(projects.map((project) => project.source_folder_path));
   const openFolders = availableFolders.filter((folder) => !takenFolders.has(folder));
+  // Only a folder the server has actually reported as empty switches the
+  // button: before one is chosen, and for a folder the answer says nothing
+  // about, the ordinary ending is the one offered.
+  const chosenFolderIsEmpty =
+    sourceFolderPath !== ""
+    && (hasFilesByFolder ?? {})[sourceFolderPath] === false;
 
   const start = async (submitted) => {
     submitted.preventDefault();
@@ -72,6 +87,14 @@ export default function AddProject({
       setProjectId(usableProjectId);
     }
 
+    // The server would refuse a run on an empty folder, so this asks for no
+    // run at all: the folder is watched from now on, and the first file put
+    // there starts the first run by itself.
+    if (chosenFolderIsEmpty) {
+      await onCreated(usableProjectId);
+      return;
+    }
+
     const started = await startRun(usableProjectId);
     if (!started.ok) {
       stopOn(started);
@@ -102,7 +125,7 @@ export default function AddProject({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="font-mono text-sm text-ink-soft hover:text-ink"
+            className="cursor-pointer font-mono text-sm text-ink-soft hover:text-ink active:translate-y-px"
           >
             ×
           </button>
@@ -120,11 +143,15 @@ export default function AddProject({
         <form onSubmit={start}>
           <label className="block">
             <span className="eyebrow mb-1 block">Folder</span>
+            {/* The browser's own dropdown paints a rounded, shaded control
+                that belongs to no other part of this screen. `appearance-none`
+                takes that away and leaves the same square border, mono type
+                and focus edge every other field here wears (item 1). */}
             <select
               value={sourceFolderPath}
               onChange={(changed) => setSourceFolderPath(changed.target.value)}
               disabled={openFolders.length === 0}
-              className="w-full border border-line-strong bg-card px-3 py-2 font-mono text-sm"
+              className="w-full cursor-pointer appearance-none border border-line-strong bg-card bg-[right_0.75rem_center] bg-no-repeat px-3 py-2 pr-9 font-mono text-sm select-caret hover:border-signal-edge focus:border-signal-edge focus:outline-2 focus:outline-offset-2 focus:outline-signal-edge disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-soft"
             >
               {openFolders.length === 0 ? (
                 <option value="">{NO_FOLDER_LEFT}</option>
@@ -149,9 +176,9 @@ export default function AddProject({
           <button
             type="submit"
             disabled={starting}
-            className="edge-shadow mt-6 w-full border-2 border-signal-edge bg-signal px-6 py-3 font-mono text-sm font-semibold disabled:opacity-40"
+            className="edge-shadow mt-6 w-full cursor-pointer border-2 border-signal-edge bg-signal px-6 py-3 font-mono text-sm font-semibold hover:bg-signal/70 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Create and start run
+            {chosenFolderIsEmpty ? CREATE_ONLY : CREATE_AND_RUN}
           </button>
         </form>
       </div>

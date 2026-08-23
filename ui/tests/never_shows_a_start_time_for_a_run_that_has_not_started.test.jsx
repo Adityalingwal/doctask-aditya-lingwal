@@ -35,7 +35,7 @@ test("a run with no started_at reads '—', never an epoch date", async () => {
     />,
   );
 
-  const row = await screen.findByRole("link", { name: /#1/ });
+  const row = await screen.findByRole("link", { name: /^1/ });
   expect(row.textContent).toContain("—");
   expect(row.textContent).not.toMatch(/1 Jan|1970/);
 });

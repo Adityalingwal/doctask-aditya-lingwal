@@ -141,14 +141,15 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
 
     assert [row["cells"]["what_was_asked"] for row in register["rows"]] == [REQUIREMENT]
     assert register["rows"][0]["cells"]["status"] == "Requested"
-    what_was_asked_citation = next(
-        citation
-        for citation in register["rows"][0]["citations"]
-        if citation["cell"] == "what_was_asked"
+    what_was_asked_evidence = next(
+        entry
+        for entry in register["rows"][0]["evidence"]
+        if "What was asked" in entry["cells"]
     )
-    assert what_was_asked_citation["source_file"] == SOURCE_FILE
-    assert what_was_asked_citation["place"] == "Discussion"
-    assert REQUIREMENT in what_was_asked_citation["source_words"]
+    assert what_was_asked_evidence["source_line"] == (
+        f'{SOURCE_FILE}, under "Discussion"'
+    )
+    assert REQUIREMENT in what_was_asked_evidence["quote"]
     assert REQUIREMENT in markdown
     assert len(committed_fingerprints) == 1
     assert committed_fingerprints[0]

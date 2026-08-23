@@ -3,14 +3,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useScrollbarWhileScrolling } from "./scrollbar_while_scrolling.js";
 
 import AddProject from "./AddProject.jsx";
-import History from "./History.jsx";
 import ProjectList from "./ProjectList.jsx";
-import Question from "./Question.jsx";
 import Refusal from "./Refusal.jsx";
-import Register, { Examine } from "./Register.jsx";
+import RegisterPanel from "./RegisterPanel.jsx";
+import ReportedInstructions from "./ReportedInstructions.jsx";
 import RunColumn from "./RunColumn.jsx";
+import RunTab from "./RunTab.jsx";
 import Section from "./Section.jsx";
-import Stages from "./Stages.jsx";
+import Skipped from "./Skipped.jsx";
 import screenConfig from "../config/screen.json";
 import {
   answerDecision,
@@ -28,21 +28,14 @@ const WAITING_FOR_REVIEW = "needs review";
 // nowhere as something to answer.
 const EXPORT_GATE_KIND = "export";
 
-// The label each kind of not-used entry wears, and the only source of one. A
-// kind this map does not hold renders with no label at all: a wrong label is
-// worse than none, and the server may learn a kind before this screen does.
-const NOT_USED_LABELS = {
-  "read before": "Read before",
-  "not read": "Not read",
-  "not attached": "Not attached to any row",
-};
+const RUN_TAB = "run";
 
 // The screen's own name. The register it shows keeps the name the decisions and
 // the exports give it; this is only what the person looking at it calls the
 // thing, and it lives in one place so it can be changed in one place.
 const PRODUCT_NAME = "Register";
 
-export default function ReviewScreen({ runId: openedRunId }) {
+export default function ReviewScreen({ projectId: openedProjectId, runId: openedRunId }) {
   const [runId, setRunId] = useState(openedRunId ?? "");
   const [run, setRun] = useState(null);
   const [exported, setExported] = useState(null);
@@ -61,6 +54,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const [projects, setProjects] = useState([]);
   const [projectsRoot, setProjectsRoot] = useState(null);
   const [availableFolders, setAvailableFolders] = useState([]);
+  const [hasFilesByFolder, setHasFilesByFolder] = useState({});
   const [projectsRefusal, setProjectsRefusal] = useState(null);
   // Screen 10: before the first read comes back, "answered with nothing" and
   // "not asked yet" hold the same two values — an empty list and no refusal.
@@ -71,7 +65,16 @@ export default function ReviewScreen({ runId: openedRunId }) {
   // A confirmed refusal is not this — the application plainly answered.
   const [unreachable, setUnreachable] = useState(false);
 
-  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    openedProjectId === "" ? null : (openedProjectId ?? null),
+  );
+  // A project named in the address alone still has to open its newest run
+  // (item 49), and the run list only arrives with the first `GET /projects`.
+  // Held until that read answers, then cleared, so a later poll never
+  // re-opens a run the reader has since navigated away from.
+  const [projectAwaitingItsRun, setProjectAwaitingItsRun] = useState(
+    openedRunId ? null : (openedProjectId || null),
+  );
   // Whether the right panel shows the project's own register rather than a
   // run. Mutually exclusive with `runId` being set — opening one always
   // clears the other, so the panel never mixes a run's decisions with the
@@ -90,8 +93,9 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const [history, setHistory] = useState(null);
   const [historyRefusal, setHistoryRefusal] = useState(null);
   const [runsCollapsed, setRunsCollapsed] = useState(false);
+  const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
-  const [openSection, setOpenSection] = useState("stages");
+  const [openSection, setOpenSection] = useState(RUN_TAB);
   const readingPane = useScrollbarWhileScrolling();
 
   const readProjectsFromServer = useCallback(async () => {
@@ -110,34 +114,45 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setProjects(answered.body.projects);
     setProjectsRoot(answered.body.projects_root);
     setAvailableFolders(answered.body.available_folders);
+    setHasFilesByFolder(answered.body.has_files_by_folder ?? {});
     setProjectsRefusal(null);
   }, []);
 
-  // A link to one run stays a link a reviewer can keep, so opening a run from
-  // a column writes it into the address without adding a history entry.
-  // What the last run said goes with it: until the new read answers, the
-  // screen shows nothing rather than the previous run's decisions beside
-  // buttons that already act on this one. Opening a run also closes the
-  // register, the same clearing rule in the other direction.
-  const openRun = useCallback((chosen) => {
-    setRegisterOpen(false);
-    setRunId(chosen);
-    setRun(null);
-    setExported(null);
-    setHistory(null);
-    setHistoryRefusal(null);
-    setReadRefusal(null);
-    setAnswerRefusal(null);
-    window.history.replaceState(null, "", `/ui/?run=${encodeURIComponent(chosen)}`);
-  }, []);
+  // What the last run said goes with the run it belonged to: until the new
+  // read answers, the screen shows nothing rather than the previous run's
+  // decisions beside buttons that already act on this one. Opening a run also
+  // closes the register, the same clearing rule in the other direction, and
+  // comes back to the Run tab, which is where the waiting block lives (37).
+  //
+  // A click on the run that is already open does nothing at all: clearing the
+  // run while its id stayed the same fired no re-read, so the panel sat on
+  // "Choose a run to see it here." until the next poll (34).
+  const openRun = useCallback(
+    (chosen) => {
+      if (chosen === runId && !registerOpen) {
+        return;
+      }
+      setRegisterOpen(false);
+      setRunId(chosen);
+      setRun(null);
+      setExported(null);
+      setHistory(null);
+      setHistoryRefusal(null);
+      setReadRefusal(null);
+      setAnswerRefusal(null);
+      setOpenSection(RUN_TAB);
+    },
+    [runId, registerOpen],
+  );
 
   // The Register entry above a project's runs (section 2.3) opens that
   // project's register in the right panel — the same panel a run opens
   // into. It must clear whatever run was open, its export and both
   // refusals, the same way openRun clears the previous run: a previous
   // run's decisions must never sit beside the register.
-  const openRegister = useCallback((projectId) => {
-    setSelectedProjectId(projectId);
+  const openRegister = useCallback((chosenProjectId) => {
+    setSelectedProjectId(chosenProjectId);
+    setProjectAwaitingItsRun(null);
     setRegisterOpen(true);
     setRegisterRead(false);
     setRunId("");
@@ -147,23 +162,68 @@ export default function ReviewScreen({ runId: openedRunId }) {
     setHistoryRefusal(null);
     setReadRefusal(null);
     setAnswerRefusal(null);
-    window.history.replaceState(null, "", "/ui/");
   }, []);
 
-  // Choosing a project from the left column shows its runs in the middle one;
-  // it does not itself open any run or the register, so nothing is shown that
-  // a click has not actually asked for.
-  const selectProject = useCallback((projectId) => {
-    setSelectedProjectId(projectId);
-    setRegisterOpen(false);
-    setRunId("");
-    setRun(null);
-    setExported(null);
-    setHistory(null);
-    setHistoryRefusal(null);
-    setReadRefusal(null);
-    window.history.replaceState(null, "", "/ui/");
-  }, []);
+  // Choosing a project from the left column opens its newest run at once
+  // (item 49) — that is what a reader came to look at, and waiting for a
+  // second click showed them an empty panel for no reason. A project that has
+  // never run keeps the runs column's own empty line.
+  const selectProject = useCallback(
+    (chosenProjectId) => {
+      const project = projects.find(
+        (candidate) => candidate.project_id === chosenProjectId,
+      );
+      const newest = project?.runs[0] ?? null;
+      setSelectedProjectId(chosenProjectId);
+      setProjectAwaitingItsRun(null);
+      setRegisterOpen(false);
+      setRunId(newest === null ? "" : newest.run_id);
+      setRun(null);
+      setExported(null);
+      setHistory(null);
+      setHistoryRefusal(null);
+      setReadRefusal(null);
+      setOpenSection(RUN_TAB);
+    },
+    [projects],
+  );
+
+  // A project named in the address alone waits here for the run list to
+  // arrive, and opens its newest run exactly once.
+  useEffect(() => {
+    if (projectAwaitingItsRun === null) {
+      return;
+    }
+    const project = projects.find(
+      (candidate) => candidate.project_id === projectAwaitingItsRun,
+    );
+    if (project === undefined) {
+      return;
+    }
+    setProjectAwaitingItsRun(null);
+    if (project.runs.length > 0) {
+      setRunId(project.runs[0].run_id);
+    }
+  }, [projectAwaitingItsRun, projects]);
+
+  // One writer for the address, so a link a reviewer keeps always names what
+  // is actually on screen (items 9 / S18). The project is written as soon as
+  // it is known — for a run opened by id alone that is the server's own
+  // answer, not something the address had to carry.
+  useEffect(() => {
+    const named = [];
+    if (selectedProjectId !== null) {
+      named.push(`project=${encodeURIComponent(selectedProjectId)}`);
+    }
+    if (runId !== "") {
+      named.push(`run=${encodeURIComponent(runId)}`);
+    }
+    window.history.replaceState(
+      null,
+      "",
+      named.length === 0 ? "/ui/" : `/ui/?${named.join("&")}`,
+    );
+  }, [selectedProjectId, runId]);
 
   const readFromServer = useCallback(async () => {
     if (runId === "") {
@@ -208,8 +268,8 @@ export default function ReviewScreen({ runId: openedRunId }) {
   }, [registerOpen, selectedProjectId]);
 
   // The same trigger and the same refresh the register read has, into state of
-  // its own — the grouping, the ordering and the wording of every entry are
-  // the core function's, so this only carries what it answered.
+  // its own — the ordering and the wording of every entry are the core
+  // function's, so this only carries what it answered.
   const readHistoryFromServer = useCallback(async () => {
     if (!registerOpen) {
       return;
@@ -298,6 +358,22 @@ export default function ReviewScreen({ runId: openedRunId }) {
     [readProjectsFromServer, openRun],
   );
 
+  // An empty folder makes a project and starts no run (locked change (a)):
+  // the new project is selected, no run is opened, and the address carries
+  // the project alone.
+  const createdProject = useCallback(
+    async (createdProjectId) => {
+      await readProjectsFromServer();
+      setAddProjectOpen(false);
+      setSelectedProjectId(createdProjectId);
+      setProjectAwaitingItsRun(null);
+      setRegisterOpen(false);
+      setRunId("");
+      setRun(null);
+    },
+    [readProjectsFromServer],
+  );
+
   // The gate is not a question anybody is asked: it is written when one of
   // the two ending buttons is pressed, and the run then carries it answered.
   // Filtered here, once, so the count and the cards can never disagree.
@@ -317,59 +393,52 @@ export default function ReviewScreen({ runId: openedRunId }) {
   const selectedProject =
     projects.find((project) => project.project_id === selectedProjectId) ?? null;
 
-  // A run panel has four tabs — Stages, Not used, Decisions, Reported. The
-  // register is not one of them: it is the project's own panel, opened from
-  // the Register entry in the runs column, never from here (section 2.3).
+  // A run panel has three tabs (item 12). The register is not one of them: it
+  // is the project's own panel, opened from the Register entry in the runs
+  // column, never from here (section 2.3).
   const sections =
     run === null
       ? []
       : [
           {
-            id: "stages",
-            number: "01",
-            name: "Stages",
-            tab: "Stages",
-            body: <Stages run={run} />,
-          },
-          {
-            id: "not-used",
-            number: "02",
-            name: "Not used",
-            tab: "Not used",
-            tabCount: run.skipped.length === 0 ? null : String(run.skipped.length),
-            count: `${run.skipped.length} not used`,
-            body: <NotUsed entries={run.skipped} />,
-          },
-          {
-            id: "decisions",
-            number: "03",
-            name: "Needs your decision",
-            tab: "Decisions",
+            id: RUN_TAB,
+            name: "Run",
+            tab: "Run",
             tabCount: waiting === 0 ? null : String(waiting),
             tabWaiting: waiting > 0,
             body: (
-              <Decisions
+              <RunTab
+                run={run}
                 decisions={questions}
-                examine={run.examine}
-                reviewing={run.status === WAITING_FOR_REVIEW}
-                answering={answering}
                 waiting={waiting}
+                answering={answering}
                 onAnswer={answer}
                 onFinish={finish}
               />
             ),
           },
           {
+            id: "skipped",
+            name: "Skipped",
+            tab: "Skipped",
+            tabCount: run.skipped.length === 0 ? null : String(run.skipped.length),
+            count:
+              run.skipped.length === 0 ? null : `${run.skipped.length} skipped`,
+            body: <Skipped entries={run.skipped} />,
+          },
+          {
             id: "reported",
-            number: "04",
-            name: "Reported, not followed",
-            tab: "Reported",
+            name: "Reported instructions",
+            tab: "Reported instructions",
             tabCount:
               run.reported_instructions.length === 0
                 ? null
                 : String(run.reported_instructions.length),
-            count: `${run.reported_instructions.length} reported`,
-            body: <Reported reported={run.reported_instructions} />,
+            count:
+              run.reported_instructions.length === 0
+                ? null
+                : `${run.reported_instructions.length} reported`,
+            body: <ReportedInstructions reported={run.reported_instructions} />,
           },
         ];
 
@@ -403,16 +472,17 @@ export default function ReviewScreen({ runId: openedRunId }) {
           <Loading />
         ) : (
           <div
-            className={`grid h-full min-h-0 grid-cols-1 ${
-              runsCollapsed
-                ? "lg:grid-cols-[16rem_3rem_1fr]"
-                : "lg:grid-cols-[16rem_12rem_1fr]"
-            }`}
+            className={`grid h-full min-h-0 grid-cols-1 ${columnWidths(
+              projectsCollapsed,
+              runsCollapsed,
+            )}`}
           >
             <ProjectList
               projects={projects}
               refusal={projectsRefusal}
               selectedProjectId={selectedProjectId}
+              collapsed={projectsCollapsed}
+              onToggleCollapse={() => setProjectsCollapsed((was) => !was)}
               onSelectProject={selectProject}
               onOpenAddProject={() => setAddProjectOpen(true)}
             />
@@ -433,12 +503,11 @@ export default function ReviewScreen({ runId: openedRunId }) {
                 <p className="m-0 mt-1 text-2xl leading-tight font-semibold">
                   {selectedProject?.name ?? "This run"}
                 </p>
-                {!registerOpen && (
+                {!registerOpen && run !== null && (
                   <SectionTabs
                     sections={sections}
                     openSection={openSection}
                     onOpenSection={setOpenSection}
-                    disabled={run === null}
                   />
                 )}
               </div>
@@ -450,7 +519,7 @@ export default function ReviewScreen({ runId: openedRunId }) {
 
                 {registerOpen ? (
                   <div className="max-w-5xl">
-                    <ProjectRegisterSection
+                    <RegisterPanel
                       exported={exported}
                       read={registerRead}
                       history={history}
@@ -470,7 +539,6 @@ export default function ReviewScreen({ runId: openedRunId }) {
                         section.id === openSection && (
                           <Section
                             key={section.id}
-                            number={section.number}
                             name={section.name}
                             headingId={`${section.id}-heading`}
                             count={section.count}
@@ -491,14 +559,31 @@ export default function ReviewScreen({ runId: openedRunId }) {
         <AddProject
           projectsRoot={projectsRoot}
           availableFolders={availableFolders}
+          hasFilesByFolder={hasFilesByFolder}
           projects={projects}
           onStarted={startedRun}
+          onCreated={createdProject}
           onClose={() => setAddProjectOpen(false)}
           onUnreachable={() => setUnreachable(true)}
         />
       )}
     </div>
   );
+}
+
+// Written out whole rather than assembled, because Tailwind reads these class
+// names out of this file: a string built at run time is a class that was
+// never generated. Either column collapses to a 3rem rail, and the reading
+// pane takes back what they gave up (items 3, 19).
+function columnWidths(projectsCollapsed, runsCollapsed) {
+  if (projectsCollapsed) {
+    return runsCollapsed
+      ? "lg:grid-cols-[3rem_3rem_1fr]"
+      : "lg:grid-cols-[3rem_12rem_1fr]";
+  }
+  return runsCollapsed
+    ? "lg:grid-cols-[13rem_3rem_1fr]"
+    : "lg:grid-cols-[13rem_12rem_1fr]";
 }
 
 // Screen 10: exactly one of this or the columns, never both, never an empty
@@ -517,10 +602,7 @@ function Loading() {
 // Tabs, not buttons: choosing which part of a run to read is navigation, and
 // the only things on this screen that act on a run are Approve, Reject and
 // the two buttons that end the review.
-function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
-  if (disabled) {
-    return null;
-  }
+function SectionTabs({ sections, openSection, onOpenSection }) {
   return (
     <div
       role="tablist"
@@ -537,10 +619,10 @@ function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
             aria-selected={open}
             aria-controls={`${section.id}-heading`}
             onClick={() => onOpenSection(section.id)}
-            className={`flex items-center gap-2 border px-4 py-2 font-mono text-xs font-semibold tracking-wide whitespace-nowrap ${
+            className={`flex cursor-pointer items-center gap-2 border px-4 py-2 font-mono text-xs font-semibold tracking-wide whitespace-nowrap active:translate-y-px ${
               open
-                ? "edge-shadow-sm border-signal-edge bg-signal text-ink"
-                : "border-line text-ink-soft hover:border-line-strong hover:text-ink"
+                ? "edge-shadow-sm border-signal-edge bg-signal text-ink hover:bg-signal/80"
+                : "border-line text-ink-soft hover:border-line-strong hover:bg-paper hover:text-ink active:bg-signal/25"
             }`}
           >
             {section.tab}
@@ -559,213 +641,5 @@ function SectionTabs({ sections, openSection, onOpenSection, disabled }) {
         );
       })}
     </div>
-  );
-}
-
-// Screen 5: the kind's label, the file name, then what happened — the `file`,
-// `summary` and `reason` labels themselves are never printed. A dropped quote
-// is told apart by carrying `summary` (a whole document that was not read
-// never does), so it shows its file, the requirement that was dropped, and
-// why — never `quote`, which is the model's words, not the document's, and
-// unverified besides.
-function NotUsed({ entries }) {
-  if (entries.length === 0) {
-    return <p className="m-0 text-ink-soft">Nothing in this run went unused.</p>;
-  }
-  return (
-    <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
-      {entries.map((entry, place) => (
-        <li key={place} className="border border-line bg-card px-4 py-3 text-sm">
-          {Object.hasOwn(NOT_USED_LABELS, entry.kind) && (
-            <p className="m-0 font-semibold text-ink-soft">
-              {NOT_USED_LABELS[entry.kind]}
-            </p>
-          )}
-          {entry.summary !== undefined ? (
-            <p className="m-0">
-              <span className="font-mono font-semibold">{entry.file}</span>
-              <br />
-              {entry.summary}
-              <br />
-              {entry.reason}
-            </p>
-          ) : entry.file !== undefined ? (
-            <p className="m-0">
-              <span className="font-mono font-semibold">{entry.file}</span>
-              <br />
-              {entry.reason}
-            </p>
-          ) : (
-            <p className="m-0">{entry.reason}</p>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Reported({ reported }) {
-  if (reported.length === 0) {
-    return (
-      <p className="m-0 text-ink-soft">
-        No document in this run tried to give the system an instruction.
-      </p>
-    );
-  }
-  return (
-    <>
-      {/* Required, not decoration: without it a reader assumes the documents
-          were discarded rather than read. It is said once above the cards
-          rather than under each, and it stops there because an embedded
-          instruction can appear on any document type, including one that
-          states no requirement at all. */}
-      <p className="m-0 mb-4 text-ink-soft">
-        Reported, not followed. These documents were still read.
-      </p>
-      <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
-        {reported.map((entry, place) => (
-          <li key={place} className="border border-line bg-card px-4 py-3 text-sm">
-            <p className="m-0">
-              <span className="font-mono font-semibold">{entry.file}</span>
-              <br />
-              {entry.place}
-            </p>
-            <p className="m-0 mt-2 italic">{`"${entry.quote}"`}</p>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
-function Decisions({
-  decisions,
-  examine,
-  reviewing,
-  answering,
-  waiting,
-  onAnswer,
-  onFinish,
-}) {
-  return (
-    <>
-      {decisions.length === 0 ? (
-        <p className="m-0 text-ink-soft">This run has raised no decision.</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-4 p-0">
-          {decisions.map((decision) => (
-            <Question
-              key={decision.decision_id}
-              decision={decision}
-              reviewing={reviewing}
-              answering={answering}
-              onAnswer={onAnswer}
-            />
-          ))}
-        </ul>
-      )}
-      {examine !== null && (
-        <div className="mt-8 border-t border-line pt-5">
-          <Examine examine={examine} />
-        </div>
-      )}
-      <EndReview
-        reviewing={reviewing}
-        unanswered={waiting}
-        answering={answering}
-        onFinish={onFinish}
-      />
-    </>
-  );
-}
-
-// Both rules belong to the server: it refuses a run that is not at review, and
-// it refuses a review with an unanswered decision. The two endings are offered
-// only where the run the server just described allows them.
-//
-// Two buttons and not one, because saying no is how a run ends without
-// committing: with only the adding button, a run nobody wants could never
-// finish and would hold its project's lock for ever. Neither is louder than
-// the other — a screen that makes one ending look like the expected answer is
-// answering for the person.
-function EndReview({ reviewing, unanswered, answering, onFinish }) {
-  if (!reviewing) {
-    return (
-      <p className="mt-8 text-sm text-ink-soft">
-        This run is not waiting for an answer, so its decisions can be read
-        here but not changed.
-      </p>
-    );
-  }
-  if (unanswered > 0) {
-    return (
-      <p className="mt-8 text-sm text-ink-soft">
-        Answer all {unanswered} to finish this review.
-      </p>
-    );
-  }
-  return (
-    <p className="m-0 mt-8 flex flex-wrap gap-3">
-      <EndReviewButton
-        label="Add this run's changes to the register"
-        answering={answering}
-        onClick={() => onFinish(true)}
-      />
-      <EndReviewButton
-        label="Discard this run's changes"
-        answering={answering}
-        onClick={() => onFinish(false)}
-      />
-    </p>
-  );
-}
-
-function EndReviewButton({ label, answering, onClick }) {
-  return (
-    <button
-      type="button"
-      disabled={answering}
-      onClick={onClick}
-      className="edge-shadow border-2 border-signal-edge bg-signal px-6 py-3 font-mono text-sm font-semibold disabled:opacity-40"
-    >
-      {label}
-    </button>
-  );
-}
-
-// The project's own panel (section 2.3): the register read live from the
-// project's committed rows. The empty state (section 2.4) covers a new
-// project, a first run still working, and a run whose changes were
-// discarded — every case in which no run has committed rows, which the
-// server answers as a register holding none — with one line, never an
-// empty table.
-function ProjectRegisterSection({ exported, read, history }) {
-  const empty = exported === null || exported.rows.length === 0;
-  return (
-    <Section
-      number=""
-      name="Register"
-      headingId="project-register-heading"
-      count={read && !empty ? `${exported.rows.length} rows` : null}
-    >
-      {!read ? (
-        // Until the read answers this screen knows nothing about this
-        // register, and saying it is empty would be a claim the server has
-        // not made.
-        <p className="m-0 max-w-prose text-sm text-ink-soft">
-          Reading this register…
-        </p>
-      ) : empty ? (
-        <p className="m-0 max-w-prose text-sm text-ink-soft">
-          Nothing has been added to this register yet.
-        </p>
-      ) : (
-        <Register exported={exported} />
-      )}
-      {/* Below the register's own sections, and only once the server has
-          answered — an empty list is this register having no history, which
-          is not the same claim as not having been asked yet. */}
-      {history !== null && <History entries={history.entries} />}
-    </Section>
   );
 }

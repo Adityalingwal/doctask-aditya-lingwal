@@ -592,7 +592,7 @@ match.
   embedded instruction placed in that document and logged against the run,
   and it creates no row, changes no cell, and reaches the Delivery Owner as no
   proposed action. It **is** reported to a person on purpose — the run's own
-  column, `GET /runs/{id}` and a fourth tab beside Not used — because
+  column, `GET /runs/{id}` and its own tab beside Skipped — because
   information nobody can see is not a report. Nothing was committed until a
   person approved it.
 - **What that proof does not cover:** the model is scripted, so this shows the
@@ -893,8 +893,13 @@ first table.
   the export gate is a button, not a card, and has no parts at all.
 - **`get_register` rows carry `evidence` (2026-08-23)** — citations merged by
   quote, each entry naming its source line, its words and the cells it
-  supports; an absence carries its sentence and no quote. `citations` and
-  `examine` stay in the JSON until `ui/src/Register.jsx` reads the new field.
+  supports; an absence carries its sentence and no quote. **The per-row
+  `citations` list and the run-level `examine` block left the register JSON on
+  2026-08-24** (they were kept beside `evidence` only until the screen read the
+  new fields): a row's findings are the row's own `findings` key, absent
+  entirely on a clean row, and which rules last judged the register is the
+  top-level `rules`. The run payload's own `examine` block is untouched — it is
+  what one run judged and found, which is a different question.
 
 Eight slice-1 API endpoints:
 
@@ -1005,9 +1010,15 @@ a symlink after creation is not re-checked.
   on a run that is not at review.
 - Section tabs still carry `role="tab"`, not the button role, because
   choosing what to read is navigation — the only actions on a run stay
-  Approve, Reject and the two buttons that end the review. **A run panel has three tabs — Stages,
-  Not used, Decisions (locked 2026-08-16, superseding a fourth Register tab —
-  see the register bullet below).**
+  Approve, Reject and the two buttons that end the review. **A run panel has
+  three tabs — Run, Skipped, Reported instructions (locked 2026-08-23,
+  replacing Stages / Not used / Decisions of 2026-08-16, which had itself
+  superseded a fourth Register tab — see the register bullet below).** Why:
+  the stages, what the run is waiting for and the questions it raised were
+  three tabs describing one run, and a reader had to visit all three to learn
+  whether anything was wanted of them. They are now one Run tab, read top to
+  bottom — stages, why it ended early, the waiting block, the decisions, the
+  rules. A tab wears a count only when it counts something above zero.
 - **A skipped entry's label comes from its `kind` and from nothing else**
   (locked 2026-08-17): the screen maps `read before`, `not read` and
   `not attached` to `Read before`, `Not read` and `Not attached to any row`,
@@ -1040,6 +1051,19 @@ a symlink after creation is not re-checked.
   through the parent's re-read. This box does not disappear once a run
   exists: a second, third, or later project is created from the same
   button the first one was.
+- **A register row's evidence is read in a panel, not under the table (locked
+  2026-08-23, superseding the per-row Evidence list beneath the register).**
+  The list repeated every quote of every row down one page, so the table a
+  reader came for scrolled away. Clicking a row opens a panel over a dimmed
+  backdrop; the table does not move, and ×, Escape and a click outside all
+  close it. `useState` only — no router and no dialog library.
+- **The address carries both ids (locked 2026-08-23).** `?project=<id>` alone
+  selects that project and opens its newest run; `?project=<id>&run=<id>` opens
+  that run; `?run=<id>` alone still works, because the run's own answer names
+  its project. It is written by one effect from what is on screen rather than
+  by each click, so a link can never name something the panel is not showing.
+  Reloading therefore keeps the reader where they were, which is why no
+  separate "remember the last project" mechanism exists.
 - No blanket approve tool, waiting wrapper, separate MCP logic, state library,
   design system, dashboard, settings, or charts.
 - **The screen polls `GET /projects` and `GET /runs/{id}` unconditionally, on

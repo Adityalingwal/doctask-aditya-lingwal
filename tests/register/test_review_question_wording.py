@@ -475,3 +475,43 @@ def test_the_approve_line_names_only_the_cells_commit_will_actually_write(
         f"Approve → Row 1 changes: What testing found: {LATER_VERDICT}\n"
         "Reject → Row 1 stays as it is."
     )
+
+
+def test_a_quote_spanning_two_paragraphs_stays_one_block_of_the_decision_text() -> None:
+    """A blank line inside a quote must not shift the blocks a reader counts.
+
+    The screen cuts the stored text at blank lines to lay the card out, so a
+    quote keeping its own blank line would push the question and the
+    Approve/Reject lines one block off. The words stay; the gap goes. The
+    committed citation is untouched by this — it is not built here.
+    """
+    from app.review.decision_text import possible_match_text, quote_block
+
+    block = quote_block(
+        "client-requirements-v1.md",
+        "Requirements",
+        "The bot must hand off to a person.\n\nWe tried three times.",
+    )
+    assert block["quote"] == (
+        "The bot must hand off to a person.\nWe tried three times."
+    )
+
+    built = possible_match_text(
+        row_number=2,
+        row_label="Register row 2",
+        cells={
+            "What was asked": "A support bot.",
+            "Written down": "Not known yet",
+            "What testing found": "Not known yet",
+            "Status": "Requested",
+        },
+        quote=block,
+        if_approved=[{"cell": "Written down", "value": "Yes"}],
+        proposed_in_writing="Yes",
+    )
+    blocks = built.question.split("\n\n")
+    # Row block · quote block · question · Approve/Reject — and the quote's
+    # own words hold no blank line, so the count cannot drift.
+    assert len(blocks) == 4
+    assert blocks[2] == "Is this the same ask as row 2?"
+    assert built.parts["quotes"] == [block]

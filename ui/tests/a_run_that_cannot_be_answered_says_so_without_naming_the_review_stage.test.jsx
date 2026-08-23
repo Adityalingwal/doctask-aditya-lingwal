@@ -1,8 +1,9 @@
-// The line under a run's decisions is read by someone who has never seen the
-// pipeline, and it appears on every run the server will not accept an answer
-// for — a run still working, a failed one, and one whose review is over. It
-// must therefore say what is true of all three without borrowing "at review",
-// which is a stage name from inside the system.
+// A run the server will not accept an answer for — one still working, a
+// failed one, one whose review is over — says so by offering nothing to
+// answer with. The sentence that used to sit under its decisions is gone
+// (item 5): it explained the pipeline to someone who has never seen it, and
+// the absent buttons already say the same thing. Nothing left on the panel
+// borrows "at review", which is a stage name from inside the system.
 import { render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
@@ -48,22 +49,24 @@ function screenShowingRun(overrides) {
       },
     ]),
   );
-  render(<ReviewScreen runId={runId} />);
+  render(<ReviewScreen projectId="" runId={runId} />);
 }
 
-test("a finished run says its decisions can be read but not changed", async () => {
+test("a finished run offers nothing to answer and explains nothing", async () => {
   screenShowingRun({ status: "done", stage: "commit" });
-  await openSection(/decisions/i);
+  await openSection(/^run/i);
+  await screen.findByText("Is this the same ask as row 2?");
 
-  expect(
-    await screen.findByText(/decisions can be read here but not changed/i),
-  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^approve$/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^reject$/i })).toBeNull();
+  expect(screen.queryByText(/not waiting for an answer/i)).toBeNull();
+  expect(screen.queryByText(/read here but not changed/i)).toBeNull();
 });
 
 test("a run that cannot be answered never explains itself with a stage name", async () => {
   screenShowingRun({ status: "done", stage: "commit" });
-  await openSection(/decisions/i);
-  await screen.findByText(answered.question);
+  await openSection(/^run/i);
+  await screen.findByText("Is this the same ask as row 2?");
 
   expect(screen.queryByText(/at review/i)).toBeNull();
 });

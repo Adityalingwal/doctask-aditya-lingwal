@@ -37,8 +37,8 @@ test("a reported instruction is shown as information and never as a decision", a
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/reported/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/reported instructions/i);
 
   const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
   const card = cards.find((text) => text.includes(reportedInstruction.file));
@@ -79,8 +79,8 @@ test("the notice is said once above the cards, not under every one", async () =>
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/reported/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/reported instructions/i);
 
   await screen.findByText(NOTICE);
   expect(screen.getAllByText(NOTICE)).toHaveLength(1);
@@ -99,8 +99,8 @@ test("a run no document addressed says so in the words of what was looked for", 
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/reported/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/reported instructions/i);
 
   expect(
     await screen.findByText(
