@@ -530,6 +530,7 @@ def build_register_graph(
             committed_rows=result.committed_row_numbers,
             merged_rows=result.merged_row_numbers,
             moved_rows=result.moved_row_numbers,
+            rows_a_document_did_not_mention=result.absent_row_numbers,
         )
         return {}
 
