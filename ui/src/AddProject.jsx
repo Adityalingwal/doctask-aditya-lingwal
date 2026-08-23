@@ -125,7 +125,7 @@ export default function AddProject({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="cursor-pointer font-mono text-sm text-ink-soft hover:text-ink"
+            className="cursor-pointer font-mono text-sm text-ink-soft hover:text-ink active:translate-y-px"
           >
             ×
           </button>

@@ -35,7 +35,7 @@ export default function RunColumn({
           type="button"
           onClick={onToggleCollapse}
           aria-label="Expand the runs column"
-          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40"
+          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40 active:translate-y-px"
         >
           »
         </button>
@@ -70,7 +70,7 @@ export default function RunColumn({
           type="button"
           onClick={onToggleCollapse}
           aria-label="Collapse the runs column"
-          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40"
+          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40 active:translate-y-px"
         >
           «
         </button>
@@ -121,8 +121,8 @@ function RailMark({ label, title, open, onOpen }) {
       onClick={onOpen}
       className={`w-8 cursor-pointer border py-1 font-mono text-xs active:translate-y-px ${
         open
-          ? "border-line-strong bg-card font-semibold text-ink hover:bg-signal/25"
-          : "border-transparent text-ink-soft hover:border-line-strong hover:bg-card hover:text-ink"
+          ? "border-line-strong bg-card font-semibold text-ink hover:bg-signal/25 active:bg-signal/40"
+          : "border-transparent text-ink-soft hover:border-line-strong hover:bg-card hover:text-ink active:bg-signal/25"
       }`}
     >
       {label}

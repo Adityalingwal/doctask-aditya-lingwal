@@ -32,7 +32,7 @@ export default function ProjectList({
           type="button"
           onClick={onToggleCollapse}
           aria-label="Expand the projects column"
-          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40"
+          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40 active:translate-y-px"
         >
           »
         </button>
@@ -60,7 +60,7 @@ export default function ProjectList({
           type="button"
           onClick={onToggleCollapse}
           aria-label="Collapse the projects column"
-          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40"
+          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40 active:translate-y-px"
         >
           «
         </button>
@@ -114,8 +114,8 @@ function ProjectMark({ project, open, onOpen }) {
       onClick={() => onOpen(project.project_id)}
       className={`flex w-8 cursor-pointer flex-col items-center border py-1 font-mono text-xs active:translate-y-px ${
         open
-          ? "border-line-strong bg-card font-semibold text-ink hover:bg-signal/25"
-          : "border-transparent text-ink-soft hover:border-line-strong hover:bg-card hover:text-ink"
+          ? "border-line-strong bg-card font-semibold text-ink hover:bg-signal/25 active:bg-signal/40"
+          : "border-transparent text-ink-soft hover:border-line-strong hover:bg-card hover:text-ink active:bg-signal/25"
       }`}
     >
       <span>{project.name.slice(0, 1).toUpperCase()}</span>

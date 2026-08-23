@@ -621,8 +621,8 @@ function SectionTabs({ sections, openSection, onOpenSection }) {
             onClick={() => onOpenSection(section.id)}
             className={`flex cursor-pointer items-center gap-2 border px-4 py-2 font-mono text-xs font-semibold tracking-wide whitespace-nowrap active:translate-y-px ${
               open
-                ? "edge-shadow-sm border-signal-edge bg-signal text-ink"
-                : "border-line text-ink-soft hover:border-line-strong hover:bg-paper hover:text-ink"
+                ? "edge-shadow-sm border-signal-edge bg-signal text-ink hover:bg-signal/80"
+                : "border-line text-ink-soft hover:border-line-strong hover:bg-paper hover:text-ink active:bg-signal/25"
             }`}
           >
             {section.tab}

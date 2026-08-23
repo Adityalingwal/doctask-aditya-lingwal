@@ -44,7 +44,7 @@ export default function RowDrawer({ row, columns, history, onClose }) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="cursor-pointer border border-line px-2 font-mono text-sm text-ink-soft hover:border-line-strong hover:text-ink"
+            className="cursor-pointer border border-line px-2 font-mono text-sm text-ink-soft hover:border-line-strong hover:text-ink active:translate-y-px"
           >
             ×
           </button>
@@ -94,7 +94,7 @@ export default function RowDrawer({ row, columns, history, onClose }) {
             type="button"
             aria-expanded={historyOpen}
             onClick={() => setHistoryOpen((was) => !was)}
-            className="eyebrow mt-8 flex w-full cursor-pointer items-center gap-2 border-b border-line pb-2 text-left hover:text-ink"
+            className="eyebrow mt-8 flex w-full cursor-pointer items-center gap-2 border-b border-line pb-2 text-left hover:text-ink active:text-ink-soft"
           >
             <span aria-hidden="true">{historyOpen ? "▾" : "▸"}</span>
             History · {countedRuns(rowHistory)}
