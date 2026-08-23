@@ -35,7 +35,7 @@ export is written by the backend from stored data, in one vocabulary.
   which folders hold a file.
 - **The watcher polls every 2s and waits 5s of quiet.**
 
-**Both suites green, no live key: 296 Python passed** and **66 front-end
+**Both suites green, no live key: 289 Python passed** and **66 front-end
 passed across 38 files**. The four demo documents have not been re-driven on a
 clean database since; that is the foreground step after this branch merges.
 
