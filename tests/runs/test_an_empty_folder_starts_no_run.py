@@ -123,3 +123,74 @@ def test_the_shipped_watcher_config_polls_every_two_seconds_and_waits_five() -> 
 
     assert settings["poll_seconds"] == 2
     assert settings["quiet_seconds"] == 5
+
+
+def test_the_watcher_reaches_the_same_refusal_when_a_folder_is_emptied(
+    tmp_path: Path,
+) -> None:
+    """The watcher's door is the refusal in `start_or_queue_run`, exercised.
+
+    A folder the watcher has baselined starts nothing while it stays empty,
+    so the refusal is only reachable the way it happens in real use: the
+    files a person put in are taken out again, the folder settles, and the
+    watcher tries to start a run over nothing.
+    """
+    watcher_config_path = tmp_path / "watcher.yaml"
+    watcher_config_path.write_text(
+        f"poll_seconds: {POLL_SECONDS}\nquiet_seconds: {QUIET_SECONDS}\n",
+        encoding="utf-8",
+    )
+    script_path = tmp_path / "script.json"
+    write_script(script_path, {})
+    log_path = tmp_path / "application.log"
+
+    with temporary_project_folder("emptied-folder") as (folder, folder_path):
+        document = folder / "meeting-notes-10-mar.md"
+        document.write_text("# Notes\n\nAn ask.\n", encoding="utf-8")
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+                watcher_config_path=watcher_config_path,
+                log_path=log_path,
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects", json={"source_folder_path": folder_path}
+                    ).json()["project_id"]
+                    # First sight baselines the file; nothing starts for it.
+                    time.sleep(LONGER_THAN_A_QUIET_PERIOD)
+                    document.unlink()
+                    refused = _wait_for_log_line(
+                        log_path, "watcher_refused_to_start_a_run"
+                    )
+                    listed = client.get("/projects").json()
+                    project = next(
+                        entry
+                        for entry in listed["projects"]
+                        if entry["project_id"] == project_id
+                    )
+            finally:
+                application.stop()
+
+    # The watcher reached the shared refusal, logged it, and started nothing.
+    assert EMPTY_FOLDER_REFUSAL in refused
+    assert project["run_count"] == 0
+    assert project["runs"] == []
+
+
+def _wait_for_log_line(log_path: Path, marker: str) -> str:
+    deadline = time.monotonic() + 30.0
+    while time.monotonic() < deadline:
+        if log_path.exists():
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+                if marker in line:
+                    return line
+        time.sleep(0.1)
+    raise AssertionError(
+        f"the application log never carried '{marker}' — the watcher did not "
+        "reach the refusal"
+    )
