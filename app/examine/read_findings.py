@@ -13,17 +13,46 @@ from app.runs.statuses import DONE
 # A finding follows its row through a merge, so both the id and the number it
 # reports come from the row it ended up on. Reading the number from the
 # proposal instead would sit a finding under one row while naming another.
-_SELECT_FINDINGS = (
-    "SELECT findings.id, findings.rule_id, findings.rule_text, findings.issue, "
+_FINDING_COLUMNS = (
+    "findings.id, findings.rule_id, findings.rule_text, findings.issue, "
     "findings.evidence, findings.question, findings.decision_key, "
     "decisions.outcome, reported_row.row_number, reported_row.id "
-    "AS register_row_id FROM findings "
+    "AS register_row_id"
+)
+_FINDING_JOINS = (
+    " FROM findings "
     "JOIN decisions ON decisions.id = findings.decision_key "
     "JOIN register_rows ON register_rows.id = findings.register_row_id "
     "JOIN register_rows AS reported_row ON reported_row.id = COALESCE("
     "register_rows.merged_into_register_row_id, register_rows.id) "
 )
+_SELECT_FINDINGS = "SELECT " + _FINDING_COLUMNS + _FINDING_JOINS
 _ORDER_FINDINGS = " ORDER BY reported_row.row_number, findings.rule_id"
+
+# Each rule's latest `done` run that actually applied it, and that run's
+# number. A run's number is not stored anywhere; it is counted here exactly as
+# `app/register/read_history.py` and `app/projects/list_projects.py` count it,
+# so no surface can number one run differently. `rules_applied` is null on a
+# run that never reached Examine, and the lateral join drops it.
+_LATEST_APPLICABLE_FINDINGS = (
+    "WITH numbered_runs AS ("
+    "SELECT runs.id, runs.status, runs.finished_at, runs.rules_applied, "
+    "ROW_NUMBER() OVER (PARTITION BY runs.project_id "
+    "ORDER BY runs.created_at ASC) AS run_number "
+    "FROM runs WHERE runs.project_id = %s), "
+    "latest_run_of_rule AS ("
+    "SELECT DISTINCT ON (applied.rule_id) applied.rule_id AS rule_id, "
+    "numbered_runs.id AS run_id FROM numbered_runs "
+    "CROSS JOIN LATERAL jsonb_array_elements_text(numbered_runs.rules_applied) "
+    "AS applied(rule_id) WHERE numbered_runs.status = %s "
+    "ORDER BY applied.rule_id, numbered_runs.finished_at DESC) "
+    "SELECT " + _FINDING_COLUMNS + ", numbered_runs.run_number"
+    + _FINDING_JOINS
+    + "JOIN latest_run_of_rule ON latest_run_of_rule.rule_id = findings.rule_id "
+    "AND latest_run_of_rule.run_id = findings.run_id "
+    "JOIN numbered_runs ON numbered_runs.id = findings.run_id "
+    "WHERE decisions.outcome = %s" + _ORDER_FINDINGS
+)
 
 
 async def examine_under_review(
@@ -72,6 +101,18 @@ def exported_finding(finding: dict[str, Any]) -> dict[str, Any]:
         "issue": finding["issue"],
         "evidence": finding["evidence"],
         "question": finding["question"],
+    }
+
+
+def finding_on_the_register(finding: dict[str, Any]) -> dict[str, Any]:
+    """A finding as the register shows it, naming the run that raised it.
+
+    The run number is what a person reads beside the finding in History, so
+    the register names the same one rather than a run id nobody has seen.
+    """
+    return exported_finding(finding) | {
+        "finding_id": str(finding["finding_id"]),
+        "raised_by_run": finding["raised_by_run"],
     }
 
 
@@ -130,19 +171,27 @@ async def approved_findings_of_project(
     connection: AsyncConnection,
     project_id: UUID,
 ) -> list[dict[str, Any]]:
-    """Every finding a person approved onto a row of this project's register.
+    """What each rule found, the last time each rule actually ran.
 
-    Only findings of runs that ended `done` count: an approved finding on a
-    run still at review has not passed the add/discard gate, and one on a
-    discarded run never will — the register is only what was added to it.
+    Every run re-examines the whole register, so a rule that raised a finding
+    in run 5 and raised nothing in run 6 has answered again — and the register
+    shows the newer answer, which is no finding at all. A rejected finding in
+    that newer run clears the row for that rule too: the person was asked and
+    said no. Where the newer run never applied the rule — because a kind of
+    document it names had not been read — the older answer is still the
+    latest one there is, and it stands.
+
+    Only runs that ended `done` count: an approved finding on a run still at
+    review has not passed the add/discard gate, and one on a discarded run
+    never will. Nothing is deleted; History keeps every run's findings.
     """
-    return await _findings_matching(
-        connection,
-        "WHERE register_rows.project_id = %s AND decisions.outcome = %s "
-        "AND EXISTS (SELECT 1 FROM runs "
-        "WHERE runs.id = findings.run_id AND runs.status = %s)",
-        (project_id, APPROVED, DONE),
+    result = await connection.execute(
+        _LATEST_APPLICABLE_FINDINGS, (project_id, DONE, APPROVED)
     )
+    return [
+        _finding_as_read(finding) | {"raised_by_run": finding["run_number"]}
+        for finding in await result.fetchall()
+    ]
 
 
 async def rules_that_ran(
@@ -198,18 +247,19 @@ async def _findings_matching(
         _SELECT_FINDINGS + condition + _ORDER_FINDINGS,
         parameters,
     )
-    return [
-        {
-            "finding_id": finding["id"],
-            "decision_id": finding["decision_key"],
-            "register_row_id": finding["register_row_id"],
-            "row_number": finding["row_number"],
-            "rule_id": finding["rule_id"],
-            "rule_text": finding["rule_text"],
-            "issue": finding["issue"],
-            "evidence": finding["evidence"],
-            "question": finding["question"],
-            "outcome": finding["outcome"],
-        }
-        for finding in await result.fetchall()
-    ]
+    return [_finding_as_read(finding) for finding in await result.fetchall()]
+
+
+def _finding_as_read(finding: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "finding_id": finding["id"],
+        "decision_id": finding["decision_key"],
+        "register_row_id": finding["register_row_id"],
+        "row_number": finding["row_number"],
+        "rule_id": finding["rule_id"],
+        "rule_text": finding["rule_text"],
+        "issue": finding["issue"],
+        "evidence": finding["evidence"],
+        "question": finding["question"],
+        "outcome": finding["outcome"],
+    }

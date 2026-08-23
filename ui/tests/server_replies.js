@@ -98,7 +98,7 @@ export function registerReply(overrides = {}) {
         fingerprint: "a1b2c3d4e5f60718",
         cells: {
           what_was_asked: "Applicants upload supporting documents.",
-          in_writing: "Yes — 12 March scope, section 2.",
+          in_writing: "Not mentioned",
           what_testing_found: "Upload failed for files over 10 MB.",
           status: "Partial",
         },
@@ -111,13 +111,12 @@ export function registerReply(overrides = {}) {
             absence_statement: null,
           },
           {
-            cell: "status",
+            cell: "in_writing",
             source_file: "26-march-scope.md",
             place: null,
             source_words: null,
             absence_statement:
-              "the 26 March scope was read in full and no longer asks for "
-              + "supporting document upload.",
+              "26-march-scope.md was read, and it does not mention this ask.",
           },
         ],
         findings: [],
