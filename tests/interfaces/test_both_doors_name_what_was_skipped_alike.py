@@ -28,7 +28,7 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 UNRELATED_ASK = "a window seat on the Tuesday flight"
 
 
-def test_both_doors_call_the_list_not_used_and_report_the_same_entries(
+def test_both_doors_call_the_list_skipped_and_report_the_same_entries(
     tmp_path: Path,
 ) -> None:
     """One name for one list, whichever door asks — and one answer behind both."""
@@ -68,8 +68,8 @@ def test_both_doors_call_the_list_not_used_and_report_the_same_entries(
             finally:
                 application.stop()
 
-    assert "skipped" not in over_http
-    assert "skipped" not in through_mcp
-    assert over_http["not_used"] == through_mcp["not_used"]
-    assert [entry["kind"] for entry in over_http["not_used"]] == ["not read"]
+    assert "not_used" not in over_http
+    assert "not_used" not in through_mcp
+    assert over_http["skipped"] == through_mcp["skipped"]
+    assert [entry["kind"] for entry in over_http["skipped"]] == ["not read"]
     assert over_http == through_mcp

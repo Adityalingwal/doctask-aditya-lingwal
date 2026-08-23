@@ -44,7 +44,9 @@ def test_no_rule_is_judged_outside_config_rules_yaml(tmp_path: Path) -> None:
     assert [rule["id"] for rule in reported["exported"]["rules"]] == ["R1"]
     assert reported["at_review"]["findings"] == []
     assert reported["exported"]["findings"] == []
-    assert "R1" in reported["markdown"]
+    # The file names the rule by its own words: whoever opens it has never
+    # seen the rules file, so a rule id would name nothing to them (S16).
+    assert "Anything built must have a written requirement." in reported["markdown"]
     # The title line carries the project name, derived from a random test
     # folder — a hex suffix starting "d1"/"d2" capitalises into the very
     # code this assertion hunts for, failing the test by coincidence.
@@ -53,7 +55,7 @@ def test_no_rule_is_judged_outside_config_rules_yaml(tmp_path: Path) -> None:
         for line in reported["markdown"].splitlines()
         if not line.startswith("# Requirements-to-Delivery Register")
     )
-    for named_in_code in ("D1", "D2"):
+    for named_in_code in ("D1", "D2", "R1"):
         assert named_in_code not in body_without_title
 
 

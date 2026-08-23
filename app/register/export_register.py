@@ -315,9 +315,21 @@ def _rules_lines(register: dict[str, Any]) -> list[str]:
             f"{_counted(applied['rows_examined'], 'row')}",
             "",
         ]
-        + [f"- {_single_line(rule['text'])}" for rule in applied["rules"]]
+        + [
+            f"- {_single_line(rule['text'])}{_rule_settings(rule)}"
+            for rule in applied["rules"]
+        ]
         + [""]
     )
+
+
+def _rule_settings(rule: dict[str, Any]) -> str:
+    """A rule whose text names a setting cannot be read without its value."""
+    params = rule.get("params")
+    if not params:
+        return ""
+    settings = ", ".join(f"{name}: {value}" for name, value in params.items())
+    return f" ({settings})"
 
 
 def _counted(how_many: int, thing: str) -> str:

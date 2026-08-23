@@ -53,7 +53,9 @@ EXPORT_WITH_A_RULE_CARRYING_A_SETTING = {
     "exported_at": "2026-08-17T00:00:00+00:00",
     "columns": list(CELL_NAMES),
     "rows": [],
-    "examine": {
+    "rules": {
+        "run_number": 1,
+        "rows_examined": 0,
         "rules": [
             {
                 "id": "R3",
@@ -61,8 +63,6 @@ EXPORT_WITH_A_RULE_CARRYING_A_SETTING = {
                 "params": {"max_days": R3_MAX_DAYS},
             }
         ],
-        "rows_examined": 0,
-        "findings": [],
     },
 }
 
@@ -201,9 +201,14 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     )
     assert export["examine"]["rows_examined"] == 1
     assert export["examine"]["findings"] == []
-    assert "No findings" in markdown
-    for rule_id in RULE_IDS_THAT_ALWAYS_APPLY:
-        assert rule_id in markdown
+    # A clean register prints no Findings block at all (item 43); the rules
+    # that produced that result are still named, by their own words, without
+    # which "nothing found" says nothing.
+    assert "**Findings**" not in markdown
+    assert "No findings" not in markdown
+    for rule in export["examine"]["rules"]:
+        assert rule["text"] in markdown
+        assert rule["id"] not in markdown
     assert all(rule.get("params") is None for rule in export["examine"]["rules"])
 
 
@@ -285,7 +290,12 @@ def test_a_finding_reaches_neither_finish_review_nor_the_export_unanswered(
     # so attaching one must not move it.
     assert len(attachment_audit) == 1
     assert attachment_audit[0]["cell_name"] is None
-    assert R1_ISSUE in attachment_audit[0]["new_value"]
+    # The history names the rule in its own words and never its id (item 48).
+    assert attachment_audit[0]["new_value"] == (
+        "Finding: Anything built must have a written requirement; a verbal "
+        "mention is not enough."
+    )
+    assert "R1" not in attachment_audit[0]["new_value"]
     assert committed["fingerprint"] == fingerprint_of_cells(
         {name: committed[name] for name in CELL_NAMES}
     )
