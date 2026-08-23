@@ -48,6 +48,7 @@ EXPECTED_COLUMNS = {
         "reported_instructions",
         "review_finished_at",
         "rules_snapshot",
+        "rules_applied",
         "rules_fingerprint",
         "examined_row_count",
         "created_at",
