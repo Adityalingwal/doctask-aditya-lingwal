@@ -64,7 +64,7 @@ test("a citation whose quoted words the server did not send is never shown as a 
       source_file: "12-march-scope.md",
       place: "Section 2 — Applicant portal",
       source_words: null,
-      absence_statement: "the 12 March scope was read in full and asks for nothing here.",
+      absence_statement: "12-march-scope.md was read, and it does not mention this ask.",
     },
   ];
   vi.stubGlobal(
@@ -85,7 +85,7 @@ test("a citation whose quoted words the server did not send is never shown as a 
   const register = await screen.findByRole("region", { name: /register/i });
 
   expect(register.textContent).toContain("12-march-scope.md");
-  expect(register.textContent).toContain("asks for nothing here");
+  expect(register.textContent).toContain("does not mention this ask");
   expect(register.textContent).not.toContain('""');
   expect(register.textContent).not.toContain("null");
 });

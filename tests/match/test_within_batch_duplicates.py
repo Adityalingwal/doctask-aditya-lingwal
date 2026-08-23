@@ -11,6 +11,8 @@ from app.register.cells import (
     CELL_NAMES,
     IN_WRITING,
     IN_WRITING_NOT_KNOWN_YET,
+    IN_WRITING_YES,
+    NOT_MENTIONED,
     WHAT_WAS_ASKED,
 )
 from tests.documents.register_documents import (
@@ -284,7 +286,7 @@ def test_that_row_says_it_is_in_writing_and_cites_both_documents(
     one_ask_in_two_documents: RunOutcome,
 ) -> None:
     row = one_ask_in_two_documents.rows[1]
-    assert _cell(row, IN_WRITING) == f"Yes — written in {REQUIREMENTS_FILE}."
+    assert _cell(row, IN_WRITING) == IN_WRITING_YES
     assert _cited_files(row, IN_WRITING) == [REQUIREMENTS_FILE]
 
 
@@ -411,20 +413,20 @@ def test_in_writing_says_the_requirements_document_does_not_mention_it(
 
     # The meeting note is read first, so its ask — the one the requirements
     # document never mentions — is row 1.
-    assert _cell(outcome.rows[1], IN_WRITING) == f"Not found in {REQUIREMENTS_FILE}."
-    assert _cited_files(outcome.rows[1], IN_WRITING) == []
-    assert _cell(outcome.rows[2], IN_WRITING) == (
-        f"Yes — written in {REQUIREMENTS_FILE}."
-    )
+    assert _cell(outcome.rows[1], IN_WRITING) == NOT_MENTIONED
+    # The absence carries its own evidence: the file that was read and is
+    # silent, never a bare claim the row cannot support.
+    assert _cited_files(outcome.rows[1], IN_WRITING) == [REQUIREMENTS_FILE]
+    assert _cell(outcome.rows[2], IN_WRITING) == IN_WRITING_YES
 
 
-def test_in_writing_names_a_requirements_document_read_by_an_earlier_run(
+def test_a_requirements_document_read_by_an_earlier_run_still_answers_written_down(
     tmp_path: Path,
 ) -> None:
     """A document is read once for a project's whole life, never again.
 
-    Answering this from the run's own batch would put "no client requirements
-    document has been read" back on every row a later run proposes.
+    A row born after that document was read must still record its silence, or
+    every later row would keep saying no requirements document has been read.
     """
     first, second = _runs_over(
         tmp_path,
@@ -433,8 +435,9 @@ def test_in_writing_names_a_requirements_document_read_by_an_earlier_run(
         {match_marker(): match_answer_within_batch([(NEW_ROW, None, None)])},
     )
 
-    assert _cell(first.rows[1], IN_WRITING) == f"Yes — written in {REQUIREMENTS_FILE}."
-    assert _cell(second.rows[2], IN_WRITING) == f"Not found in {REQUIREMENTS_FILE}."
+    assert _cell(first.rows[1], IN_WRITING) == IN_WRITING_YES
+    assert _cell(second.rows[2], IN_WRITING) == NOT_MENTIONED
+    assert _cited_files(second.rows[2], IN_WRITING) == [REQUIREMENTS_FILE]
 
 
 def test_two_documents_in_separate_runs_still_reach_the_committed_row_gate(

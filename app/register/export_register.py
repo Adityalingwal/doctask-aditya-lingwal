@@ -8,7 +8,7 @@ from psycopg import AsyncConnection
 from app.examine.read_findings import (
     approved_findings_of_project,
     examine_as_exported,
-    exported_finding,
+    finding_on_the_register,
 )
 from app.register.cells import CELL_NAMES, COLUMN_HEADINGS
 from app.runs.statuses import DONE
@@ -81,12 +81,13 @@ async def _read_register_document(
             }
         )
 
-    # A row carries every finding approved onto it, whichever run raised it;
-    # the examine block below is what the newest committed run judged and found.
+    # A row carries what each rule found the last time that rule ran — which
+    # may be nothing at all; the examine block below is what the newest
+    # committed run judged and found.
     findings_by_row: dict[UUID, list[dict[str, Any]]] = {}
     for finding in await approved_findings_of_project(connection, project["id"]):
         findings_by_row.setdefault(finding["register_row_id"], []).append(
-            exported_finding(finding)
+            finding_on_the_register(finding)
         )
 
     return {

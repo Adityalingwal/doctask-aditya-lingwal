@@ -23,6 +23,7 @@ from tests.documents.register_documents import (
     write_meeting_note,
 )
 from tests.examine.answers import examine_answer, one_finding
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -39,7 +40,7 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 TESTING_SUMMARY = "the notification reaches the operations team"
 TESTING_QUOTE = "The email notification reaches the operations team every time."
 TESTING_DATE = "25 March 2026"
-STATUS_BEFORE_TESTING = "Nothing said yet"
+STATUS_BEFORE_TESTING = "Requested"
 STATUS_AFTER_PASSED_TESTING = "Done"
 
 
@@ -74,6 +75,7 @@ def _project(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -235,10 +237,7 @@ def test_two_findings_attached_to_one_row_in_one_run_keep_one_order(
     second = one_finding(
         rule_id="R4",
         issue="No testing outcome has been read for this requirement.",
-        evidence=(
-            "Not known yet — no testing outcome has been read for this "
-            "requirement."
-        ),
+        evidence="Not known yet",
         question="Row 1 has no testing outcome read yet. Keep this finding?",
     )
     with _project(tmp_path, examine_answer([first, second])) as (

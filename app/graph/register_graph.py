@@ -15,6 +15,8 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from app.extract.answer import (
+    CLIENT_REQUIREMENTS_DOCUMENT,
+    TESTING_FEEDBACK,
     UNRELATED_DOCUMENT,
     ListTheDocumentTypeMayNotFill,
     UnrecognisedDocumentType,
@@ -23,6 +25,7 @@ from app.extract.answer import (
 )
 from app.examine.examine_register import UnusableExamineAnswer, examine_register
 from app.examine.frozen_rules import (
+    APPLIES_WHEN_KEY,
     freeze_rules_for_run,
     frozen_rules_of_run,
     rules_changed_since_the_register_was_last_examined,
@@ -31,6 +34,7 @@ from app.examine.record_findings import record_findings
 from app.examine.register_under_examination import register_under_examination
 from app.extract.read_document import locate_extraction, read_one_document
 from app.ingest.collect_batch import collect_batch
+from app.ingest.read_once import kinds_read_by_project
 from app.match.match_requirements import (
     EXISTING_ROW,
     POSSIBLE_MATCH,
@@ -39,6 +43,7 @@ from app.match.match_requirements import (
     match_requirements,
 )
 from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
+from app.register.absence_rows import propose_absences
 from app.register.commit_register import commit_register
 from app.register.move_rows import propose_moves
 from app.register.propose_rows import MatchSettlement, committed_rows, propose_rows
@@ -102,6 +107,7 @@ class RunState(TypedDict, total=False):
     next_document_index: int
     requirements_found: int
     observations_found: int
+    absence_kinds_read: int
     moved_rows: int
     examine_changed_rules: bool
     proposed_rows: int
@@ -173,6 +179,7 @@ def build_register_graph(
             "next_document_index": 0,
             "requirements_found": 0,
             "observations_found": 0,
+            "absence_kinds_read": 0,
             "examine_changed_rules": examine_changed_rules,
         }
 
@@ -349,6 +356,8 @@ def build_register_graph(
             + requirements_found,
             "observations_found": state.get("observations_found", 0)
             + _observations_in(located.extraction),
+            "absence_kinds_read": state.get("absence_kinds_read", 0)
+            + _speaks_to_a_cell_by_silence(answer.document_type.value),
         }
 
     async def match(state: RunState) -> dict[str, Any]:
@@ -377,6 +386,10 @@ def build_register_graph(
             # is added over a folder that already holds them.
             moves = await propose_moves(connection, model_client, run_id, project_id)
             await append_not_used(connection, run_id, moves.unmatched)
+            # After the moves, because a row a report spoke about is known only
+            # once its observations have been matched; stored beside them so
+            # Examine judges the register as Commit will leave it.
+            silent_rows = await propose_absences(connection, run_id, project_id)
             await _finish_stage(connection, run_id, MATCH_STAGE)
 
         _log(
@@ -388,6 +401,7 @@ def build_register_graph(
             run_id,
             gated_rows=proposed.gated_row_numbers + moves.gated_row_numbers,
             moved_rows=moves.moved_row_numbers,
+            rows_a_document_did_not_mention=silent_rows,
         )
         return {
             "proposed_rows": len(proposed.proposed_row_ids),
@@ -399,29 +413,50 @@ def build_register_graph(
         project_id = UUID(state["project_id"])
         async with pool.connection() as connection:
             await enter_stage(connection, run_id, EXAMINE_STAGE)
-            rules = await frozen_rules_of_run(connection, run_id)
+            frozen = await frozen_rules_of_run(connection, run_id)
             rows = await register_under_examination(connection, project_id, run_id)
+            # This run's own batch counts as read: Extract has stored its
+            # documents, and a rule waiting on the kind they are is waiting no
+            # longer.
+            kinds_read = await kinds_read_by_project(
+                connection, project_id, include_run_id=run_id
+            )
 
-        try:
-            found = await examine_register(model_client, rules, rows)
-        except UnusableExamineAnswer:
-            raise  # it already names its own cause and fix
-        except Exception as error:
-            raise_if_configuration_failure(error)
-            # Examine judges the whole register in one call, so there is no
-            # single row to drop the way Extract drops one document.
-            raise ModelCallFailed(
-                "The register could not be examined against this run's rules "
-                f"({describe_unreadable_answer(error)}) — no finding was "
-                "recorded and nothing was exported. Start another run once the "
-                "model is answering."
-            ) from error
+        rules = _the_rules_that_apply(frozen, kinds_read)
+        found: list[dict[str, Any]] = []
+        if rules:
+            try:
+                found = await examine_register(model_client, rules, rows)
+            except UnusableExamineAnswer:
+                raise  # it already names its own cause and fix
+            except Exception as error:
+                raise_if_configuration_failure(error)
+                # Examine judges the whole register in one call, so there is no
+                # single row to drop the way Extract drops one document.
+                raise ModelCallFailed(
+                    "The register could not be examined against this run's rules "
+                    f"({describe_unreadable_answer(error)}) — no finding was "
+                    "recorded and nothing was exported. Start another run once the "
+                    "model is answering."
+                ) from error
+        else:
+            _log(
+                logging.INFO,
+                "examine_no_rules_applied",
+                "No rule was judged: every rule this run froze names a kind of "
+                "document this project has not read yet, and a rule judged "
+                "before its evidence exists raises findings against silence.",
+                run_id,
+            )
 
         async with pool.connection() as connection:
             await record_findings(connection, run_id, found)
+            # Written together, because a row count without the rules behind it
+            # cannot say what the register was actually judged against.
             await connection.execute(
-                "UPDATE runs SET examined_row_count = %s WHERE id = %s",
-                (len(rows), run_id),
+                "UPDATE runs SET examined_row_count = %s, rules_applied = %s "
+                "WHERE id = %s",
+                (len(rows), Jsonb([rule["id"] for rule in rules]), run_id),
             )
             await _finish_stage(connection, run_id, EXAMINE_STAGE)
 
@@ -641,6 +676,23 @@ async def _settle_against_the_register(
     }
 
 
+def _the_rules_that_apply(
+    frozen: list[dict[str, Any]],
+    kinds_read: set[str],
+) -> list[dict[str, Any]]:
+    """The frozen rules whose every named document kind the project has read.
+
+    A rule about what testing found, judged before any testing feedback has
+    been read, has nothing to judge and reports the silence as a fault — six
+    such findings in one demo. A rule naming no kind applies always.
+    """
+    return [
+        rule
+        for rule in frozen
+        if all(kind in kinds_read for kind in rule.get(APPLIES_WHEN_KEY, []))
+    ]
+
+
 def _outcome_the_candidate_allows(outcome: MatchOutcome) -> str:
     """Downgrade a confident match against a committed row, and only that one.
 
@@ -667,13 +719,25 @@ def _route_after_extract(state: RunState) -> str:
         return EXTRACT_NODE
     # A batch of nothing but testing feedback and a handover summary states no
     # requirement and still has work to do: it moves rows an earlier run made.
-    if state.get("requirements_found") or state.get("observations_found"):
+    if (
+        state.get("requirements_found")
+        or state.get("observations_found")
+        or state.get("absence_kinds_read")
+    ):
         return MATCH_NODE
     return END_EARLY_NODE
 
 
 def _route_after_match(state: RunState) -> str:
-    if state.get("proposed_rows") or state.get("moved_rows"):
+    # A document's silence about a row is a change too: a requirements document
+    # or a testing report that was read and mentions nothing still moves every
+    # row it does not mention to `Not mentioned`, and a person approves that at
+    # the gate like any other change.
+    if (
+        state.get("proposed_rows")
+        or state.get("moved_rows")
+        or state.get("absence_kinds_read")
+    ):
         return EXAMINE_NODE
     return END_EARLY_NODE
 
@@ -697,6 +761,17 @@ def _early_reason(state: RunState) -> str:
         state.get("document_ids", [])
     )
     return _nothing_read_reason(not_used_count) if not_used_count else NO_FILES_FOUND
+
+
+def _speaks_to_a_cell_by_silence(document_type: str) -> int:
+    """Whether reading this kind of document can move a cell by saying nothing.
+
+    A client requirements document answers `Written down` and a testing report
+    answers `What testing found`, for every row — including the rows neither of
+    them mentions. A meeting note and a handover answer no cell by silence, and
+    an unrelated document was never about this project at all.
+    """
+    return int(document_type in (CLIENT_REQUIREMENTS_DOCUMENT, TESTING_FEEDBACK))
 
 
 def _observations_in(extraction: dict[str, Any]) -> int:

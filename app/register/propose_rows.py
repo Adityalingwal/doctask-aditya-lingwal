@@ -9,10 +9,9 @@ from app.extract.answer import CLIENT_REQUIREMENTS_DOCUMENT
 from app.match.match_requirements import EXISTING_ROW, NEW_ROW
 from app.register.cells import (
     IN_WRITING,
-    IN_WRITING_NOT_FOUND_IN,
     IN_WRITING_NOT_KNOWN_YET,
-    IN_WRITING_WRITTEN_IN_OPENING,
-    STATUS_NOTHING_SAID_YET,
+    IN_WRITING_YES,
+    STATUS_REQUESTED,
     TESTING_NOT_KNOWN_YET,
     WHAT_WAS_ASKED,
 )
@@ -75,9 +74,6 @@ async def propose_rows(
         await _clear_what_this_run_proposed_before(connection, run_id)
         register = await committed_rows(connection, project_id)
         candidate_by_number = {row["row_number"]: row for row in register}
-        documents_read = await _requirements_documents_of_project(
-            connection, project_id
-        )
         next_row_number = await _next_row_number(connection, project_id)
 
         stating_requirement = _which_requirement_states_each_row(
@@ -98,7 +94,6 @@ async def propose_rows(
                 project_id,
                 next_row_number,
                 on_this_row,
-                documents_read,
             )
             proposed_row_ids.append(row_id)
             row_by_requirement[stated_by] = {
@@ -217,41 +212,19 @@ async def _next_row_number(connection: AsyncConnection, project_id: UUID) -> int
     return int(highest["highest"]) + 1
 
 
-async def _requirements_documents_of_project(
-    connection: AsyncConnection,
-    project_id: UUID,
-) -> list[str]:
-    """Every client requirements document this project has read, in name order.
-
-    Scoped to the project rather than this run's batch: a document is read once
-    for a project's whole life, so a requirements document read by an earlier
-    run is never read again and would otherwise be invisible here.
-    """
-    result = await connection.execute(
-        "SELECT DISTINCT documents.source_path FROM documents "
-        "JOIN runs ON runs.id = documents.run_id "
-        "WHERE runs.project_id = %s "
-        "AND documents.extraction ->> 'document_type' = %s "
-        "ORDER BY documents.source_path",
-        (project_id, CLIENT_REQUIREMENTS_DOCUMENT),
-    )
-    return [document["source_path"] for document in await result.fetchall()]
-
-
 async def _insert_proposed_row(
     connection: AsyncConnection,
     run_id: UUID,
     project_id: UUID,
     row_number: int,
     requirements_on_row: list[dict[str, Any]],
-    documents_read: list[str],
 ) -> UUID:
     row_id = uuid4()
     # The batch is ordered by document type, so the first requirement on a row
     # is the one stated earliest in the workflow, whatever the files are named.
     stated_the_ask = requirements_on_row[0]
     written_down = _the_requirement_in_writing(requirements_on_row)
-    in_writing = _in_writing_cell(written_down, documents_read)
+    in_writing = _in_writing_cell(written_down)
 
     await connection.execute(
         "INSERT INTO register_rows (id, project_id, what_was_asked, in_writing, "
@@ -264,7 +237,7 @@ async def _insert_proposed_row(
             stated_the_ask["summary"],
             in_writing,
             TESTING_NOT_KNOWN_YET,
-            STATUS_NOTHING_SAID_YET,
+            STATUS_REQUESTED,
             UNSET_FINGERPRINT,
             row_number,
             run_id,
@@ -289,18 +262,16 @@ def _the_requirement_in_writing(
     return None
 
 
-def _in_writing_cell(
-    written_down: dict[str, Any] | None,
-    documents_read: list[str],
-) -> str:
-    # "No" would claim the client requirements documents were read in full and
-    # this ask is in none of them. Only a document actually read can support a
-    # claim at all, and one not mentioning an ask does not prove the client
-    # never put it in writing.
+def _in_writing_cell(written_down: dict[str, Any] | None) -> str:
+    """`Yes` where a requirements document states the ask, and nothing more.
+
+    A new row never claims absence. Whether a requirements document the project
+    has read is silent about this ask is settled at Commit by the absence move
+    (`app/register/absence_rows.py`), which writes the evidence behind that
+    claim; a cell written here could only assert it with none.
+    """
     if written_down is not None:
-        return f"{IN_WRITING_WRITTEN_IN_OPENING}{written_down['source_file']}."
-    if documents_read:
-        return IN_WRITING_NOT_FOUND_IN.format(documents=", ".join(documents_read))
+        return IN_WRITING_YES
     return IN_WRITING_NOT_KNOWN_YET
 
 

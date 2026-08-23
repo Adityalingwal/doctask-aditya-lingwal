@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision,
@@ -82,6 +83,7 @@ def _committed_row_and_a_second_document(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:

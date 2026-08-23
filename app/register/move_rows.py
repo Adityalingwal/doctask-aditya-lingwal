@@ -9,6 +9,7 @@ from psycopg.types.json import Jsonb
 
 from app.extract.answer import TestingLabel
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH, match_observations
+from app.register.absence_rows import is_absence, write_absence
 from app.register.audit_entries import write_cell_change
 from app.register.cells import (
     CELL_NAMES,
@@ -240,7 +241,7 @@ def status_after(
     claim — so it is `Not delivered`.
 
     A handover with no testing behind it lands on `Handed over`. The three
-    states are distinct claims rather than shades of one: `Nothing said yet`
+    states are distinct claims rather than shades of one: `Requested`
     means no document has spoken, `Handed over` means we say we built it, and
     `Done` means testing confirmed it behaves as asked.
     """
@@ -355,7 +356,12 @@ async def _write_one_rows_moves(
     # one arriving in the same batch.
     superseded = await _citations_of_cell(connection, row["id"], WHAT_TESTING_FOUND)
 
-    for move in moves:
+    # An observation's move first, then an absence: a cell the report spoke
+    # about is never then marked as one it was silent on.
+    for move in sorted(moves, key=is_absence):
+        if is_absence(move):
+            await write_absence(connection, row, move, run_id)
+            continue
         old_value = row[move["cell"]]
         if old_value == move["value"]:
             continue

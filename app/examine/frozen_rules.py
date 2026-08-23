@@ -10,15 +10,19 @@ import yaml
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
+from app.extract.answer import DOCUMENT_WORKFLOW_ORDER
+
 
 RULES_KEY = "rules"
 ID_KEY = "id"
 TEXT_KEY = "text"
 PARAMS_KEY = "params"
+APPLIES_WHEN_KEY = "applies_when"
 FIX_THE_FILE = (
     "Fix the file, or point RULES_CONFIG_PATH at a rules file of your own, "
     "then start another run."
 )
+ALLOWED_DOCUMENT_KINDS = DOCUMENT_WORKFLOW_ORDER
 
 
 class RulesFileUnusable(RuntimeError):
@@ -145,8 +149,45 @@ def _normalised_rules(
             _refuse(f"rule {rule_id} in {config_path} has a '{PARAMS_KEY}:' "
                     "that is not a mapping")
         seen_ids.add(rule_id)
-        rules.append({ID_KEY: rule_id, TEXT_KEY: rule_text, PARAMS_KEY: params})
+        normalised = {ID_KEY: rule_id, TEXT_KEY: rule_text, PARAMS_KEY: params}
+        # Absent rather than empty when the rule does not name kinds: a rule
+        # naming none applies always, and an empty list would be the same
+        # claim written differently — and would move every fingerprint.
+        if APPLIES_WHEN_KEY in rule:
+            normalised[APPLIES_WHEN_KEY] = _document_kinds(
+                config_path, rule_id, rule[APPLIES_WHEN_KEY]
+            )
+        rules.append(normalised)
     return rules
+
+
+def _document_kinds(
+    config_path: Path,
+    rule_id: str,
+    named: Any,
+) -> list[str]:
+    """The document kinds one rule waits for, refusing anything else by name.
+
+    An unknown kind can never be read, so a rule naming one would never run
+    again — silently, and looking exactly like a rule that simply found
+    nothing.
+    """
+    if not isinstance(named, list) or not named:
+        _refuse(
+            f"rule {rule_id} in {config_path} has an '{APPLIES_WHEN_KEY}:' that "
+            f"is not a list of document kinds — write one or more of "
+            f"{', '.join(ALLOWED_DOCUMENT_KINDS)}, or leave the field out so "
+            "the rule always applies"
+        )
+    for kind in named:
+        if kind not in ALLOWED_DOCUMENT_KINDS:
+            _refuse(
+                f"rule {rule_id} in {config_path} names '{kind}' under "
+                f"'{APPLIES_WHEN_KEY}:', which is not a kind of document this "
+                f"system reads — use one or more of "
+                f"{', '.join(ALLOWED_DOCUMENT_KINDS)}"
+            )
+    return list(named)
 
 
 def _refuse(cause: str) -> NoReturn:

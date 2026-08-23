@@ -4,6 +4,47 @@ Current status only. Completed narrative that has fallen out of this file
 stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-23, branch `brief-1a-pipeline-and-schema`
+
+The pipeline half of the demo-run repairs: after this branch the register's
+cells, findings and history say what the documents actually support.
+
+- **The status `Nothing said yet` is `Requested`** (migration
+  `20260823_0022`), everywhere a reader or the system takes the word from.
+  A grep for the old words over the repository hits only the places that
+  record them on purpose: the two rename migrations and their two tests
+  (`test_schema.py`, `test_requested_status_migration.py`), the DECISIONS
+  replacement notes, this line and the live-run row below, and the live-run
+  record under `documentation/` — never `app/`, `ui/`, `config/` or README.
+- **Cells are short, and the file behind an answer is in the evidence.**
+  `Written down` reads `Not known yet` · `Yes` · `Not mentioned`;
+  `What testing found` reads `Not known yet` · what testing said ·
+  `Not mentioned`.
+- **The absence move is built** (`app/register/absence_rows.py`), the feature
+  this file listed as not built. Match works out which rows each client
+  requirements document and testing report the project has read does not
+  mention and stores that beside the observations' moves; Examine judges the
+  register with those absences overlaid, and Commit writes them: the cell
+  moves to `Not mentioned` with the file as its evidence, its history entry
+  and a moved fingerprint. It never overwrites an answer, and a run that read
+  such a document always continues to Review.
+- **A rule waits for the documents it is about** (`applies_when` in
+  `config/rules.yaml`, validated at startup and at every freeze), and
+  `runs.rules_applied` (migration `20260823_0023`) records exactly what
+  Examine sent to the model.
+- **The register shows each rule's finding from the latest run that applied
+  it**, so a row never carries two copies of one rule's finding again.
+- **Examine treats an unanswered possible match as the match**: it judges the
+  row the proposal would join, with that proposal's `Written down` overlaid,
+  and counts real rows only.
+- **One definition of "read"** (`app/ingest/read_once.py`), shared by Ingest,
+  the rule gate and the absence move.
+
+**Both suites green, no live key: 271 Python passed** and **66 front-end
+passed across 38 files.** The corpus has not been driven against a live model
+on this branch; the expected end state is in
+`sample-documents/helpline-ai/README.md`.
+
 ## Snapshot — 2026-08-19, branch `live-run-repairs`
 
 Two more defects the live run exposed, both fixed test-first.
@@ -27,13 +68,6 @@ Two more defects the live run exposed, both fixed test-first.
 
 **Both suites green, no live key: 253 Python passed** and **63 front-end
 passed across 36 files.**
-
-**Still open, deliberately not built here:** a row's `Written down` keeps
-"no client requirements document has been read for this project" after one
-has been read that does not mention the ask. Refreshing it needs a new kind
-of move — an absence-backed cell change on a row no requirement landed on,
-with its own citation, audit entry and gate — which is a feature rather than
-a repair. Recorded under `## Known limitations`.
 
 ## Snapshot — 2026-08-18, branch `strict-schema-and-honest-early-exit`
 
@@ -395,54 +429,6 @@ written first and seen failing on `DID NOT RAISE`
 twin). After the repair the Python suite printed **216 passed** and the
 front-end suite was not re-run — no front-end file changed in the repair.
 
-### The status `No evidence yet` becomes `Nothing said yet` (branch `rename-status-nothing-said-yet`)
-
-One rename, from `main` at `13e1eca`. The value, the constant
-`STATUS_NO_EVIDENCE_YET` (now `STATUS_NOTHING_SAID_YET`), its two use sites, the
-literals in nine test files, `DECISIONS.md`, `README.md`, and a new migration
-`20260817_0018`. The dead `Blocker` entry left `DECISIONS.md`'s locked
-vocabulary in the same work. The superseded wording, the rejected
-alternatives and the reasoning for both are in `DECISIONS.md`'s Git history.
-
-**Test-first, and the baseline failures were recorded before the rename.**
-`test_a_row_nothing_has_spoken_about_starts_at_nothing_said_yet` failed on
-`main` with `AssertionError: assert 'No evidence yet' == 'Nothing said yet'`,
-and `test_register_row_takes_nothing_said_yet_and_refuses_the_name_it_replaced`
-failed with a `CheckViolation` on `ck_register_rows_status` — both real
-assertions rather than import errors. After the rename: **202 Python tests
-passed** (200 before, plus these two) and **46 front-end tests across 30
-files**, unchanged because no front-end source was touched.
-
-**Migration evidence, driven by hand against a real database.**
-`pg_get_constraintdef` and `pg_indexes` were read at `20260817_0017` first:
-`ck_register_rows_status` is the only check constraint naming a status, and all
-four indexes on `register_rows`, `citations` and `audit` are plain btree with no
-predicate, so no index names the value. Two committed rows were seeded, one
-`No evidence yet` and one `Handed over`. `alembic upgrade head` left row 1
-reading `Nothing said yet` and row 2 untouched, with the constraint reading
-`Done, Partial, Not delivered, Handed over, Disputed, Nothing said yet`.
-`alembic downgrade 20260817_0017` restored both the old value and the old
-constraint exactly, and upgrading again reached the same state.
-
-**`tests/infrastructure/test_four_cell_migration.py` deliberately still spells
-`No evidence yet`.** Its `STATUSES_BEFORE` names the check constraint as it
-stood at `20260816_0016`, where the rows are seeded before the narrowing runs;
-rewriting it would make the seed violate that revision's own constraint.
-
-**Codex's three findings repaired in the foreground, on the same branch, after
-Aditya decided all three.** `ui/config/screen.json` marks `Nothing said yet`
-again — with a new test written first and seen failing on the assertion
-(`a_status_the_configuration_calls_out_is_marked_for_attention.test.jsx`);
-`TASK.md`'s vocabulary list no longer names `blocker`; and
-`ui/demo/serve_demo_runs.js` emits the renamed status. The demo file's
-`what_testing_found: "No evidence yet."` lines predate this work — the real
-cell sentence there has been "Not known yet — …" since before the rename — and
-are left as part of the already-recorded stale-demo limitation. After the
-repairs the front-end suite printed **47 passed across 31 files** in the
-foreground; the Python suite was not re-run for them — the repairs touch no
-`.py` file — and stands at the **202 passed** printed independently in the
-foreground before the repairs.
-
 ### The register becomes four cells (branch `register-becomes-four-cells`)
 
 Eight parts, one commit each, from `main` at `85e97bb`. Baseline counts printed
@@ -546,9 +532,10 @@ merging and about `Written down` still stands.
       every requirement on it, recomputes `In writing?` across them, and takes
       the **earliest** document date as `First seen`
       (`app/register/document_dates.py`).
-- [x] `In writing?` reads `Not found in <file>.` once the **project** has read a
-      client requirements document that does not mention the ask; the query
-      joins `documents` to `runs`, so an earlier run's document is visible.
+- [x] `Written down` is answered against every client requirements document
+      the **project** has read, not this run's batch. The wording and the
+      writer both moved on 2026-08-23: the cell reads `Not mentioned` and the
+      absence move writes it at Commit, with the file as evidence.
 - [x] The three outcome words are a `Literal` on both `MatchOutcome` and
       `ObservationOutcome`; the outcome-membership branch they shared is gone,
       and a test holds the `Literal` and the three constants in step.
@@ -1225,21 +1212,16 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
-- **A row's `Written down` can keep a claim the project has outgrown.** The
-  cell is computed when a requirement lands on the row, so a row no
-  requirement ever lands on keeps "Not known yet — no client requirements
-  document has been read for this project" after one has been read that does
-  not mention its ask. Seen live on the escalation row of the staged drives;
-  the paired drives never show it, because there the requirements document is
-  in the same batch that creates the row. Refreshing it means a new kind of
-  move — an absence-backed cell change on a row no requirement reached, with
-  its citation, audit entry and gate — so it is written down rather than
-  built around.
-- **The testing-outcome rule re-asks on every run until a testing document
-  arrives.** Six to seven identical questions per run, each rejected, each
-  returning next run. The rule is telling the truth each time; suppressing a
-  repeat risks hiding a finding that has become real, so the human gate
-  absorbs it.
+- **An unanswered possible match is examined as the match it asks about**, so
+  a rejected match leaves the new row without a finding for that run. Written
+  up for a reader in README's "What it does not do"; the next run raises it.
+- **A model-judged rule that runs again may not re-raise an earlier finding.**
+  The register shows the newer answer and History keeps the older one; README's
+  "What it does not do" states it for a reader.
+- **A rule still asks its question again on every run**, once the documents it
+  names have been read — README's "What it does not do" is that one's home.
+  `applies_when` removed the worse half of it: the demo's six findings raised
+  before any testing feedback existed.
 - **A file dropped into a brand-new project's folder before the watcher's
   first look at it starts no run by itself.** The watcher's first sight of a
   project records whatever the folder holds as the baseline, and that first
@@ -1337,12 +1319,6 @@ working claim only after its own implementation and proof land.
   the four cells printed beside it. A fresh database never holds such a row.
   Recomputing inside the migration was considered and refused: a migration that
   computes a hash has to carry the application's rules.
-- A committed row keeps the `Written down` sentence it was committed with, so a
-  row committed before any client requirements document was read still says
-  "no client requirements document has been read for this project" after one
-  arrives. Rewriting rows a new document did not affect is exactly what the
-  system must not do; closing this needs a decided rule about which cells a
-  later document may re-answer.
 - The 20-page limit binds `.pdf` only; Markdown reports no page count and none
   is invented for it.
 - A handover summary that lists requirements, in a run that never exports, is
@@ -1460,7 +1436,7 @@ configures twice. Before the change an INFO run event printed nothing
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| The live model run, staged by hand | 2026-08-19, `main` at `7720623` | Three drives on the Helpline AI corpus, `openai/gpt-5.6-luna` and `openai/gpt-5.6-terra` at `reasoning_effort: high`. Each reached **all seven expected statuses**, including `Disputed` on the human-escalation row, whose audit trail reads `Nothing said yet` → `Handed over` → `Disputed` across three separate runs — the cross-batch conflict PR #38 fixed, confirmed on live data rather than in tests alone. Luna raised the written-requirement finding on that row and Terra never did; the two agreed on every status. The change-request rule raised no finding in any drive: the SMS ask is reported as a dropped observation, because no row traces it. **A merged fix is not live until the application process restarts** — the first drive returned six of seven against modules the container had imported before PR #38 reached disk |
+| The live model run, staged by hand | 2026-08-19, `main` at `7720623` | Three drives on the Helpline AI corpus, `openai/gpt-5.6-luna` and `openai/gpt-5.6-terra` at `reasoning_effort: high`. Each reached **all seven expected statuses**, including `Disputed` on the human-escalation row, whose audit trail reads `Nothing said yet` → `Handed over` → `Disputed` across three separate runs (that first status is the wording of the day; migration `20260823_0022` renamed it `Requested` on the rows, and an audit entry already written keeps the words it was written with) — the cross-batch conflict PR #38 fixed, confirmed on live data rather than in tests alone. Luna raised the written-requirement finding on that row and Terra never did; the two agreed on every status. The change-request rule raised no finding in any drive: the SMS ask is reported as a dropped observation, because no row traces it. **A merged fix is not live until the application process restarts** — the first drive returned six of seven against modules the container had imported before PR #38 reached disk |
 | `docker compose -p helplinelive exec -T app pytest` | 2026-08-20, `main` at `69ecaec` | **253 passed**, real PostgreSQL, no live key, run inside the live stack |
 | `npm --prefix ui test` | 2026-08-20, `main` at `69ecaec` | **66 passed across 38 files**, no live key. The baseline printed 63 across 36; the three new tests cover the read-only wording and the decision card's shared label column, and all three fail at the branch point |
 | `docker compose -p brief5live run --rm app pytest` | 2026-08-18, `register-read-live` branch | **235 passed**, real PostgreSQL, no live key. The baseline at `f6aa015` printed 227; the eight new tests are the two read-once tests, the four live-register tests and the two both-doors register tests |

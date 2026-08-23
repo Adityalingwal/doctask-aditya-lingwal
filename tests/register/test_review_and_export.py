@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import create_engine, text
 
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
@@ -58,6 +59,7 @@ def _application_at_review(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -138,7 +140,7 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
         engine.dispose()
 
     assert [row["cells"]["what_was_asked"] for row in register["rows"]] == [REQUIREMENT]
-    assert register["rows"][0]["cells"]["status"] == "Nothing said yet"
+    assert register["rows"][0]["cells"]["status"] == "Requested"
     what_was_asked_citation = next(
         citation
         for citation in register["rows"][0]["citations"]
@@ -216,6 +218,7 @@ def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:

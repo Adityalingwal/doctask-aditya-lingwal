@@ -10,11 +10,17 @@ from psycopg import AsyncConnection
 
 from app.database import build_connection_pool
 from app.examine.frozen_rules import (
+    APPLIES_WHEN_KEY,
     RulesFileUnusable,
     fingerprint_of_rules,
     freeze_rules_for_run,
     frozen_rules_of_run,
     load_rules,
+)
+from app.extract.answer import (
+    DOCUMENT_WORKFLOW_ORDER,
+    HANDOVER_SUMMARY,
+    TESTING_FEEDBACK,
 )
 from app.runs.statuses import RUNNING
 from tests.runs.application import PROJECT_ROOT, temporary_database
@@ -40,6 +46,14 @@ rules:
       max_days:   14   # two weeks
 """
 RULES_WITH_A_CHANGED_VALUE = PLAIN_RULES.replace("max_days: 14", "max_days: 30")
+UNKNOWN_DOCUMENT_KIND = "invoice"
+RULES_NAMING_AN_UNKNOWN_KIND = f"""\
+rules:
+  - id: R1
+    text: "Anything built must have a written requirement."
+    applies_when:
+      - {UNKNOWN_DOCUMENT_KIND}
+"""
 
 
 def test_the_shipped_rules_file_loads_as_the_default_rules() -> None:
@@ -47,6 +61,50 @@ def test_the_shipped_rules_file_loads_as_the_default_rules() -> None:
 
     assert [rule["id"] for rule in rules] == ["R1", "R2", "R4", "R5"]
     assert all(rule["params"] == {} for rule in rules)
+    # Every shipped rule waits for the kind of document it is about, so none of
+    # them is ever judged against a register nothing has spoken about.
+    assert {rule["id"]: rule[APPLIES_WHEN_KEY] for rule in rules} == {
+        "R1": [HANDOVER_SUMMARY],
+        "R2": [TESTING_FEEDBACK],
+        "R4": [TESTING_FEEDBACK],
+        "R5": [HANDOVER_SUMMARY, TESTING_FEEDBACK],
+    }
+
+
+def test_a_rule_naming_no_document_kind_always_applies(tmp_path: Path) -> None:
+    """The field is absent, not empty: a rule that waits for nothing says so.
+
+    An empty list would be the same claim written differently, and it would
+    move every fingerprint of every rules file that never named a kind.
+    """
+    plain = tmp_path / "plain.yaml"
+    plain.write_text(PLAIN_RULES, encoding="utf-8")
+
+    (rule,) = load_rules(plain)
+
+    assert APPLIES_WHEN_KEY not in rule
+
+
+def test_an_unknown_applies_when_value_is_refused_at_freeze_naming_the_four_kinds(
+    tmp_path: Path,
+) -> None:
+    """A rule waiting on a kind that can never be read would never run again.
+
+    The file is re-read on every run, so this is refused where a run freezes
+    it as firmly as it is refused at startup.
+    """
+    broken = tmp_path / "rules.yaml"
+    broken.write_text(RULES_NAMING_AN_UNKNOWN_KIND, encoding="utf-8")
+
+    with pytest.raises(RulesFileUnusable) as refused:
+        load_rules(broken)
+
+    message = str(refused.value)
+    assert UNKNOWN_DOCUMENT_KIND in message
+    assert "R1" in message
+    for kind in DOCUMENT_WORKFLOW_ORDER:
+        assert kind in message
+    assert "start another run" in message
 
 
 def test_rules_fingerprint_ignores_comments_and_layout(tmp_path: Path) -> None:

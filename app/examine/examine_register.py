@@ -72,18 +72,16 @@ Rule given to you:
 Row given to you:
   row_number: 2
   what_was_asked: "a weekly summary of all open tickets"
-  in_writing: "Yes — written in client-requirements-v2.md."
-  what_testing_found: "Not known yet — no testing outcome has been
-                       read for this requirement."
-  status: "Nothing said yet"
+  in_writing: "Yes"
+  what_testing_found: "Not mentioned"
+  status: "Requested"
 
 Your finding:
   rule_id: "R4"
   row_number: 2
-  issue: "This row is written down but no testing outcome has been
-          read for it."
-  evidence: "Not known yet — no testing outcome has been read for
-             this requirement."
+  issue: "This row is written down, and the testing feedback that has
+          been read does not mention it."
+  evidence: "Not mentioned"
   question: "Every written requirement must have a testing outcome.
              Row #2 — a weekly summary of all open tickets — is
              written down in client-requirements-v2.md, but no
@@ -100,16 +98,16 @@ Rule given to you:
 Row given to you:
   row_number: 5
   what_was_asked: "a search over old records"
-  in_writing: "Not found in client-requirements-v2.md."
+  in_writing: "Not mentioned"
   what_testing_found: "the search was delivered and works"
   status: "Done"
 
 Your finding:
   rule_id: "R1"
   row_number: 5
-  issue: "This row is Done, so the work was built, but the ask is not
-          in the client's written requirements."
-  evidence: "Not found in client-requirements-v2.md."
+  issue: "This row is Done, so the work was built, but the client's
+          requirements document does not mention the ask."
+  evidence: "Not mentioned"
   question: "Anything built must have a written requirement; a verbal
              mention is not enough. Row #5 — a search over old
              records — is marked Done, but the ask was never written
@@ -123,14 +121,16 @@ Same rule as above.
 Row given to you:
   row_number: 3
   what_was_asked: "the same notification over WhatsApp"
-  in_writing: "Not found in client-requirements-v2.md."
-  what_testing_found: "Not known yet — no testing outcome has been
-                       read for this requirement."
-  status: "Nothing said yet"
+  in_writing: "Not known yet"
+  what_testing_found: "Not known yet"
+  status: "Requested"
 
-No finding. That rule is about work that was built. Nothing here says
-this was built — no handover claimed it and no testing saw it. "Not
-found in writing" on its own is not a violation.
+No finding. "Not known yet" means no document that could answer that
+cell has been read at all. It states nothing about the row, so it is
+never a violation on its own — the cell to look for is "Not
+mentioned", which says a document was read and is silent. This rule
+is also about work that was built, and nothing here says this was
+built.
 
 ## When nothing is wrong
 

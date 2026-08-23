@@ -50,16 +50,24 @@ HANDED_OVER_SUMMARY = "the email notification was handed over"
 TESTING_SUMMARY = "the notification reaches the team"
 DEFECT_SUMMARY = "the notification goes to the wrong address"
 
+TWO_ASK_MEETING = "meeting-notes-11-mar.md"
+SPOKEN_ONLY_ASK = "a search over old records"
+SPOKEN_ONLY_QUOTE = "The client also asked for a search over old records."
+
 DOCUMENT_LINES = {
-    MEETING_NOTE: ASK_QUOTE,
-    REQUIREMENTS: WRITTEN_QUOTE,
-    HANDOVER: HANDOVER_QUOTE,
-    FIRST_TESTING: DEFECT_QUOTE,
-    TESTING_FEEDBACK: TESTING_QUOTE,
+    MEETING_NOTE: [ASK_QUOTE],
+    TWO_ASK_MEETING: [ASK_QUOTE, SPOKEN_ONLY_QUOTE],
+    REQUIREMENTS: [WRITTEN_QUOTE],
+    HANDOVER: [HANDOVER_QUOTE],
+    FIRST_TESTING: [DEFECT_QUOTE],
+    TESTING_FEEDBACK: [TESTING_QUOTE],
 }
 EXTRACT_ANSWERS = {
     extract_marker(MEETING_NOTE): several_requirements_answer(
         [(ASK, ASK_QUOTE)], "meeting notes"
+    ),
+    extract_marker(TWO_ASK_MEETING): several_requirements_answer(
+        [(ASK, ASK_QUOTE), (SPOKEN_ONLY_ASK, SPOKEN_ONLY_QUOTE)], "meeting notes"
     ),
     extract_marker(REQUIREMENTS): several_requirements_answer(
         [(WRITTEN_ASK, WRITTEN_QUOTE)], "client requirements document"
@@ -98,6 +106,24 @@ TWO_PAIRED_RUNS_SCRIPT = EXTRACT_ANSWERS | {
 }
 
 
+# The same four documents again, with one ask nothing but the meeting note ever
+# states — so the requirements document and the testing report are each read
+# and silent about a row, which is what an absence has to be tested against.
+FOUR_RUNS_WITH_A_SILENT_ROW_SCRIPT = EXTRACT_ANSWERS | {
+    match_marker_against_an_empty_register(): match_answer(2),
+    match_marker_for_batch_with(REQUIREMENTS): match_answer_existing_row(1),
+    observation_marker(): observation_answer_of([1]),
+    examine_marker(): no_findings_answer(),
+}
+ONE_BATCH_WITH_A_SILENT_ROW_SCRIPT = EXTRACT_ANSWERS | {
+    match_marker_against_an_empty_register(): match_answer_within_batch(
+        [("new row", None, None), ("new row", None, None), ("existing row", None, 0)]
+    ),
+    observation_marker(): observation_answer_of([1, 1]),
+    examine_marker(): no_findings_answer(),
+}
+
+
 class RunResult(NamedTuple):
     """One finished run: the committed register it left, cells and citations."""
 
@@ -105,7 +131,7 @@ class RunResult(NamedTuple):
     citations: dict[int, dict[str, list[tuple[str, str]]]]
 
 
-def test_a_row_nothing_has_spoken_about_starts_at_nothing_said_yet(
+def test_a_row_nothing_has_spoken_about_starts_at_requested(
     tmp_path: Path,
 ) -> None:
     """The starting status reports the reading, not the work.
@@ -116,12 +142,12 @@ def test_a_row_nothing_has_spoken_about_starts_at_nothing_said_yet(
     """
     (asked,) = drive_batches(
         tmp_path,
-        "nothing-said-yet",
+        "requested",
         [[MEETING_NOTE]],
         ONE_DOCUMENT_PER_RUN_SCRIPT,
     )
 
-    assert asked.cells[1]["status"] == "Nothing said yet"
+    assert asked.cells[1]["status"] == "Requested"
     assert asked.citations[1].get("status", []) == []
 
 
@@ -138,7 +164,7 @@ def test_testing_passing_moves_a_handed_over_row_to_done(tmp_path: Path) -> None
         ONE_DOCUMENT_PER_RUN_SCRIPT,
     )
 
-    assert asked.cells[1]["status"] == "Nothing said yet"
+    assert asked.cells[1]["status"] == "Requested"
     assert handed_over.cells[1]["status"] == "Handed over"
     assert tested.cells[1]["status"] == "Done"
     assert tested.cells[1]["what_testing_found"] == TESTING_SUMMARY
@@ -204,6 +230,38 @@ def test_one_document_per_run_and_the_paired_order_end_with_the_same_citations(
     assert _cited_files(one_per_run, 1, "status") == {HANDOVER, TESTING_FEEDBACK}
 
 
+def test_all_four_documents_in_one_batch_end_like_one_at_a_time(
+    tmp_path: Path,
+) -> None:
+    """A row nothing but the meeting note mentions ends the same either way.
+
+    The requirements document and the testing report are read once for the
+    project's whole life, so their silence about that row has to be recorded
+    when the row is committed, whichever run committed it.
+    """
+    one_per_run = drive_batches(
+        tmp_path,
+        "silent-row-one-per-run",
+        [[TWO_ASK_MEETING], [REQUIREMENTS], [HANDOVER], [TESTING_FEEDBACK]],
+        FOUR_RUNS_WITH_A_SILENT_ROW_SCRIPT,
+    )[-1]
+    one_batch = drive_batches(
+        tmp_path,
+        "silent-row-one-batch",
+        [[TWO_ASK_MEETING, REQUIREMENTS, HANDOVER, TESTING_FEEDBACK]],
+        ONE_BATCH_WITH_A_SILENT_ROW_SCRIPT,
+    )[-1]
+
+    assert one_per_run.cells[2]["in_writing"] == "Not mentioned"
+    assert one_per_run.cells[2]["what_testing_found"] == "Not mentioned"
+    assert one_per_run.cells == one_batch.cells
+    for row_number, cells in one_per_run.cells.items():
+        for cell_name in cells:
+            assert _cited_files(one_per_run, row_number, cell_name) == _cited_files(
+                one_batch, row_number, cell_name
+            ), (row_number, cell_name)
+
+
 def _cited_files(result: RunResult, row_number: int, cell_name: str) -> set[str]:
     return {
         source_file
@@ -245,7 +303,7 @@ def drive_batches(
                                 folder,
                                 source_file,
                                 "10 March 2026",
-                                [DOCUMENT_LINES[source_file]],
+                                DOCUMENT_LINES[source_file],
                             )
                         run_id = client.post(
                             "/runs", json={"project_id": project_id}

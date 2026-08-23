@@ -159,17 +159,20 @@ def test_a_testing_feedback_document_never_creates_a_register_row(
                 extract_marker(TESTING_FILE): feedback_extraction_answer(
                     [("The email notification reaches the team.", "Passed", quote)]
                 ),
+                examine_marker(): no_findings_answer(),
             },
         )
-        ended, stored = _one_run_over(
+        stored, committed_rows = _one_run_added_to_the_register(
             tmp_path, source_folder_path, script_path, TESTING_FILE
         )
 
     # Testing feedback says what testing found; it never states a new ask, so
-    # there is nothing here for the register to take as a row.
+    # there is nothing here for the register to take as a row. The run still
+    # goes to a person, because reading it is what lets every row say whether
+    # testing has spoken about it.
     assert stored["requirements"] == []
     assert len(stored["testing_observations"]) == 1
-    assert ended["exported"] is False
+    assert committed_rows == 0
 
 
 def test_a_filled_list_the_type_may_not_use_leaves_that_document_unread(
@@ -236,6 +239,53 @@ def test_a_filled_list_the_type_may_not_use_leaves_that_document_unread(
     assert [row["cells"]["what_was_asked"] for row in export["rows"]] == [
         ORDINARY_REQUIREMENT
     ]
+
+
+def _one_run_added_to_the_register(
+    tmp_path: Path,
+    source_folder_path: str,
+    script_path: Path,
+    source_file: str,
+) -> tuple[dict, int]:
+    """One run taken through Review to Commit, and what it left behind."""
+    with temporary_database() as database_url:
+        application = ApplicationProcess(
+            database_url=database_url,
+            script_path=script_path,
+            call_log_path=tmp_path / "model-calls.jsonl",
+        )
+        application.start()
+        try:
+            with application.client() as client:
+                project_id = client.post(
+                    "/projects", json={"source_folder_path": source_folder_path}
+                ).json()["project_id"]
+                run_id = client.post(
+                    "/runs", json={"project_id": project_id}
+                ).json()["run_id"]
+                wait_for_run_status(client, run_id, "needs review")
+                approve_every_decision_and_finish_review(client, run_id)
+                wait_for_run_status(client, run_id, "done")
+        finally:
+            application.stop()
+
+        engine = create_engine(database_url)
+        with engine.connect() as connection:
+            stored = connection.execute(
+                text("SELECT extraction FROM documents WHERE source_path = :path"),
+                {"path": source_file},
+            ).scalar_one()
+            committed_rows = connection.execute(
+                text(
+                    "SELECT count(*) FROM register_rows WHERE is_committed"
+                )
+            ).scalar_one()
+        engine.dispose()
+
+    return (
+        stored if isinstance(stored, dict) else json.loads(stored),
+        committed_rows,
+    )
 
 
 def _one_run_over(

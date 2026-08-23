@@ -142,7 +142,7 @@ def _insert_seven_cell_row(
     row_id = uuid4()
     cells = {
         "what_was_asked": f"Requirement {row_number}.",
-        "in_writing": "Yes — written in client-requirements-v1.md.",
+        "in_writing": "Yes",
         "what_testing_found": "Not known yet.",
         "status": status,
         "blocked_on": "Waiting on the client's WhatsApp credentials.",

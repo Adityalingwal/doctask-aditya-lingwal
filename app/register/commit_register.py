@@ -44,6 +44,10 @@ async def commit_register(
     # After the merges, so a move lands on the row an approved merge sent its
     # evidence to; before the proposals below, so a row created and moved in
     # one batch is committed with the cells the move left it holding.
+    # The absences Match worked out travel in the same list and are written
+    # here too, after the observations' moves on each row, so a row proposed
+    # in this batch is born holding `Not mentioned` rather than gaining it a
+    # line later in its own history.
     moved_row_numbers = await apply_moves(connection, run_id, document_id_by_file)
 
     proposals = await connection.execute(

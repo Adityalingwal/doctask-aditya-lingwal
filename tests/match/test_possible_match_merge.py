@@ -1,9 +1,25 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+from typing import Any
+from uuid import UUID, uuid4
 
+from psycopg import AsyncConnection
 from sqlalchemy import create_engine, text
 
+from app.database import build_connection_pool
+from app.examine.read_findings import findings_of_run
+from app.register.cells import (
+    CELL_NAMES,
+    IN_WRITING_NOT_KNOWN_YET,
+    STATUS_REQUESTED,
+    TESTING_NOT_KNOWN_YET,
+)
+from app.review.review_queue import APPROVED, FINDING_DECISION
+from app.runs.statuses import DONE
+
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -74,6 +90,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -181,6 +198,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -253,13 +271,15 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
     ]
 
 
-def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
+def test_a_finding_raised_while_a_match_is_unanswered_names_the_row_it_will_join(
     tmp_path: Path,
 ) -> None:
-    """A finding follows its row through the merge, and so must its number.
+    """Examine judges the candidate, so its finding names the candidate.
 
-    Reporting the proposal's number while sitting under the committed row tells
-    the Delivery Owner two different things about the same finding.
+    The proposal waiting on the match answer is not a row of its own here
+    (item 21), so nothing can raise a finding against a number that is about
+    to be merged away. The same rule ran in both runs, so the register shows
+    the newer run's answer and only that one.
     """
     with temporary_project_folder("merging-with-finding") as (source_folder, source_folder_path):
         first_quote = write_meeting_note(source_folder, FIRST_FILE, FIRST_REQUIREMENT)
@@ -278,13 +298,12 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
                     SECOND_REQUIREMENT,
                     f"The client asked for {SECOND_REQUIREMENT}.",
                 ),
-                # Only the second run's register holds the proposed row, so keying
-                # on its requirement puts the finding on that run alone; the first
-                # run falls through to the empty answer below.
-                SECOND_REQUIREMENT: examine_answer(
-                    [one_finding(rule_id="R1", row_number=PROPOSED_ROW_NUMBER)]
+                # Both runs are judged against the same one row, and both raise
+                # the same rule against it — which is what makes the register's
+                # "one finding per rule per row" visible here.
+                examine_marker(): examine_answer(
+                    [one_finding(rule_id="R1", row_number=COMMITTED_ROW_NUMBER)]
                 ),
-                examine_marker(): no_findings_answer(),
             },
         )
 
@@ -293,6 +312,7 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -323,12 +343,116 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
 
     exported_row = export["rows"][0]
     assert exported_row["row_number"] == COMMITTED_ROW_NUMBER
+    # Two runs raised this rule against this row; the register shows the
+    # newer answer, once.
     assert len(exported_row["findings"]) == 1
-    # The finding sits under row 1, so every number it carries must say row 1.
     assert exported_row["findings"][0]["row_number"] == COMMITTED_ROW_NUMBER
+    assert exported_row["findings"][0]["raised_by_run"] == 2
     assert [
         finding["row_number"] for finding in export["examine"]["findings"]
     ] == [COMMITTED_ROW_NUMBER]
     assert [
         finding["row_number"] for finding in status["examine"]["findings"]
     ] == [COMMITTED_ROW_NUMBER]
+
+
+def test_a_finding_stored_against_a_merged_proposal_reports_the_surviving_row(
+) -> None:
+    """A finding follows its row through the merge, and so must its number.
+
+    Reporting the proposal's number while sitting under the committed row
+    tells the Delivery Owner two different things about one finding.
+    """
+    reported = asyncio.run(_read_a_finding_left_on_a_merged_proposal())
+
+    assert [finding["row_number"] for finding in reported] == [COMMITTED_ROW_NUMBER]
+
+
+async def _read_a_finding_left_on_a_merged_proposal() -> list[dict[str, Any]]:
+    with temporary_database() as database_url:
+        pool = build_connection_pool(database_url)
+        await pool.open(wait=True)
+        try:
+            async with pool.connection() as connection:
+                run_id = await _seed_a_merged_proposal_with_a_finding(connection)
+                return await findings_of_run(
+                    connection, run_id, approved_only=True
+                )
+        finally:
+            await pool.close()
+
+
+async def _seed_a_merged_proposal_with_a_finding(
+    connection: AsyncConnection,
+) -> UUID:
+    project_id, run_id = uuid4(), uuid4()
+    await connection.execute(
+        "INSERT INTO projects (id, name, source_folder_path) VALUES (%s, %s, %s)",
+        (project_id, f"Merged {project_id}", f"sample-projects/merged-{project_id}"),
+    )
+    await connection.execute(
+        "INSERT INTO runs (id, project_id, status) VALUES (%s, %s, %s)",
+        (run_id, project_id, DONE),
+    )
+    survivor = await _insert_row(
+        connection, project_id, run_id, COMMITTED_ROW_NUMBER, True, None
+    )
+    proposal = await _insert_row(
+        connection, project_id, run_id, PROPOSED_ROW_NUMBER, False, survivor
+    )
+    decision_id = uuid4()
+    question = f"Does row #{PROPOSED_ROW_NUMBER} break this rule?"
+    await connection.execute(
+        "INSERT INTO decisions (id, run_id, kind, question, outcome, decided_at) "
+        "VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)",
+        (decision_id, run_id, FINDING_DECISION, question, APPROVED),
+    )
+    await connection.execute(
+        "INSERT INTO findings (id, run_id, register_row_id, rule_id, rule_text, "
+        "issue, evidence, question, decision_key) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (
+            uuid4(),
+            run_id,
+            proposal,
+            "R1",
+            "Anything built must have a written requirement.",
+            "This row rests on a meeting note alone.",
+            "Not known yet",
+            question,
+            decision_id,
+        ),
+    )
+    return run_id
+
+
+async def _insert_row(
+    connection: AsyncConnection,
+    project_id: UUID,
+    run_id: UUID,
+    row_number: int,
+    is_committed: bool,
+    merged_into: UUID | None,
+) -> UUID:
+    row_id = uuid4()
+    await connection.execute(
+        "INSERT INTO register_rows (id, project_id, "
+        + ", ".join(CELL_NAMES)
+        + ", fingerprint, row_number, proposed_by_run_id, is_committed, "
+        "merged_into_register_row_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (
+            row_id,
+            project_id,
+            f"Requirement {row_number}.",
+            IN_WRITING_NOT_KNOWN_YET,
+            TESTING_NOT_KNOWN_YET,
+            STATUS_REQUESTED,
+            f"fingerprint-{row_number}",
+            row_number,
+            run_id,
+            is_committed,
+            merged_into,
+        ),
+    )
+    return row_id
