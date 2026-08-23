@@ -70,7 +70,7 @@ per batch rather than once over a whole dump:
 mkdir sample-projects/helpline-ai        # empty folder, create the project on it
 # then copy documents in one at a time (or in pairs), waiting for each run:
 cp sample-documents/helpline-ai/meeting-notes-02-jul.md sample-projects/helpline-ai/
-# ... watcher: poll_seconds 4, quiet_seconds 10
+# ... watcher: poll_seconds 2, quiet_seconds 5
 ```
 
 Create the project first, through the screen's Add-project box or the MCP

@@ -40,6 +40,12 @@ passed across 38 files**. The four demo documents have not been re-driven on a
 clean database since; that is the foreground step after this branch merges.
 
 **Assumptions made on this branch, so they are findable later.**
+- The screen still shows the words it showed before this branch — the `Not
+  used` tab name, its own Approve/Reject wording in `Question.jsx`, no
+  `source_line` on a skipped entry, `citations` rather than `evidence`. This
+  branch changed `ui/src` only as far as the screen keeps running on the new
+  payload; every screen change is Brief 2's (items 12, 22/30, 35/38, 33), and
+  the review's three `ui/src` findings were settled that way on 2026-08-24.
 - The locked sketches of the three decision shapes are aligned for a
   monospace reader. The stored text normalises that: blocks separated by a
   blank line, single spaces after `→` and after each colon, two spaces
@@ -1302,6 +1308,11 @@ working claim only after its own implementation and proof land.
   names have been read — README's "What it does not do" is that one's home.
   `applies_when` removed the worse half of it: the demo's six findings raised
   before any testing feedback existed.
+- **A handover only ever sets `Handed over`; `Partial` stays testing's word**
+  (decided 2026-08-23, item 36) — README's "What it does not do" is the home.
+- **A rule never runs against an observation that reached no row** (S10): it
+  is shown on the Skipped tab instead — README's "What it does not do" is the
+  home.
 - **A file dropped into a brand-new project's folder before the watcher's
   first look at it starts no run by itself.** The watcher's first sight of a
   project records whatever the folder holds as the baseline, and that first
@@ -1310,7 +1321,8 @@ working claim only after its own implementation and proof land.
   collected its batch, before the baseline is taken) waits for the next run,
   whichever way it starts; it is never lost, because a batch collects every
   file not yet read. Decided 2026-08-18 with Aditya: shrink the window by
-  config (`poll_seconds` 10 → 4, `quiet_seconds` 30 → 10) rather than persist
+  config (`poll_seconds` 4 → 2, `quiet_seconds` 10 → 5 on 2026-08-23; first
+  10 → 4 and 30 → 10) rather than persist
   a creation-time folder baseline, which would take a migration; revisit only
   if a live run or demo actually hits the window.
 - **Rules about elapsed time cannot be judged.** "Nothing stays blocked more
