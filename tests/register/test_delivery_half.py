@@ -216,7 +216,7 @@ def _stored_cells(database_url: str, project_id: str) -> dict[int, dict[str, str
 def _findings_on(export: dict, row_number: int) -> list[dict]:
     for row in export["rows"]:
         if row["row_number"] == row_number:
-            return row["findings"]
+            return row.get("findings", [])
     return []
 
 

@@ -120,7 +120,9 @@ def _second_run_at_review_with_its_finding_approved(
 def _register_findings(client: httpx.Client, project_id: str) -> list[str]:
     register = client.get(f"/projects/{project_id}/register").json()
     return [
-        finding["issue"] for row in register["rows"] for finding in row["findings"]
+        finding["issue"]
+        for row in register["rows"]
+        for finding in row.get("findings", [])
     ]
 
 
