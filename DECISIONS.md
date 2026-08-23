@@ -392,13 +392,18 @@ cannot each assume a different one:
   sentences is unreadable, and the same file was printed twice on every row.
   `Not mentioned` still never means "No" — the evidence behind it is the exact
   file that was read plus the sentence saying it does not mention this ask.
-- **A document's silence is written at Commit, by the absence move
-  (2026-08-23).** `Written down` used to be composed when a requirement landed
-  on a row, so a row no requirement ever landed on kept denying that any
-  requirements document had been read. Now every client requirements document
-  and every testing report the project has read is applied at Commit against
-  every row it does not mention: the cell moves to `Not mentioned`, gains an
-  absence citation, writes its history entry and moves the row's fingerprint.
+- **A document's silence is worked out in Match and written at Commit, by
+  the absence move (2026-08-23).** `Written down` used to be composed when a
+  requirement landed on a row, so a row no requirement ever landed on kept
+  denying that any requirements document had been read. Now every client
+  requirements document and every testing report the project has read is
+  set against every row it does not mention. The result travels in
+  `runs.pending_moves` beside the observations' moves, so Examine judges the
+  register exactly as Commit will leave it — a rule about a silent testing
+  report could never see the silence otherwise, since the cell is only
+  written after the person has answered — and Commit writes that same list:
+  the cell moves to `Not mentioned`, gains an absence citation, writes its
+  history entry and moves the row's fingerprint.
   It only ever fills a cell still reading `Not known yet`; a cell holding `Yes`
   or a testing verdict is left exactly as it stands, and a second silent
   document behind an existing `Not mentioned` adds its evidence and nothing

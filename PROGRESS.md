@@ -11,16 +11,23 @@ cells, findings and history say what the documents actually support.
 
 - **The status `Nothing said yet` is `Requested`** (migration
   `20260823_0022`), everywhere a reader or the system takes the word from.
+  A grep for the old words over the repository hits only the places that
+  record them on purpose: the two rename migrations and their two tests
+  (`test_schema.py`, `test_requested_status_migration.py`), the DECISIONS
+  replacement notes, this line and the live-run row below, and the live-run
+  record under `documentation/` — never `app/`, `ui/`, `config/` or README.
 - **Cells are short, and the file behind an answer is in the evidence.**
   `Written down` reads `Not known yet` · `Yes` · `Not mentioned`;
   `What testing found` reads `Not known yet` · what testing said ·
   `Not mentioned`.
 - **The absence move is built** (`app/register/absence_rows.py`), the feature
-  this file listed as not built. At Commit, every client requirements document
-  and testing report the project has read is applied against every row it does
-  not mention: the cell moves to `Not mentioned` with the file as its
-  evidence, its history entry and a moved fingerprint. It never overwrites an
-  answer, and a run that read such a document always continues to Review.
+  this file listed as not built. Match works out which rows each client
+  requirements document and testing report the project has read does not
+  mention and stores that beside the observations' moves; Examine judges the
+  register with those absences overlaid, and Commit writes them: the cell
+  moves to `Not mentioned` with the file as its evidence, its history entry
+  and a moved fingerprint. It never overwrites an answer, and a run that read
+  such a document always continues to Review.
 - **A rule waits for the documents it is about** (`applies_when` in
   `config/rules.yaml`, validated at startup and at every freeze), and
   `runs.rules_applied` (migration `20260823_0023`) records exactly what
@@ -528,7 +535,7 @@ merging and about `Written down` still stands.
 - [x] `Written down` is answered against every client requirements document
       the **project** has read, not this run's batch. The wording and the
       writer both moved on 2026-08-23: the cell reads `Not mentioned` and the
-      absence move at Commit writes it, with the file as evidence.
+      absence move writes it at Commit, with the file as evidence.
 - [x] The three outcome words are a `Literal` on both `MatchOutcome` and
       `ObservationOutcome`; the outcome-membership branch they shared is gone,
       and a test holds the `Literal` and the three constants in step.

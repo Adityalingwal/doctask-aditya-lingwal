@@ -12,7 +12,8 @@ have to open all four documents and match them up by hand.
 This system does that matching for you. It reads the documents and builds one
 table, called the **register**. Each row is one thing the client asked for. Each
 cell says which file it came from, which section of that file, and the exact
-words. Nothing is added to the register until a person approves it.
+words — or, when a document was read and said nothing about the row, which
+file that was. Nothing is added to the register until a person approves it.
 
 The system is small on purpose. It reads two file formats, covers one kind of
 work, and only adds rows — it never deletes or rewrites them. Everything it
@@ -73,7 +74,7 @@ about it, and every move keeps the quote behind it.
 
 | Status | What it means | What puts a row here |
 |---|---|---|
-| `Requested` | The client asked for this. Nothing read so far says whether it was built or tested. | Only the client's own ask has been read |
+| `Requested` | The client asked for this. No document read so far says whether it was built or tested. | No handover note and no testing report has said anything about it — a document that was read and silent about the row leaves it here |
 | `Handed over` | The provider says it is built. Nobody has tested it yet. | A handover note, with no testing report about it |
 | `Done` | Testing tried it and it worked. | A testing report that passed it |
 | `Partial` | It exists, but testing found it broken or unfinished. | A testing report that found a defect |
@@ -114,7 +115,8 @@ read for the project:
 The four values allowed there are the four kinds of document this system reads:
 `meeting notes`, `client requirements document`, `handover summary`, `testing
 feedback`. Anything else stops the application at startup and says which rule
-named it. A rule with no `applies_when` is checked on every run.
+named it. A rule with no `applies_when` is checked whenever the register is
+examined.
 
 Without this, a rule about testing outcomes is checked before any testing
 report has been read, and it reports the silence as a fault on every row.
