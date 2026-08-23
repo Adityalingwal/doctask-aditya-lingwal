@@ -11,6 +11,7 @@ from uuid import UUID
 import yaml
 from psycopg import AsyncConnection
 
+from app.refusal import UnusableRequest
 from app.run_logging import log_run_event
 from app.runs.run_lifecycle import RunEngine, start_or_queue_run
 from app.runs.statuses import ACTIVE_STATUSES, WAITING
@@ -125,7 +126,20 @@ async def start_runs_for_settled_folders(
                 continue
 
         watched[project["id"]].started_for = signature
-        run = await start_or_queue_run(engine, project["id"])
+        try:
+            run = await start_or_queue_run(engine, project["id"])
+        except UnusableRequest as refused:
+            # No run exists to name in the log, so the project is named
+            # instead. Nothing is started: the folder has nothing to read.
+            log_run_event(
+                logging.INFO,
+                "watcher_refused_to_start_a_run",
+                f"The folder watched for '{project['name']}' settled, and no "
+                f"run started: {refused}",
+                None,
+                project_id=str(project["id"]),
+            )
+            continue
         started.append(run["run_id"])
         log_run_event(
             logging.INFO,

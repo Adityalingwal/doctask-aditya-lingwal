@@ -31,7 +31,7 @@ INVENTED_QUOTE = "the client wants a weekly AI summary of every open ticket"
 UNRELATED_ASK = "a window seat on the Tuesday flight"
 
 
-def test_a_not_used_entry_names_whether_the_file_was_already_read_not_read_or_dropped(
+def test_a_skipped_entry_names_whether_the_file_was_read_before_not_read_or_not_attached(
     tmp_path: Path,
 ) -> None:
     """Each of the three weights of entry says which one it is, in `kind`.
@@ -40,7 +40,8 @@ def test_a_not_used_entry_names_whether_the_file_was_already_read_not_read_or_dr
     already read from a requirement that fell out of the register, so the kind
     is driven through the three paths that really create one: a quote that is
     not in its file, an unrelated document, and a second run over a folder
-    nobody touched.
+    nobody touched. Each sentence is asserted whole, because the screen prints
+    it and writes none of it.
     """
     with temporary_project_folder("kind-per-entry") as (source_folder, folder_path):
         traced_quote = write_meeting_note(
@@ -91,12 +92,15 @@ def test_a_not_used_entry_names_whether_the_file_was_already_read_not_read_or_dr
             finally:
                 application.stop()
 
-    dropped = _entries_of_kind(exported, "dropped")
-    assert [entry["file"] for entry in dropped] == [SCOPE_FILE]
-    assert dropped[0]["summary"] == DROPPED_REQUIREMENT
-    # The entry is a dropped one; the sentence still names what was dropped.
-    assert dropped[0]["reason"] == (
-        "These words were not found in the file, so this requirement was dropped."
+    not_attached = _entries_of_kind(exported, "not attached")
+    assert [entry["file"] for entry in not_attached] == [SCOPE_FILE]
+    assert not_attached[0]["summary"] == DROPPED_REQUIREMENT
+    # The words were never in the file, so there is no place to name and the
+    # reason names the file instead (S12).
+    assert not_attached[0]["source_line"] is None
+    assert not_attached[0]["reason"] == (
+        f"The model said this comes from {SCOPE_FILE}, but those words are "
+        "not in the file."
     )
 
     not_read = _entries_of_kind(exported, "not read")
@@ -105,14 +109,19 @@ def test_a_not_used_entry_names_whether_the_file_was_already_read_not_read_or_dr
         "This document is not related to this client or project."
     )
 
-    already_read = _entries_of_kind(ended, "already read")
-    assert sorted(entry["file"] for entry in already_read) == sorted(
+    read_before = _entries_of_kind(ended, "read before")
+    assert sorted(entry["file"] for entry in read_before) == sorted(
         [SCOPE_FILE, UNRELATED_FILE]
     )
-    assert already_read[0]["reason"] == "Already read, and unchanged since."
+    # The screen prints `<file> — <reason>`, so the reason never repeats the
+    # file name it sits beside.
+    assert read_before[0]["reason"] == "unchanged since it was read."
     # Nothing the second run recorded is anything but a file it had read.
-    assert [entry["kind"] for entry in ended["not_used"]] == ["already read"] * 2
+    assert [entry["kind"] for entry in ended["skipped"]] == ["read before"] * 2
+    assert ended["ended_early_reason"] == (
+        "2 files were skipped. See the Skipped tab for why."
+    )
 
 
-def _entries_of_kind(run: dict[str, Any], kind: str) -> list[dict[str, str]]:
-    return [entry for entry in run["not_used"] if entry["kind"] == kind]
+def _entries_of_kind(run: dict[str, Any], kind: str) -> list[dict[str, Any]]:
+    return [entry for entry in run["skipped"] if entry["kind"] == kind]

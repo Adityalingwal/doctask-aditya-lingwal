@@ -10,8 +10,8 @@ from app.register.audit_entries import write_attachment, write_cell_change
 from app.register.cells import (
     CELL_NAMES,
     IN_WRITING,
+    cells_a_merge_would_write,
     fingerprint_of_cells,
-    in_writing_says_yes,
 )
 from app.register.move_rows import apply_moves
 from app.review.review_queue import (
@@ -39,8 +39,10 @@ async def commit_register(
     copied anywhere — every reader reads the register live from
     `register_rows`.
     """
-    merged_row_numbers = await _merge_approved_matches(connection, run_id)
     document_id_by_file = await _documents_of_run(connection, run_id)
+    merged_row_numbers = await _merge_approved_matches(
+        connection, run_id, document_id_by_file
+    )
     # After the merges, so a move lands on the row an approved merge sent its
     # evidence to; before the proposals below, so a row created and moved in
     # one batch is committed with the cells the move left it holding.
@@ -64,7 +66,7 @@ async def commit_register(
             # A row without a source citation is an unsupported claim and must
             # never reach the register.
             raise RuntimeError(
-                f"Register row #{row['row_number']} carries no citation and "
+                f"Register row {row['row_number']} carries no citation and "
                 "cannot be committed — every committed row states what a "
                 "document said and names where it said it. Re-run the batch so "
                 "the row is proposed with its evidence."
@@ -97,6 +99,7 @@ async def commit_register(
 async def _merge_approved_matches(
     connection: AsyncConnection,
     run_id: UUID,
+    document_id_by_file: dict[str, UUID],
 ) -> list[int]:
     """Approving a possible match moves the new evidence onto the existing row.
 
@@ -118,7 +121,7 @@ async def _merge_approved_matches(
         # Before the citations move, so a cell replaced here drops the citation
         # that supported its old value while the arriving one is still to come.
         await _bring_cells_up_to_the_new_evidence(
-            connection, lands_on, proposal_id, run_id
+            connection, lands_on, proposal_id, run_id, document_id_by_file
         )
         await connection.execute(
             "UPDATE citations SET register_row_id = %s WHERE register_row_id = %s",
@@ -149,6 +152,7 @@ async def _bring_cells_up_to_the_new_evidence(
     survivor_id: UUID,
     proposal_id: UUID,
     run_id: UUID,
+    document_id_by_file: dict[str, UUID],
 ) -> None:
     """Move the surviving row's cells to what the arriving evidence supports.
 
@@ -156,17 +160,17 @@ async def _bring_cells_up_to_the_new_evidence(
     saying the ask is not written down in a file the row now cites is
     contradicted by the row's own evidence — and nothing else in Commit looks
     at that cell again.
+
+    Which cells move is `cells_a_merge_would_write`, the same answer the
+    decision showed the person before they approved it.
     """
     survivor = await _cells_of(connection, survivor_id)
     proposal = await _cells_of(connection, proposal_id)
     if survivor is None or proposal is None:
         return
 
-    changed: dict[str, str] = {}
-    if in_writing_says_yes(proposal[IN_WRITING]) and not in_writing_says_yes(
-        survivor[IN_WRITING]
-    ):
-        changed[IN_WRITING] = proposal[IN_WRITING]
+    changed = cells_a_merge_would_write(proposal[IN_WRITING], survivor[IN_WRITING])
+    citing_file = await _file_behind_a_cell(connection, proposal_id, IN_WRITING)
 
     for cell_name, value in changed.items():
         await connection.execute(
@@ -184,6 +188,9 @@ async def _bring_cells_up_to_the_new_evidence(
             # A row this run proposed has its whole first history written when
             # it is committed; a row already in the register gets its
             # before-and-after here, the way an approved move does.
+            # The history names the document the arriving claim came from,
+            # which is the proposal's own citation on this cell — the merge
+            # moves that citation across a moment from now.
             await write_cell_change(
                 connection,
                 survivor_id,
@@ -191,7 +198,7 @@ async def _bring_cells_up_to_the_new_evidence(
                 survivor[cell_name],
                 value,
                 run_id,
-                None,
+                document_id_by_file.get(citing_file) if citing_file else None,
             )
 
     if changed and survivor["is_committed"]:
@@ -203,6 +210,20 @@ async def _bring_cells_up_to_the_new_evidence(
                 survivor_id,
             ),
         )
+
+
+async def _file_behind_a_cell(
+    connection: AsyncConnection,
+    register_row_id: UUID,
+    cell_name: str,
+) -> str | None:
+    result = await connection.execute(
+        "SELECT source_file FROM citations WHERE register_row_id = %s "
+        "AND cell_name = %s LIMIT 1",
+        (register_row_id, cell_name),
+    )
+    citation = await result.fetchone()
+    return citation["source_file"] if citation else None
 
 
 async def _cells_of(
@@ -255,7 +276,7 @@ async def _write_attachment_audit(
         await write_attachment(
             connection,
             finding["register_row_id"],
-            f"{finding['rule_id']} — {finding['issue']}",
+            f"Finding: {finding['rule_text']}",
             run_id,
         )
 

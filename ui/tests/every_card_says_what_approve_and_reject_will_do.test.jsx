@@ -27,7 +27,7 @@ const observationMatch = decisionReply({
     + "out a day early'. Is this about row #2 — SMS reminders before an "
     + "appointment?",
   row_number: 2,
-  moved_cells: [
+  if_approved: [
     { cell: "What testing found", value: "the reminder goes out a day early" },
     { cell: "Status", value: "Partial" },
   ],

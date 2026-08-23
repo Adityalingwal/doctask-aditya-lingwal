@@ -326,7 +326,7 @@ def test_an_answer_naming_both_a_row_number_and_a_batch_index_is_refused(
     with pytest.raises(IncompleteMatchAnswer) as refusal:
         _answered_by_the_model(tmp_path, answer, 2)
 
-    assert "named both row #3 and requirement 0" in str(refusal.value)
+    assert "named both row 3 and requirement 0" in str(refusal.value)
 
 
 def test_an_answer_naming_neither_for_a_match_outcome_is_refused(

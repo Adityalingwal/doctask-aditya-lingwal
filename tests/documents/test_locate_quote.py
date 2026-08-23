@@ -6,6 +6,7 @@ from app.ingest.locate_quote import PLACE_BEFORE_FIRST_HEADING, locate_quote
 from app.ingest.place_in_document import page_number_at
 from app.ingest.read_pdf import PAGE_SEPARATOR
 from app.ingest.read_text_document import read_text_document
+from app.ingest.source_line import SAYS, source_line
 
 # The single character pdfplumber emits for "fi" in a ligatured font.
 FI_LIGATURE = "ﬁ"
@@ -57,14 +58,51 @@ def test_quote_the_model_invented_is_not_located() -> None:
     assert locate_quote(MEETING_NOTE, "the client wants search on old records") is None
 
 
-def test_a_quote_appearing_under_two_headings_names_both_places() -> None:
+def test_a_quote_appearing_under_two_headings_names_only_the_first() -> None:
     location = locate_quote(REPEATED_UNDER_TWO_HEADINGS, "The login page is not working.")
 
     assert location is not None
-    assert location.place == "A, B"
-    # The document's own words, from the first occurrence — the place names
-    # every heading, but the quoted text is not repeated.
+    # The stored words are read from the first occurrence, so the first
+    # occurrence is the place the citation names. A comma-joined pair cannot
+    # be written as the one source line every surface prints.
+    assert location.place == "A"
     assert location.source_words == "The login page is not working."
+
+
+def test_the_source_line_of_a_quote_under_two_headings_names_only_the_first() -> None:
+    location = locate_quote(REPEATED_UNDER_TWO_HEADINGS, "The login page is not working.")
+
+    assert location is not None
+    assert source_line("testing-feedback-12-aug.md", location.place) == (
+        'testing-feedback-12-aug.md, under "A"'
+    )
+
+
+def test_the_source_line_says_so_when_a_quote_sits_above_every_heading() -> None:
+    location = locate_quote("Plain opening line.\n\n# Later heading\n", "Plain opening")
+
+    assert location is not None
+    assert source_line("notes.md", location.place) == (
+        "notes.md, before the first heading"
+    )
+
+
+def test_the_source_line_of_a_pdf_quote_names_its_page() -> None:
+    document_text = f"Page one text.{PAGE_SEPARATOR}The login page is not working.\n"
+    location = locate_quote(
+        document_text, "The login page is not working.", page_number_at
+    )
+
+    assert location is not None
+    assert source_line("scan.pdf", location.place) == "scan.pdf, page 2"
+
+
+def test_a_decision_appends_says_to_the_same_source_line() -> None:
+    # Decisions, evidence and the Skipped tab share one template; only a
+    # decision, which shows the words next, ends its line with a colon.
+    assert f"{source_line('notes.md', 'Discussion')}{SAYS}" == (
+        'notes.md, under "Discussion", says:'
+    )
 
 
 def test_a_quote_appearing_once_still_names_that_one_place() -> None:

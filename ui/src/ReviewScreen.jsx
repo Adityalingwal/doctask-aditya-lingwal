@@ -32,9 +32,9 @@ const EXPORT_GATE_KIND = "export";
 // kind this map does not hold renders with no label at all: a wrong label is
 // worse than none, and the server may learn a kind before this screen does.
 const NOT_USED_LABELS = {
-  "already read": "Already read",
+  "read before": "Read before",
   "not read": "Not read",
-  dropped: "Dropped",
+  "not attached": "Not attached to any row",
 };
 
 // The screen's own name. The register it shows keeps the name the decisions and
@@ -336,9 +336,9 @@ export default function ReviewScreen({ runId: openedRunId }) {
             number: "02",
             name: "Not used",
             tab: "Not used",
-            tabCount: run.not_used.length === 0 ? null : String(run.not_used.length),
-            count: `${run.not_used.length} not used`,
-            body: <NotUsed entries={run.not_used} />,
+            tabCount: run.skipped.length === 0 ? null : String(run.skipped.length),
+            count: `${run.skipped.length} not used`,
+            body: <NotUsed entries={run.skipped} />,
           },
           {
             id: "decisions",

@@ -11,15 +11,15 @@ from sqlalchemy import create_engine, inspect, text
 from tests.runs.application import PROJECT_ROOT, temporary_database
 
 
-BEFORE_THE_RENAME = "20260817_0019"
-EARLIER_COLUMN = "skipped"
-RENAMED_COLUMN = "not_used"
+BEFORE_THE_RENAME = "20260823_0023"
+EARLIER_COLUMN = "not_used"
+RENAMED_COLUMN = "skipped"
 # One entry of each weight the list holds, written as the pipeline writes them.
 STORED_ENTRIES = [
     {
-        "kind": "already read",
+        "kind": "read before",
         "file": "12-march-scope.md",
-        "reason": "Already read, and unchanged since.",
+        "reason": "unchanged since it was read.",
     },
     {
         "kind": "not read",
@@ -27,12 +27,14 @@ STORED_ENTRIES = [
         "reason": "This document is not related to this client or project.",
     },
     {
-        "kind": "dropped",
+        "kind": "not attached",
         "file": "meeting-notes-10-mar.md",
         "summary": "a weekly AI summary of all open tickets",
         "quote": "the client wants a weekly AI summary of every open ticket",
+        "source_line": None,
         "reason": (
-            "These words were not found in the file, so this requirement was dropped."
+            "The model said this comes from meeting-notes-10-mar.md, but "
+            "those words are not in the file."
         ),
     },
 ]
@@ -85,8 +87,8 @@ def _seed_a_run_holding_the_entries(database_url: str) -> Any:
                 ),
                 {
                     "id": project_id,
-                    "name": f"Not used {project_id}",
-                    "folder": f"sample-projects/not-used-{project_id}",
+                    "name": f"Skipped {project_id}",
+                    "folder": f"sample-projects/skipped-{project_id}",
                 },
             )
             connection.execute(

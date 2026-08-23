@@ -8,12 +8,26 @@ from psycopg import AsyncConnection
 from app.extract.answer import CLIENT_REQUIREMENTS_DOCUMENT
 from app.match.match_requirements import EXISTING_ROW, NEW_ROW
 from app.register.cells import (
+    CELL_NAMES,
+    COLUMN_HEADINGS,
     IN_WRITING,
     IN_WRITING_NOT_KNOWN_YET,
     IN_WRITING_YES,
+    STATUS,
     STATUS_REQUESTED,
     TESTING_NOT_KNOWN_YET,
+    WHAT_TESTING_FOUND,
     WHAT_WAS_ASKED,
+    cells_a_merge_would_write,
+    shorten_quote,
+)
+from app.review.decision_text import (
+    DecisionText,
+    cells_as_a_person_reads_them,
+    possible_match_text,
+    proposed_row_label,
+    quote_block,
+    register_row_label,
 )
 from app.review.review_queue import raise_possible_match_decision
 
@@ -31,23 +45,26 @@ class MatchSettlement(NamedTuple):
 
     Both candidates are carried because a requirement matches either a register
     row that already exists or an earlier requirement of this same batch, and
-    the two are settled in different ways. The question is Match's own sentence
-    and travels with the settlement: this is the only way it reaches the
-    decision, and a decision must show the person the words Match wrote.
+    the two are settled in different ways. No sentence travels here: every
+    word a person reads on the decision is built from stored data below.
     """
 
     outcome: str
     row_number: int | None
     same_as_requirement_index: int | None
-    question: str | None
 
 
 async def committed_rows(
     connection: AsyncConnection,
     project_id: UUID,
 ) -> list[dict[str, Any]]:
+    """The register's committed rows, whole, because a decision quotes them.
+
+    All four cells, not `what_was_asked` alone: the possible-match decision
+    shows the candidate row exactly as the register's table shows it.
+    """
     result = await connection.execute(
-        "SELECT id, row_number, what_was_asked FROM register_rows "
+        "SELECT id, row_number, " + ", ".join(CELL_NAMES) + " FROM register_rows "
         "WHERE project_id = %s AND is_committed ORDER BY row_number",
         (project_id,),
     )
@@ -88,18 +105,27 @@ async def propose_rows(
         row_by_requirement: dict[int, dict[str, Any]] = {}
         for stated_by in sorted(requirements_of_row):
             on_this_row = requirements_of_row[stated_by]
+            in_writing = _in_writing_cell(_the_requirement_in_writing(on_this_row))
             row_id = await _insert_proposed_row(
                 connection,
                 run_id,
                 project_id,
                 next_row_number,
                 on_this_row,
+                in_writing,
             )
             proposed_row_ids.append(row_id)
             row_by_requirement[stated_by] = {
                 "id": row_id,
                 "row_number": next_row_number,
-                "what_was_asked": on_this_row[0]["summary"],
+                # A candidate may be one of these proposals (S24), and the
+                # decision shows a candidate's four cells, so a proposal
+                # carries them here rather than being read back.
+                WHAT_WAS_ASKED: on_this_row[0]["summary"],
+                IN_WRITING: in_writing,
+                WHAT_TESTING_FOUND: TESTING_NOT_KNOWN_YET,
+                STATUS: STATUS_REQUESTED,
+                "is_committed": False,
             }
             next_row_number += 1
 
@@ -114,10 +140,12 @@ async def propose_rows(
             if candidate is None:
                 continue
             proposed = row_by_requirement[index]
+            asked = _the_text_of_the_question(candidate, proposed, requirements[index])
             await raise_possible_match_decision(
                 connection,
                 run_id,
-                settled.question,
+                asked.question,
+                asked.parts,
                 proposed["id"],
                 candidate["id"],
             )
@@ -126,6 +154,42 @@ async def propose_rows(
     return ProposedRegister(
         proposed_row_ids=proposed_row_ids,
         gated_row_numbers=gated_row_numbers,
+    )
+
+
+def _the_text_of_the_question(
+    candidate: dict[str, Any],
+    proposed: dict[str, Any],
+    requirement: dict[str, Any],
+) -> DecisionText:
+    """The whole decision a person reads before two asks are treated as one.
+
+    The candidate may be a row this same run proposed, which is not on the
+    register yet and says so (S24). What approving writes is worked out by the
+    one rule Commit's merge uses, so the line never promises a cell change
+    Commit will not make.
+    """
+    label = (
+        register_row_label(candidate["row_number"])
+        if candidate.get("is_committed", True)
+        else proposed_row_label(candidate["row_number"])
+    )
+    return possible_match_text(
+        row_number=candidate["row_number"],
+        row_label=label,
+        cells=cells_as_a_person_reads_them(candidate),
+        quote=quote_block(
+            requirement["source_file"],
+            requirement["place"],
+            shorten_quote(requirement["source_words"]),
+        ),
+        if_approved=[
+            {"cell": COLUMN_HEADINGS[cell_name], "value": value}
+            for cell_name, value in cells_a_merge_would_write(
+                proposed[IN_WRITING], candidate[IN_WRITING]
+            ).items()
+        ],
+        proposed_in_writing=proposed[IN_WRITING],
     )
 
 
@@ -218,13 +282,13 @@ async def _insert_proposed_row(
     project_id: UUID,
     row_number: int,
     requirements_on_row: list[dict[str, Any]],
+    in_writing: str,
 ) -> UUID:
     row_id = uuid4()
     # The batch is ordered by document type, so the first requirement on a row
     # is the one stated earliest in the workflow, whatever the files are named.
     stated_the_ask = requirements_on_row[0]
     written_down = _the_requirement_in_writing(requirements_on_row)
-    in_writing = _in_writing_cell(written_down)
 
     await connection.execute(
         "INSERT INTO register_rows (id, project_id, what_was_asked, in_writing, "

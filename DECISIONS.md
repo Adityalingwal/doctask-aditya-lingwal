@@ -127,6 +127,14 @@ export is always gated.
 | 12 | Final export/commit | Yes |
 | 13 | Honest `No findings` result | No |
 
+- **An empty folder makes a project and starts no run (2026-08-23).** The
+  refusal, `This folder has no files. Add a document.`, lives in
+  `start_or_queue_run` — the one function `POST /runs`, the MCP `start_run`
+  tool and the watcher all reach, so none of the three can grow its own
+  wording. The folder list carries a has-files flag so the button can say
+  which of the two it is offering. Replaces the earlier "create and start
+  run" step, which recorded a run that read nothing.
+
 ### Actions and persistence
 
 - **Decision:** Every gated proposal has only **Approve** or **Reject**. The
@@ -165,14 +173,15 @@ export is always gated.
   to newly raised questions only, so an audit shows what each person actually
   read rather than what the system would say today.
 - **What Approve and Reject will do is code's to write, never the model's
-  (2026-08-17).** It is fixed text per kind, printed beside values the server
-  computed, and it is never part of the stored question. `decisions_of_run`
-  carries `row_number` — the register row the decision is about, whichever
-  kind it is — and `moved_cells`, read from the very `pending_moves` entry
-  Commit applies. A possible match shows only the shape (`one row` /
-  `a separate row`), because the new `Written down` is worked out inside
-  Commit; an observation match shows the values, because they were stored
-  before the question was raised.
+  (2026-08-17; part of the stored question since 2026-08-23).** Every kind's
+  two lines are built from stored data and now sit inside the frozen text a
+  person read, as `parts.if_approved` (a list of `{cell, value}`, empty where
+  approving writes no cell) and `parts.if_rejected` (one sentence).
+  `decisions_of_run` carries `row_number` — the register row the decision is
+  about, whichever kind it is. A possible match names the cell an approved
+  merge would write, worked out by `cells_a_merge_would_write`, which Commit
+  reads too; an observation match names the cells of the very `pending_moves`
+  entry Commit applies.
 - **A finding's answer lives only here.** `findings` carries the `decision_key`
   of its gated question and no `review_state` of its own, because an answer may
   change until `finish-review` and a second copy would have to be kept in step
@@ -203,7 +212,7 @@ export is always gated.
   and README's "What this does not do, and why" for the boundary this draws
   for a user.
 - **Removed file:** Deleting a watched file does not delete its historical rows.
-- **Watcher:** Poll every 10 seconds and auto-start after 30 seconds of quiet,
+- **Watcher:** Poll every 2 seconds and auto-start after 5 seconds of quiet,
   provided the project has no run running, at review, or queued. Manual
   `POST /runs` remains. Files arriving during Review wait for the next run.
   Both numbers are `config/watcher.yaml`, read through `WATCHER_CONFIG_PATH`.
@@ -431,7 +440,9 @@ cannot each assume a different one:
 - Absence evidence = exact file read plus explicit absence statement.
 - Locator by format: PDF page, Markdown nearest heading.
 - The model supplies exact words; code derives the place. Repeated words use
-  the first occurrence.
+  the first occurrence, and the citation names that one place — the
+  comma-joined list of every place left on 2026-08-23, because one source line
+  (`app/ingest/source_line.py`) cannot be written from a list.
 - An unfindable quote drops that requirement and records a skip reason. Plain
   normalized substring matching is intentional; no fuzzy match.
 - **Evidence/status:** Markdown quote location, multi-line normalization,
@@ -635,18 +646,21 @@ match.
   incomplete answer fails the run; it never defaults to a guess.
 - The three outcome words are a `Literal` on both answer models, so the
   generated schema refuses an invented outcome before the reply is read.
-- **Match writes the question a person reads, and it is stored unchanged
-  (2026-08-17).** Both answer models carry a `question`, and the prompts carry
-  worked examples of the sentence. The rule follows the data, not the outcome
-  word: a question is required wherever an answer names a register row — for
-  either outcome, because a confident answer against a committed row is
-  downgraded into the same possible-match decision — and wherever the outcome
-  is `possible match`, which covers the within-batch pair that names no row.
-  It is refused everywhere else. `MatchSettlement` carries it from the graph to
-  `propose_rows`; nothing composes a sentence any more. A grouped
-  observation-match decision stores its observations' sentences in answer
-  order, joined by one blank line, character for character. History:
-  2026-08-17.
+- **The backend builds every decision sentence; the model writes none
+  (2026-08-23).** Replaces "Match writes the question a person reads, and it is
+  stored unchanged" (2026-08-17), which is why: a model-phrased sentence
+  brought `\"` escapes and `Row #8` onto the screen, and a template cannot.
+  `question` leaves `MatchOutcome`, the observation outcome model and
+  `MatchSettlement`, with the refusals that failed a run on a missing one.
+  `app/review/decision_text.py` builds all three shapes from the candidate
+  row's own cells, this batch's own quote and the move an approval would make
+  — worked out by `cells_a_merge_would_write`, the one rule Commit's merge
+  also reads, so the line never promises a change Commit will not write.
+  `decisions.question` still freezes the whole text at raise time, and
+  `decisions.parts` freezes the same text taken apart so a screen can lay it
+  out without composing wording of its own. Two observations on one row are
+  one decision carrying two quote blocks, never a stitched paragraph. A
+  candidate this same run proposed reads `Row N (proposed by this run)`.
 - Each requirement reaches the Match prompt with its `document_type`, taken
   from the stored extraction and never guessed from a file name, so the
   question can name the kind of document each statement came from.
@@ -691,14 +705,23 @@ match.
   stores the id it was raised under. What is given up: a code check always
   runs, while a model-judged rule depends on the model.
 - One findings table, no rules table. Each finding freezes rule id and text,
-  found issue, evidence, row, and human question; its answer is read from the
-  decision it names (D02), not stored again.
-- **A finding is five fields, and Examine writes the question itself
-  (2026-08-17):** `rule_id`, `row_number`, `issue`, `evidence`, `question`. An
-  empty question is refused beside an empty issue or evidence. The sentence is
-  stored unchanged, states the rule in its own words, and carries no rule code
-  — the person reading it has never seen the rules file. History:
-  2026-08-17.
+  found issue, evidence, row, and the whole question the backend built; its
+  answer is read from the decision it names (D02), not stored again. The
+  history line names the rule by its text alone (`Row 1 · Finding: <text>`).
+- **A finding is four fields, and only its issue line is the model's
+  (2026-08-23).** Replaces "A finding is five fields, and Examine writes the
+  question itself" (2026-08-17), for the D09 reason: a model-phrased question
+  put JSON escapes and a stale row number in front of a person. The model
+  answers `rule_id`, `row_number`, `issue` and `evidence`; `question` leaves
+  the model. The issue line stays the model's because only the rule can say
+  what breaking it looks like, and the backend wraps it — the row block, the
+  rule's own words, the issue, `Does row N break this rule?`, and what each
+  answer does — and stores the whole as `decisions.question`. An empty issue
+  or evidence is still refused.
+- **The change-request rule is a declared limitation, not extended
+  (2026-08-23).** A testing observation that attached to no row reaches the
+  person through the Skipped tab, and no rule runs on it — Examine sees
+  register rows only. Written out once, in README "What it does not do".
 - Configuration is frozen per run. A fingerprint covers parsed rules, ignoring
   comments/whitespace. Per-rule change detection is deliberately not built;
   a rules change re-examines the whole small register in one model call.
@@ -865,6 +888,14 @@ Eight domain tables: `projects`, `runs`, `documents`, `register_rows`,
 checkpoint tables in the same PostgreSQL. Alembic migrations exist from the
 first table.
 
+- **`decisions.parts` (JSONB, nullable, 2026-08-23)** — the whole decision
+  text taken apart, frozen beside `question` at raise time. Nullable because
+  the export gate is a button, not a card, and has no parts at all.
+- **`get_register` rows carry `evidence` (2026-08-23)** — citations merged by
+  quote, each entry naming its source line, its words and the cells it
+  supports; an absence carries its sentence and no quote. `citations` and
+  `examine` stay in the JSON until `ui/src/Register.jsx` reads the new field.
+
 Eight slice-1 API endpoints:
 
 | Endpoint | Job |
@@ -878,24 +909,24 @@ Eight slice-1 API endpoints:
 | `GET /projects/{project_id}/register` | The project's register, live from its committed rows, JSON or Markdown |
 | `GET /projects/{project_id}/history` | The project's register history, read from `audit`: what changed, when, and from which document (§ history read below); JSON only |
 
-**The list of what a run did not use is called `not_used`, in all three places
-(locked 2026-08-17, superseding `skipped` in the column, the payload field and
-the tab, and the three mismatched kind values `"file"`, `"document"` and
-`"observation"` — history: "`skipped` becomes `not_used`, and every entry says
-which kind it is").** The column is `runs.not_used` (migration
-`20260818_0020`, `ALTER TABLE ... RENAME COLUMN`, downgrade the exact
-reverse); the payload field both doors answer with is `not_used`; the tab
-reads `Not used`. Renaming only the tab was refused: it would leave the screen
-and the two other doors using different words for one thing, the fault being
-fixed. Every entry carries one of exactly three kinds, named once in
-`app/runs/not_used_kinds.py`: `already read` (an earlier finished run read
-this file, by name or content), `not read` (unrelated, too long, encrypted,
-wrong format, unknown document type, failed model call — every reason a file
-was never read), and `dropped` (a quote was not found in the file, so the
-requirement or observation it carried was dropped). A dropped entry keeps its
-`summary` and its reason sentence, and that sentence still names what was
-dropped — a requirement or a testing observation — so no field is added for
-it.
+**The list of what a run did not use is called `skipped`, in all three places
+(locked 2026-08-23, replacing `not_used` of 2026-08-17, which had itself
+replaced `skipped`).** Why the name went back: `not_used` was chosen because
+"skipped" read wrongly for a quote out of a file that *was* read, and the kind
+words answer that objection directly, so one word can carry the whole list
+again. The column is `runs.skipped` (migration `20260823_0024`, `ALTER TABLE
+... RENAME COLUMN`, downgrade the exact reverse; migration `20260818_0020`,
+which did the opposite rename, is left alone); the payload field both doors
+answer with is `skipped`. Every entry carries one of exactly three kinds,
+named once in `app/runs/skipped_kinds.py`: `read before` (an earlier finished
+run read this file, by name or content), `not read` (unrelated, too long,
+encrypted, wrong format, unknown document type, failed model call — every
+reason a file was never read), and `not attached` (something a document said
+that reached no register row). A `not attached` entry keeps its `summary` and
+carries a `source_line` where the words were located in the file, and `null`
+where they were never in it — a silence has no place to point at, and its
+reason names the file instead. Every sentence in the list is the backend's;
+the screen prints `<file> — <reason>` and writes nothing of its own.
 
 `GET /runs` (every run, flat, newest first) is replaced by `GET /projects`,
 not kept beside it — two list shapes for the same data was exactly the drift
@@ -977,10 +1008,10 @@ a symlink after creation is not re-checked.
   Approve, Reject and the two buttons that end the review. **A run panel has three tabs — Stages,
   Not used, Decisions (locked 2026-08-16, superseding a fourth Register tab —
   see the register bullet below).**
-- **A not-used entry's label comes from its `kind` and from nothing else**
-  (locked 2026-08-17): the screen maps `already read`, `not read` and
-  `dropped` to `Already read`, `Not read` and `Dropped`, and an entry whose
-  kind it does not recognise renders with no label at all. There is no default
+- **A skipped entry's label comes from its `kind` and from nothing else**
+  (locked 2026-08-17): the screen maps `read before`, `not read` and
+  `not attached` to `Read before`, `Not read` and `Not attached to any row`,
+  and an entry whose kind it does not recognise renders with no label at all. There is no default
   label anywhere — a wrong label is worse than none, and the server may learn
   a kind before the screen does.
 - **The stage strip's own stage wins over "done" only while the run is active**

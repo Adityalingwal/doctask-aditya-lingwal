@@ -46,8 +46,9 @@ raised by the handover run.
   waits for a handover summary (`applies_when`), so it is judged from the
   handover run onwards.
 - **The change-request rule (R2)** — the SMS follow-up is testing feedback
-  asking for new behaviour, logged as a bug, with no written requirement
-  behind it.
+  asking for new behaviour, with no written requirement behind it. It reaches
+  no register row, so no rule is applied to it: it is shown on the **Skipped**
+  tab as an observation about no row, and never raised as a finding.
 - **The testing-outcome rule (R4)** — Hindi/English and the weekly analytics
   report are both written down and never mentioned in the testing feedback.
 - **The fourth rule (R5, no row `Done` without a testing outcome)** is
@@ -69,7 +70,7 @@ per batch rather than once over a whole dump:
 mkdir sample-projects/helpline-ai        # empty folder, create the project on it
 # then copy documents in one at a time (or in pairs), waiting for each run:
 cp sample-documents/helpline-ai/meeting-notes-02-jul.md sample-projects/helpline-ai/
-# ... watcher: poll_seconds 4, quiet_seconds 10
+# ... watcher: poll_seconds 2, quiet_seconds 5
 ```
 
 Create the project first, through the screen's Add-project box or the MCP

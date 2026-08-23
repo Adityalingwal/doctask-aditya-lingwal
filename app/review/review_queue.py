@@ -4,8 +4,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection
-
-from app.register.cells import COLUMN_HEADINGS
+from psycopg.types.json import Jsonb
 
 
 POSSIBLE_MATCH_DECISION = "possible match"
@@ -27,12 +26,13 @@ async def raise_finding_decision(
     connection: AsyncConnection,
     run_id: UUID,
     question: str,
+    parts: dict[str, Any],
 ) -> UUID:
     decision_id = uuid4()
     await connection.execute(
-        "INSERT INTO decisions (id, run_id, kind, question) "
-        "VALUES (%s, %s, %s, %s)",
-        (decision_id, run_id, FINDING_DECISION, question),
+        "INSERT INTO decisions (id, run_id, kind, question, parts) "
+        "VALUES (%s, %s, %s, %s, %s)",
+        (decision_id, run_id, FINDING_DECISION, question, Jsonb(parts)),
     )
     return decision_id
 
@@ -41,19 +41,21 @@ async def raise_possible_match_decision(
     connection: AsyncConnection,
     run_id: UUID,
     question: str,
+    parts: dict[str, Any],
     proposed_register_row_id: UUID,
     candidate_register_row_id: UUID,
 ) -> UUID:
     decision_id = uuid4()
     await connection.execute(
-        "INSERT INTO decisions (id, run_id, kind, question, "
+        "INSERT INTO decisions (id, run_id, kind, question, parts, "
         "proposed_register_row_id, candidate_register_row_id) "
-        "VALUES (%s, %s, %s, %s, %s, %s)",
+        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
         (
             decision_id,
             run_id,
             POSSIBLE_MATCH_DECISION,
             question,
+            Jsonb(parts),
             proposed_register_row_id,
             candidate_register_row_id,
         ),
@@ -65,18 +67,20 @@ async def raise_observation_match_decision(
     connection: AsyncConnection,
     run_id: UUID,
     question: str,
+    parts: dict[str, Any],
     candidate_register_row_id: UUID,
 ) -> UUID:
     """Ask before this batch's evidence changes what a committed row says."""
     decision_id = uuid4()
     await connection.execute(
-        "INSERT INTO decisions (id, run_id, kind, question, "
-        "candidate_register_row_id) VALUES (%s, %s, %s, %s, %s)",
+        "INSERT INTO decisions (id, run_id, kind, question, parts, "
+        "candidate_register_row_id) VALUES (%s, %s, %s, %s, %s, %s)",
         (
             decision_id,
             run_id,
             OBSERVATION_MATCH_DECISION,
             question,
+            Jsonb(parts),
             candidate_register_row_id,
         ),
     )
@@ -116,16 +120,20 @@ async def decisions_of_run(
 ) -> list[dict[str, Any]]:
     """Every decision this run raised, with the row and the change it is about.
 
-    The screen shows a finding as three labelled parts and never a rule code
-    (screen 4), which the flat `question` sentence alone cannot carry — so a
-    finding decision is joined to its row in `findings` for `rule_text`,
-    `issue` and `evidence`. `row_number` is the register row the decision is
-    about, whichever kind it is: a finding's own row, or the row a match would
-    attach to. The export gate is about no single row and carries null.
+    The screen shows a finding as labelled parts and never a rule code (screen
+    4), which the flat `question` sentence alone cannot carry — so a finding
+    decision is joined to its row in `findings` for `rule_text`, `issue` and
+    `evidence`. `row_number` is the register row the decision is about,
+    whichever kind it is: a finding's own row, or the row a match would attach
+    to. The export gate is about no single row and carries null.
+
+    The order is the one every surface shows (S23): by the row the decision is
+    about, then possible match before observation match before finding, then
+    id. The export gate is about no row, so its null row number sorts last.
     """
     result = await connection.execute(
         "SELECT decisions.id, decisions.kind, decisions.question, "
-        "decisions.proposed_register_row_id, "
+        "decisions.parts, decisions.proposed_register_row_id, "
         "decisions.candidate_register_row_id, decisions.outcome, "
         "decisions.decided_at, findings.rule_text, findings.issue, "
         "findings.evidence, COALESCE(finding_rows.row_number, "
@@ -136,41 +144,18 @@ async def decisions_of_run(
         "ON finding_rows.id = findings.register_row_id "
         "LEFT JOIN register_rows AS candidate_rows "
         "ON candidate_rows.id = decisions.candidate_register_row_id "
-        "WHERE decisions.run_id = %s ORDER BY decisions.kind, decisions.id",
-        (run_id,),
+        "WHERE decisions.run_id = %s "
+        "ORDER BY COALESCE(finding_rows.row_number, candidate_rows.row_number), "
+        "CASE decisions.kind WHEN %s THEN 0 WHEN %s THEN 1 WHEN %s THEN 2 "
+        "ELSE 3 END, decisions.id",
+        (
+            run_id,
+            POSSIBLE_MATCH_DECISION,
+            OBSERVATION_MATCH_DECISION,
+            FINDING_DECISION,
+        ),
     )
-    moves = await _pending_moves_of_run(connection, run_id)
-    return [
-        {**decision, "moved_cells": _cells_this_decision_would_write(moves, decision["id"])}
-        for decision in await result.fetchall()
-    ]
-
-
-async def _pending_moves_of_run(
-    connection: AsyncConnection,
-    run_id: UUID,
-) -> list[dict[str, Any]]:
-    result = await connection.execute(
-        "SELECT pending_moves FROM runs WHERE id = %s", (run_id,)
-    )
-    stored = await result.fetchone()
-    return stored["pending_moves"] if stored else []
-
-
-def _cells_this_decision_would_write(
-    moves: list[dict[str, Any]],
-    decision_id: UUID,
-) -> list[dict[str, str]]:
-    """What approving this decision writes, read from the move Commit applies.
-
-    Printed from the stored move rather than worked out a second time, so the
-    line a person reads and the cell that actually changes cannot disagree.
-    """
-    return [
-        {"cell": COLUMN_HEADINGS[move["cell"]], "value": move["value"]}
-        for move in moves
-        if move["decision_id"] == str(decision_id)
-    ]
+    return list(await result.fetchall())
 
 
 async def unanswered_decisions(

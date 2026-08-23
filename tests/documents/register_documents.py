@@ -13,7 +13,6 @@ from app.match.match_requirements import (
     MATCH_PROMPT_MARKER,
     NEW_ROW,
     OBSERVATION_PROMPT_MARKER,
-    POSSIBLE_MATCH,
 )
 
 
@@ -226,35 +225,7 @@ def match_answer(requirement_count: int) -> dict[str, Any]:
     }
 
 
-def match_question_about_row(row_number: int) -> str:
-    """The sentence the model must write whenever its answer names a row."""
-    return (
-        f"This ask was raised in meeting notes — row #{row_number}. It is "
-        "stated again in this batch's document. Is this the same ask?"
-    )
-
-
-def match_question_within_batch(same_as_requirement_index: int) -> str:
-    """The same sentence for a pair inside one batch, where no row exists yet."""
-    return (
-        "This ask appears twice in this batch: stated by requirement "
-        f"{same_as_requirement_index}, and stated again here. Is this the "
-        "same ask?"
-    )
-
-
-def observation_question_about_row(observation_index: int, row_number: int) -> str:
-    """One sentence per observation, and two observations never share one."""
-    return (
-        f"A document read in this run reports statement {observation_index}. "
-        f"Is this about row #{row_number}?"
-    )
-
-
-def match_answer_existing_row(
-    row_number: int,
-    question: str | None = None,
-) -> dict[str, Any]:
+def match_answer_existing_row(row_number: int) -> dict[str, Any]:
     """Match reporting that the one requirement in this batch is already a row."""
     return {
         "outcomes": [
@@ -262,7 +233,6 @@ def match_answer_existing_row(
                 "requirement_index": 0,
                 "outcome": "existing row",
                 "row_number": row_number,
-                "question": question or match_question_about_row(row_number),
             }
         ]
     }
@@ -276,9 +246,6 @@ def match_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
                 "requirement_index": index,
                 "outcome": NEW_ROW if row_number is None else EXISTING_ROW,
                 "row_number": row_number,
-                "question": (
-                    None if row_number is None else match_question_about_row(row_number)
-                ),
             }
             for index, row_number in enumerate(matched_row_numbers)
         ]
@@ -287,7 +254,6 @@ def match_answer_of(matched_row_numbers: list[int | None]) -> dict[str, Any]:
 
 def match_answer_within_batch(
     answered: list[tuple[str, int | None, int | None]],
-    questions: list[str | None] | None = None,
 ) -> dict[str, Any]:
     """Match's answer per requirement: outcome, register row, batch requirement.
 
@@ -302,13 +268,6 @@ def match_answer_within_batch(
                 "outcome": outcome,
                 "row_number": row_number,
                 "same_as_requirement_index": same_as_requirement_index,
-                "question": (
-                    questions[index]
-                    if questions is not None
-                    else _default_match_question(
-                        outcome, row_number, same_as_requirement_index
-                    )
-                ),
             }
             for index, (outcome, row_number, same_as_requirement_index) in enumerate(
                 answered
@@ -317,22 +276,8 @@ def match_answer_within_batch(
     }
 
 
-def _default_match_question(
-    outcome: str,
-    row_number: int | None,
-    same_as_requirement_index: int | None,
-) -> str | None:
-    """A question exactly where the answer needs one, and nowhere else."""
-    if row_number is not None:
-        return match_question_about_row(row_number)
-    if outcome == POSSIBLE_MATCH and same_as_requirement_index is not None:
-        return match_question_within_batch(same_as_requirement_index)
-    return None
-
-
 def observation_answer_of(
     matched_row_numbers: list[int | None],
-    questions: list[str | None] | None = None,
 ) -> dict[str, Any]:
     """Match's answer per observation: the row it is about, or None for none.
 
@@ -346,13 +291,6 @@ def observation_answer_of(
                 "observation_index": index,
                 "outcome": NEW_ROW if row_number is None else EXISTING_ROW,
                 "row_number": row_number,
-                "question": (
-                    questions[index]
-                    if questions is not None
-                    else None
-                    if row_number is None
-                    else observation_question_about_row(index, row_number)
-                ),
             }
             for index, row_number in enumerate(matched_row_numbers)
         ]

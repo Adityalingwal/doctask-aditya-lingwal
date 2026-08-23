@@ -10,18 +10,13 @@ from app.ingest.locate_quote import locate_quote
 from app.ingest.place_in_document import place_finder_for
 from app.model.call_the_model import call_the_model
 from app.register.cells import shorten_quote
-from app.runs.not_used_kinds import DROPPED_KIND
+from app.runs.skipped_kinds import NOT_ATTACHED_KIND
 
-
-REQUIREMENT_KIND = "requirement"
-TESTING_OBSERVATION_KIND = "testing observation"
-DELIVERY_EVIDENCE_KIND = "delivery evidence"
-EMBEDDED_INSTRUCTION_KIND = "embedded instruction"
 
 
 class LocatedExtraction(NamedTuple):
     extraction: dict[str, Any]
-    dropped: list[dict[str, str]]
+    dropped: list[dict[str, Any]]
 
 
 async def read_one_document(
@@ -46,24 +41,24 @@ def locate_extraction(
     paraphrased. Either way its evidence cannot be verified, so what it
     supports is dropped rather than committed as an unsupported claim.
     """
-    dropped: list[dict[str, str]] = []
+    dropped: list[dict[str, Any]] = []
     place_of = place_finder_for(source_file)
 
-    # The entry's own kind and the kind of quote that was dropped are two
-    # different things: every entry here is a dropped one, and the sentence
-    # still has to name what was dropped.
-    def located(summary: str, quote: str, quote_kind: str) -> dict[str, str] | None:
+    # `source_line` is null and stays null: the words are not in the file, so
+    # there is no place to name, and the reason names the file instead (S12).
+    def located(summary: str, quote: str) -> dict[str, str] | None:
         location = locate_quote(document_text, quote, place_of)
         if location is None:
             dropped.append(
                 {
-                    "kind": DROPPED_KIND,
+                    "kind": NOT_ATTACHED_KIND,
                     "file": source_file,
                     "summary": summary,
                     "quote": quote,
+                    "source_line": None,
                     "reason": (
-                        "These words were not found in the file, so this "
-                        f"{quote_kind} was dropped."
+                        f"The model said this comes from {source_file}, but "
+                        "those words are not in the file."
                     ),
                 }
             )
@@ -85,28 +80,24 @@ def locate_extraction(
     }
 
     for requirement in answer.requirements:
-        found = located(requirement.summary, requirement.quote, REQUIREMENT_KIND)
+        found = located(requirement.summary, requirement.quote)
         if found is not None:
             extraction["requirements"].append(found)
 
     for observation in answer.testing_observations:
-        found = located(
-            observation.summary, observation.quote, TESTING_OBSERVATION_KIND
-        )
+        found = located(observation.summary, observation.quote)
         if found is not None:
             extraction["testing_observations"].append(
                 {**found, "label": observation.label.value}
             )
 
     for delivered in answer.delivery_evidence:
-        found = located(delivered.summary, delivered.quote, DELIVERY_EVIDENCE_KIND)
+        found = located(delivered.summary, delivered.quote)
         if found is not None:
             extraction["delivery_evidence"].append(found)
 
     for instruction in answer.embedded_instructions:
-        found = located(
-            instruction.quote, instruction.quote, EMBEDDED_INSTRUCTION_KIND
-        )
+        found = located(instruction.quote, instruction.quote)
         if found is not None:
             extraction["embedded_instructions"].append(found)
 

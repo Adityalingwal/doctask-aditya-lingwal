@@ -48,13 +48,30 @@ FIRST_REQUIREMENT = "an email to the operations team on intake form submit"
 SECOND_REQUIREMENT = "a notification to operations when the intake form is sent"
 COMMITTED_ROW_NUMBER = 1
 PROPOSED_ROW_NUMBER = 2
-# Match is certain the two are one ask. It still writes the sentence, because
-# a confident match against a row already in the register is downgraded into
-# the same possible-match decision an uncertain one raises.
+# Match is certain the two are one ask, and the person is still asked: a
+# confident match against a row already in the register is downgraded into the
+# same possible-match decision an uncertain one raises. Every word below is
+# the backend's, built from the committed row and this batch's own quote.
+#
+# Both documents are meeting notes, so the proposal claims nothing about
+# `Written down` and approving the merge writes no cell at all — the sentence
+# says what does happen instead of promising a change Commit will not make.
 CONFIDENT_MATCH_QUESTION = (
-    f"This ask was raised in meeting notes ({FIRST_FILE}) — row "
-    f"#{COMMITTED_ROW_NUMBER}, {FIRST_REQUIREMENT}. It is stated again in "
-    f"{SECOND_FILE} as {SECOND_REQUIREMENT}. Is this the same ask?"
+    f"Register row {COMMITTED_ROW_NUMBER}\n"
+    f"What was asked: {FIRST_REQUIREMENT}\n"
+    "Written down: Not known yet\n"
+    "What testing found: Not known yet\n"
+    "Status: Requested\n"
+    "\n"
+    f'{SECOND_FILE}, under "Discussion", says:\n'
+    f'"The client asked for {SECOND_REQUIREMENT}."\n'
+    "\n"
+    f"Is this the same ask as row {COMMITTED_ROW_NUMBER}?\n"
+    "\n"
+    f"Approve → Row {COMMITTED_ROW_NUMBER} stays as it is; this ask's "
+    "evidence is added to it.\n"
+    "Reject → A new row is created for this ask, with Written down: Not "
+    "known yet."
 )
 
 
@@ -71,7 +88,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                 # view repeats the first run's requirement, so the general Match
                 # marker matches both prompts.
                 match_marker_for_batch_with(SECOND_FILE): match_answer_existing_row(
-                    COMMITTED_ROW_NUMBER, CONFIDENT_MATCH_QUESTION
+                    COMMITTED_ROW_NUMBER
                 ),
                 match_marker(): match_answer(1),
                 examine_marker(): no_findings_answer(),
@@ -144,10 +161,10 @@ def test_approved_possible_match_merges_into_the_existing_row(
             engine.dispose()
 
     assert len(merge_decisions) == 1
-    # The model's own sentence reaches the card unchanged — nothing composed
-    # it from the row and the requirement after the fact.
+    # The whole sentence is built from stored data: the row as the register
+    # shows it, this batch's own quote, and what each answer would do.
     assert merge_decisions[0]["question"] == CONFIDENT_MATCH_QUESTION
-    assert FIRST_REQUIREMENT in merge_decisions[0]["question"]
+    assert merge_decisions[0]["if_approved"] == []
     # The register keeps one row for one requirement, and its evidence is both
     # documents rather than the second document's alone.
     assert [row["row_number"] for row in export["rows"]] == [COMMITTED_ROW_NUMBER]
@@ -179,7 +196,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
             script_path,
             {
                 match_marker_for_batch_with(SECOND_FILE): match_answer_existing_row(
-                    COMMITTED_ROW_NUMBER, CONFIDENT_MATCH_QUESTION
+                    COMMITTED_ROW_NUMBER
                 ),
                 match_marker(): match_answer(1),
                 examine_marker(): no_findings_answer(),
@@ -261,7 +278,6 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
             engine.dispose()
 
     assert match_decision["question"] == CONFIDENT_MATCH_QUESTION
-    assert FIRST_REQUIREMENT in match_decision["question"]
     # A rejected match stays a row of its own — committed, never merged.
     assert proposal.is_committed is True
     assert proposal.merged_into_register_row_id is None
@@ -288,7 +304,7 @@ def test_a_finding_raised_while_a_match_is_unanswered_names_the_row_it_will_join
             script_path,
             {
                 match_marker_for_batch_with(SECOND_FILE): match_answer_existing_row(
-                    COMMITTED_ROW_NUMBER, CONFIDENT_MATCH_QUESTION
+                    COMMITTED_ROW_NUMBER
                 ),
                 match_marker(): match_answer(1),
                 extract_marker(FIRST_FILE): extraction_answer(
@@ -401,7 +417,7 @@ async def _seed_a_merged_proposal_with_a_finding(
         connection, project_id, run_id, PROPOSED_ROW_NUMBER, False, survivor
     )
     decision_id = uuid4()
-    question = f"Does row #{PROPOSED_ROW_NUMBER} break this rule?"
+    question = f"Does row {PROPOSED_ROW_NUMBER} break this rule?"
     await connection.execute(
         "INSERT INTO decisions (id, run_id, kind, question, outcome, decided_at) "
         "VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)",

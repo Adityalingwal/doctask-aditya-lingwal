@@ -68,7 +68,7 @@ def test_the_register_shows_only_the_latest_applicable_finding_per_rule_and_row(
     ]
     assert [finding["raised_by_run"] for finding in shown] == [2, 1]
     assert {
-        row["row_number"]: [finding["rule_id"] for finding in row["findings"]]
+        row["row_number"]: [finding["rule_id"] for finding in row.get("findings", [])]
         for row in register["rows"]
     } == {
         CLEARED_BY_A_CLEAN_RERUN: [],
@@ -79,7 +79,7 @@ def test_the_register_shows_only_the_latest_applicable_finding_per_rule_and_row(
     (kept,) = [
         finding
         for row in register["rows"]
-        for finding in row["findings"]
+        for finding in row.get("findings", [])
         if finding["rule_id"] == "R1"
     ]
     assert kept["raised_by_run"] == 1

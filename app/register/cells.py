@@ -65,6 +65,25 @@ def in_writing_says_yes(cell: str) -> bool:
     return cell == IN_WRITING_YES
 
 
+def cells_a_merge_would_write(
+    proposal_in_writing: str,
+    candidate_in_writing: str,
+) -> dict[str, str]:
+    """Which of the surviving row's cells an approved merge moves, and to what.
+
+    Only the cell the arriving requirement can speak to moves, and only
+    towards `Yes`: the requirement can say the ask is written down and cannot
+    say it is not. Written once because two readers need the same answer — the
+    decision that promises the change, and Commit that makes it. A promise
+    worked out separately from the write is a promise that can be broken.
+    """
+    if in_writing_says_yes(proposal_in_writing) and not in_writing_says_yes(
+        candidate_in_writing
+    ):
+        return {IN_WRITING: proposal_in_writing}
+    return {}
+
+
 def fingerprint_of_cells(cells: dict[str, str]) -> str:
     """Hash the four cells only — attachments never move a row's fingerprint."""
     joined = "\n".join(f"{name}={cells[name]}" for name in CELL_NAMES)

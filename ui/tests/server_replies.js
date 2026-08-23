@@ -13,7 +13,7 @@ export function runReply(overrides = {}) {
     project_id: projectId,
     status: "needs review",
     stage: "review",
-    not_used: [],
+    skipped: [],
     reported_instructions: [],
     ended_early_reason: null,
     failure_reason: null,
@@ -40,10 +40,14 @@ export function decisionReply(overrides = {}) {
     evidence: null,
     // The register row this decision is about — a finding's row, or the row a
     // match would attach to. The export gate is about no single row and sends
-    // null. `moved_cells` is what an approved observation match would write,
-    // read back from the move Commit itself applies.
+    // null. `if_approved` is what approving would write, read back from the
+    // move Commit itself applies; `row` and `quotes` are the parts the whole
+    // `question` text above was built from.
     row_number: 2,
-    moved_cells: [],
+    row: null,
+    quotes: [],
+    if_approved: [],
+    if_rejected: null,
     ...overrides,
   };
 }
@@ -119,9 +123,33 @@ export function registerReply(overrides = {}) {
               "26-march-scope.md was read, and it does not mention this ask.",
           },
         ],
+        // The shape every surface is moving to: one entry per thing a
+        // document said, and the cells it supports.
+        evidence: [
+          {
+            source_line: '12-march-scope.md, under "Section 2 — Applicant portal"',
+            quote: "applicants must be able to upload supporting documents",
+            absence: null,
+            cells: ["What was asked"],
+          },
+          {
+            source_line: null,
+            quote: null,
+            absence:
+              "26-march-scope.md was read, and it does not mention this ask.",
+            cells: ["Written down"],
+          },
+        ],
         findings: [],
       },
     ],
+    rules: {
+      run_number: 2,
+      rows_examined: 1,
+      rules: [
+        { id: "R1", text: "Every requirement must have a written scope entry." },
+      ],
+    },
     examine: {
       rules: [
         { id: "R1", text: "Every requirement must have a written scope entry." },

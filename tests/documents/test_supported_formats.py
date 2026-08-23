@@ -55,7 +55,7 @@ def test_a_docx_file_is_not_read_and_the_reason_names_the_supported_formats(
 ) -> None:
     finished = one_run_over_four_extensions
 
-    assert _not_used_reason(finished["run"], WORD_FILE) == UNSUPPORTED_FORMAT
+    assert _skipped_reason(finished["run"], WORD_FILE) == UNSUPPORTED_FORMAT
     assert WORD_FILE not in finished["documents_read"]
     assert extract_marker(WORD_FILE) not in finished["markers"]
 
@@ -65,7 +65,7 @@ def test_a_txt_file_is_not_read_and_the_reason_names_the_supported_formats(
 ) -> None:
     finished = one_run_over_four_extensions
 
-    assert _not_used_reason(finished["run"], PLAIN_TEXT_FILE) == UNSUPPORTED_FORMAT
+    assert _skipped_reason(finished["run"], PLAIN_TEXT_FILE) == UNSUPPORTED_FORMAT
     assert PLAIN_TEXT_FILE not in finished["documents_read"]
     assert extract_marker(PLAIN_TEXT_FILE) not in finished["markers"]
 
@@ -141,8 +141,8 @@ def _drive_one_run(tmp_path: Path) -> Iterator[dict[str, Any]]:
             }
 
 
-def _not_used_reason(run: dict[str, Any], source_file: str) -> str:
-    entries = [entry for entry in run["not_used"] if entry.get("file") == source_file]
+def _skipped_reason(run: dict[str, Any], source_file: str) -> str:
+    entries = [entry for entry in run["skipped"] if entry.get("file") == source_file]
     assert len(entries) == 1, f"expected one not-used entry for {source_file}, got {entries}"
     return entries[0]["reason"]
 

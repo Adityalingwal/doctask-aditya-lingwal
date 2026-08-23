@@ -1,4 +1,4 @@
 # How often each project's source folder is looked at, and how long a folder
 # must stop changing before the run that reads it starts by itself.
-poll_seconds: 4
-quiet_seconds: 10
+poll_seconds: 2
+quiet_seconds: 5

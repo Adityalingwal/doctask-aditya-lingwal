@@ -25,7 +25,11 @@ MCP_INSTRUCTIONS = (
     "run, poll its status, answer each decision it raises, finish the review, "
     "then read the project's register. A run is not one call — start_run "
     "returns a run id and get_run_status is polled until the run reports it "
-    "is done."
+    "is done. Every sentence a person would read is built by this system and "
+    "carried in the answer: each decision arrives as one whole text and as "
+    "the parts it was built from, and each register row carries its evidence. "
+    "A row a document was read and silent about reads Requested or Not "
+    "mentioned; a file or a quote a run did not use is in skipped."
 )
 
 
@@ -66,7 +70,13 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
 
     @server.tool(name="get_run_status")
     async def get_run_status_tool(run_id: UUID) -> dict[str, Any]:
-        """Read one run's status, stage, what it did not use, decisions and findings."""
+        """Read one run's status, stage, what it skipped, decisions and findings.
+
+        Each decision carries `question` — the whole text a person reads — and
+        the parts it was built from: `row`, `quotes`, `if_approved` and
+        `if_rejected`. `skipped` names every file and quote this run did not
+        use, each with its kind: read before, not read, or not attached.
+        """
         async with application.state.pool.connection() as connection:
             return await read_run_status(connection, run_id)
 
@@ -108,7 +118,14 @@ def build_mcp_server(application: FastAPI) -> FastMCP:
         project_id: UUID,
         register_format: str = JSON_FORMAT,
     ) -> Any:
-        """Read one project's register, live from its committed rows, as json or as markdown."""
+        """Read one project's register, live from its committed rows, as json or as markdown.
+
+        Each row carries its four cells and its `evidence`: one entry per
+        thing a document said, with where it was said, the words, and the
+        cells it supports — or, where a document was read and silent, the
+        sentence saying so. A row carries `findings` only when a rule found
+        something on it.
+        """
         async with application.state.pool.connection() as connection:
             return await read_register(connection, project_id, register_format)
 

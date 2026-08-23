@@ -117,14 +117,14 @@ def test_a_document_extract_could_not_read_is_read_again_by_the_next_run(
             engine.dispose()
 
     assert exported["exported"] is True
-    # The document Extract could not read is not "already read", however well
+    # The document Extract could not read is not "read before", however well
     # the run that held it finished; the one that was read is not read twice.
     assert list(second_batch) == [UNREAD_FILE]
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert [entry["file"] for entry in already_read] == [READ_FILE]
-    assert already_read[0]["reason"] == "Already read, and unchanged since."
+    assert already_read[0]["reason"] == "unchanged since it was read."
 
 
 def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> None:
@@ -179,11 +179,14 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
 
     assert recorded_markers(call_log_path).count(extract_marker(READ_FILE)) == 1
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert [entry["file"] for entry in already_read] == [READ_FILE]
     assert already_read[0]["reason"] == (
-        "Read before — an edited or renamed file is not read again."
+        (
+        "read before under another name or with other words; an edited or "
+        "renamed file is not read again."
+    )
     )
 
 
@@ -242,24 +245,32 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
 
     assert recorded_markers(call_log_path).count(extract_marker(ORIGINAL_NAME)) == 1
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert [entry["file"] for entry in already_read] == [RENAMED_NAME]
     assert already_read[0]["reason"] == (
-        "Read before — an edited or renamed file is not read again."
+        (
+        "read before under another name or with other words; an edited or "
+        "renamed file is not read again."
+    )
     )
     # No second set of rows: the register is exactly what the first run wrote.
     assert after_second_run == after_first_run
 
 
 def test_a_deleted_document_never_removes_a_row(tmp_path: Path) -> None:
+    # A second, unrelated file stays behind so the folder is not empty after
+    # the deletion: a run over an empty folder is refused outright, and this
+    # test is about what a run that does happen leaves the register holding.
     with temporary_project_folder("deleted-document") as (source_folder, source_folder_path):
         quote = write_meeting_note(source_folder, READ_FILE, READ_REQUIREMENT)
+        write_meeting_note(source_folder, UNRELATED_FILE, UNRELATED_REQUIREMENT)
         script_path = tmp_path / "script.json"
         write_script(
             script_path,
             {
                 extract_marker(READ_FILE): extraction_answer(READ_REQUIREMENT, quote),
+                extract_marker(UNRELATED_FILE): unrelated_extraction_answer(),
                 match_marker(): match_answer(1),
                 examine_marker(): no_findings_answer(),
             },

@@ -30,7 +30,7 @@ async def require_run(connection: AsyncConnection, run_id: UUID) -> dict[str, An
 async def read_run(connection: AsyncConnection, run_id: UUID) -> dict[str, Any] | None:
     result = await connection.execute(
         "SELECT id, project_id, status, current_stage, started_at, finished_at, "
-        "not_used, ended_early_reason, failure_reason, "
+        "skipped, ended_early_reason, failure_reason, "
         "review_finished_at, examined_row_count, finished_stages, "
         "reported_instructions "
         "FROM runs WHERE id = %s",
@@ -140,7 +140,7 @@ async def append_reported_instructions(
 
     Extract is replayed from the start of its node on resume, so a blind
     append records the same instruction twice. The whole entry is compared,
-    every key, for the reason `append_not_used` compares whole entries: two
+    every key, for the reason `append_skipped` compares whole entries: two
     instructions from one file differ only in their words.
     """
     if not entries:
@@ -162,10 +162,10 @@ async def append_reported_instructions(
         )
 
 
-async def append_not_used(
+async def append_skipped(
     connection: AsyncConnection,
     run_id: UUID,
-    entries: list[dict[str, str]],
+    entries: list[dict[str, Any]],
 ) -> None:
     """Add only the entries this run has not already recorded.
 
@@ -181,15 +181,15 @@ async def append_not_used(
         return
     async with connection.transaction():
         result = await connection.execute(
-            "SELECT not_used FROM runs WHERE id = %s FOR UPDATE",
+            "SELECT skipped FROM runs WHERE id = %s FOR UPDATE",
             (run_id,),
         )
         row = await result.fetchone()
-        already_stored = row["not_used"] if row else []
+        already_stored = row["skipped"] if row else []
         new_entries = [entry for entry in entries if entry not in already_stored]
         if not new_entries:
             return
         await connection.execute(
-            "UPDATE runs SET not_used = not_used || %s WHERE id = %s",
+            "UPDATE runs SET skipped = skipped || %s WHERE id = %s",
             (Jsonb(new_entries), run_id),
         )

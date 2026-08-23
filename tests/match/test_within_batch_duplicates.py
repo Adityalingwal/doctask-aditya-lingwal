@@ -64,19 +64,29 @@ RESTATED_QUOTE = "Operations must hear about every new intake form."
 
 POSSIBLE_MATCH_DECISION = "possible match"
 
-# The sentences Match itself writes. Both name the kind of document each
-# statement came from and ask the one thing that matters, and both reach the
-# card character for character — nothing here is composed by the code.
-UNSURE_BATCH_QUESTION = (
-    "This ask appears twice in this batch: raised in meeting notes as "
-    f"{SPOKEN_ASK}, and written in the client requirements document as "
-    f"{WRITTEN_ASK}. Is this the same ask?"
-)
-COMMITTED_ROW_QUESTION = (
-    f"This ask was raised in meeting notes ({MEETING_FILE}) — row 1, "
-    f"{SPOKEN_ASK}. It is now written in the client requirements document "
-    f"({REQUIREMENTS_FILE}) as {WRITTEN_ASK}. Is this the same ask?"
-)
+# The whole text a person reads, built by the backend from the candidate row,
+# this batch's own quote and the move an approval would make. Match writes
+# none of it, so both shapes can be written out here in full.
+def _possible_match_question(row_label: str) -> str:
+    return (
+        f"{row_label}\n"
+        f"What was asked: {SPOKEN_ASK}\n"
+        f"Written down: {IN_WRITING_NOT_KNOWN_YET}\n"
+        "What testing found: Not known yet\n"
+        "Status: Requested\n"
+        "\n"
+        f'{REQUIREMENTS_FILE}, under "Discussion", says:\n'
+        f'"{WRITTEN_QUOTE}"\n'
+        "\n"
+        "Is this the same ask as row 1?\n"
+        "\n"
+        "Approve → Row 1 changes: Written down: Yes\n"
+        "Reject → A new row is created for this ask, with Written down: Yes."
+    )
+
+
+UNSURE_BATCH_QUESTION = _possible_match_question("Row 1 (proposed by this run)")
+COMMITTED_ROW_QUESTION = _possible_match_question("Register row 1")
 
 
 class Document(NamedTuple):
@@ -311,16 +321,15 @@ def test_an_uncertain_batch_match_raises_a_decision_and_never_settles_itself(
         {
             match_marker(): match_answer_within_batch(
                 [(NEW_ROW, None, None), (POSSIBLE_MATCH, None, 0)],
-                questions=[None, UNSURE_BATCH_QUESTION],
             )
         },
     )[0]
 
+    # The candidate is a row this same run proposed, so the block says so
+    # rather than calling it a register row it is not yet (S24).
     questions = _match_questions(outcome)
     assert len(questions) == 1
     assert questions[0] == UNSURE_BATCH_QUESTION
-    assert SPOKEN_ASK in questions[0]
-    assert WRITTEN_ASK in questions[0]
     # The person approved it, so the two became one row carrying both sources.
     assert sorted(outcome.rows) == [1]
     assert _cited_files(outcome.rows[1], WHAT_WAS_ASKED) == [
@@ -457,7 +466,6 @@ def test_two_documents_in_separate_runs_still_reach_the_committed_row_gate(
             # call is the only prompt naming the requirements document.
             match_marker_for_batch_with(REQUIREMENTS_FILE): match_answer_within_batch(
                 [(EXISTING_ROW, 1, None)],
-                questions=[COMMITTED_ROW_QUESTION],
             ),
             match_marker(): match_answer_within_batch([(NEW_ROW, None, None)]),
         },
@@ -467,7 +475,6 @@ def test_two_documents_in_separate_runs_still_reach_the_committed_row_gate(
     questions = _match_questions(second)
     assert len(questions) == 1
     assert questions[0] == COMMITTED_ROW_QUESTION
-    assert SPOKEN_ASK in questions[0]
     # The person approved it, so one row carries both documents.
     assert sorted(second.rows) == [1]
     assert _cited_files(second.rows[1], WHAT_WAS_ASKED) == [
