@@ -23,6 +23,7 @@ from tests.documents.register_documents import (
     write_meeting_note,
 )
 from tests.examine.answers import examine_answer, one_finding
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -74,6 +75,7 @@ def _project(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:

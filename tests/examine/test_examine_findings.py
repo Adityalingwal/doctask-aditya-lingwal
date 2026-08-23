@@ -29,6 +29,10 @@ from tests.runs.application import (
     wait_until,
     write_script,
 )
+from tests.examine.rules_files import (
+    RULE_IDS_THAT_ALWAYS_APPLY,
+    rules_that_always_apply,
+)
 from tests.examine.answers import R1_EVIDENCE, R1_ISSUE, examine_answer, one_finding
 from tests.documents.register_documents import (
     extract_marker,
@@ -41,7 +45,6 @@ from tests.documents.register_documents import (
 
 SOURCE_FILE = "meeting-note.md"
 REQUIREMENT = "an email to the operations team on intake form submit"
-SHIPPED_RULES = ("R1", "R2", "R4", "R5")
 # The test rules file below gives R3 a limit in its params, so reporting the
 # text alone never says which limit a run was judged against.
 R3_MAX_DAYS = 14
@@ -118,6 +121,7 @@ def _run_at_review(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -188,17 +192,17 @@ def test_a_run_with_nothing_wrong_names_the_rules_that_ran_and_finds_nothing(
     assert _decision_of_kind(waiting, "finding") is None
     assert written_findings == 0
     assert [rule["id"] for rule in waiting["examine"]["rules"]] == list(
-        SHIPPED_RULES
+        RULE_IDS_THAT_ALWAYS_APPLY
     )
     assert waiting["examine"]["rows_examined"] == 1
     assert waiting["examine"]["findings"] == []
     assert [rule["id"] for rule in export["examine"]["rules"]] == list(
-        SHIPPED_RULES
+        RULE_IDS_THAT_ALWAYS_APPLY
     )
     assert export["examine"]["rows_examined"] == 1
     assert export["examine"]["findings"] == []
     assert "No findings" in markdown
-    for rule_id in SHIPPED_RULES:
+    for rule_id in RULE_IDS_THAT_ALWAYS_APPLY:
         assert rule_id in markdown
     assert all(rule.get("params") is None for rule in export["examine"]["rules"])
 

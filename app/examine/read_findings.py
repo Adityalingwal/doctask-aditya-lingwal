@@ -149,9 +149,30 @@ async def rules_that_ran(
     connection: AsyncConnection,
     run_id: UUID,
 ) -> list[dict[str, Any]]:
-    """Every rule this run was judged against — the ones it froze, and no others."""
+    """Every rule this run actually sent to the model, and no other.
+
+    A rule the run froze but never applied — because a kind of document it
+    names had not been read — did not judge this register, and reporting it as
+    having run would make an honest `No findings` result say more than it can.
+    The text still comes from the snapshot, which is where a rule's words live.
+    """
+    applied = await _rules_applied(connection, run_id)
     frozen = await frozen_rules_of_run(connection, run_id) or []
-    return [_rule_as_reported(rule) for rule in frozen]
+    rule_by_id = {rule["id"]: rule for rule in frozen}
+    return [_rule_as_reported(rule_by_id[rule_id]) for rule_id in applied]
+
+
+async def _rules_applied(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> list[str]:
+    """The rule ids Examine sent to the model, or none while it has not run."""
+    result = await connection.execute(
+        "SELECT rules_applied FROM runs WHERE id = %s",
+        (run_id,),
+    )
+    run = await result.fetchone()
+    return (run["rules_applied"] if run else None) or []
 
 
 def _rule_as_reported(rule: dict[str, Any]) -> dict[str, Any]:

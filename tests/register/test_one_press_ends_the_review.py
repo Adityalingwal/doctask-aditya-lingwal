@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import create_engine, text
 
 from app.examine.examine_register import EXAMINE_PROMPT_MARKER
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
@@ -59,6 +60,7 @@ def _run_at_review_with_one_finding(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:

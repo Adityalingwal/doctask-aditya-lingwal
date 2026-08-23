@@ -113,6 +113,19 @@ def runs_of_project(database_url: str, project_id: str) -> list[tuple[Any, ...]]
         engine.dispose()
 
 
+def rules_applied_of_run(database_url: str, run_id: str) -> list[str]:
+    """The rule ids Examine sent to the model on one run, as PostgreSQL holds them."""
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            return connection.execute(
+                text("SELECT rules_applied FROM runs WHERE id = :run_id"),
+                {"run_id": run_id},
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+
 def findings_of_run(database_url: str, run_id: str) -> list[tuple[Any, ...]]:
     """Every finding one run raised, with the project and row each one names."""
     engine = create_engine(database_url)

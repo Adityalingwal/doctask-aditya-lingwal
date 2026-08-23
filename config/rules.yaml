@@ -1,12 +1,24 @@
 rules:
   - id: R1
     text: "Anything built must have a written requirement; a verbal mention is not enough."
+    # A rule runs only once every kind of document it names has been read for
+    # the project. Without this line a rule about built work is judged before
+    # anything has said what was built, and it raises findings against silence.
+    applies_when:
+      - handover summary
 
   - id: R2
     text: "Testing feedback asking for new behaviour is a change request, not a bug."
+    applies_when:
+      - testing feedback
 
   - id: R4
     text: "Every written requirement must have a testing outcome."
+    applies_when:
+      - testing feedback
 
   - id: R5
     text: "No register row is 'Done' without a testing outcome."
+    applies_when:
+      - handover summary
+      - testing feedback

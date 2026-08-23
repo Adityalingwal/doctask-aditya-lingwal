@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text
 
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -74,6 +75,7 @@ def test_approved_possible_match_merges_into_the_existing_row(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -181,6 +183,7 @@ def test_an_unsure_match_is_still_asked_about_rather_than_merged(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:
@@ -293,6 +296,7 @@ def test_a_finding_on_a_merged_proposal_reports_the_row_it_ended_up_on(
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:

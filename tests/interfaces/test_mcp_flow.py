@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     temporary_database,
@@ -50,6 +51,7 @@ def test_a_machine_drives_a_whole_run_through_the_mcp_tools(tmp_path: Path) -> N
                 database_url=database_url,
                 script_path=script_path,
                 call_log_path=tmp_path / "model-calls.jsonl",
+                rules_config_path=rules_that_always_apply(tmp_path),
             )
             application.start()
             try:

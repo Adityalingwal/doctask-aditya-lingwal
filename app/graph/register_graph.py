@@ -23,6 +23,7 @@ from app.extract.answer import (
 )
 from app.examine.examine_register import UnusableExamineAnswer, examine_register
 from app.examine.frozen_rules import (
+    APPLIES_WHEN_KEY,
     freeze_rules_for_run,
     frozen_rules_of_run,
     rules_changed_since_the_register_was_last_examined,
@@ -31,6 +32,7 @@ from app.examine.record_findings import record_findings
 from app.examine.register_under_examination import register_under_examination
 from app.extract.read_document import locate_extraction, read_one_document
 from app.ingest.collect_batch import collect_batch
+from app.ingest.read_once import kinds_read_by_project
 from app.match.match_requirements import (
     EXISTING_ROW,
     POSSIBLE_MATCH,
@@ -399,29 +401,50 @@ def build_register_graph(
         project_id = UUID(state["project_id"])
         async with pool.connection() as connection:
             await enter_stage(connection, run_id, EXAMINE_STAGE)
-            rules = await frozen_rules_of_run(connection, run_id)
+            frozen = await frozen_rules_of_run(connection, run_id)
             rows = await register_under_examination(connection, project_id, run_id)
+            # This run's own batch counts as read: Extract has stored its
+            # documents, and a rule waiting on the kind they are is waiting no
+            # longer.
+            kinds_read = await kinds_read_by_project(
+                connection, project_id, include_run_id=run_id
+            )
 
-        try:
-            found = await examine_register(model_client, rules, rows)
-        except UnusableExamineAnswer:
-            raise  # it already names its own cause and fix
-        except Exception as error:
-            raise_if_configuration_failure(error)
-            # Examine judges the whole register in one call, so there is no
-            # single row to drop the way Extract drops one document.
-            raise ModelCallFailed(
-                "The register could not be examined against this run's rules "
-                f"({describe_unreadable_answer(error)}) — no finding was "
-                "recorded and nothing was exported. Start another run once the "
-                "model is answering."
-            ) from error
+        rules = _the_rules_that_apply(frozen, kinds_read)
+        found: list[dict[str, Any]] = []
+        if rules:
+            try:
+                found = await examine_register(model_client, rules, rows)
+            except UnusableExamineAnswer:
+                raise  # it already names its own cause and fix
+            except Exception as error:
+                raise_if_configuration_failure(error)
+                # Examine judges the whole register in one call, so there is no
+                # single row to drop the way Extract drops one document.
+                raise ModelCallFailed(
+                    "The register could not be examined against this run's rules "
+                    f"({describe_unreadable_answer(error)}) — no finding was "
+                    "recorded and nothing was exported. Start another run once the "
+                    "model is answering."
+                ) from error
+        else:
+            _log(
+                logging.INFO,
+                "examine_no_rules_applied",
+                "No rule was judged: every rule this run froze names a kind of "
+                "document this project has not read yet, and a rule judged "
+                "before its evidence exists raises findings against silence.",
+                run_id,
+            )
 
         async with pool.connection() as connection:
             await record_findings(connection, run_id, found)
+            # Written together, because a row count without the rules behind it
+            # cannot say what the register was actually judged against.
             await connection.execute(
-                "UPDATE runs SET examined_row_count = %s WHERE id = %s",
-                (len(rows), run_id),
+                "UPDATE runs SET examined_row_count = %s, rules_applied = %s "
+                "WHERE id = %s",
+                (len(rows), Jsonb([rule["id"] for rule in rules]), run_id),
             )
             await _finish_stage(connection, run_id, EXAMINE_STAGE)
 
@@ -639,6 +662,23 @@ async def _settle_against_the_register(
         )
         for outcome in answer.outcomes
     }
+
+
+def _the_rules_that_apply(
+    frozen: list[dict[str, Any]],
+    kinds_read: set[str],
+) -> list[dict[str, Any]]:
+    """The frozen rules whose every named document kind the project has read.
+
+    A rule about what testing found, judged before any testing feedback has
+    been read, has nothing to judge and reports the silence as a fault — six
+    such findings in one demo. A rule naming no kind applies always.
+    """
+    return [
+        rule
+        for rule in frozen
+        if all(kind in kinds_read for kind in rule.get(APPLIES_WHEN_KEY, []))
+    ]
 
 
 def _outcome_the_candidate_allows(outcome: MatchOutcome) -> str:

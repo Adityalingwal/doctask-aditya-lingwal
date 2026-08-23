@@ -13,6 +13,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from app.api.routes import add_refusal_responses, router
 from app.database import build_connection_pool
+from app.examine.frozen_rules import load_rules
 from app.graph.register_graph import build_register_graph
 from app.ingest.read_source_document import READER_EXTENSIONS
 from app.mcp_server.tools import MCP_PATH, build_mcp_server
@@ -70,6 +71,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             DEFAULT_WATCHER_CONFIG_PATH,
         ),
     )
+    rules_config_path = _config_path(
+        os.environ,
+        RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE,
+        DEFAULT_RULES_CONFIG_PATH,
+    )
+    # Read here only to refuse a broken rules file at startup rather than on
+    # the first run, which would be after a person had already started one.
+    # Every run still freezes the file itself, so what is loaded here is not
+    # what any run is judged against.
+    await asyncio.to_thread(load_rules, rules_config_path)
 
     pool = build_connection_pool(database_url)
     await pool.open(wait=True)
@@ -84,11 +95,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         checkpointer,
         frozenset(formats.accepted_extensions),
         formats.page_limit,
-        _config_path(
-            os.environ,
-            RULES_CONFIG_PATH_ENVIRONMENT_VARIABLE,
-            DEFAULT_RULES_CONFIG_PATH,
-        ),
+        rules_config_path,
     )
 
     engine = app.state.run_engine

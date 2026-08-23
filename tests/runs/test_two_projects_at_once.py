@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from tests.examine.rules_files import rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -93,6 +94,7 @@ def test_two_projects_running_at_once_never_appear_in_each_others_work(
                     call_log_path=call_log_path,
                     delay_seconds=MODEL_DELAY_SECONDS,
                     log_path=log_path,
+                    rules_config_path=rules_that_always_apply(tmp_path),
                 )
                 application.start()
                 try:
