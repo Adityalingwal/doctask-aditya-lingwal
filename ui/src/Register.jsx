@@ -128,9 +128,9 @@ export function Examine({ examine }) {
         </p>
       ) : (
         <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
-          {examine.findings.map((finding, place) => (
+          {examine.findings.map((finding) => (
             <li
-              key={place}
+              key={finding.finding_id}
               className="border-l-4 border-caution bg-card py-2 pl-4"
             >
               {findingLine(finding)}
@@ -157,8 +157,11 @@ function StatusChip({ status }) {
   );
 }
 
+// The issue sentence is the backend's; the row prefix is the same data join
+// history lines use. The evidence is not repeated here — the decision card
+// already shows it in full.
 function findingLine(finding) {
-  return `Row ${finding.row_number} — ${finding.issue} (${finding.evidence})`;
+  return `Row ${finding.row_number} · ${finding.issue}`;
 }
 
 // A rule's own parameters, folded into its sentence: a rule whose text names
