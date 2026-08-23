@@ -40,8 +40,10 @@ shows what the backend already built, and composes no sentence of its own.
   with `examine_as_exported` removed as the orphan it became. The Markdown
   export already read only the new fields.
 
-**Both suites green, no live key: PYTHON_COUNT Python passed** and
-**114 front-end passed across 48 files**. The four demo documents have not been
+**Both suites green, no live key: 292 Python passed** and
+**114 front-end passed across 48 files**. One assertion was added to
+`tests/register/test_the_register_is_read_live.py` after that full run and
+proven by running that file on its own. The four demo documents have not been
 re-driven on a clean database since Brief 1a; that is still the foreground step
 after this branch merges.
 
