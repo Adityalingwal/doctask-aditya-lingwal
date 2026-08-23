@@ -28,6 +28,7 @@ from tests.documents.register_documents import (
     several_requirements_answer,
     write_document_stating,
 )
+from tests.examine.answers import examine_answer, one_finding
 from tests.register.stored_register import StoredRow, audit_of_row, stored_rows
 from tests.runs.application import (
     ApplicationProcess,
@@ -43,6 +44,7 @@ MEETING_NOTE = "meeting-notes-02-jul.md"
 REQUIREMENTS_V1 = "client-requirements-v1.md"
 REQUIREMENTS_V2 = "client-requirements-v2.md"
 TESTING_FEEDBACK = "testing-feedback-12-aug.md"
+TESTING_FEEDBACK_2 = "testing-feedback-19-aug.md"
 DOCUMENT_DATE = "2 July 2026"
 
 SPOKEN_ASK = "a voice agent that answers support-line calls"
@@ -53,8 +55,13 @@ THIRD_ASK = "support in Hindi as well as English"
 THIRD_QUOTE = "The client asked for support in Hindi as well as English."
 OBSERVATION_ABOUT_NO_ROW = "the marketing site loads slowly on mobile"
 OBSERVATION_QUOTE = "The marketing site loads slowly on a phone."
+VERDICT_ON_THE_SPOKEN_ASK = "the voice agent answers every test call"
+VERDICT_QUOTE = "The voice agent answered every call we placed."
 
 CELL_INDEX = {name: index for index, name in enumerate(CELL_NAMES)}
+# Matches the Examine prompt only when the silent row is shown as Commit
+# will leave it; an Examine that still shows `Not known yet` never hits it.
+EXAMINE_SEES_NOT_MENTIONED_MARKER = f'"{WHAT_TESTING_FOUND}": "{NOT_MENTIONED}"'
 
 
 class Driven(NamedTuple):
@@ -150,6 +157,20 @@ def test_absence_never_overwrites_yes_or_a_testing_verdict(tmp_path: Path) -> No
     # cited behind it at all.
     assert _files_cited(still_written[1], IN_WRITING) == {REQUIREMENTS_V1}
 
+    # The testing half of the promise: a verdict already on the row, then a
+    # testing report silent about it — the verdict stands and the silent
+    # report is not cited behind it.
+    tested_then_silent = _drive(
+        tmp_path,
+        "tested-then-silent",
+        [[MEETING_NOTE], [TESTING_FEEDBACK_2], [TESTING_FEEDBACK]],
+        {TESTING_FEEDBACK_2: SPOKEN_ASK},
+    )
+    _asked, tested, still_tested = tested_then_silent.after_each_batch
+    assert _cell(tested[1], WHAT_TESTING_FOUND) == VERDICT_ON_THE_SPOKEN_ASK
+    assert _cell(still_tested[1], WHAT_TESTING_FOUND) == VERDICT_ON_THE_SPOKEN_ASK
+    assert _files_cited(still_tested[1], WHAT_TESTING_FOUND) == {TESTING_FEEDBACK_2}
+
     _before, silent_once, silent_again = silent_twice.after_each_batch
     assert _cell(silent_again[1], IN_WRITING) == NOT_MENTIONED
     assert _files_cited(silent_again[1], IN_WRITING) == {
@@ -212,6 +233,33 @@ def test_a_silent_testing_feedback_document_still_reaches_review_and_commit(
     ) in tested[1].citations
 
 
+def test_examine_sees_a_silent_documents_not_mentioned_before_commit(
+    tmp_path: Path,
+) -> None:
+    """A rule about silence must see the silence before the person is asked.
+
+    `Not mentioned` is written at Commit, after Review — but the rule runs
+    before it. Examine therefore has to be shown what Commit will write, the
+    way it is shown pending moves, or the testing-outcome rule never sees a
+    silent testing report and the finding it exists for is never raised.
+    """
+    driven = _drive(
+        tmp_path,
+        "silent-seen-by-examine",
+        [[MEETING_NOTE], [TESTING_FEEDBACK]],
+        {},
+        decisions_per_batch=[[], ["finding"]],
+        answers_tried_first={
+            EXAMINE_SEES_NOT_MENTIONED_MARKER: examine_answer(
+                [one_finding(rule_id="R4", row_number=1)]
+            )
+        },
+    )
+    _asked, tested = driven.after_each_batch
+    assert _cell(tested[1], WHAT_TESTING_FOUND) == NOT_MENTIONED
+    assert [finding["rule_id"] for finding in driven.register["rows"][0]["findings"]] == ["R4"]
+
+
 def _cell(row: StoredRow, cell_name: str) -> str:
     return row.cells[CELL_INDEX[cell_name]]
 
@@ -228,6 +276,8 @@ def _drive(
     batches: list[list[str]],
     requirements_documents_state: dict[str, str],
     decisions_at_review: list[str] | None = None,
+    decisions_per_batch: list[list[str]] | None = None,
+    answers_tried_first: dict[str, Any] | None = None,
 ) -> Driven:
     """Run one project batch by batch, approving everything each time.
 
@@ -236,7 +286,12 @@ def _drive(
     makes it silent about row 1 and propose a row of its own.
     """
     script_path = tmp_path / "script.json"
-    write_script(script_path, _answers(requirements_documents_state))
+    # A script answers the first marker that matches, so an answer that must
+    # win over the general Examine answer is written before it.
+    write_script(
+        script_path,
+        {**(answers_tried_first or {}), **_answers(requirements_documents_state)},
+    )
     snapshots: list[dict[int, StoredRow]] = []
 
     with temporary_project_folder(name_hint) as (folder, folder_path):
@@ -252,7 +307,7 @@ def _drive(
                     project_id = client.post(
                         "/projects", json={"source_folder_path": folder_path}
                     ).json()["project_id"]
-                    for batch in batches:
+                    for batch_index, batch in enumerate(batches):
                         for source_file in batch:
                             write_document_stating(
                                 folder,
@@ -264,10 +319,15 @@ def _drive(
                             "/runs", json={"project_id": project_id}
                         ).json()["run_id"]
                         waiting = wait_for_run_status(client, run_id, "needs review")
-                        if decisions_at_review is not None:
+                        expected_decisions = (
+                            decisions_per_batch[batch_index]
+                            if decisions_per_batch is not None
+                            else decisions_at_review
+                        )
+                        if expected_decisions is not None:
                             assert [
                                 decision["kind"] for decision in waiting["decisions"]
-                            ] == decisions_at_review
+                            ] == expected_decisions
                         approve_every_decision_and_finish_review(client, run_id)
                         wait_for_run_status(client, run_id, "done")
                         snapshots.append(stored_rows(database_url, project_id))
@@ -299,6 +359,8 @@ def _ask_in(source_file: str, states: dict[str, str]) -> str:
         return SPOKEN_ASK
     if source_file == TESTING_FEEDBACK:
         return OBSERVATION_ABOUT_NO_ROW
+    if source_file == TESTING_FEEDBACK_2:
+        return VERDICT_ON_THE_SPOKEN_ASK
     return states[source_file]
 
 
@@ -307,6 +369,7 @@ _QUOTE_OF_ASK = {
     SECOND_ASK: SECOND_QUOTE,
     THIRD_ASK: THIRD_QUOTE,
     OBSERVATION_ABOUT_NO_ROW: OBSERVATION_QUOTE,
+    VERDICT_ON_THE_SPOKEN_ASK: VERDICT_QUOTE,
 }
 
 
@@ -325,6 +388,14 @@ def _answers(states: dict[str, str]) -> dict[str, Any]:
         ),
     }
     for source_file, ask in states.items():
+        if source_file == TESTING_FEEDBACK_2:
+            answers[extract_marker(source_file)] = feedback_extraction_answer(
+                [(VERDICT_ON_THE_SPOKEN_ASK, "Passed", VERDICT_QUOTE)]
+            )
+            # Answered before the general observation answer below, because
+            # the scripted model takes the first marker that matches.
+            answers[match_marker_for_batch_with(source_file)] = observation_answer_of([1])
+            continue
         answers[extract_marker(source_file)] = several_requirements_answer(
             [(ask, _QUOTE_OF_ASK[ask])], CLIENT_REQUIREMENTS_DOCUMENT
         )

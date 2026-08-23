@@ -6,7 +6,6 @@ from uuid import UUID
 from psycopg import AsyncConnection
 
 from app.examine.read_findings import findings_of_run
-from app.register.absence_rows import apply_absences
 from app.register.audit_entries import write_attachment, write_cell_change
 from app.register.cells import (
     CELL_NAMES,
@@ -26,7 +25,6 @@ class CommitResult(NamedTuple):
     committed_row_numbers: list[int]
     merged_row_numbers: list[int]
     moved_row_numbers: list[int]
-    absent_row_numbers: list[int]
 
 
 async def commit_register(
@@ -46,13 +44,11 @@ async def commit_register(
     # After the merges, so a move lands on the row an approved merge sent its
     # evidence to; before the proposals below, so a row created and moved in
     # one batch is committed with the cells the move left it holding.
+    # The absences Match worked out travel in the same list and are written
+    # here too, after the observations' moves on each row, so a row proposed
+    # in this batch is born holding `Not mentioned` rather than gaining it a
+    # line later in its own history.
     moved_row_numbers = await apply_moves(connection, run_id, document_id_by_file)
-    # Last of the three, and before the proposals are committed: what a
-    # document did say is on the rows by now, so what is left is what it did
-    # not say — and a row proposed here is born holding that answer rather
-    # than gaining it a line later in its own history.
-    project_id = await _project_of_run(connection, run_id)
-    absent_row_numbers = await apply_absences(connection, run_id, project_id)
 
     proposals = await connection.execute(
         "SELECT id, row_number, " + ", ".join(CELL_NAMES) + " FROM register_rows "
@@ -95,7 +91,6 @@ async def commit_register(
         committed_row_numbers=committed_row_numbers,
         merged_row_numbers=merged_row_numbers,
         moved_row_numbers=moved_row_numbers,
-        absent_row_numbers=absent_row_numbers,
     )
 
 
@@ -263,16 +258,6 @@ async def _write_attachment_audit(
             f"{finding['rule_id']} — {finding['issue']}",
             run_id,
         )
-
-
-async def _project_of_run(
-    connection: AsyncConnection,
-    run_id: UUID,
-) -> UUID:
-    result = await connection.execute(
-        "SELECT project_id FROM runs WHERE id = %s", (run_id,)
-    )
-    return (await result.fetchone())["project_id"]
 
 
 async def _documents_of_run(

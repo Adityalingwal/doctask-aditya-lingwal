@@ -43,6 +43,7 @@ from app.match.match_requirements import (
     match_requirements,
 )
 from app.model.call_failure import ModelCallFailed, raise_if_configuration_failure
+from app.register.absence_rows import propose_absences
 from app.register.commit_register import commit_register
 from app.register.move_rows import propose_moves
 from app.register.propose_rows import MatchSettlement, committed_rows, propose_rows
@@ -385,6 +386,10 @@ def build_register_graph(
             # is added over a folder that already holds them.
             moves = await propose_moves(connection, model_client, run_id, project_id)
             await append_not_used(connection, run_id, moves.unmatched)
+            # After the moves, because a row a report spoke about is known only
+            # once its observations have been matched; stored beside them so
+            # Examine judges the register as Commit will leave it.
+            silent_rows = await propose_absences(connection, run_id, project_id)
             await _finish_stage(connection, run_id, MATCH_STAGE)
 
         _log(
@@ -396,6 +401,7 @@ def build_register_graph(
             run_id,
             gated_rows=proposed.gated_row_numbers + moves.gated_row_numbers,
             moved_rows=moves.moved_row_numbers,
+            rows_a_document_did_not_mention=silent_rows,
         )
         return {
             "proposed_rows": len(proposed.proposed_row_ids),
@@ -530,7 +536,6 @@ def build_register_graph(
             committed_rows=result.committed_row_numbers,
             merged_rows=result.merged_row_numbers,
             moved_rows=result.moved_row_numbers,
-            rows_a_document_did_not_mention=result.absent_row_numbers,
         )
         return {}
 

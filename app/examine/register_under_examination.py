@@ -5,6 +5,7 @@ from uuid import UUID
 
 from psycopg import AsyncConnection
 
+from app.register.absence_rows import is_absence
 from app.register.cells import CELL_NAMES, IN_WRITING, in_writing_says_yes
 from app.review.review_queue import POSSIBLE_MATCH_DECISION
 
@@ -157,7 +158,12 @@ async def _cells_this_run_moves(
     stored = await result.fetchone()
     values: dict[str, dict[str, str]] = {}
     cited: dict[str, set[str]] = {}
-    for move in (stored["pending_moves"] if stored else []) or []:
+    # An absence first, then the observation's move on the same cell: a move
+    # still awaiting its answer is assumed approved here, exactly as an
+    # unanswered possible match is assumed to be the match.
+    for move in sorted(
+        (stored["pending_moves"] if stored else []) or [], key=lambda m: not is_absence(m)
+    ):
         row_id = move["register_row_id"]
         values.setdefault(row_id, {})[move["cell"]] = move["value"]
         if move["citations"]:
