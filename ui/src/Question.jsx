@@ -113,7 +113,7 @@ function whatEachAnswerDoes(decision) {
         <>
           row #{decision.row_number} records:
           <ul className="m-0 mt-2 list-none p-0">
-            {decision.moved_cells.map((moved) => (
+            {decision.if_approved.map((moved) => (
               <li key={moved.cell}>{`${moved.cell}: ${moved.value}`}</li>
             ))}
           </ul>

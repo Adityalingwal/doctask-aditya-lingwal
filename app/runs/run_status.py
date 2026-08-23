@@ -24,28 +24,41 @@ async def read_run_status(
         "project_id": str(run["project_id"]),
         "status": run["status"],
         "stage": run["current_stage"],
-        "not_used": run["not_used"],
+        "skipped": run["skipped"],
         "reported_instructions": run["reported_instructions"],
         "ended_early_reason": run["ended_early_reason"],
         "failure_reason": run["failure_reason"],
-        "decisions": [
-            {
-                "decision_id": str(decision["id"]),
-                "kind": decision["kind"],
-                "question": decision["question"],
-                "outcome": decision["outcome"],
-                "rule_text": decision["rule_text"],
-                "row_number": decision["row_number"],
-                "issue": decision["issue"],
-                "evidence": decision["evidence"],
-                "moved_cells": decision["moved_cells"],
-            }
-            for decision in decisions
-        ],
+        "decisions": [_decision_as_read(decision) for decision in decisions],
         "examine": await examine_under_review(connection, run),
         "finished_stages": ordered_finished_stages(run["finished_stages"]),
         # The key name is machinery both doors already answer with; since the
         # snapshot went, `done` is the fact it derives from — a run is
         # `done` exactly when its changes were added to the register.
         "exported": run["status"] == DONE,
+    }
+
+
+def _decision_as_read(decision: dict[str, Any]) -> dict[str, Any]:
+    """One decision as both doors answer with it: the text, and its parts.
+
+    The text is the whole thing a person reads, frozen when the decision was
+    raised. The parts are the same text taken apart, so a screen can lay it
+    out without writing a word of its own (S21) — and neither is rebuilt out
+    of cells that have moved since. The export gate is a button, not a card,
+    so it has no parts and answers with the empty shapes.
+    """
+    parts = decision["parts"] or {}
+    return {
+        "decision_id": str(decision["id"]),
+        "kind": decision["kind"],
+        "question": decision["question"],
+        "outcome": decision["outcome"],
+        "rule_text": decision["rule_text"],
+        "row_number": decision["row_number"],
+        "issue": decision["issue"],
+        "evidence": decision["evidence"],
+        "row": parts.get("row"),
+        "quotes": parts.get("quotes", []),
+        "if_approved": parts.get("if_approved", []),
+        "if_rejected": parts.get("if_rejected"),
     }

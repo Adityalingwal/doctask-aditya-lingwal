@@ -13,7 +13,7 @@ afterEach(() => {
 // file it came from, what was asked, the model's own (unverified) words, and
 // why it was dropped.
 const droppedRequirement = {
-  kind: "dropped",
+  kind: "not attached",
   file: "12-march-scope.md",
   summary: "an SMS reminder before every appointment",
   quote: "the client wants a text message reminder before each appointment",
@@ -28,7 +28,7 @@ test("a dropped quote names the file and what was dropped", async () => {
       {
         method: "GET",
         path: `/runs/${runId}`,
-        reply: { body: runReply({ not_used: [droppedRequirement] }) },
+        reply: { body: runReply({ skipped: [droppedRequirement] }) },
       },
     ]),
   );

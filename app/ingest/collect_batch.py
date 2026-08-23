@@ -14,7 +14,7 @@ from app.ingest.read_once import (
 )
 from app.ingest.read_source_document import READER_EXTENSIONS, read_source_document
 from app.ingest.unreadable_document import DocumentUnreadable
-from app.runs.not_used_kinds import ALREADY_READ_KIND, NOT_READ_KIND
+from app.runs.skipped_kinds import NOT_READ_KIND, READ_BEFORE_KIND
 
 
 UNREADABLE_FORMAT = "Not a format this system reads. It reads .md and .pdf."
@@ -22,7 +22,7 @@ UNREADABLE_FORMAT = "Not a format this system reads. It reads .md and .pdf."
 
 class CollectedBatch(NamedTuple):
     document_ids: list[UUID]
-    not_used: list[dict[str, str]]
+    skipped: list[dict[str, str]]
 
 
 async def collect_batch(
@@ -35,15 +35,15 @@ async def collect_batch(
 ) -> CollectedBatch:
     """Take every file this project has never read before, by name or content."""
     document_ids: list[UUID] = []
-    not_used: list[dict[str, str]] = []
+    skipped: list[dict[str, str]] = []
 
     # One transaction, so a killed process never leaves half a batch behind.
     async with connection.transaction():
-        for path in sorted(_top_level_files(source_folder)):
+        for path in sorted(top_level_files(source_folder)):
             extension = path.suffix.lower()
             if extension not in accepted_extensions or extension not in READER_EXTENSIONS:
-                not_used.append(
-                    _not_used_entry(NOT_READ_KIND, path.name, UNREADABLE_FORMAT)
+                skipped.append(
+                    _skipped_entry(NOT_READ_KIND, path.name, UNREADABLE_FORMAT)
                 )
                 continue
 
@@ -52,13 +52,13 @@ async def collect_batch(
                     read_source_document, path, page_limit
                 )
             except DocumentUnreadable as unreadable:
-                not_used.append(
-                    _not_used_entry(NOT_READ_KIND, path.name, str(unreadable))
+                skipped.append(
+                    _skipped_entry(NOT_READ_KIND, path.name, str(unreadable))
                 )
                 continue
             except OSError as error:
-                not_used.append(
-                    _not_used_entry(
+                skipped.append(
+                    _skipped_entry(
                         NOT_READ_KIND,
                         path.name,
                         f"Could not be opened ({error.strerror}).",
@@ -71,9 +71,9 @@ async def collect_batch(
                 connection, project_id, path.name, content_hash
             )
             if matched is not None:
-                not_used.append(
-                    _not_used_entry(
-                        ALREADY_READ_KIND, path.name, _already_read_reason(matched)
+                skipped.append(
+                    _skipped_entry(
+                        READ_BEFORE_KIND, path.name, _read_before_reason(matched)
                     )
                 )
                 continue
@@ -84,7 +84,7 @@ async def collect_batch(
                 )
             )
 
-    return CollectedBatch(document_ids=document_ids, not_used=not_used)
+    return CollectedBatch(document_ids=document_ids, skipped=skipped)
 
 
 async def _write_document(
@@ -115,11 +115,17 @@ async def _write_document(
     return written["id"]
 
 
-def _top_level_files(source_folder: Path) -> list[Path]:
+def top_level_files(source_folder: Path) -> list[Path]:
+    """The files a run may read: the folder's own, never a sub-folder's.
+
+    Shared with `start_or_queue_run`, which refuses a run over a folder this
+    returns nothing for — one rule about what a folder holds, so the refusal
+    and the batch can never disagree.
+    """
     return [path for path in source_folder.iterdir() if path.is_file()]
 
 
-def _not_used_entry(kind: str, file_name: str, reason: str) -> dict[str, str]:
+def _skipped_entry(kind: str, file_name: str, reason: str) -> dict[str, str]:
     return {"kind": kind, "file": file_name, "reason": reason}
 
 
@@ -181,7 +187,15 @@ async def _already_read_by_name_or_content(
     return None
 
 
-def _already_read_reason(matched: str) -> str:
+def _read_before_reason(matched: str) -> str:
+    """Why this file was read before, in the words the Skipped tab prints.
+
+    The screen writes `<file> — <reason>`, so neither sentence names the file
+    a second time.
+    """
     if matched == "both":
-        return "Already read, and unchanged since."
-    return "Read before — an edited or renamed file is not read again."
+        return "unchanged since it was read."
+    return (
+        "read before under another name or with other words; an edited or "
+        "renamed file is not read again."
+    )

@@ -6,6 +6,7 @@ from typing import Any
 import yaml
 from psycopg import AsyncConnection
 
+from app.ingest.collect_batch import top_level_files
 from app.refusal import ProjectsUnavailable
 from app.runs.finished_stages import ordered_finished_stages
 from app.runs.statuses import DONE
@@ -62,6 +63,26 @@ async def read_project_list(
         "projects": _grouped_by_project(rows),
         "projects_root": projects_root,
         "available_folders": available_folders,
+        # Whether each of those folders holds a file to read. A folder with
+        # none can be made a project but cannot be run (S15), and the button
+        # has to say which of the two it is offering. Carried beside the list
+        # rather than inside it while `ui/src/AddProject.jsx` still reads
+        # plain paths; Brief 2 moves the screen and this can then join them.
+        "has_files_by_folder": _has_files_by_folder(
+            project_root, projects_root, available_folders
+        ),
+    }
+
+
+def _has_files_by_folder(
+    project_root: Path,
+    projects_root: str,
+    available_folders: list[str],
+) -> dict[str, bool]:
+    return {
+        folder: bool(top_level_files(project_root / folder))
+        for folder in available_folders
+        if (project_root / folder).is_dir()
     }
 
 

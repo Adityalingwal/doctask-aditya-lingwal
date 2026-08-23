@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 // A whole document Ingest never read (`app/ingest/collect_batch.py`'s
-// `_not_used_entry`): `kind`, `file` and `reason`, and nothing else — in
+// `_skipped_entry`): `kind`, `file` and `reason`, and nothing else — in
 // particular, no `summary`.
 const documentThatWasNotRead = {
   kind: "not read",
@@ -22,7 +22,7 @@ const documentThatWasNotRead = {
 // (`app/extract/read_document.py`): the same `file` key, plus `summary` —
 // which only a dropped entry carries.
 const droppedRequirement = {
-  kind: "dropped",
+  kind: "not attached",
   file: "12-march-scope.md",
   summary: "an SMS reminder before every appointment",
   quote: "the client wants a text message reminder before each appointment",
@@ -37,7 +37,7 @@ test("a dropped quote is never shown as a file that was not read", async () => {
       {
         method: "GET",
         path: `/runs/${runId}`,
-        reply: { body: runReply({ not_used: [documentThatWasNotRead, droppedRequirement] }) },
+        reply: { body: runReply({ skipped: [documentThatWasNotRead, droppedRequirement] }) },
       },
     ]),
   );

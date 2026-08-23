@@ -26,6 +26,7 @@ async def record_findings(
                 connection,
                 run_id,
                 finding["question"],
+                finding["parts"],
             )
             finding_id = uuid4()
             await connection.execute(

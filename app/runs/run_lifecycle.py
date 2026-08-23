@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -13,13 +14,15 @@ from psycopg import AsyncConnection
 from psycopg.errors import UniqueViolation
 from psycopg_pool import AsyncConnectionPool
 
-from app.refusal import RunsUnavailable
+from app.ingest.collect_batch import top_level_files
+from app.refusal import RunsUnavailable, UnusableRequest
 from app.run_logging import log_run_event
 from app.runs.run_records import record_run_failure, require_project
 from app.runs.statuses import RUNNING, WAITING
 
 
 REVIEW_FINISHED = "review finished"
+EMPTY_FOLDER_REFUSAL = "This folder has no files. Add a document."
 
 
 @dataclass(frozen=True)
@@ -29,6 +32,11 @@ class RunEngine:
     graph: CompiledStateGraph
     pool: AsyncConnectionPool
     checkpointer: AsyncPostgresSaver
+    # A project's folder is named relative to the repository, so the root has
+    # to travel with the engine: the empty-folder check below is reached by
+    # POST /runs, the MCP tool and the watcher alike, and none of the three
+    # can be trusted to pass its own idea of where the repository is.
+    project_root: Path
     background_runs: set[asyncio.Task] = field(default_factory=set)
 
 
@@ -56,7 +64,12 @@ async def start_or_queue_run(engine: RunEngine, project_id: UUID) -> dict[str, A
     The lock is the active run row itself: PostgreSQL allows only one run per
     project in a running or waiting-for-review state, and that row survives the
     process dying, which is what startup resume takes over.
+
+    A run over an empty folder is refused before the lock is claimed, so the
+    three doors that reach this function — POST /runs, the MCP `start_run`
+    tool and the watcher — all refuse in the same words (S15).
     """
+    await _refuse_a_folder_with_no_files(engine, project_id)
     async with engine.pool.connection() as connection:
         run_id = uuid4()
         if await _insert_run(connection, run_id, project_id, RUNNING):
@@ -86,6 +99,26 @@ async def start_or_queue_run(engine: RunEngine, project_id: UUID) -> dict[str, A
         )
         already_waiting = await waiting.fetchone()
         return {"run_id": already_waiting["id"], "status": WAITING}
+
+
+async def _refuse_a_folder_with_no_files(
+    engine: RunEngine,
+    project_id: UUID,
+) -> None:
+    """Refuse a run that has nothing to read, naming what to do about it.
+
+    A run over an empty folder reads nothing, proposes nothing and ends early
+    — a record of a run that was never worth starting. The same top-level file
+    rule Ingest reads by, so the two can never disagree about what a folder
+    holds.
+    """
+    async with engine.pool.connection() as connection:
+        project = await require_project(connection, project_id)
+    folder = Path(project["source_folder_path"])
+    if not folder.is_absolute():
+        folder = engine.project_root / folder
+    if folder.is_dir() and not await asyncio.to_thread(top_level_files, folder):
+        raise UnusableRequest(EMPTY_FOLDER_REFUSAL)
 
 
 def resume_after_review(engine: RunEngine, run_id: UUID, project_id: UUID) -> None:

@@ -8,11 +8,13 @@ from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
 from app.extract.answer import TestingLabel
+from app.ingest.source_line import source_line
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH, match_observations
 from app.register.absence_rows import is_absence, write_absence
 from app.register.audit_entries import write_cell_change
 from app.register.cells import (
     CELL_NAMES,
+    COLUMN_HEADINGS,
     STATUS,
     STATUS_DISPUTED,
     STATUS_DONE,
@@ -21,21 +23,24 @@ from app.register.cells import (
     STATUS_PARTIAL,
     WHAT_TESTING_FOUND,
     fingerprint_of_cells,
+    shorten_quote,
+)
+from app.review.decision_text import (
+    cells_as_a_person_reads_them,
+    observation_match_text,
+    quote_block,
+    register_row_label,
 )
 from app.review.review_queue import (
     APPROVED,
     OBSERVATION_MATCH_DECISION,
     raise_observation_match_decision,
 )
-from app.runs.not_used_kinds import DROPPED_KIND
+from app.runs.skipped_kinds import NOT_ATTACHED_KIND
 
 
 TESTING_OBSERVATION = "testing observation"
 DELIVERY_EVIDENCE = "delivery evidence"
-# One decision covers a row's whole list of observations, so its sentences are
-# stacked as paragraphs rather than joined into one. Joining them would show
-# the person words Match never wrote.
-QUESTIONS_STACKED_BY = "\n\n"
 
 
 class ProposedMoves(NamedTuple):
@@ -78,7 +83,7 @@ async def rows_a_move_may_reach(
     document, so this run's own proposals have to be reachable too.
     """
     result = await connection.execute(
-        "SELECT id, row_number, what_was_asked, status, is_committed "
+        "SELECT id, row_number, is_committed, " + ", ".join(CELL_NAMES) + " "
         "FROM register_rows WHERE project_id = %s "
         "AND (is_committed OR proposed_by_run_id = %s) "
         "AND merged_into_register_row_id IS NULL ORDER BY row_number",
@@ -111,12 +116,8 @@ async def propose_moves(
     row_by_number = {row["row_number"]: row for row in rows}
 
     observations_by_row: dict[int, list[dict[str, Any]]] = {}
-    # Match writes one sentence per observation, and the decision below covers
-    # a whole row's list, so the sentences are kept beside the observations
-    # they were written for rather than on them.
-    questions_by_row: dict[int, list[str]] = {}
     ask_about: set[int] = set()
-    unmatched: list[dict[str, str]] = []
+    unmatched: list[dict[str, Any]] = []
     for outcome in answer.outcomes:
         observation = observations[outcome.observation_index]
         row = row_by_number.get(outcome.row_number or -1)
@@ -130,14 +131,12 @@ async def propose_moves(
         if outcome.outcome == POSSIBLE_MATCH or row["is_committed"]:
             ask_about.add(row["row_number"])
         observations_by_row.setdefault(row["row_number"], []).append(observation)
-        questions_by_row.setdefault(row["row_number"], []).append(outcome.question)
 
     return await _store_the_moves(
         connection,
         run_id,
         row_by_number,
         observations_by_row,
-        questions_by_row,
         ask_about,
         unmatched,
     )
@@ -148,9 +147,8 @@ async def _store_the_moves(
     run_id: UUID,
     row_by_number: dict[int, dict[str, Any]],
     observations_by_row: dict[int, list[dict[str, Any]]],
-    questions_by_row: dict[int, list[str]],
     ask_about: set[int],
-    unmatched: list[dict[str, str]],
+    unmatched: list[dict[str, Any]],
 ) -> ProposedMoves:
     moves: list[dict[str, Any]] = []
     moved_row_numbers: list[int] = []
@@ -175,10 +173,30 @@ async def _store_the_moves(
                 continue
             decision_id = None
             if row_number in ask_about:
+                asked = observation_match_text(
+                    row_number=row_number,
+                    row_label=register_row_label(row_number),
+                    cells=cells_as_a_person_reads_them(row),
+                    quotes=[
+                        quote_block(
+                            observed["source_file"],
+                            observed["place"],
+                            shorten_quote(observed["source_words"]),
+                        )
+                        for observed in observations_by_row[row_number]
+                    ],
+                    # Read from the very list Commit applies, so the line a
+                    # person reads and the cell that changes cannot disagree.
+                    if_approved=[
+                        {"cell": COLUMN_HEADINGS[cell_name], "value": value}
+                        for cell_name, value, _ in cells
+                    ],
+                )
                 decision_id = await raise_observation_match_decision(
                     connection,
                     run_id,
-                    QUESTIONS_STACKED_BY.join(questions_by_row[row_number]),
+                    asked.question,
+                    asked.parts,
                     row["id"],
                 )
                 gated_row_numbers.append(row_number)
@@ -271,19 +289,24 @@ def _citation(observed: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _unmatched_entries(observations: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _unmatched_entries(observations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [_unmatched_entry(observation) for observation in observations]
 
 
-def _unmatched_entry(observation: dict[str, Any]) -> dict[str, str]:
+def _unmatched_entry(observation: dict[str, Any]) -> dict[str, Any]:
+    """One thing a document said that reached no row, with where it was said.
+
+    The words were located in the file, so this entry names its place — the
+    shape a dropped quote cannot take, because there is nowhere to point (S12).
+    """
     return {
-        "kind": DROPPED_KIND,
+        "kind": NOT_ATTACHED_KIND,
         "file": observation["source_file"],
         "summary": observation["summary"],
-        "reason": (
-            f"This {observation['kind']} is about no requirement the register "
-            "traces, so it was reported rather than attached to a row."
+        "source_line": source_line(
+            observation["source_file"], observation["place"]
         ),
+        "reason": "This is not about any requirement in the register.",
     }
 
 

@@ -50,15 +50,15 @@ from app.register.propose_rows import MatchSettlement, committed_rows, propose_r
 from app.review.review_queue import export_was_approved
 from app.run_logging import log_run_event
 from app.runs.finished_stages import record_stage_finished
-from app.runs.not_used_kinds import NOT_READ_KIND
 from app.runs.run_records import (
-    append_not_used,
     append_reported_instructions,
+    append_skipped,
     enter_stage,
     read_project,
     read_run,
     set_run_status,
 )
+from app.runs.skipped_kinds import NOT_READ_KIND
 from app.runs.statuses import (
     CLOSED_WITHOUT_EXPORT,
     COMMIT_STAGE,
@@ -90,11 +90,10 @@ NOTHING_MOVED = (
 )
 
 
-def _nothing_read_reason(not_used_count: int) -> str:
-    file_word = "file was" if not_used_count == 1 else "files were"
+def _nothing_read_reason(skipped_count: int) -> str:
+    file_word = "file was" if skipped_count == 1 else "files were"
     return (
-        f"Nothing was read — all {not_used_count} {file_word} not used. See "
-        "the Not used tab for why."
+        f"{skipped_count} {file_word} skipped. See the Skipped tab for why."
     )
 
 
@@ -102,7 +101,7 @@ class RunState(TypedDict, total=False):
     run_id: str
     project_id: str
     document_ids: list[str]
-    not_used_count: int
+    skipped_count: int
     documents_read: int
     next_document_index: int
     requirements_found: int
@@ -155,7 +154,7 @@ def build_register_graph(
                 accepted_extensions,
                 page_limit,
             )
-            await append_not_used(connection, run_id, batch.not_used)
+            await append_skipped(connection, run_id, batch.skipped)
             examine_changed_rules = (
                 not batch.document_ids
                 and bool(await committed_rows(connection, project_id))
@@ -169,13 +168,13 @@ def build_register_graph(
             logging.INFO,
             "ingest_finished",
             f"Ingest took {len(batch.document_ids)} document(s) into the batch "
-            f"and did not use {len(batch.not_used)}.",
+            f"and skipped {len(batch.skipped)}.",
             run_id,
-            not_used=batch.not_used,
+            skipped=batch.skipped,
         )
         return {
             "document_ids": [str(document_id) for document_id in batch.document_ids],
-            "not_used_count": len(batch.not_used),
+            "skipped_count": len(batch.skipped),
             "next_document_index": 0,
             "requirements_found": 0,
             "observations_found": 0,
@@ -213,7 +212,7 @@ def build_register_graph(
                 logging.WARNING, "extract_document_type_unrecognised", log_reason, run_id
             )
             async with pool.connection() as connection:
-                await append_not_used(
+                await append_skipped(
                     connection,
                     run_id,
                     [
@@ -250,7 +249,7 @@ def build_register_graph(
                 run_id,
             )
             async with pool.connection() as connection:
-                await append_not_used(
+                await append_skipped(
                     connection,
                     run_id,
                     [
@@ -277,7 +276,7 @@ def build_register_graph(
             )
             _log(logging.ERROR, "extract_document_not_read", log_reason, run_id)
             async with pool.connection() as connection:
-                await append_not_used(
+                await append_skipped(
                     connection,
                     run_id,
                     [
@@ -292,10 +291,10 @@ def build_register_graph(
             return {"next_document_index": index + 1}
 
         located = locate_extraction(answer, document["extracted_text"], source_file)
-        not_used = list(located.dropped)
+        skipped = list(located.dropped)
         requirements_found = len(located.extraction["requirements"])
         if answer.document_type == UNRELATED_DOCUMENT:
-            not_used.append(
+            skipped.append(
                 {
                     "kind": NOT_READ_KIND,
                     "file": source_file,
@@ -327,7 +326,7 @@ def build_register_graph(
                 "UPDATE documents SET extraction = %s WHERE id = %s",
                 (Jsonb(located.extraction), document_id),
             )
-            await append_not_used(connection, run_id, not_used)
+            await append_skipped(connection, run_id, skipped)
             await append_reported_instructions(connection, run_id, reported)
             await _finish_stage(connection, run_id, EXTRACT_STAGE)
 
@@ -385,7 +384,7 @@ def build_register_graph(
             # all four kinds of document arrive in one batch whenever a project
             # is added over a folder that already holds them.
             moves = await propose_moves(connection, model_client, run_id, project_id)
-            await append_not_used(connection, run_id, moves.unmatched)
+            await append_skipped(connection, run_id, moves.unmatched)
             # After the moves, because a row a report spoke about is known only
             # once its observations have been matched; stored beside them so
             # Examine judges the register as Commit will leave it.
@@ -670,7 +669,6 @@ async def _settle_against_the_register(
             _outcome_the_candidate_allows(outcome),
             outcome.row_number,
             outcome.same_as_requirement_index,
-            outcome.question,
         )
         for outcome in answer.outcomes
     }
@@ -756,11 +754,11 @@ def _early_reason(state: RunState) -> str:
             return NOTHING_MOVED
         return NOTHING_FOUND
     # Nothing was read: every file either never reached Extract or failed
-    # there, and each one says why in the Not used tab.
-    not_used_count = state.get("not_used_count", 0) + len(
+    # there, and each one says why in the Skipped tab.
+    skipped_count = state.get("skipped_count", 0) + len(
         state.get("document_ids", [])
     )
-    return _nothing_read_reason(not_used_count) if not_used_count else NO_FILES_FOUND
+    return _nothing_read_reason(skipped_count) if skipped_count else NO_FILES_FOUND
 
 
 def _speaks_to_a_cell_by_silence(document_type: str) -> int:

@@ -48,20 +48,18 @@ which show the problem, there is no finding to report.
   not allow.
 - evidence — the fewest words from that row's cells that show it,
   copied exactly.
-- question — the whole sentence a person will read before deciding.
 
-## Writing the question
+## Writing the issue line
 
-The question is read by one person who has not seen the rules file. So:
+The issue line is the one sentence a person reads about why this row
+breaks this rule, and it is the only sentence you write. Everything
+around it — the row, the rule, the question and what each answer does
+— is written for you. So:
 
-- state the rule in its own words. Never write a rule id in the
-  question — no "R4", no code of any kind.
-- name the row by its number and by what it asked for.
-- say what the row shows that the rule does not allow.
-- end with a yes/no question, phrased so that approving it means yes.
-
-Write the question as plain sentences. Do not describe what approving
-or rejecting will do — the person is shown that separately.
+- state the problem in the rule's own words. Never write a rule id —
+  no "R4", no code of any kind, and no row number either.
+- where the rule is about a kind of document, name the document.
+- one sentence, plain, and nothing about approving or rejecting.
 
 ## A worked finding
 
@@ -79,14 +77,9 @@ Row given to you:
 Your finding:
   rule_id: "R4"
   row_number: 2
-  issue: "This row is written down, and the testing feedback that has
-          been read does not mention it."
+  issue: "testing-feedback-12-aug.md was read, and it says nothing
+          about this requirement."
   evidence: "Not mentioned"
-  question: "Every written requirement must have a testing outcome.
-             Row #2 — a weekly summary of all open tickets — is
-             written down in client-requirements-v2.md, but no
-             testing outcome has been read for it. Attach this
-             finding to row #2?"
 
 ## A second finding, where two cells contradict each other
 
@@ -105,14 +98,10 @@ Row given to you:
 Your finding:
   rule_id: "R1"
   row_number: 5
-  issue: "This row is Done, so the work was built, but the client's
-          requirements document does not mention the ask."
+  issue: "The client's requirements document was read, and it does
+          not mention this ask, but testing reports the work
+          delivered."
   evidence: "Not mentioned"
-  question: "Anything built must have a written requirement; a verbal
-             mention is not enough. Row #5 — a search over old
-             records — is marked Done, but the ask was never written
-             into the client's requirements document. Attach this
-             finding to row #5?"
 
 ## A row that looks wrong and is not
 
@@ -151,9 +140,6 @@ class FoundIssue(BaseModel):
         description="What this row shows that this rule does not allow."
     )
     evidence: str = Field(description="The words in that row which show it.")
-    question: str = Field(
-        description="The whole sentence a person will read before deciding."
-    )
 
 
 class ExamineAnswer(BaseModel):
@@ -186,7 +172,6 @@ async def examine_register(
             row_by_number[found.row_number],
             found.issue,
             found.evidence,
-            found.question,
         )
         for found in _refuse_what_was_not_asked_about(
             answer, rule_text_by_id, row_by_number
@@ -215,19 +200,13 @@ def _refuse_what_was_not_asked_about(
         if found.row_number not in row_by_number:
             _refuse(
                 f"Examine reported a finding on register row "
-                f"#{found.row_number}, which was not among the "
+                f"{found.row_number}, which was not among the "
                 f"{len(row_by_number)} row(s) it was given"
             )
         if not found.issue.strip() or not found.evidence.strip():
             _refuse(
                 f"Examine reported a finding against rule {found.rule_id} on "
-                f"row #{found.row_number} with no issue or no evidence in it"
-            )
-        if not found.question.strip():
-            _refuse(
-                f"Examine reported a finding against rule {found.rule_id} on "
-                f"row #{found.row_number} with no question in it, so the "
-                "person answering it would be shown a blank card"
+                f"row {found.row_number} with no issue or no evidence in it"
             )
     return answer.findings
 

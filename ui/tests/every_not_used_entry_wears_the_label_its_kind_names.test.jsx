@@ -12,24 +12,29 @@ afterEach(() => {
 // The three kinds the server writes (`app/ingest/collect_batch.py`,
 // `app/graph/register_graph.py`, `app/extract/read_document.py`), and a fourth
 // this screen has never been taught.
-// Its reason deliberately never says "Already read" itself, so the assertion
+// Its reason deliberately never says "Read before" itself, so the assertion
 // below can only be satisfied by a label the screen put there.
-const alreadyRead = {
-  kind: "already read",
+const readBefore = {
+  kind: "read before",
   file: "client-requirements-v2.md",
-  reason: "Read before — an edited or renamed file is not read again.",
+  reason:
+    "read before under another name or with other words; an edited or "
+    + "renamed file is not read again.",
 };
 const notRead = {
   kind: "not read",
   file: "clinic-staff-leave-policy.pdf",
   reason: "This document is not related to this client or project.",
 };
-const dropped = {
-  kind: "dropped",
+const notAttached = {
+  kind: "not attached",
   file: "meeting-notes-10-mar.md",
   summary: "a weekly AI summary of all open tickets",
   quote: "the client wants a weekly AI summary of every open ticket",
-  reason: "These words were not found in the file, so this requirement was dropped.",
+  source_line: null,
+  reason:
+    "The model said this comes from meeting-notes-10-mar.md, but those "
+    + "words are not in the file.",
 };
 const kindThisScreenDoesNotKnow = {
   kind: "left for later",
@@ -58,7 +63,7 @@ function cardsFor(entries) {
       {
         method: "GET",
         path: `/runs/${runId}`,
-        reply: { body: runReply({ not_used: entries }) },
+        reply: { body: runReply({ skipped: entries }) },
       },
     ]),
   );
@@ -66,7 +71,7 @@ function cardsFor(entries) {
 }
 
 test("every not-used entry wears the label its kind names", async () => {
-  cardsFor([alreadyRead, notRead, dropped]);
+  cardsFor([readBefore, notRead, notAttached]);
   await openSection(/not used/i);
 
   const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
@@ -74,11 +79,11 @@ test("every not-used entry wears the label its kind names", async () => {
 
   // The label is what tells a file an earlier run had already read apart from
   // a requirement that fell out of the register.
-  expect(cardFor(alreadyRead)).toContain("Already read");
+  expect(cardFor(readBefore)).toContain("Read before");
   expect(cardFor(notRead)).toContain("Not read");
-  expect(cardFor(dropped)).toContain("Dropped");
-  expect(cardFor(notRead)).not.toContain("Already read");
-  expect(cardFor(dropped)).toContain(dropped.summary);
+  expect(cardFor(notAttached)).toContain("Not attached to any row");
+  expect(cardFor(notRead)).not.toContain("Read before");
+  expect(cardFor(notAttached)).toContain(notAttached.summary);
 });
 
 test("an entry whose kind the screen does not know wears no label at all", async () => {

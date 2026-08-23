@@ -161,7 +161,15 @@ def _build_run_engine(
         page_limit,
         rules_config_path,
     )
-    return RunEngine(graph=graph, pool=pool, checkpointer=checkpointer), None
+    return (
+        RunEngine(
+            graph=graph,
+            pool=pool,
+            checkpointer=checkpointer,
+            project_root=PROJECT_ROOT,
+        ),
+        None,
+    )
 
 
 app = FastAPI(lifespan=lifespan)
