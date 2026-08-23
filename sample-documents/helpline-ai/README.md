@@ -22,21 +22,29 @@ Hindi/English support.
 
 ## Expected end state — the outcome of the live-key run, not an acceptance check for this corpus
 
-| Row | Status | Why |
-|---|---|---|
-| Voice agent | Done | testing passed |
-| Chat widget | Done | testing passed (the SMS ask is a change request and moves nothing) |
-| WhatsApp support | Not delivered | testing reports it absent, no handover claim behind it |
-| Transcripts dashboard | Partial | defect on delivered work |
-| Human escalation | Disputed | handover says built, testing says absent |
-| Weekly analytics report | Handed over | delivered, testing silent |
-| Hindi and English | Requested | written down, no delivery or testing evidence |
+| Row | Status | Written down | What testing found | Why |
+|---|---|---|---|---|
+| Voice agent | Done | Yes | testing's own words | testing passed |
+| Chat widget | Done | Yes | testing's own words | testing passed (the SMS ask is a change request and moves nothing) |
+| WhatsApp support | Not delivered | Yes | testing's own words | testing reports it absent, no handover claim behind it |
+| Transcripts dashboard | Partial | Yes | testing's own words | defect on delivered work |
+| Human escalation | Disputed | Not mentioned | testing's own words | handover says built, testing says absent; the requirements document was read and does not mention the ask |
+| Weekly analytics report | Handed over | Yes | Not mentioned | delivered, and the testing report was read and is silent about it |
+| Hindi and English | Requested | Yes | Not mentioned | written down; the testing report was read and is silent about it |
+
+Findings expected on that register: none on rows 1-4; one testing-outcome
+finding each on the weekly report and the Hindi/English rows, raised by the
+testing-feedback run; and one written-requirement finding on human escalation,
+raised by the handover run.
 
 ## Which rule each hook feeds
 
 - **The written-requirement rule (R1)** — human escalation is built
   (`handover-summary.md`) but was only ever asked for verbally
-  (`meeting-notes-02-jul.md`), never in `client-requirements-v1.md`.
+  (`meeting-notes-02-jul.md`), never in `client-requirements-v1.md`, so its
+  `Written down` reads `Not mentioned` once that document has been read. R1
+  waits for a handover summary (`applies_when`), so it is judged from the
+  handover run onwards.
 - **The change-request rule (R2)** — the SMS follow-up is testing feedback
   asking for new behaviour, logged as a bug, with no written requirement
   behind it.

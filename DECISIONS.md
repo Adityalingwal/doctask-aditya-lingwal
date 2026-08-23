@@ -255,9 +255,21 @@ match.
   rather than carry an unproven capability in the riskiest part of the system.
   Superseded 2026-08-16: "Read-once rule replaces re-reading a changed
   document, and withdrawal is removed".
+- **One definition, one function (2026-08-23).** The rule above is one SQL
+  condition, `READ_BY_THE_PROJECT` in `app/ingest/read_once.py`, and
+  `documents_read_by_project` answers "which documents of kind K has this
+  project read" from it. Ingest asks it to decide whether to pay to read a file
+  again; the rule gate and the absence move ask it to decide what the register
+  may claim a document was silent about. A second definition let a discarded
+  run's requirements document count as read for `Written down` while Ingest
+  read it again — the two answers have to be one. A run's own batch counts
+  where the caller passes `include_run_id`: the run's status is not `done`
+  until Commit writes it, and Match, Examine and Commit have all read it by
+  then.
 - **Evidence/status:** Implemented and verified by change-detection tests for
   transient failure, an edited document, a renamed document, a deleted
-  document, an unrelated document, and a document that asks for nothing.
+  document, an unrelated document, and a document that asks for nothing, plus
+  `test_ingest_and_match_share_one_definition_of_read`.
 
 ### D04 — formats and document types
 
@@ -370,14 +382,29 @@ cannot each assume a different one:
   say. `Not found` behind a handover claiming delivery is `Disputed`; `Not
   found` with no handover behind it is `Not delivered`, because silence
   contradicts nothing. Without this label neither status could ever be written.
-- Unknown cells say why they are unknown; they are never blank or guessed.
-- **`Written down` is answered against every client requirements document the
-  *project* has read**, not this run's batch. A document is read once for a
-  project's whole life, so a run-scoped answer would put "no client
-  requirements document has been read" back on every row a later run proposes.
-  Once one has been read and does not mention the ask the cell reads
-  `Not found in <file>.`, never "No" — a document saying nothing about an ask
-  cannot support that claim.
+- Unknown cells say what is unknown; they are never blank or guessed.
+- **A cell answers in as few words as a reader can scan down a column, and the
+  file behind the answer lives in the row's evidence (2026-08-23).**
+  `Written down` reads `Not known yet` · `Yes` · `Not mentioned`, and `What
+  testing found` reads `Not known yet` · what testing said · `Not mentioned`.
+  This replaces the bullet that had the cell read `Not found in <file>.` and
+  the two long "Not known yet — no … has been read" sentences: a column of
+  sentences is unreadable, and the same file was printed twice on every row.
+  `Not mentioned` still never means "No" — the evidence behind it is the exact
+  file that was read plus the sentence saying it does not mention this ask.
+- **A document's silence is written at Commit, by the absence move
+  (2026-08-23).** `Written down` used to be composed when a requirement landed
+  on a row, so a row no requirement ever landed on kept denying that any
+  requirements document had been read. Now every client requirements document
+  and every testing report the project has read is applied at Commit against
+  every row it does not mention: the cell moves to `Not mentioned`, gains an
+  absence citation, writes its history entry and moves the row's fingerprint.
+  It only ever fills a cell still reading `Not known yet`; a cell holding `Yes`
+  or a testing verdict is left exactly as it stands, and a second silent
+  document behind an existing `Not mentioned` adds its evidence and nothing
+  else. `Status` is never moved by an absence. One writer,
+  `app/register/absence_rows.py`; a run that read such a document always
+  continues to Review, because silence is a change a person approves.
 - Conflicts, findings, and possible-match questions attach to rows but are not
   row cells. This preserves gate separation and cell-only fingerprints.
 - **A cell keeps the citation of every document that still supports the value
@@ -679,17 +706,53 @@ match.
   ran and a run with no findings has that rule text nowhere else. Ingest
   freezes it once, guarded on `rules_snapshot IS NULL`, so a resumed run reads
   what it froze rather than the file.
-- **Who computes what:** every rule is judged by the model in one Examine call.
-  An unusable rules file fails the run at the boundary and is never read as
-  "no rules".
+- **Who computes what:** every applicable rule is judged by the model in one
+  Examine call. An unusable rules file fails the run at the boundary and is
+  never read as "no rules".
+- **A rule waits for the documents it is about (`applies_when`, 2026-08-23).**
+  Each rule in `config/rules.yaml` may name the document kinds it needs, from
+  the four Extract reports, and runs only once the project has read every kind
+  it names (the read-once definition above). This **replaces the 2026-08-17
+  lock "every rule is judged by the model in one Examine call"** — unqualified.
+  Why: the testing-outcome rule, judged before any testing feedback existed,
+  raised findings against silence — six of them in one demo. A rule naming no
+  kind applies always, which is what a test's own rules file relies on.
+  Validation lives in `load_rules`, so a value outside the four stops the
+  application at startup and again at every freeze, naming all four.
+- **`runs.rules_applied` (JSONB, 2026-08-23)** names exactly the rules Examine
+  sent to the model, written in the same statement as `examined_row_count`, and
+  null until Examine has run. `rules_snapshot` is unchanged and stays the
+  fingerprint source: a snapshot holding only the applied subset would move the
+  fingerprint every run and trigger rules-only re-examines that changed
+  nothing. Every reader of "which rules ran" — `examine.rules`, the Markdown
+  export, and the register read below — comes from this column.
+- **The register shows each rule's finding from the latest run that applied it
+  (2026-08-23).** No schema change and no "resolved" flag: `findings` keeps
+  every run's findings, and only the register read changes. For each rule, the
+  project's latest `done` run whose `rules_applied` names it decides, and that
+  run's approved findings are what the row shows — which may be none, including
+  when that run raised one and the person rejected it. Where a later run never
+  applied the rule, the older answer is still the latest there is and stands.
+  Before this, a row carried two and three copies of one rule's finding from
+  three runs. Older findings stay in History.
 - **`examined_row_count` on `runs`** records how many rows Examine judged, so
   the `No findings` result can state it after the run ends, whether or not
-  the run committed.
+  the run committed. A proposal still waiting on a possible-match answer is
+  **not** one of them (2026-08-23): Examine assumes the match, judges the row
+  it would join with the proposal's `Written down` overlaid, and counts real
+  rows only. **Known limitation:** if the person then rejects the match, the
+  new row gets no finding in that run; the next run raises it.
+- **Known limitation:** a rule is judged by a model, so a rule that runs again
+  in a later run may not re-raise a finding an earlier run raised. The register
+  then shows the newer answer and History keeps the older one.
 - **Status:** Implemented and verified with the scripted model. Findings reach
   the human gate through the existing review queue, a rejected finding stays in
   the run record and never reaches the register, and Examine re-entry after a
   crash replaces this run's unanswered findings rather than adding to them.
   Proven by `tests/examine/test_examine_findings.py`,
+  `tests/examine/test_rules_apply_when_their_documents_are_read.py`,
+  `tests/examine/test_an_unanswered_possible_match_is_examined_as_the_match.py`,
+  `tests/register/test_the_register_shows_the_latest_finding.py`,
   `tests/examine/test_examine_answer.py`,
   `tests/examine/test_frozen_rules.py`,
   `tests/examine/test_rules_live_only_in_config.py`, and

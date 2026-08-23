@@ -28,13 +28,6 @@ Two more defects the live run exposed, both fixed test-first.
 **Both suites green, no live key: 253 Python passed** and **63 front-end
 passed across 36 files.**
 
-**Still open, deliberately not built here:** a row's `Written down` keeps
-"no client requirements document has been read for this project" after one
-has been read that does not mention the ask. Refreshing it needs a new kind
-of move — an absence-backed cell change on a row no requirement landed on,
-with its own citation, audit entry and gate — which is a feature rather than
-a repair. Recorded under `## Known limitations`.
-
 ## Snapshot — 2026-08-18, branch `strict-schema-and-honest-early-exit`
 
 The first live-key run started and stopped on its first model call. Three
@@ -498,9 +491,10 @@ merging and about `Written down` still stands.
       every requirement on it, recomputes `In writing?` across them, and takes
       the **earliest** document date as `First seen`
       (`app/register/document_dates.py`).
-- [x] `In writing?` reads `Not found in <file>.` once the **project** has read a
-      client requirements document that does not mention the ask; the query
-      joins `documents` to `runs`, so an earlier run's document is visible.
+- [x] `Written down` is answered against every client requirements document
+      the **project** has read, not this run's batch. The wording and the
+      writer both moved on 2026-08-23: the cell reads `Not mentioned` and the
+      absence move at Commit writes it, with the file as evidence.
 - [x] The three outcome words are a `Literal` on both `MatchOutcome` and
       `ObservationOutcome`; the outcome-membership branch they shared is gone,
       and a test holds the `Literal` and the three constants in step.
@@ -1177,21 +1171,16 @@ working claim only after its own implementation and proof land.
 
 ## Known limitations
 
-- **A row's `Written down` can keep a claim the project has outgrown.** The
-  cell is computed when a requirement lands on the row, so a row no
-  requirement ever lands on keeps "Not known yet — no client requirements
-  document has been read for this project" after one has been read that does
-  not mention its ask. Seen live on the escalation row of the staged drives;
-  the paired drives never show it, because there the requirements document is
-  in the same batch that creates the row. Refreshing it means a new kind of
-  move — an absence-backed cell change on a row no requirement reached, with
-  its citation, audit entry and gate — so it is written down rather than
-  built around.
-- **The testing-outcome rule re-asks on every run until a testing document
-  arrives.** Six to seven identical questions per run, each rejected, each
-  returning next run. The rule is telling the truth each time; suppressing a
-  repeat risks hiding a finding that has become real, so the human gate
-  absorbs it.
+- **An unanswered possible match is examined as the match it asks about**, so
+  a rejected match leaves the new row without a finding for that run. Written
+  up for a reader in README's "What it does not do"; the next run raises it.
+- **A model-judged rule that runs again may not re-raise an earlier finding.**
+  The register shows the newer answer and History keeps the older one; README's
+  "What it does not do" states it for a reader.
+- **A rule still asks its question again on every run**, once the documents it
+  names have been read — README's "What it does not do" is that one's home.
+  `applies_when` removed the worse half of it: the demo's six findings raised
+  before any testing feedback existed.
 - **A file dropped into a brand-new project's folder before the watcher's
   first look at it starts no run by itself.** The watcher's first sight of a
   project records whatever the folder holds as the baseline, and that first
@@ -1289,12 +1278,6 @@ working claim only after its own implementation and proof land.
   the four cells printed beside it. A fresh database never holds such a row.
   Recomputing inside the migration was considered and refused: a migration that
   computes a hash has to carry the application's rules.
-- A committed row keeps the `Written down` sentence it was committed with, so a
-  row committed before any client requirements document was read still says
-  "no client requirements document has been read for this project" after one
-  arrives. Rewriting rows a new document did not affect is exactly what the
-  system must not do; closing this needs a decided rule about which cells a
-  later document may re-answer.
 - The 20-page limit binds `.pdf` only; Markdown reports no page count and none
   is invented for it.
 - A handover summary that lists requirements, in a run that never exports, is

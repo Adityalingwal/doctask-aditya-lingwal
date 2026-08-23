@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import shutil
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from app.examine.frozen_rules import RulesFileUnusable
+from app.run_logging import RUN_LOGGER_NAME
 from app.extract.answer import (
     CLIENT_REQUIREMENTS_DOCUMENT,
     DOCUMENT_WORKFLOW_ORDER,
@@ -82,9 +85,29 @@ def test_a_rule_runs_only_after_every_document_kind_it_names_was_read(
     assert markers["after_testing"].count(R4_IN_THE_PROMPT) == 1
 
 
+@pytest.fixture()
+def run_logger_left_as_found() -> Iterator[None]:
+    """Starting the application configures the run logger; put it back after.
+
+    The handler it adds holds the `sys.stdout` of the moment, and it is added
+    once and never replaced — so a test that starts the application and walks
+    away leaves every later test's run events going to a stream pytest has
+    already swapped out.
+    """
+    logger = logging.getLogger(RUN_LOGGER_NAME)
+    handlers_before = list(logger.handlers)
+    propagate_before = logger.propagate
+    level_before = logger.level
+    yield
+    logger.handlers = handlers_before
+    logger.propagate = propagate_before
+    logger.setLevel(level_before)
+
+
 def test_an_unknown_applies_when_value_stops_startup_naming_the_four_kinds(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    run_logger_left_as_found: None,
 ) -> None:
     """A broken rules file stops the application, not the first run someone starts.
 

@@ -73,7 +73,7 @@ about it, and every move keeps the quote behind it.
 
 | Status | What it means | What puts a row here |
 |---|---|---|
-| `Requested` | Nothing read so far says whether this was built or tested. The row makes no claim either way. | Only the client's own ask has been read |
+| `Requested` | The client asked for this. Nothing read so far says whether it was built or tested. | Only the client's own ask has been read |
 | `Handed over` | The provider says it is built. Nobody has tested it yet. | A handover note, with no testing report about it |
 | `Done` | Testing tried it and it worked. | A testing report that passed it |
 | `Partial` | It exists, but testing found it broken or unfinished. | A testing report that found a defect |
@@ -99,6 +99,28 @@ When a rule is broken, the system asks a question instead of changing anything.
 The question names the rule, the row, what went wrong, and the evidence. Approve
 it and the finding is attached to the row. Reject it and the finding stays in
 the run's record, off the register.
+
+A rule waits for the documents it is about. Each rule may list them under
+`applies_when`, and the rule is checked only once every kind it lists has been
+read for the project:
+
+```yaml
+  - id: R4
+    text: "Every written requirement must have a testing outcome."
+    applies_when:
+      - testing feedback
+```
+
+The four values allowed there are the four kinds of document this system reads:
+`meeting notes`, `client requirements document`, `handover summary`, `testing
+feedback`. Anything else stops the application at startup and says which rule
+named it. A rule with no `applies_when` is checked on every run.
+
+Without this, a rule about testing outcomes is checked before any testing
+report has been read, and it reports the silence as a fault on every row.
+
+Each run reports which rules actually ran, so a rule still waiting is not
+counted as one that found nothing.
 
 Editing `config/rules.yaml` is the only way to add or change a rule. The screen,
 the API and the tools can all show which rules ran, but none of them can change
@@ -294,7 +316,7 @@ files. None of it requires changing code.
 
 | File | Holds |
 |---|---|
-| `config/rules.yaml` | The rules the register is checked against — the only place a rule can be added |
+| `config/rules.yaml` | The rules the register is checked against, and the document kinds each one waits for (`applies_when`) — the only place a rule can be added |
 | `config/formats.yaml` | Which file extensions are read, and the page limit |
 | `config/model.yaml` | Which model to call, and its endpoint, retries, timeout and reasoning effort |
 | `config/projects.yaml` | The folder that the Add-project dropdown lists |
@@ -328,10 +350,14 @@ The rest of the limits:
 - **Rules about time cannot be checked.** A rule like "nothing stays blocked
   more than N days" has nothing to count from, because the register stores no
   dates from the documents.
-- **A row's `Written down` can go stale.** That cell is filled in when a
-  requirement lands on the row. A row that no requirement ever landed on keeps
-  saying "no client requirements document has been read", even after one has
-  been read that simply does not mention it.
+- **An unanswered possible match is checked as the match it asks about.** While
+  the question is open, the rules are checked against the existing row rather
+  than against the new one. If you then reject the match, the new row gets no
+  finding in that run. The next run checks it like any other row.
+- **A rule that ran before may not raise the same finding again.** A rule is
+  judged by a model, so a later run that checks the same row may or may not
+  repeat what an earlier run found. The register shows the newer answer, and
+  the History tab keeps the older one.
 - **A rule that keeps failing asks its question again on every run.** A rule is
   checked against the row as it stands right now, so no row is ever done being
   checked. The cost is the same question coming back run after run.
