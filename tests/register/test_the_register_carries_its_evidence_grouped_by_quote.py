@@ -138,3 +138,42 @@ def _register_after_a_testing_report(tmp_path: Path) -> list[dict[str, Any]]:
             finally:
                 application.stop()
     return register["rows"]
+
+
+def test_groups_of_one_moment_follow_column_order_by_their_earliest_cell() -> None:
+    """A testing quote also supporting Status sorts as column three, not four.
+
+    The citations arrive ordered by cell name, so the group's first-seen cell
+    is the alphabetical one (`status`); ordering on it would put a
+    delivery-only Status group ahead of the testing group it followed.
+    """
+    from datetime import datetime
+
+    from app.register.export_register import _evidence_of_row
+
+    one_moment = datetime(2026, 8, 23, 12, 0, 0)
+    delivery_only = {
+        "cell": "status",
+        "source_file": "handover-summary.md",
+        "place": "What was handed over",
+        "source_words": "We built it.",
+        "absence_statement": None,
+        "created_at": one_moment,
+    }
+    testing_status_half = dict(
+        delivery_only,
+        source_file="testing-feedback-12-aug.md",
+        place="What we found",
+        source_words="It worked.",
+    )
+    testing_verdict_half = dict(testing_status_half, cell="what_testing_found")
+
+    # Alphabetical arrival: status citations first, the testing cell last.
+    evidence = _evidence_of_row(
+        [delivery_only, testing_status_half, testing_verdict_half]
+    )
+
+    assert [entry["cells"] for entry in evidence] == [
+        ["What testing found", "Status"],
+        ["Status"],
+    ]

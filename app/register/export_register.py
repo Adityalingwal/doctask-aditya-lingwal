@@ -173,7 +173,9 @@ def _evidence_of_row(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
         grouped.values(),
         key=lambda entry: (
             entry["first_cited_at"],
-            CELL_NAMES.index(entry["cells"][0]),
+            # The earliest register column the group supports — the cells
+            # arrive alphabetically, so the first-seen one is not it.
+            min(CELL_NAMES.index(cell) for cell in entry["cells"]),
         ),
     )
     return [
