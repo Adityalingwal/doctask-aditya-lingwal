@@ -26,7 +26,10 @@ const droppedRequirement = {
   file: "12-march-scope.md",
   summary: "an SMS reminder before every appointment",
   quote: "the client wants a text message reminder before each appointment",
-  reason: "These words were not found in the file, so this requirement was dropped.",
+  source_line: null,
+  reason:
+    "The model said this comes from 12-march-scope.md, but those words "
+    + "are not in the file.",
 };
 
 test("a dropped quote is never shown as a file that was not read", async () => {
@@ -42,8 +45,8 @@ test("a dropped quote is never shown as a file that was not read", async () => {
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/not used/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/skipped/i);
 
   const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
   const documentCard = cards.find((text) => text.includes(documentThatWasNotRead.reason));

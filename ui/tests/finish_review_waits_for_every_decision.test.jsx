@@ -37,13 +37,18 @@ test("neither ending is offered while one decision is still unanswered", async (
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/^run/i);
   await screen.findByText(unanswered.issue);
 
-  expect(screen.queryByRole("button", { name: ADD })).toBeNull();
-  expect(screen.queryByRole("button", { name: DISCARD })).toBeNull();
-  expect(screen.getByText("Answer all 1 to finish this review.")).toBeTruthy();
+  // Item 12: the adding button is shown and disabled rather than hidden, and
+  // the waiting line carries the count — a person must be able to see what
+  // finishing looks like before they have finished. The old "Answer all N"
+  // sentence went with it (item 40).
+  expect(screen.getByRole("button", { name: ADD }).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: DISCARD }).disabled).toBe(false);
+  expect(screen.getByText(/1 decision to answer/)).toBeTruthy();
+  expect(screen.queryByText(/answer all/i)).toBeNull();
 });
 
 test("both endings are offered once the server reports every decision answered", async () => {
@@ -66,8 +71,8 @@ test("both endings are offered once the server reports every decision answered",
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/^run/i);
 
   expect(await screen.findByRole("button", { name: ADD })).toBeTruthy();
   expect(screen.getByRole("button", { name: DISCARD })).toBeTruthy();

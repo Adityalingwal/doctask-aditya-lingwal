@@ -9,6 +9,11 @@ import StageMarks from "./StageMarks.jsx";
 const RUNNING = "running";
 const NEEDS_REVIEW = "needs review";
 
+// The register's mark on the collapsed rail. The word itself is wider than a
+// 3rem rail, and turned on its side it stopped being readable at a glance;
+// one capital letter is not ambiguous above a column of run numbers (14).
+const REGISTER_MARK = "R";
+
 export default function RunColumn({
   project,
   selectedRunId,
@@ -19,33 +24,41 @@ export default function RunColumn({
   onToggleCollapse,
 }) {
   const listPane = useScrollbarWhileScrolling();
-  const openRun = project?.runs.find((run) => run.run_id === selectedRunId) ?? null;
 
   if (collapsed) {
     return (
-      <div className="flex min-h-0 flex-col items-center border-line-strong bg-paper py-3 lg:border-r">
+      <nav
+        aria-label="Runs"
+        className="flex min-h-0 flex-col items-center gap-2 border-line-strong bg-paper py-3 lg:border-r"
+      >
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label="Expand the runs column"
-          className="border border-line-strong bg-card px-2 py-1 font-mono text-xs"
+          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40"
         >
           »
         </button>
-        {openRun !== null && (
-          <p className="mt-4 font-mono text-xs text-ink-soft" title={`Run ${openRun.run_number}`}>
-            #{openRun.run_number}
-          </p>
+        {project !== null && (
+          <>
+            <RailMark
+              label={REGISTER_MARK}
+              title="Register"
+              open={registerOpen}
+              onOpen={() => onOpenRegister(project.project_id)}
+            />
+            {project.runs.map((run) => (
+              <RailMark
+                key={run.run_id}
+                label={String(run.run_number)}
+                title={`Run ${run.run_number}`}
+                open={run.run_id === selectedRunId}
+                onOpen={() => onOpenRun(run.run_id)}
+              />
+            ))}
+          </>
         )}
-        {openRun === null && registerOpen && (
-          // The collapsed rail is 3rem wide and a run's mark is two characters,
-          // so this word is the one label that cannot fit across it. Turned on
-          // its side it stays whole rather than being cut off mid-word.
-          <p className="mt-4 font-mono text-xs text-ink-soft [writing-mode:vertical-rl]">
-            Register
-          </p>
-        )}
-      </div>
+      </nav>
     );
   }
 
@@ -57,7 +70,7 @@ export default function RunColumn({
           type="button"
           onClick={onToggleCollapse}
           aria-label="Collapse the runs column"
-          className="border border-line-strong bg-card px-2 py-1 font-mono text-xs"
+          className="cursor-pointer border border-line-strong bg-card px-2 py-1 font-mono text-xs hover:bg-signal/40"
         >
           «
         </button>
@@ -96,6 +109,27 @@ export default function RunColumn({
   );
 }
 
+// The collapsed rail is navigation, not decoration: every run the expanded
+// column offers is reachable from it, and each mark says what it opens (3).
+function RailMark({ label, title, open, onOpen }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-current={open ? "page" : undefined}
+      onClick={onOpen}
+      className={`w-8 cursor-pointer border py-1 font-mono text-xs active:translate-y-px ${
+        open
+          ? "border-line-strong bg-card font-semibold text-ink"
+          : "border-transparent text-ink-soft hover:border-line-strong hover:bg-card hover:text-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 // The Register entry sits above a project's runs (section 2.3): the register
 // is one thing the project holds, not one more run. Its row count comes from
 // the same run list already shown below it — the newest run whose row_count
@@ -110,8 +144,10 @@ function RegisterRow({ open, rowCount, onOpen }) {
           clicked.preventDefault();
           onOpen();
         }}
-        className={`block border-b border-line-strong px-4 py-3 ${
-          open ? "border-l-4 border-l-ink bg-card pl-3" : "hover:bg-signal/15"
+        className={`block cursor-pointer border-b border-line-strong px-4 py-3 ${
+          open
+            ? "border-l-4 border-l-ink bg-card pl-3"
+            : "hover:bg-signal/25 active:bg-signal/40"
         }`}
       >
         <p className="m-0 flex items-baseline justify-between gap-2 font-mono text-xs font-semibold">
@@ -142,12 +178,14 @@ function RunRow({ run, open, onOpen }) {
           clicked.preventDefault();
           onOpen(run.run_id);
         }}
-        className={`block border-b border-line px-4 py-3 ${
-          open ? "border-l-4 border-l-ink bg-card pl-3" : "hover:bg-signal/15"
+        className={`block cursor-pointer border-b border-line px-4 py-3 ${
+          open
+            ? "border-l-4 border-l-ink bg-card pl-3"
+            : "hover:bg-signal/25 active:bg-signal/40"
         }`}
       >
         <p className="m-0 flex items-baseline justify-between gap-2 font-mono text-xs">
-          <span className="font-semibold">#{run.run_number}</span>
+          <span className="font-semibold">{run.run_number}</span>
           <span className="text-ink-soft">{startedOn(run.started_at)}</span>
         </p>
         <p className="m-0 mt-1.5 flex items-center gap-2 font-mono text-xs text-ink-soft">

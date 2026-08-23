@@ -12,6 +12,10 @@ import {
   serverAnswering,
 } from "./server_replies.js";
 
+// The one line of a possible-match decision that asks the question, out of
+// the several blocks the backend built the whole text from.
+const THE_QUESTION_LINE = "Is this the same ask as row 2?";
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -60,14 +64,14 @@ function screenShowing(decisions, overrides = {}) {
     },
   ]);
   vi.stubGlobal("fetch", fetching);
-  render(<ReviewScreen runId={runId} />);
+  render(<ReviewScreen projectId="" runId={runId} />);
   return fetching;
 }
 
 test("the export gate is never shown as a question with answers to give", async () => {
   screenShowing([answered, gate]);
-  await openSection(/decisions/i);
-  await screen.findByText(answered.question);
+  await openSection(/^run/i);
+  await screen.findByText(THE_QUESTION_LINE);
 
   expect(screen.queryByText(gate.question)).toBeNull();
   expect(screen.queryByText("export")).toBeNull();
@@ -75,7 +79,7 @@ test("the export gate is never shown as a question with answers to give", async 
 
 test("pressing add sends the answer that adds this run's changes to the register", async () => {
   const fetching = screenShowing([answered]);
-  await openSection(/decisions/i);
+  await openSection(/^run/i);
   fireEvent.click(await screen.findByRole("button", { name: ADD }));
 
   await waitFor(() => expect(_finishCalls(fetching)).toHaveLength(1));
@@ -86,7 +90,7 @@ test("pressing add sends the answer that adds this run's changes to the register
 
 test("pressing discard sends the answer that discards this run's changes", async () => {
   const fetching = screenShowing([answered]);
-  await openSection(/decisions/i);
+  await openSection(/^run/i);
   fireEvent.click(await screen.findByRole("button", { name: DISCARD }));
 
   await waitFor(() => expect(_finishCalls(fetching)).toHaveLength(1));

@@ -108,18 +108,34 @@
   }
 
   /* Every labelled block inside one decision card shares this label column,
-     so the values line up down the whole card. Sized to the longest label the
-     card writes — "Row NN breaks it" — rather than to whichever labels one
-     block happens to hold, which is what left the two blocks starting their
-     values at different places. */
+     so the values line up down the whole card. It carries the two answer
+     buttons as well as the cell names, which is why the column is sized to a
+     button rather than to a word: a label and the sentence beside it start on
+     the same line however long either of them runs (item 32). */
   .decision-lines {
     display: grid;
     grid-template-columns: 10rem 1fr;
     column-gap: 1.25rem;
   }
 
-  /* The name of a section, which should carry as much weight as the numbers
-     under it. */
+  /* The Skipped tab's file lines: name, dash, reason. Giving the reason its
+     own column means a long one wraps under itself rather than under the file
+     name, so a group reads down one edge (item 35). */
+  .skipped-line {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) auto 1fr;
+    column-gap: 0.75rem;
+  }
+
+  /* The folder dropdown keeps this screen's square border and mono type, so
+     it draws its own arrow once the browser's rounded control is taken away
+     (item 1). Ink, not the accent — it points, it does not signal. */
+  .select-caret {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M0 0h10L5 7z' fill='%230f0f0e'/%3E%3C/svg%3E");
+    background-size: 10px 7px;
+  }
+
+  /* The name of a section, set to carry the weight of a heading. */
   .section-name {
     font-family: var(--font-mono);
     font-size: 13px;
@@ -127,13 +143,6 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--color-ink);
-  }
-
-  .section-number {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--color-ink-soft);
   }
 
   .signal-slide {

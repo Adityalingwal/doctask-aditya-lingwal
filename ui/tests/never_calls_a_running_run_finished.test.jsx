@@ -28,8 +28,8 @@ test("a run the server reports running is not shown as finished anywhere on the 
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  const stages = await screen.findByRole("region", { name: /stages/i });
+  render(<ReviewScreen projectId="" runId={runId} />);
+  const stages = await screen.findByRole("region", { name: /^run$/i });
 
   // Screen 3: the identifier lines above the strip — run, project, status —
   // are gone, so the run's own status is not printed as text here at all;
@@ -59,7 +59,7 @@ test("the project's register panel says nothing has been added yet rather than s
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
+  render(<ReviewScreen projectId="" runId={runId} />);
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
   const register = await screen.findByRole("region", { name: /register/i });
 

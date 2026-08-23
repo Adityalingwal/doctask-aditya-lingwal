@@ -51,7 +51,7 @@ test("never_shows_a_register_before_a_run_has_added_to_it", async () => {
     ]),
   );
 
-  render(<ReviewScreen runId="" />);
+  render(<ReviewScreen projectId="" runId="" />);
 
   fireEvent.click(await screen.findByText(neverExported.name));
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));

@@ -17,6 +17,10 @@ import {
   serverAnswering,
 } from "./server_replies.js";
 
+// The one line of a possible-match decision that asks the question, out of
+// the several blocks the backend built the whole text from.
+const THE_QUESTION_LINE = "Is this the same ask as row 2?";
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -58,16 +62,16 @@ test("never_shows_a_runs_decisions_beside_the_project_register", async () => {
     ]),
   );
 
-  render(<ReviewScreen runId={runId} />);
-  await openSection(/decisions/i);
+  render(<ReviewScreen projectId="" runId={runId} />);
+  await openSection(/^run/i);
   await waitFor(() => {
-    expect(screen.getByText(/Applicant document upload/)).toBeTruthy();
+    expect(screen.getByText(THE_QUESTION_LINE)).toBeTruthy();
   });
 
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
 
   await waitFor(() => {
-    expect(screen.queryByText(/Applicant document upload/)).toBeNull();
+    expect(screen.queryByText(THE_QUESTION_LINE)).toBeNull();
   });
   expect(screen.queryByRole("button", { name: /approve/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /finish review/i })).toBeNull();

@@ -60,11 +60,13 @@ test("the_decisions_tab_counts_only_a_run_the_server_says_is_at_review", async (
     };
   });
 
-  render(<ReviewScreen runId={runId} />);
+  render(<ReviewScreen projectId="" runId={runId} />);
 
-  const tab = await screen.findByRole("tab", { name: /decisions/i });
+  // The decisions live on the Run tab since item 12, and it is that tab's
+  // badge which must not offer work the server would refuse.
+  const tab = await screen.findByRole("tab", { name: /^run/i });
   await waitFor(() => {
-    expect(screen.getByRole("tab", { name: /stages/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /skipped/i })).toBeTruthy();
   });
   expect(tab.textContent).not.toContain("3");
 });

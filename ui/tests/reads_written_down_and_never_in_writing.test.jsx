@@ -34,7 +34,7 @@ async function openRegister(exported) {
     ]),
   );
 
-  render(<ReviewScreen runId="" />);
+  render(<ReviewScreen projectId="" runId="" />);
   fireEvent.click(await screen.findByText(exportedProject(1).name));
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
   return screen.findByRole("region", { name: /register/i });
@@ -58,7 +58,7 @@ test("the register shows the four cells and no heading for a cell that left", as
     within(register)
       .getAllByRole("columnheader")
       .map((heading) => heading.textContent),
-  ).toEqual(["#", "What was asked", "Written down", "What testing found", "Status"]);
+  ).toEqual(["Row", "What was asked", "Written down", "What testing found", "Status"]);
   for (const gone of ["Blocked on", "First seen", "Last moved"]) {
     expect(register.textContent).not.toContain(gone);
   }

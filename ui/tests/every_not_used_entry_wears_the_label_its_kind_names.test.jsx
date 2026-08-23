@@ -67,54 +67,59 @@ function cardsFor(entries) {
       },
     ]),
   );
-  render(<ReviewScreen runId={runId} />);
+  render(<ReviewScreen projectId="" runId={runId} />);
 }
 
-test("every not-used entry wears the label its kind names", async () => {
-  cardsFor([readBefore, notRead, notAttached]);
-  await openSection(/not used/i);
+// The entries wear their label as the heading of the group they sit in
+// (item 35), so what an entry is labelled is the heading above it.
+async function groups() {
+  const tab = await screen.findByRole("region", { name: /skipped/i });
+  return [...tab.querySelectorAll("section")].map((group) => ({
+    label: group.querySelector("h3")?.textContent ?? null,
+    entries: [...group.querySelectorAll("li")].map((item) => item.textContent),
+  }));
+}
 
-  const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
-  const cardFor = (entry) => cards.find((text) => text.includes(entry.file));
+async function groupHolding(text) {
+  return (await groups()).find((group) =>
+    group.entries.some((entry) => entry.includes(text)),
+  );
+}
+
+test("every skipped entry wears the label its kind names", async () => {
+  cardsFor([readBefore, notRead, notAttached]);
+  await openSection(/skipped/i);
 
   // The label is what tells a file an earlier run had already read apart from
   // a requirement that fell out of the register.
-  expect(cardFor(readBefore)).toContain("Read before");
-  expect(cardFor(notRead)).toContain("Not read");
-  expect(cardFor(notAttached)).toContain("Not attached to any row");
-  expect(cardFor(notRead)).not.toContain("Read before");
-  expect(cardFor(notAttached)).toContain(notAttached.summary);
+  expect((await groupHolding(readBefore.file)).label).toBe("Read before");
+  expect((await groupHolding(notRead.file)).label).toBe("Not read");
+  const dropped = await groupHolding(notAttached.summary);
+  expect(dropped.label).toBe("Not attached to any row");
+  expect(dropped.entries.join("")).toContain(notAttached.summary);
 });
 
 test("an entry whose kind the screen does not know wears no label at all", async () => {
   cardsFor([kindThisScreenDoesNotKnow]);
-  await openSection(/not used/i);
+  await openSection(/skipped/i);
 
-  const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
-  const card = cards.find((text) => text.includes(kindThisScreenDoesNotKnow.reason));
-
-  // A wrong label is worse than none: the card still says the file and the
+  // A wrong label is worse than none: the entry still says the file and the
   // reason, and claims nothing about which kind of entry this is.
-  expect(card).toBeTruthy();
-  expect(card).toContain(kindThisScreenDoesNotKnow.file);
-  expect(card).toContain(kindThisScreenDoesNotKnow.reason);
-  expect(card).not.toContain("Already read");
-  expect(card).not.toContain("Not read");
-  expect(card).not.toContain("Dropped");
+  const group = await groupHolding(kindThisScreenDoesNotKnow.reason);
+  expect(group).toBeTruthy();
+  expect(group.label).toBeNull();
+  expect(group.entries.join("")).toContain(kindThisScreenDoesNotKnow.file);
+  expect(group.entries.join("")).toContain(kindThisScreenDoesNotKnow.reason);
 });
 
 test("a kind that collides with a built-in object key wears no label and does not break the screen", async () => {
   cardsFor([kindNamedLikeAnObjectBuiltIn, kindNamedLikeThePrototypeKey]);
-  await openSection(/not used/i);
-
-  const cards = (await screen.findAllByRole("listitem")).map((item) => item.textContent);
+  await openSection(/skipped/i);
 
   for (const entry of [kindNamedLikeAnObjectBuiltIn, kindNamedLikeThePrototypeKey]) {
-    const card = cards.find((text) => text.includes(entry.file));
-    expect(card).toBeTruthy();
-    expect(card).toContain(entry.reason);
-    expect(card).not.toContain("Already read");
-    expect(card).not.toContain("Not read");
-    expect(card).not.toContain("Dropped");
+    const group = await groupHolding(entry.reason);
+    expect(group).toBeTruthy();
+    expect(group.label).toBeNull();
+    expect(group.entries.join("")).toContain(entry.reason);
   }
 });
