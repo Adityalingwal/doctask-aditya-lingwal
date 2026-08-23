@@ -49,20 +49,25 @@ HANDOVER_DATE = "30 March 2026"
 
 REQUESTED = "Requested"
 
-# One sentence per observation, written by Match itself. Two observations
-# landing on one row raise one decision, so both sentences have to survive it.
-VAGUE_OBSERVATION_QUESTION = (
-    f"Testing feedback ({TESTING_FILE}) says: 'something the tester was vague "
-    f"about'. Is this about row #1 — {ASKED}?"
+# The row block every observation-match decision opens with, as the register's
+# own table shows the row at the moment the question is raised.
+ROW_BLOCK = (
+    "Register row 1\n"
+    f"What was asked: {ASKED}\n"
+    "Written down: Not known yet\n"
+    "What testing found: Not known yet\n"
+    "Status: Requested"
 )
-FIRST_OBSERVATION_QUESTION = (
-    f"Testing feedback ({TESTING_FILE}) says: 'the notification reaches the "
-    f"team'. Is this about row #1 — {ASKED}?"
-)
-SECOND_OBSERVATION_QUESTION = (
-    f"Testing feedback ({TESTING_FILE}) says: 'the notification names the "
-    f"visitor'. Is this about row #1 — {ASKED}?"
-)
+
+
+def _quote_block(quote: str) -> str:
+    return f'{TESTING_FILE}, under "Notes", says:\n"{quote}"'
+
+
+def _observation_question(quote_blocks: list[str], changes: str) -> str:
+    return "\n\n".join(
+        [ROW_BLOCK, *quote_blocks, "Is this about row 1?", changes]
+    )
 
 
 def _write_document(folder: Path, name: str, date: str, line: str) -> None:
@@ -430,7 +435,6 @@ def test_an_uncertain_observation_to_row_link_is_flagged_and_never_settled(
                     "observation_index": 0,
                     "outcome": "possible match",
                     "row_number": 1,
-                    "question": VAGUE_OBSERVATION_QUESTION,
                 }
             ]
         },
@@ -451,8 +455,12 @@ def test_an_uncertain_observation_to_row_link_is_flagged_and_never_settled(
         if decision["kind"] == "observation match"
     ]
     assert len(asked) == 1
-    assert asked[0]["question"] == VAGUE_OBSERVATION_QUESTION
-    assert "row #1" in asked[0]["question"]
+    assert asked[0]["question"] == _observation_question(
+        [_quote_block(TESTING_QUOTE)],
+        "Approve → Row 1 changes: What testing found: something the tester "
+        "was vague about  Status: Done\n"
+        "Reject → Row 1 stays as it is.",
+    )
     assert finished.rows[1]["status"] == REQUESTED
     # The rejected link left the row citing nothing from that document, so the
     # report counts as read and silent about this row.
@@ -638,13 +646,14 @@ def _fingerprints(database_url: str, project_id: str) -> dict[int, str]:
     return {row["row_number"]: row["fingerprint"] for row in rows}
 
 
-def test_two_observations_on_one_row_stack_their_questions_verbatim(
+def test_two_observations_on_one_row_become_two_quote_blocks_under_one_question(
     tmp_path: Path,
 ) -> None:
-    """One decision covers both observations, so it shows both sentences.
+    """One decision covers both observations, so it shows both quotes.
 
-    Joining them into a new sentence would put words in front of the person
-    that Match never wrote, and an audit could no longer show what was read.
+    Stitching them into one paragraph put words in front of a person that no
+    document contains (item 42); each observation keeps its own block under
+    the one question the decision asks.
     """
     finished = _run_once(
         tmp_path,
@@ -669,13 +678,11 @@ def test_two_observations_on_one_row_stack_their_questions_verbatim(
                         "observation_index": 0,
                         "outcome": "possible match",
                         "row_number": 1,
-                        "question": FIRST_OBSERVATION_QUESTION,
                     },
                     {
                         "observation_index": 1,
                         "outcome": "possible match",
                         "row_number": 1,
-                        "question": SECOND_OBSERVATION_QUESTION,
                     },
                 ]
             },
@@ -689,9 +696,13 @@ def test_two_observations_on_one_row_stack_their_questions_verbatim(
         if decision["kind"] == "observation match"
     ]
     assert len(asked) == 1
-    assert asked[0]["question"] == (
-        f"{FIRST_OBSERVATION_QUESTION}\n\n{SECOND_OBSERVATION_QUESTION}"
+    assert asked[0]["question"] == _observation_question(
+        [_quote_block(TESTING_QUOTE), _quote_block(TESTING_QUOTE)],
+        "Approve → Row 1 changes: What testing found: the notification "
+        "reaches the team the notification names the visitor  Status: Done\n"
+        "Reject → Row 1 stays as it is.",
     )
+    assert len(asked[0]["quotes"]) == 2
 
 
 def test_a_handover_from_an_earlier_run_still_opposes_a_later_absence_report(

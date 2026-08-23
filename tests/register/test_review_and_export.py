@@ -264,5 +264,8 @@ def test_requirement_whose_quote_is_not_in_the_document_never_reaches_a_row(
     assert dropped[0]["file"] == SOURCE_FILE
     assert dropped[0]["quote"] == paraphrased
     assert dropped[0]["reason"] == (
-        "These words were not found in the file, so this requirement was dropped."
+        f"The model said this comes from {SOURCE_FILE}, but those words are "
+        "not in the file."
     )
+    # There is no place to name, so none is invented (S12).
+    assert dropped[0]["source_line"] is None

@@ -23,7 +23,7 @@ from tests.documents.register_documents import (
     write_meeting_note,
 )
 from tests.examine.answers import examine_answer, one_finding
-from tests.examine.rules_files import rules_that_always_apply
+from tests.examine.rules_files import RULE_TEXTS_THAT_ALWAYS_APPLY, rules_that_always_apply
 from tests.runs.application import (
     ApplicationProcess,
     approve_every_decision_and_finish_review,
@@ -170,7 +170,12 @@ def test_an_approved_finding_shows_as_a_finding_attached_entry(tmp_path: Path) -
 
     attached = _of_kind(entries, "finding attached")
     assert len(attached) == 1
-    assert attached[0]["detail"] == f"{finding['rule_id']} — {finding['issue']}"
+    # The rule in its own words, and never its id: the person reading the
+    # history has never seen the rules file (item 48).
+    assert attached[0]["detail"] == (
+        f"Finding: {RULE_TEXTS_THAT_ALWAYS_APPLY[finding['rule_id']]}"
+    )
+    assert finding["rule_id"] not in attached[0]["detail"]
     assert attached[0]["row_number"] == 1
     assert attached[0]["run_number"] == 1
     # An attachment moved no cell and came from no document, so it claims
@@ -238,7 +243,6 @@ def test_two_findings_attached_to_one_row_in_one_run_keep_one_order(
         rule_id="R4",
         issue="No testing outcome has been read for this requirement.",
         evidence="Not known yet",
-        question="Row 1 has no testing outcome read yet. Keep this finding?",
     )
     with _project(tmp_path, examine_answer([first, second])) as (
         application,
@@ -255,8 +259,8 @@ def test_two_findings_attached_to_one_row_in_one_run_keep_one_order(
     attached = _of_kind(reads[0], "finding attached")
     assert len(attached) == 2
     assert {entry["detail"] for entry in attached} == {
-        f"{first['rule_id']} — {first['issue']}",
-        f"{second['rule_id']} — {second['issue']}",
+        f"Finding: {RULE_TEXTS_THAT_ALWAYS_APPLY[first['rule_id']]}",
+        f"Finding: {RULE_TEXTS_THAT_ALWAYS_APPLY[second['rule_id']]}",
     }
     assert reads[1] == reads[0]
     assert reads[2] == reads[0]

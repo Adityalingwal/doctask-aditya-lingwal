@@ -117,11 +117,7 @@ async def _record_findings_twice() -> dict[str, Any]:
                             "cells": {"what_was_asked": row["what_was_asked"]},
                         },
                         "No client requirements document states this in writing.",
-                        f"Row #{row['row_number']} cites a meeting note only.",
-                        "Anything built must have a written requirement. Row "
-                        f"#{row['row_number']} — {row['what_was_asked']} — "
-                        "rests on a meeting note alone. Attach this finding "
-                        f"to row #{row['row_number']}?",
+                        "Not mentioned",
                     )
                 ]
                 await record_findings(connection, run_id, found)
@@ -240,7 +236,11 @@ def _dropped_requirement(summary: str, quote: str) -> dict[str, str]:
         "file": "shared-notes.md",
         "summary": summary,
         "quote": quote,
-        "reason": "These words were not found in the file, so this requirement was dropped.",
+        "source_line": None,
+        "reason": (
+            "The model said this comes from shared-notes.md, but those words "
+            "are not in the file."
+        ),
     }
 
 
@@ -257,15 +257,8 @@ async def _propose_rows_twice() -> dict[str, Any]:
                 project_id, run_id = await _project_with_a_running_run(connection)
                 await _insert_committed_row(connection, project_id, run_id)
                 outcomes = {
-                    0: MatchSettlement(
-                        POSSIBLE_MATCH,
-                        COMMITTED_ROW_NUMBER,
-                        None,
-                        "This ask was raised in meeting notes — row "
-                        f"#{COMMITTED_ROW_NUMBER}. It is stated again in "
-                        "doc-1.md. Is this the same ask?",
-                    ),
-                    1: MatchSettlement(NEW_ROW, None, None, None),
+                    0: MatchSettlement(POSSIBLE_MATCH, COMMITTED_ROW_NUMBER, None),
+                    1: MatchSettlement(NEW_ROW, None, None),
                 }
                 await propose_rows(
                     connection, run_id, project_id, requirements, outcomes

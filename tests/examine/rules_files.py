@@ -26,6 +26,20 @@ rules:
 """
 
 RULE_IDS_THAT_ALWAYS_APPLY = ("R1", "R2", "R4", "R5")
+# The same four rules by the words a person actually meets — on a finding
+# card, in the history and in the export, none of which ever shows an id.
+RULE_TEXTS_THAT_ALWAYS_APPLY = {
+    "R1": (
+        "Anything built must have a written requirement; a verbal mention is "
+        "not enough."
+    ),
+    "R2": (
+        "Testing feedback asking for new behaviour is a change request, not a "
+        "bug."
+    ),
+    "R4": "Every written requirement must have a testing outcome.",
+    "R5": "No register row is 'Done' without a testing outcome.",
+}
 
 
 def rules_that_always_apply(folder: Path) -> Path:
