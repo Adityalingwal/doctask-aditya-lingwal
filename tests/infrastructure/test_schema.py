@@ -134,7 +134,7 @@ REGISTER_ROW_STATUSES = (
     "Not delivered",
     "Handed over",
     "Disputed",
-    "Nothing said yet",
+    "Requested",
 )
 
 
@@ -257,7 +257,7 @@ def _insert_register_row(
     connection: Connection,
     project_id: UUID | None,
     run_id: UUID,
-    status: str = "Nothing said yet",
+    status: str = "Requested",
     row_number: int = 1,
     on_the_seven_cell_shape: bool = False,
 ) -> UUID:
@@ -484,7 +484,7 @@ def test_audit_change_requires_one_existing_run(
                     "id": uuid4(),
                     "register_row_id": register_row_id,
                     "cell_name": "status",
-                    "old_value": "Nothing said yet",
+                    "old_value": "Requested",
                     "new_value": "Done",
                     "run_id": audit_run_id,
                     "source_document_id": document_id,
@@ -641,12 +641,12 @@ def test_register_row_refuses_status_outside_the_locked_set(
             )
 
 
-def test_register_row_takes_nothing_said_yet_and_refuses_the_name_it_replaced(
+def test_register_row_takes_requested_and_refuses_the_name_it_replaced(
     database_connection: Connection,
 ) -> None:
-    """20260817_0018 renamed the value, so the old spelling is now outside the set.
+    """20260823_0022 renamed the value, so the old spelling is now outside the set.
 
-    A database left holding `No evidence yet` would show a status the register
+    A database left holding `Nothing said yet` would show a status the register
     no longer defines, which is why the rename rewrites the stored rows rather
     than only widening the check.
     """
@@ -656,7 +656,7 @@ def test_register_row_takes_nothing_said_yet_and_refuses_the_name_it_replaced(
         database_connection,
         accepting_project_id,
         accepting_run_id,
-        status="Nothing said yet",
+        status="Requested",
     )
 
     refusing_project_id = _insert_project(database_connection)
@@ -667,7 +667,7 @@ def test_register_row_takes_nothing_said_yet_and_refuses_the_name_it_replaced(
                 database_connection,
                 refusing_project_id,
                 refusing_run_id,
-                status="No evidence yet",
+                status="Nothing said yet",
             )
 
 

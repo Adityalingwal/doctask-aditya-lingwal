@@ -39,7 +39,7 @@ REQUIREMENT = "an email to the operations team on intake form submit"
 TESTING_SUMMARY = "the notification reaches the operations team"
 TESTING_QUOTE = "The email notification reaches the operations team every time."
 TESTING_DATE = "25 March 2026"
-STATUS_BEFORE_TESTING = "Nothing said yet"
+STATUS_BEFORE_TESTING = "Requested"
 STATUS_AFTER_PASSED_TESTING = "Done"
 
 

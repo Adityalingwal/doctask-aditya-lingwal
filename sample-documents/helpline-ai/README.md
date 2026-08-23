@@ -30,7 +30,7 @@ Hindi/English support.
 | Transcripts dashboard | Partial | defect on delivered work |
 | Human escalation | Disputed | handover says built, testing says absent |
 | Weekly analytics report | Handed over | delivered, testing silent |
-| Hindi and English | Nothing said yet | written down, no delivery or testing evidence |
+| Hindi and English | Requested | written down, no delivery or testing evidence |
 
 ## Which rule each hook feeds
 

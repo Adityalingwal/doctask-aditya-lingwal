@@ -138,7 +138,7 @@ def test_approved_run_exports_the_register(tmp_path: Path) -> None:
         engine.dispose()
 
     assert [row["cells"]["what_was_asked"] for row in register["rows"]] == [REQUIREMENT]
-    assert register["rows"][0]["cells"]["status"] == "Nothing said yet"
+    assert register["rows"][0]["cells"]["status"] == "Requested"
     what_was_asked_citation = next(
         citation
         for citation in register["rows"][0]["citations"]

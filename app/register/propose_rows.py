@@ -12,7 +12,7 @@ from app.register.cells import (
     IN_WRITING_NOT_FOUND_IN,
     IN_WRITING_NOT_KNOWN_YET,
     IN_WRITING_WRITTEN_IN_OPENING,
-    STATUS_NOTHING_SAID_YET,
+    STATUS_REQUESTED,
     TESTING_NOT_KNOWN_YET,
     WHAT_WAS_ASKED,
 )
@@ -264,7 +264,7 @@ async def _insert_proposed_row(
             stated_the_ask["summary"],
             in_writing,
             TESTING_NOT_KNOWN_YET,
-            STATUS_NOTHING_SAID_YET,
+            STATUS_REQUESTED,
             UNSET_FINGERPRINT,
             row_number,
             run_id,

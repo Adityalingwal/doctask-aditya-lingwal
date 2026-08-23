@@ -26,7 +26,7 @@ COLUMN_HEADINGS = {
     STATUS: "Status",
 }
 
-STATUS_NOTHING_SAID_YET = "Nothing said yet"
+STATUS_REQUESTED = "Requested"
 STATUS_HANDED_OVER = "Handed over"
 STATUS_DONE = "Done"
 STATUS_PARTIAL = "Partial"

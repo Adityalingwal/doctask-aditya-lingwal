@@ -145,7 +145,7 @@ export function historyReply(overrides = {}) {
         kind: "cell change",
         row_number: 1,
         cell: "status",
-        old_value: "Nothing said yet",
+        old_value: "Requested",
         new_value: "Done",
         changed_at: "2026-03-27T09:30:00+00:00",
         run_number: 2,

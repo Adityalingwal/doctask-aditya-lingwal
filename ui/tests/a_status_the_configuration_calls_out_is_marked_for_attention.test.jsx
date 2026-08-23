@@ -17,11 +17,11 @@ afterEach(() => {
 // The configuration names the statuses that deserve the caution colour. The
 // register's starting status is one of them; a status the configuration does
 // not name is shown plainly. Locked by the finding on the 2026-08-17 rename:
-// the configuration still said "No evidence yet" after the register started
-// saying "Nothing said yet", and no test caught the chip losing its colour.
+// the configuration kept the status word the register had stopped using, and
+// no test caught the chip losing its colour.
 test("the starting status is marked for attention and a settled one is not", async () => {
   const exported = registerReply();
-  exported.rows[0].cells.status = "Nothing said yet";
+  exported.rows[0].cells.status = "Requested";
   const run = { ...projectReply().runs[0], row_count: exported.rows.length };
   const project = projectReply({ runs: [run] });
   vi.stubGlobal(
@@ -41,6 +41,6 @@ test("the starting status is marked for attention and a settled one is not", asy
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
   const register = await screen.findByRole("region", { name: /register/i });
 
-  const marked = within(register).getByText("Nothing said yet");
+  const marked = within(register).getByText("Requested");
   expect(marked.className).toContain("border-caution");
 });

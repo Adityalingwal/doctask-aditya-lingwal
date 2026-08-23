@@ -1,4 +1,4 @@
 {
   "poll_interval_ms": 3000,
-  "attention_statuses": ["Nothing said yet"]
+  "attention_statuses": ["Requested"]
 }

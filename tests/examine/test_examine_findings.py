@@ -526,7 +526,7 @@ async def _insert_committed_row(
         "INSERT INTO register_rows (id, project_id, what_was_asked, in_writing, "
         "what_testing_found, status, "
         "fingerprint, row_number, proposed_by_run_id, is_committed) VALUES "
-        "(%s, %s, %s, 'Yes', 'Not known yet', 'Nothing said yet', %s, 1, %s, true)",
+        "(%s, %s, %s, 'Yes', 'Not known yet', 'Requested', %s, 1, %s, true)",
         (row_id, project_id, REQUIREMENT, "fingerprint-before-examine", run_id),
     )
     await connection.execute(

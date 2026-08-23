@@ -395,54 +395,6 @@ written first and seen failing on `DID NOT RAISE`
 twin). After the repair the Python suite printed **216 passed** and the
 front-end suite was not re-run — no front-end file changed in the repair.
 
-### The status `No evidence yet` becomes `Nothing said yet` (branch `rename-status-nothing-said-yet`)
-
-One rename, from `main` at `13e1eca`. The value, the constant
-`STATUS_NO_EVIDENCE_YET` (now `STATUS_NOTHING_SAID_YET`), its two use sites, the
-literals in nine test files, `DECISIONS.md`, `README.md`, and a new migration
-`20260817_0018`. The dead `Blocker` entry left `DECISIONS.md`'s locked
-vocabulary in the same work. The superseded wording, the rejected
-alternatives and the reasoning for both are in `DECISIONS.md`'s Git history.
-
-**Test-first, and the baseline failures were recorded before the rename.**
-`test_a_row_nothing_has_spoken_about_starts_at_nothing_said_yet` failed on
-`main` with `AssertionError: assert 'No evidence yet' == 'Nothing said yet'`,
-and `test_register_row_takes_nothing_said_yet_and_refuses_the_name_it_replaced`
-failed with a `CheckViolation` on `ck_register_rows_status` — both real
-assertions rather than import errors. After the rename: **202 Python tests
-passed** (200 before, plus these two) and **46 front-end tests across 30
-files**, unchanged because no front-end source was touched.
-
-**Migration evidence, driven by hand against a real database.**
-`pg_get_constraintdef` and `pg_indexes` were read at `20260817_0017` first:
-`ck_register_rows_status` is the only check constraint naming a status, and all
-four indexes on `register_rows`, `citations` and `audit` are plain btree with no
-predicate, so no index names the value. Two committed rows were seeded, one
-`No evidence yet` and one `Handed over`. `alembic upgrade head` left row 1
-reading `Nothing said yet` and row 2 untouched, with the constraint reading
-`Done, Partial, Not delivered, Handed over, Disputed, Nothing said yet`.
-`alembic downgrade 20260817_0017` restored both the old value and the old
-constraint exactly, and upgrading again reached the same state.
-
-**`tests/infrastructure/test_four_cell_migration.py` deliberately still spells
-`No evidence yet`.** Its `STATUSES_BEFORE` names the check constraint as it
-stood at `20260816_0016`, where the rows are seeded before the narrowing runs;
-rewriting it would make the seed violate that revision's own constraint.
-
-**Codex's three findings repaired in the foreground, on the same branch, after
-Aditya decided all three.** `ui/config/screen.json` marks `Nothing said yet`
-again — with a new test written first and seen failing on the assertion
-(`a_status_the_configuration_calls_out_is_marked_for_attention.test.jsx`);
-`TASK.md`'s vocabulary list no longer names `blocker`; and
-`ui/demo/serve_demo_runs.js` emits the renamed status. The demo file's
-`what_testing_found: "No evidence yet."` lines predate this work — the real
-cell sentence there has been "Not known yet — …" since before the rename — and
-are left as part of the already-recorded stale-demo limitation. After the
-repairs the front-end suite printed **47 passed across 31 files** in the
-foreground; the Python suite was not re-run for them — the repairs touch no
-`.py` file — and stands at the **202 passed** printed independently in the
-foreground before the repairs.
-
 ### The register becomes four cells (branch `register-becomes-four-cells`)
 
 Eight parts, one commit each, from `main` at `85e97bb`. Baseline counts printed
@@ -1460,7 +1412,7 @@ configures twice. Before the change an INFO run event printed nothing
 
 | Evidence | Last confirmed | Result / boundary |
 |---|---|---|
-| The live model run, staged by hand | 2026-08-19, `main` at `7720623` | Three drives on the Helpline AI corpus, `openai/gpt-5.6-luna` and `openai/gpt-5.6-terra` at `reasoning_effort: high`. Each reached **all seven expected statuses**, including `Disputed` on the human-escalation row, whose audit trail reads `Nothing said yet` → `Handed over` → `Disputed` across three separate runs — the cross-batch conflict PR #38 fixed, confirmed on live data rather than in tests alone. Luna raised the written-requirement finding on that row and Terra never did; the two agreed on every status. The change-request rule raised no finding in any drive: the SMS ask is reported as a dropped observation, because no row traces it. **A merged fix is not live until the application process restarts** — the first drive returned six of seven against modules the container had imported before PR #38 reached disk |
+| The live model run, staged by hand | 2026-08-19, `main` at `7720623` | Three drives on the Helpline AI corpus, `openai/gpt-5.6-luna` and `openai/gpt-5.6-terra` at `reasoning_effort: high`. Each reached **all seven expected statuses**, including `Disputed` on the human-escalation row, whose audit trail reads `Nothing said yet` → `Handed over` → `Disputed` across three separate runs (that first status is the wording of the day; migration `20260823_0022` renamed it `Requested` on the rows, and an audit entry already written keeps the words it was written with) — the cross-batch conflict PR #38 fixed, confirmed on live data rather than in tests alone. Luna raised the written-requirement finding on that row and Terra never did; the two agreed on every status. The change-request rule raised no finding in any drive: the SMS ask is reported as a dropped observation, because no row traces it. **A merged fix is not live until the application process restarts** — the first drive returned six of seven against modules the container had imported before PR #38 reached disk |
 | `docker compose -p helplinelive exec -T app pytest` | 2026-08-20, `main` at `69ecaec` | **253 passed**, real PostgreSQL, no live key, run inside the live stack |
 | `npm --prefix ui test` | 2026-08-20, `main` at `69ecaec` | **66 passed across 38 files**, no live key. The baseline printed 63 across 36; the three new tests cover the read-only wording and the decision card's shared label column, and all three fail at the branch point |
 | `docker compose -p brief5live run --rm app pytest` | 2026-08-18, `register-read-live` branch | **235 passed**, real PostgreSQL, no live key. The baseline at `f6aa015` printed 227; the eight new tests are the two read-once tests, the four live-register tests and the two both-doors register tests |

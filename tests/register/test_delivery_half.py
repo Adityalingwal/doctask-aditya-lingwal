@@ -47,7 +47,7 @@ WRITTEN_DATE = "12 March 2026"
 TESTING_DATE = "25 March 2026"
 HANDOVER_DATE = "30 March 2026"
 
-NOTHING_SAID_YET = "Nothing said yet"
+REQUESTED = "Requested"
 
 # One sentence per observation, written by Match itself. Two observations
 # landing on one row raise one decision, so both sentences have to survive it.
@@ -304,7 +304,7 @@ def test_a_change_request_never_moves_the_status(tmp_path: Path) -> None:
 
     # A new ask arriving during testing is not a verdict on the work. Moving
     # the status here would make the register claim the client asked earlier.
-    assert finished.rows[1]["status"] == NOTHING_SAID_YET
+    assert finished.rows[1]["status"] == REQUESTED
     assert finished.rows[1]["what_testing_found"] == "the team wants a daily digest too"
 
 
@@ -332,9 +332,9 @@ def test_a_row_nobody_has_looked_at_stays_no_evidence_yet_with_no_citation(
 
     assert finished.rows[1]["status"] == "Done"
     # Nothing read said anything about the search row, so it claims nothing.
-    assert finished.rows[2]["status"] == NOTHING_SAID_YET
+    assert finished.rows[2]["status"] == REQUESTED
     assert finished.rows[2]["what_testing_found"].startswith("Not known yet")
-    # `Nothing said yet` names no document, so nothing is cited behind it.
+    # `Requested` names no document, so nothing is cited behind it.
     # `Not delivered` is the opposite claim and always carries a citation.
     assert _citations_on(finished.export, 2, "status") == []
 
@@ -451,7 +451,7 @@ def test_an_uncertain_observation_to_row_link_is_flagged_and_never_settled(
     assert len(asked) == 1
     assert asked[0]["question"] == VAGUE_OBSERVATION_QUESTION
     assert "row #1" in asked[0]["question"]
-    assert finished.rows[1]["status"] == NOTHING_SAID_YET
+    assert finished.rows[1]["status"] == REQUESTED
     assert finished.rows[1]["what_testing_found"].startswith("Not known yet")
 
 
@@ -506,7 +506,7 @@ def test_not_delivered_still_needs_a_document_that_looked_and_did_not_find_it(
 
     # Silence is not a claim: no handover said this was delivered, so testing
     # reporting it absent contradicts nothing. `Not delivered` is a positive
-    # claim, so unlike `Nothing said yet` it names the document that made it.
+    # claim, so unlike `Requested` it names the document that made it.
     assert finished.rows[1]["status"] == "Not delivered"
     assert [
         citation["source_file"]
@@ -547,13 +547,13 @@ def test_a_cell_moved_by_an_observation_writes_its_audit_entry_and_moves_the_fin
     tmp_path: Path,
 ) -> None:
     # Two runs on purpose: a row created and moved in one run never publicly
-    # held "Nothing said yet", so only a second run exercises the move against
+    # held "Requested", so only a second run exercises the move against
     # a row that is already committed — the branch this test exists for.
     fingerprints, audit = _committed_row_then_moved(tmp_path)
 
     before, after = fingerprints
     assert before != after
-    assert audit["status"] == (NOTHING_SAID_YET, "Done")
+    assert audit["status"] == (REQUESTED, "Done")
     assert audit["what_testing_found"][0].startswith("Not known yet")
     assert audit["what_testing_found"][1] == "the notification reaches the team"
 

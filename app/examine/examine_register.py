@@ -75,7 +75,7 @@ Row given to you:
   in_writing: "Yes — written in client-requirements-v2.md."
   what_testing_found: "Not known yet — no testing outcome has been
                        read for this requirement."
-  status: "Nothing said yet"
+  status: "Requested"
 
 Your finding:
   rule_id: "R4"
@@ -126,7 +126,7 @@ Row given to you:
   in_writing: "Not found in client-requirements-v2.md."
   what_testing_found: "Not known yet — no testing outcome has been
                        read for this requirement."
-  status: "Nothing said yet"
+  status: "Requested"
 
 No finding. That rule is about work that was built. Nothing here says
 this was built — no handover claimed it and no testing saw it. "Not
