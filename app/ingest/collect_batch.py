@@ -8,11 +8,13 @@ from uuid import UUID, uuid4
 
 from psycopg import AsyncConnection
 
-from app.extract.answer import UNRELATED_DOCUMENT
+from app.ingest.read_once import (
+    READ_BY_THE_PROJECT,
+    read_by_the_project_parameters,
+)
 from app.ingest.read_source_document import READER_EXTENSIONS, read_source_document
 from app.ingest.unreadable_document import DocumentUnreadable
 from app.runs.not_used_kinds import ALREADY_READ_KIND, NOT_READ_KIND
-from app.runs.statuses import DONE, ENDED_WITHOUT_CHANGES
 
 
 UNREADABLE_FORMAT = "Not a format this system reads. It reads .md and .pdf."
@@ -147,26 +149,22 @@ async def _already_read_by_name_or_content(
     a document that failed extraction has no row here at all (`extraction IS
     NOT NULL` excludes it), so the next run reads it again regardless of which
     half would otherwise have matched.
+
+    The rule itself is `READ_BY_THE_PROJECT` (`app/ingest/read_once.py`), the
+    same condition Commit and Examine ask: whether a document is settled must
+    not depend on which stage is asking.
     """
     result = await connection.execute(
         "SELECT bool_or(documents.source_path = %s) AS name_matched, "
         "bool_or(documents.content_hash = %s) AS content_matched "
         "FROM documents "
         "JOIN runs ON runs.id = documents.run_id "
-        "WHERE runs.project_id = %s "
-        "AND documents.extraction IS NOT NULL "
-        "AND (runs.status = %s "
-        "OR documents.extraction ->> 'document_type' = %s "
-        "OR (jsonb_array_length(documents.extraction -> 'requirements') = 0 "
-        "AND runs.status = %s)) "
+        f"WHERE {READ_BY_THE_PROJECT} "
         "AND (documents.source_path = %s OR documents.content_hash = %s)",
         (
             source_path,
             content_hash,
-            project_id,
-            DONE,
-            UNRELATED_DOCUMENT,
-            ENDED_WITHOUT_CHANGES,
+            *read_by_the_project_parameters(project_id),
             source_path,
             content_hash,
         ),
