@@ -308,7 +308,7 @@ def test_a_change_request_never_moves_the_status(tmp_path: Path) -> None:
     assert finished.rows[1]["what_testing_found"] == "the team wants a daily digest too"
 
 
-def test_a_row_nobody_has_looked_at_stays_no_evidence_yet_with_no_citation(
+def test_a_row_no_document_speaks_about_stays_requested_with_no_citation(
     tmp_path: Path,
 ) -> None:
     finished = _run_once(
@@ -333,7 +333,9 @@ def test_a_row_nobody_has_looked_at_stays_no_evidence_yet_with_no_citation(
     assert finished.rows[1]["status"] == "Done"
     # Nothing read said anything about the search row, so it claims nothing.
     assert finished.rows[2]["status"] == REQUESTED
-    assert finished.rows[2]["what_testing_found"].startswith("Not known yet")
+    # The testing report was read and says nothing about this row, which is an
+    # answer for that cell — and no claim at all about delivery.
+    assert finished.rows[2]["what_testing_found"] == "Not mentioned"
     # `Requested` names no document, so nothing is cited behind it.
     # `Not delivered` is the opposite claim and always carries a citation.
     assert _citations_on(finished.export, 2, "status") == []
@@ -452,7 +454,9 @@ def test_an_uncertain_observation_to_row_link_is_flagged_and_never_settled(
     assert asked[0]["question"] == VAGUE_OBSERVATION_QUESTION
     assert "row #1" in asked[0]["question"]
     assert finished.rows[1]["status"] == REQUESTED
-    assert finished.rows[1]["what_testing_found"].startswith("Not known yet")
+    # The rejected link left the row citing nothing from that document, so the
+    # report counts as read and silent about this row.
+    assert finished.rows[1]["what_testing_found"] == "Not mentioned"
 
 
 def test_a_row_this_run_moved_to_done_raises_no_finding_about_a_missing_outcome(
