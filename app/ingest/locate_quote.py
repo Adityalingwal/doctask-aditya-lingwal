@@ -47,46 +47,28 @@ def locate_quote(
 
     A quote can genuinely sit in more than one place — a testing feedback
     document restating the same finding against several requirements is the
-    obvious case — so every occurrence is found and every place it names is
-    reported, in document order. `source_words` still comes from the first
-    occurrence; it is the document's own characters either way, and the
-    reader is told where all of them are by `place`.
+    obvious case. The first occurrence is the one named, because that is where
+    `source_words` is read from: one citation states one place, and a
+    comma-joined list of them cannot be written as the one sentence every
+    surface prints (`app/ingest/source_line.py`).
     """
     normalised_document, original_offsets = _normalise_with_offsets(document_text)
     normalised_quote = _normalise(quote)
     if not normalised_quote:
         return None
 
-    match_starts = _find_all(normalised_document, normalised_quote)
-    if not match_starts:
+    match_start = normalised_document.find(normalised_quote)
+    if match_start < 0:
         return None
 
-    match_end = match_starts[0] + len(normalised_quote) - 1
-    first_character = original_offsets[match_starts[0]]
+    match_end = match_start + len(normalised_quote) - 1
+    first_character = original_offsets[match_start]
     last_character = original_offsets[match_end]
 
-    places: list[str] = []
-    for match_start in match_starts:
-        place = place_of(document_text, original_offsets[match_start])
-        if place not in places:
-            places.append(place)
-
     return QuoteLocation(
-        place=", ".join(places),
+        place=place_of(document_text, first_character),
         source_words=document_text[first_character : last_character + 1],
     )
-
-
-def _find_all(haystack: str, needle: str) -> list[int]:
-    """Every start offset `needle` occurs at in `haystack`, in order."""
-    positions: list[int] = []
-    start = 0
-    while True:
-        index = haystack.find(needle, start)
-        if index < 0:
-            return positions
-        positions.append(index)
-        start = index + len(needle)
 
 
 def _normalise(text: str) -> str:
