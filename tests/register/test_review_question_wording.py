@@ -387,3 +387,91 @@ def _one_decision_of_kind(run: dict, kind: str) -> dict:
     ]
     assert len(matching) == 1
     return matching[0]
+
+
+SECOND_FEEDBACK_FILE = "testing-feedback-19-aug.md"
+LATER_FINDING_QUOTE = "The email arrived again on every submit we tried this week."
+LATER_VERDICT = "the notification email still arrived on every submit"
+
+
+def test_the_approve_line_names_only_the_cells_commit_will_actually_write(
+    tmp_path: Path,
+) -> None:
+    """A row already `Done` gets a second passing report: Status is not promised.
+
+    Commit skips a cell whose value has not changed, so a line promising
+    `Status: Done` on a row that is already Done would show a change that
+    never happens — the promise and the write must come from one comparison.
+    """
+    with temporary_project_folder("approve-line-only-changes") as (
+        source_folder,
+        folder_path,
+    ):
+        quote = write_meeting_note(source_folder, SOURCE_FILE, ROW_ASK)
+        script_path = tmp_path / "script.json"
+        write_script(
+            script_path,
+            {
+                extract_marker(SOURCE_FILE): extraction_answer(ROW_ASK, quote),
+                extract_marker(FEEDBACK_FILE): feedback_extraction_answer(
+                    [(FIRST_VERDICT, "Passed", FIRST_FINDING_QUOTE)]
+                ),
+                extract_marker(SECOND_FEEDBACK_FILE): feedback_extraction_answer(
+                    [(LATER_VERDICT, "Passed", LATER_FINDING_QUOTE)]
+                ),
+                observation_marker(): observation_answer_of([1]),
+                match_marker(): match_answer(1),
+                examine_marker(): no_findings_answer(),
+            },
+        )
+        with temporary_database() as database_url:
+            application = ApplicationProcess(
+                database_url=database_url,
+                script_path=script_path,
+                call_log_path=tmp_path / "model-calls.jsonl",
+            )
+            application.start()
+            try:
+                with application.client() as client:
+                    project_id = client.post(
+                        "/projects", json={"source_folder_path": folder_path}
+                    ).json()["project_id"]
+                    for feedback_file, feedback_quote in (
+                        (None, None),
+                        (FEEDBACK_FILE, FIRST_FINDING_QUOTE),
+                    ):
+                        if feedback_file is not None:
+                            write_document_stating(
+                                source_folder,
+                                feedback_file,
+                                "12 August 2026",
+                                [feedback_quote],
+                            )
+                        run_id = client.post(
+                            "/runs", json={"project_id": project_id}
+                        ).json()["run_id"]
+                        wait_for_run_status(client, run_id, "needs review")
+                        approve_every_decision_and_finish_review(client, run_id)
+                        wait_for_run_status(client, run_id, "done")
+
+                    write_document_stating(
+                        source_folder,
+                        SECOND_FEEDBACK_FILE,
+                        "19 August 2026",
+                        [LATER_FINDING_QUOTE],
+                    )
+                    third_run = client.post(
+                        "/runs", json={"project_id": project_id}
+                    ).json()["run_id"]
+                    waiting = wait_for_run_status(client, third_run, "needs review")
+            finally:
+                application.stop()
+
+    decision = _one_decision_of_kind(waiting, "observation match")
+    assert decision["if_approved"] == [
+        {"cell": "What testing found", "value": LATER_VERDICT},
+    ]
+    assert decision["question"].endswith(
+        f"Approve → Row 1 changes: What testing found: {LATER_VERDICT}\n"
+        "Reject → Row 1 stays as it is."
+    )
