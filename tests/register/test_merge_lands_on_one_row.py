@@ -23,7 +23,7 @@ from tests.documents.register_documents import (
 )
 
 from app.extract.answer import CLIENT_REQUIREMENTS_DOCUMENT, MEETING_NOTES
-from app.register.cells import IN_WRITING_WRITTEN_IN_OPENING
+from app.register.cells import IN_WRITING_YES
 
 MEETING_NOTE = "a-meeting-note.md"
 REQUIREMENTS_FILE = "b-client-requirements.md"
@@ -106,10 +106,7 @@ def test_an_approved_merge_leaves_no_cell_denying_the_row_s_own_evidence(
     assert len(export["rows"]) == 1
     surviving = export["rows"][0]
     assert surviving["cells"]["what_was_asked"] == RAISED_IN_THE_MEETING
-    assert (
-        surviving["cells"]["in_writing"]
-        == f"{IN_WRITING_WRITTEN_IN_OPENING}{REQUIREMENTS_FILE}."
-    )
+    assert surviving["cells"]["in_writing"] == IN_WRITING_YES
     # The cell that changed keeps exactly the citation supporting what it now
     # says, never the one that supported the sentence it no longer holds.
     in_writing_citations = [

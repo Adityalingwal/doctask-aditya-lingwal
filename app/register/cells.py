@@ -35,25 +35,34 @@ STATUS_DISPUTED = "Disputed"
 MAXIMUM_QUOTE_CHARACTERS = 300
 TRUNCATED_QUOTE_SUFFIX = "\u2026"
 
-# A cell whose answer is not known says so in words. A blank cell would mean
-# both "not known" and "nothing to report", and a reader cannot tell which.
-IN_WRITING_NOT_KNOWN_YET = (
-    "Not known yet — no client requirements document has been read for this "
-    "project."
-)
-# Said instead once the project has read one and it does not mention this ask.
-# The sentence above would be a plain falsehood there, and "No" would claim
-# more than a document saying nothing about an ask can support.
-IN_WRITING_NOT_FOUND_IN = "Not found in {documents}."
-IN_WRITING_WRITTEN_IN_OPENING = "Yes — written in "
-TESTING_NOT_KNOWN_YET = (
-    "Not known yet — no testing outcome has been read for this requirement."
-)
+# A cell answers in as few words as a reader can scan down a column; the file
+# behind the answer lives in the row's evidence and is never repeated here. A
+# blank cell would mean both "not known" and "nothing to report", and a reader
+# cannot tell which, so a cell with no answer yet still carries words.
+IN_WRITING_NOT_KNOWN_YET = "Not known yet"
+IN_WRITING_YES = "Yes"
+TESTING_NOT_KNOWN_YET = "Not known yet"
+# Said once a document of the kind that speaks to this cell has been read and
+# does not mention this ask. "No" would claim more than a document saying
+# nothing about an ask can support.
+NOT_MENTIONED = "Not mentioned"
+
+ABSENCE_STATEMENT = "{source_file} was read, and it does not mention this ask."
+
+
+def absence_statement_for(source_file: str) -> str:
+    """The one sentence standing behind every `Not mentioned` cell.
+
+    Written in one place because both cells and both document kinds use it: a
+    second writer would let `Written down` and `What testing found` describe
+    the same silence in two different sentences.
+    """
+    return ABSENCE_STATEMENT.format(source_file=source_file)
 
 
 def in_writing_says_yes(cell: str) -> bool:
-    """Whether this cell reports the ask written down, whichever file it names."""
-    return cell.startswith(IN_WRITING_WRITTEN_IN_OPENING)
+    """Whether this cell reports the ask written down."""
+    return cell == IN_WRITING_YES
 
 
 def fingerprint_of_cells(cells: dict[str, str]) -> str:

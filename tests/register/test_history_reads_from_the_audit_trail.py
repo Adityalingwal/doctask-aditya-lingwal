@@ -235,10 +235,7 @@ def test_two_findings_attached_to_one_row_in_one_run_keep_one_order(
     second = one_finding(
         rule_id="R4",
         issue="No testing outcome has been read for this requirement.",
-        evidence=(
-            "Not known yet — no testing outcome has been read for this "
-            "requirement."
-        ),
+        evidence="Not known yet",
         question="Row 1 has no testing outcome read yet. Keep this finding?",
     )
     with _project(tmp_path, examine_answer([first, second])) as (

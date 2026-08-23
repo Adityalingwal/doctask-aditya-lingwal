@@ -25,11 +25,11 @@ requirements. Reading all four produces this register:
 
 | # | What was asked | Written down | What testing found | Status |
 |---|---|---|---|---|
-| 1 | BrightCart wants an AI system that answers support-line calls. | Yes — written in client-requirements-v1.md. | The voice agent answered questions correctly every time it was tested. | `Done` |
-| 3 | BrightCart wants the support bot available on WhatsApp. | Yes — written in client-requirements-v1.md. | The WhatsApp bot could not be found or reached during testing. | `Not delivered` |
-| 4 | BrightCart wants one dashboard containing all call and chat transcripts. | Yes — written in client-requirements-v1.md. | Chat transcripts appeared. The call-transcripts part was unfinished. | `Partial` |
-| 6 | Support must work in Hindi and English. | Yes — written in client-requirements-v1.md. | Not known yet — no testing outcome has been read for this requirement. | `Requested` |
-| 7 | Chats the bot cannot resolve must reach a real person. | Not found in client-requirements-v1.md. | Human escalation was absent from the delivered system. | `Disputed` |
+| 1 | BrightCart wants an AI system that answers support-line calls. | Yes | The voice agent answered questions correctly every time it was tested. | `Done` |
+| 3 | BrightCart wants the support bot available on WhatsApp. | Yes | The WhatsApp bot could not be found or reached during testing. | `Not delivered` |
+| 4 | BrightCart wants one dashboard containing all call and chat transcripts. | Yes | Chat transcripts appeared. The call-transcripts part was unfinished. | `Partial` |
+| 6 | Support must work in Hindi and English. | Yes | Not mentioned | `Requested` |
+| 7 | Chats the bot cannot resolve must reach a real person. | Not mentioned | Human escalation was absent from the delivered system. | `Disputed` |
 
 The register above is the short view. Behind every cell sits the quote it was
 built from. Row 7 is the one worth opening, so here it is in full:
@@ -41,7 +41,9 @@ Row 7 — Chats the bot cannot resolve must reach a real person.
                    "when a chat gets stuck and the bot can't help, it has
                     to hand off to a real person."
 
-  Written down     Not found in client-requirements-v1.md.
+  Written down     Not mentioned
+                   client-requirements-v1.md was read, and it does not
+                   mention this ask.
 
   Status           handover-summary.md · What was handed over
                    "We also built a 'talk to a human' handover: when the
