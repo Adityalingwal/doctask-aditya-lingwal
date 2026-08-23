@@ -84,23 +84,27 @@ function demoRuns() {
         failure_reason:
           "OPENROUTER_API_KEY is empty — copy .env.example to .env and put an "
           + "OpenRouter API key in it, then start the run again.",
-        not_used: [
+        skipped: [
           {
-            source_file: "northside-dental-brochure.pdf",
-            reason: "read as an unrelated document, so it produced no requirement",
+            kind: "not read",
+            file: "northside-dental-brochure.pdf",
+            reason: "This document is not related to this client or project.",
           },
           {
-            source_file: "old-contract-scan.pdf",
+            kind: "not read",
+            file: "old-contract-scan.pdf",
             reason:
-              "the file is a scanned image with no extractable text — export it "
-              + "as a text PDF, or supply the wording as .md, and run again",
+              "The file is a scanned image with no text to read. Export it as "
+              + "a text PDF, or supply the wording as .md, and run again.",
           },
           {
-            source_file: "12-march-scope.docx",
-            quote_not_found: "patients should be able to reschedule without calling",
+            kind: "not attached",
+            file: "12-march-scope.md",
+            summary: "Patients reschedule without calling.",
+            source_line: null,
             reason:
-              "the quoted words were not found in the extracted text, so no "
-              + "citation could be written for them",
+              "The model said this comes from 12-march-scope.md, but those "
+              + "words are not in the file.",
           },
         ],
         finished_stages: ["ingest"],

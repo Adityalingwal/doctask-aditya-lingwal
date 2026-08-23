@@ -57,8 +57,8 @@ function Group({ label, entries }) {
   );
 }
 
-// A whole file that was not used: its name, then the reason, in one column so
-// a long reason wraps under itself rather than under the file name.
+// A whole file the run did not read: its name, then the reason, in one column
+// so a long reason wraps under itself rather than under the file name.
 function FileLine({ entry }) {
   if (entry.file === undefined) {
     return <p className="m-0">{entry.reason}</p>;
