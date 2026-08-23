@@ -115,7 +115,13 @@ async def _read_register_document(
                     for citation in citations_by_row.get(row["id"], [])
                 ],
                 "evidence": _evidence_of_row(citations_by_row.get(row["id"], [])),
-                "findings": findings_by_row.get(row["id"], []),
+                # Item 43: the field exists only when findings exist — a
+                # machine caller never sees "0 findings" spelled as [].
+                **(
+                    {"findings": findings_by_row[row["id"]]}
+                    if findings_by_row.get(row["id"])
+                    else {}
+                ),
             }
             for row in rows
         ],
@@ -277,7 +283,7 @@ def _row_detail_lines(row: dict[str, Any]) -> list[str]:
     lines.append("")
     # A row nothing was found wrong with prints no block at all: "No findings"
     # on every clean row is noise a reader has to skim past (item 43).
-    if row["findings"]:
+    if row.get("findings"):
         lines += ["**Findings**", ""]
         lines += [_finding_line(finding) for finding in row["findings"]]
         lines.append("")

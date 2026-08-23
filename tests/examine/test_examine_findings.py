@@ -348,7 +348,8 @@ def test_a_rejected_finding_stays_in_the_run_and_never_reaches_the_export(
             ).scalar_one()
         engine.dispose()
 
-    assert export["rows"][0]["findings"] == []
+    # Item 43: the field exists only when findings exist — never an empty list.
+    assert "findings" not in export["rows"][0]
     assert export["examine"]["findings"] == []
     assert R1_ISSUE not in markdown
     assert attachment_audit == 0

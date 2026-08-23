@@ -73,9 +73,9 @@ export default function Register({ exported }) {
                 </li>
               ))}
             </ul>
-            {row.findings.length > 0 && (
+            {(row.findings ?? []).length > 0 && (
               <ul className="m-0 mt-3 flex list-none flex-col gap-2 border-t border-line p-0 pt-3">
-                {row.findings.map((finding) => (
+                {(row.findings ?? []).map((finding) => (
                   <li
                     key={finding.rule_id}
                     className="border-l-4 border-caution py-1 pl-4"
