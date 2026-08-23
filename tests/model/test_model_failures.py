@@ -96,7 +96,7 @@ def test_a_refused_key_fails_the_run_instead_of_leaving_every_document_unread(
     # A wrong key is not a document problem: no document goes unread and no empty
     # register is exported in place of the explanation.
     assert proposed == []
-    assert failed["not_used"] == []
+    assert failed["skipped"] == []
     assert failed["exported"] is False
     assert "check the OpenRouter key in your environment variables" in (
         failed["failure_reason"]
@@ -126,7 +126,7 @@ def test_a_timed_out_document_is_not_read_while_the_batch_continues(
 
     assert proposed == [SECOND_REQUIREMENT]
     documents_not_read = [
-        entry for entry in at_review["not_used"] if entry["kind"] == "not read"
+        entry for entry in at_review["skipped"] if entry["kind"] == "not read"
     ]
     assert len(documents_not_read) == 1
     assert documents_not_read[0]["file"] == FIRST_FILE
@@ -142,7 +142,7 @@ def test_a_run_whose_every_document_failed_never_says_the_documents_were_read(
     Both documents fail at the model call, so nothing was read at all. Saying
     "the documents were read, but none of them stated a requirement" claims a
     read that never happened and sends the reader looking for a requirement
-    instead of at the failure in the Not used tab.
+    instead of at the failure in the Skipped tab.
     """
     ended, proposed = _run_over_two_documents(
         tmp_path,
@@ -156,7 +156,6 @@ def test_a_run_whose_every_document_failed_never_says_the_documents_were_read(
     assert proposed == []
     assert "The documents were read" not in ended["ended_early_reason"]
     assert ended["ended_early_reason"] == (
-        "Nothing was read — all 2 files were not used. See the Not used tab "
-        "for why."
+        "2 files were skipped. See the Skipped tab for why."
     )
-    assert len(ended["not_used"]) == 2
+    assert len(ended["skipped"]) == 2

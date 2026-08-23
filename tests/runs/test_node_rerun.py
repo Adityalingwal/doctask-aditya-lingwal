@@ -13,7 +13,7 @@ from app.examine.record_findings import record_findings
 from app.ingest.collect_batch import collect_batch
 from app.match.match_requirements import NEW_ROW, POSSIBLE_MATCH
 from app.register.propose_rows import MatchSettlement, propose_rows
-from app.runs.run_records import append_not_used, read_run
+from app.runs.run_records import append_skipped, read_run
 from app.runs.statuses import RUNNING
 from tests.runs.application import temporary_database
 from tests.documents.register_documents import write_meeting_note
@@ -40,17 +40,17 @@ def test_ingest_rerun_does_not_duplicate_documents(tmp_path: Path) -> None:
     assert len(collected["second_batch"]) == 2
 
 
-def test_a_replayed_stage_does_not_record_the_same_not_used_file_twice(
+def test_a_replayed_stage_does_not_record_the_same_skipped_file_twice(
     tmp_path: Path,
 ) -> None:
     source_folder = tmp_path / "unsupported-format"
     source_folder.mkdir()
     (source_folder / "scope.rtf").write_text("Out of scope for this reader.")
 
-    not_used = asyncio.run(_collect_batch_and_append_not_used_twice(source_folder))
+    skipped = asyncio.run(_collect_batch_and_append_skipped_twice(source_folder))
 
-    assert len(not_used) == 1
-    assert not_used[0]["file"] == "scope.rtf"
+    assert len(skipped) == 1
+    assert skipped[0]["file"] == "scope.rtf"
 
 
 def test_two_different_dropped_quotes_from_one_file_are_both_kept() -> None:
@@ -66,11 +66,11 @@ def test_two_different_dropped_quotes_from_one_file_are_both_kept() -> None:
         "the client wants a weekly digest of new intake records",
     )
 
-    not_used = asyncio.run(
-        _append_not_used_then_append_both_again(first_dropped, second_dropped)
+    skipped = asyncio.run(
+        _append_skipped_then_append_both_again(first_dropped, second_dropped)
     )
 
-    assert not_used == [first_dropped, second_dropped]
+    assert skipped == [first_dropped, second_dropped]
 
 
 def test_match_rerun_does_not_duplicate_proposed_rows(tmp_path: Path) -> None:
@@ -186,7 +186,7 @@ async def _collect_batch_twice(source_folder: Path) -> dict[str, Any]:
             await pool.close()
 
 
-async def _collect_batch_and_append_not_used_twice(
+async def _collect_batch_and_append_skipped_twice(
     source_folder: Path,
 ) -> list[dict[str, str]]:
     """What Ingest itself does on every pass: collect the batch, then record
@@ -207,14 +207,14 @@ async def _collect_batch_and_append_not_used_twice(
                         MARKDOWN_ONLY,
                         PAGE_LIMIT,
                     )
-                    await append_not_used(connection, run_id, batch.not_used)
+                    await append_skipped(connection, run_id, batch.skipped)
                 run = await read_run(connection, run_id)
-                return run["not_used"]
+                return run["skipped"]
         finally:
             await pool.close()
 
 
-async def _append_not_used_then_append_both_again(
+async def _append_skipped_then_append_both_again(
     first: dict[str, str],
     second: dict[str, str],
 ) -> list[dict[str, str]]:
@@ -224,19 +224,19 @@ async def _append_not_used_then_append_both_again(
         try:
             async with pool.connection() as connection:
                 project_id, run_id = await _project_with_a_running_run(connection)
-                await append_not_used(connection, run_id, [first])
+                await append_skipped(connection, run_id, [first])
                 # A replay recomputes the whole batch, so the second call
                 # carries the already-stored entry again alongside the new one.
-                await append_not_used(connection, run_id, [first, second])
+                await append_skipped(connection, run_id, [first, second])
                 run = await read_run(connection, run_id)
-                return run["not_used"]
+                return run["skipped"]
         finally:
             await pool.close()
 
 
 def _dropped_requirement(summary: str, quote: str) -> dict[str, str]:
     return {
-        "kind": "dropped",
+        "kind": "not attached",
         "file": "shared-notes.md",
         "summary": summary,
         "quote": quote,

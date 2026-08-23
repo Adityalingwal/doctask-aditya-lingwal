@@ -96,7 +96,7 @@ def test_a_document_read_by_a_done_run_is_counted_already_read(
 
     assert second_batch == []
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert [entry["file"] for entry in already_read] == [SOURCE_FILE]
     assert recorded_markers(call_log_path).count(extract_marker(SOURCE_FILE)) == 1
@@ -131,7 +131,7 @@ def test_a_document_read_only_by_a_discarded_run_is_read_again(
             second_batch = documents_of_run(database_url, second_run)
 
     assert second_batch == [SOURCE_FILE]
-    assert ended["not_used"] == []
+    assert ended["skipped"] == []
     assert recorded_markers(call_log_path).count(extract_marker(SOURCE_FILE)) == 2
 
 
@@ -225,7 +225,7 @@ def test_a_testing_document_read_only_by_a_discarded_run_is_read_again(
     assert third_batch == [TESTING_FILE]
     assert recorded_markers(call_log_path).count(extract_marker(TESTING_FILE)) == 2
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert sorted(entry["file"] for entry in already_read) == [
         SOURCE_FILE,

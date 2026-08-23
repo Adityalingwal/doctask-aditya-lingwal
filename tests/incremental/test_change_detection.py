@@ -117,11 +117,11 @@ def test_a_document_extract_could_not_read_is_read_again_by_the_next_run(
             engine.dispose()
 
     assert exported["exported"] is True
-    # The document Extract could not read is not "already read", however well
+    # The document Extract could not read is not "read before", however well
     # the run that held it finished; the one that was read is not read twice.
     assert list(second_batch) == [UNREAD_FILE]
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert [entry["file"] for entry in already_read] == [READ_FILE]
     assert already_read[0]["reason"] == "Already read, and unchanged since."
@@ -179,7 +179,7 @@ def test_an_edited_document_is_never_sent_to_the_model_again(tmp_path: Path) -> 
 
     assert recorded_markers(call_log_path).count(extract_marker(READ_FILE)) == 1
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert [entry["file"] for entry in already_read] == [READ_FILE]
     assert already_read[0]["reason"] == (
@@ -242,7 +242,7 @@ def test_a_renamed_document_is_never_read_as_a_new_one(tmp_path: Path) -> None:
 
     assert recorded_markers(call_log_path).count(extract_marker(ORIGINAL_NAME)) == 1
     already_read = [
-        entry for entry in ended["not_used"] if entry["kind"] == "already read"
+        entry for entry in ended["skipped"] if entry["kind"] == "read before"
     ]
     assert [entry["file"] for entry in already_read] == [RENAMED_NAME]
     assert already_read[0]["reason"] == (
