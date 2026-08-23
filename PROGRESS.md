@@ -4,6 +4,40 @@ Current status only. Completed narrative that has fallen out of this file
 stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-23, branch `brief-1a-pipeline-and-schema`
+
+The pipeline half of the demo-run repairs: after this branch the register's
+cells, findings and history say what the documents actually support.
+
+- **The status `Nothing said yet` is `Requested`** (migration
+  `20260823_0022`), everywhere a reader or the system takes the word from.
+- **Cells are short, and the file behind an answer is in the evidence.**
+  `Written down` reads `Not known yet` · `Yes` · `Not mentioned`;
+  `What testing found` reads `Not known yet` · what testing said ·
+  `Not mentioned`.
+- **The absence move is built** (`app/register/absence_rows.py`), the feature
+  this file listed as not built. At Commit, every client requirements document
+  and testing report the project has read is applied against every row it does
+  not mention: the cell moves to `Not mentioned` with the file as its
+  evidence, its history entry and a moved fingerprint. It never overwrites an
+  answer, and a run that read such a document always continues to Review.
+- **A rule waits for the documents it is about** (`applies_when` in
+  `config/rules.yaml`, validated at startup and at every freeze), and
+  `runs.rules_applied` (migration `20260823_0023`) records exactly what
+  Examine sent to the model.
+- **The register shows each rule's finding from the latest run that applied
+  it**, so a row never carries two copies of one rule's finding again.
+- **Examine treats an unanswered possible match as the match**: it judges the
+  row the proposal would join, with that proposal's `Written down` overlaid,
+  and counts real rows only.
+- **One definition of "read"** (`app/ingest/read_once.py`), shared by Ingest,
+  the rule gate and the absence move.
+
+**Both suites green, no live key: 271 Python passed** and **66 front-end
+passed across 38 files.** The corpus has not been driven against a live model
+on this branch; the expected end state is in
+`sample-documents/helpline-ai/README.md`.
+
 ## Snapshot — 2026-08-19, branch `live-run-repairs`
 
 Two more defects the live run exposed, both fixed test-first.
