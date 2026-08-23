@@ -143,14 +143,14 @@ def test_absence_never_overwrites_yes_or_a_testing_verdict(tmp_path: Path) -> No
         {REQUIREMENTS_V1: SECOND_ASK, REQUIREMENTS_V2: THIRD_ASK},
     )
 
-    written, _second, still_written = mentioned_first.after_each_batch
+    _asked, written, still_written = mentioned_first.after_each_batch
     assert _cell(written[1], IN_WRITING) == IN_WRITING_YES
     assert _cell(still_written[1], IN_WRITING) == IN_WRITING_YES
     # The silent second document supports nothing the cell says, so it is not
     # cited behind it at all.
     assert _files_cited(still_written[1], IN_WRITING) == {REQUIREMENTS_V1}
 
-    _asked, silent_once, silent_again = silent_twice.after_each_batch
+    _before, silent_once, silent_again = silent_twice.after_each_batch
     assert _cell(silent_again[1], IN_WRITING) == NOT_MENTIONED
     assert _files_cited(silent_again[1], IN_WRITING) == {
         REQUIREMENTS_V1,
