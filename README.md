@@ -187,7 +187,7 @@ has stopped changing for 5s the first run starts by itself. You will see its
 progress move through Ingest, Extract, Match and Examine, and then stop at
 Review.
 
-It stops there because it needs you. Open the **Decisions** tab and answer the
+It stops there because it needs you. Open the **Run** tab and answer the
 questions this run raised. Then press **Add this run's changes to the register**.
 
 That is when the register is written. This meeting note names seven things the
@@ -418,6 +418,11 @@ The rest of the limits:
   or `127.0.0.1`, so another machine cannot reach it as it stands.
 - **The screen is built by Node, which the application image does not have.**
   `ui/dist` has to be built on your machine before `docker compose up`.
+- **The pinned MCP SDK emits one startup warning under the resolved
+  `pydantic-settings==2.15.0`.** Its internal `Settings.lifespan` annotation is
+  left unresolved; MCP discovery and flow still pass. The upstream issue is
+  open, and this repository neither suppresses the warning nor reaches into a
+  private SDK class to hide it.
 - **A project's folder must sit directly inside** the folder named in
   `config/projects.yaml` (`sample-projects/` by default). Not the root itself,
   not nested deeper, never an absolute path. Anything else is refused, with the

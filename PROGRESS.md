@@ -36,6 +36,15 @@ were observed failing first; the complete watcher file is now **5 passed**, and
 the wider watcher/queue/run-ending set had **12 existing tests pass** before a
 new fixture-only assertion was corrected and re-run green.
 
+The small drift pass now points README at the current `Run` tab, documents the
+shipped 2-second poll and 5-second quiet window in `config/README.md`, and
+bundles an SVG favicon under `/ui/`. The remaining startup warning is diagnosed
+to the pinned official MCP SDK's unresolved `Settings.lifespan` forward
+reference under `pydantic-settings==2.15.0`; its upstream issue is still open,
+so it is recorded as a third-party limitation rather than suppressed or
+patched through a private SDK import. The production UI build succeeds and the
+full front-end suite is **116 passed across 50 files**.
+
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 
 The screen half of the demo-run repairs: after this branch the review screen

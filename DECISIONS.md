@@ -1015,6 +1015,17 @@ a symlink after creation is not re-checked.
 - The dependency is the official `mcp` SDK pinned at `1.29.0`. Its 2.x line was
   days old and changes the HTTP stack it depends on; `fastmcp` would put a
   second server framework beside FastAPI.
+- **Known third-party warning (2026-08-25):** constructing `FastMCP` under the
+  resolved `pydantic-settings==2.15.0` emits
+  `IncompleteFieldDefinitionWarning` for the SDK's `Settings.lifespan` forward
+  reference. A warnings-as-errors import traces entirely through
+  `mcp.server.fastmcp.server.Settings`; the same `mcp==1.29.0` reproduction is
+  open upstream as
+  [python-sdk issue 3294](https://github.com/modelcontextprotocol/python-sdk/issues/3294).
+  Current MCP discovery and flow tests pass. We do not suppress it, import the
+  SDK's private Settings class to rebuild it, or move to its alpha/new-major
+  line merely to hide a non-functional warning; revisit when the pinned stable
+  SDK ships the upstream fix.
 - **The screen is three columns (L1–L10, locked 2026-08-15, superseding the
   single run list):** projects (16rem), one selected project's runs (12rem,
   collapsible to a strip that
