@@ -22,10 +22,11 @@ from app.runs.statuses import DONE
 from tests.runs.application import temporary_database
 
 
-CLEARED_BY_A_CLEAN_RERUN = 1
+PRESERVED_THROUGH_A_CLEAN_RERUN = 1
 REPLACED_BY_A_NEW_RAISE = 2
 PRESERVED_BECAUSE_THE_RULE_DID_NOT_RUN = 3
 CLEARED_BY_A_REJECTION = 4
+OTHER_ROW_OF_THE_SAME_RULE_CLEARED = 5
 
 # The earlier run applied every rule; the later one never applied R1, because a
 # kind of document R1 names had not been read by then.
@@ -41,40 +42,44 @@ class SeededFinding(NamedTuple):
 
 
 SEEDED_FINDINGS = (
-    SeededFinding("earlier", "R4", CLEARED_BY_A_CLEAN_RERUN, APPROVED),
+    SeededFinding("earlier", "R4", PRESERVED_THROUGH_A_CLEAN_RERUN, APPROVED),
     SeededFinding("earlier", "R2", REPLACED_BY_A_NEW_RAISE, APPROVED),
     SeededFinding("earlier", "R1", PRESERVED_BECAUSE_THE_RULE_DID_NOT_RUN, APPROVED),
     SeededFinding("earlier", "R5", CLEARED_BY_A_REJECTION, APPROVED),
-    # R4 raised nothing at all in the later run, which is the newer answer.
+    SeededFinding("earlier", "R4", OTHER_ROW_OF_THE_SAME_RULE_CLEARED, APPROVED),
+    # R4 raises nothing about row 1 in the later run. Silence is not a human
+    # decision and must not erase the finding already approved on that row.
     SeededFinding("later", "R2", REPLACED_BY_A_NEW_RAISE, APPROVED),
     SeededFinding("later", "R5", CLEARED_BY_A_REJECTION, REJECTED),
+    SeededFinding("later", "R4", OTHER_ROW_OF_THE_SAME_RULE_CLEARED, REJECTED),
 )
 
 
-def test_the_register_shows_only_the_latest_applicable_finding_per_rule_and_row() -> None:
-    """Each rule's newest answer stands, and no row ever carries two of one rule.
+def test_an_approved_finding_stays_until_that_rule_and_row_are_decided_again() -> None:
+    """Silence never clears a decision; a newer decision on the same row does.
 
-    Four rows, four rules, two runs. A rule that raised nothing the second
-    time has answered again; a rule that raised again replaces rather than
-    adds; a rule the second run never applied keeps the answer it gave; and a
-    finding the person rejected in the newest run leaves the row clear rather
-    than letting the older one reappear.
+    Five rows, four rules, two runs. A rule that raises nothing on a row the
+    second time leaves its earlier approved finding there; a new approval
+    replaces rather than adds; a rule the second run never applied keeps its
+    answer; and a rejection clears only the same rule on the same row.
     """
     shown, register = asyncio.run(_two_runs_of_findings())
 
     assert [(finding["row_number"], finding["rule_id"]) for finding in shown] == [
+        (PRESERVED_THROUGH_A_CLEAN_RERUN, "R4"),
         (REPLACED_BY_A_NEW_RAISE, "R2"),
         (PRESERVED_BECAUSE_THE_RULE_DID_NOT_RUN, "R1"),
     ]
-    assert [finding["raised_by_run"] for finding in shown] == [2, 1]
+    assert [finding["raised_by_run"] for finding in shown] == [1, 2, 1]
     assert {
         row["row_number"]: [finding["rule_id"] for finding in row.get("findings", [])]
         for row in register["rows"]
     } == {
-        CLEARED_BY_A_CLEAN_RERUN: [],
+        PRESERVED_THROUGH_A_CLEAN_RERUN: ["R4"],
         REPLACED_BY_A_NEW_RAISE: ["R2"],
         PRESERVED_BECAUSE_THE_RULE_DID_NOT_RUN: ["R1"],
         CLEARED_BY_A_REJECTION: [],
+        OTHER_ROW_OF_THE_SAME_RULE_CLEARED: [],
     }
     (kept,) = [
         finding
@@ -124,7 +129,7 @@ async def _seed(connection: AsyncConnection) -> dict[str, Any]:
         row_number: await _insert_row(
             connection, project_id, run_id["earlier"], row_number
         )
-        for row_number in range(1, 5)
+        for row_number in range(1, 6)
     }
     for seeded in SEEDED_FINDINGS:
         await _insert_finding(connection, run_id[seeded.run], row_id, seeded)
@@ -148,7 +153,7 @@ async def _insert_run(
             DONE,
             moment,
             moment,
-            4,
+            5,
             Jsonb(
                 [
                     {"id": rule_id, "text": f"Rule {rule_id}.", "params": {}}

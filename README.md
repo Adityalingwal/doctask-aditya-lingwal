@@ -375,16 +375,18 @@ The rest of the limits:
   finding in that run. The next run checks it like any other row.
 - **A rule that ran before may not raise the same finding again.** A rule is
   judged by a model, so a later run that checks the same row may or may not
-  repeat what an earlier run found. The register shows the newer answer, and
-  the History tab keeps the older one.
+  repeat what an earlier run found. Silence never erases a finding a person
+  approved. It stays on that row until a later finding for the same rule and
+  row is explicitly approved or rejected; the History tab keeps every answer.
 - **A rule that keeps failing asks its question again on every run.** A rule is
   checked against the row as it stands right now, so no row is ever done being
   checked. The cost is the same question coming back run after run.
 - **The evidence in a finding is not checked against the row.** It is only
   checked for not being empty. If the model paraphrases instead of quoting,
   nothing catches it.
-- **A rejected finding does not come back** if later evidence would make it
-  stronger. An approved one is not looked at again.
+- **A rejected finding stays off the register** until the model raises a new
+  finding for that rule and row and a person approves it. The earlier rejection
+  remains in History.
 - **A handover only ever moves a row to `Handed over`.** A handover that says
   the work is partly there still reads `Handed over`, because `Partial` is
   testing's word for what testing found. Testing moves the row when it runs.

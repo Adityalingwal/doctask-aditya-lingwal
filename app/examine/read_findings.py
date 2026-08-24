@@ -28,30 +28,29 @@ _FINDING_JOINS = (
 )
 _SELECT_FINDINGS = "SELECT " + _FINDING_COLUMNS + _FINDING_JOINS
 _ORDER_FINDINGS = " ORDER BY reported_row.row_number, findings.rule_id"
+_ORDER_DECIDED_FINDINGS = " ORDER BY row_number, rule_id"
 
-# Each rule's latest `done` run that actually applied it, and that run's
-# number. A run's number is not stored anywhere; it is counted here exactly as
-# `app/register/read_history.py` and `app/projects/list_projects.py` count it,
-# so no surface can number one run differently. `rules_applied` is null on a
-# run that never reached Examine, and the lateral join drops it.
-_LATEST_APPLICABLE_FINDINGS = (
+# The latest explicit finding decision for each rule and row. Silence from a
+# later model call is not a human decision, so it cannot erase an approved
+# finding. A run's number is counted exactly as the History and project reads
+# count it, so every surface names the run the same way.
+_LATEST_DECIDED_FINDINGS = (
     "WITH numbered_runs AS ("
-    "SELECT runs.id, runs.status, runs.finished_at, runs.rules_applied, "
+    "SELECT runs.id, runs.status, runs.finished_at, "
     "ROW_NUMBER() OVER (PARTITION BY runs.project_id "
     "ORDER BY runs.created_at ASC) AS run_number "
     "FROM runs WHERE runs.project_id = %s), "
-    "latest_run_of_rule AS ("
-    "SELECT DISTINCT ON (applied.rule_id) applied.rule_id AS rule_id, "
-    "numbered_runs.id AS run_id FROM numbered_runs "
-    "CROSS JOIN LATERAL jsonb_array_elements_text(numbered_runs.rules_applied) "
-    "AS applied(rule_id) WHERE numbered_runs.status = %s "
-    "ORDER BY applied.rule_id, numbered_runs.finished_at DESC) "
-    "SELECT " + _FINDING_COLUMNS + ", numbered_runs.run_number"
+    "decided_findings AS (SELECT " + _FINDING_COLUMNS
+    + ", numbered_runs.run_number, "
+    "ROW_NUMBER() OVER (PARTITION BY findings.rule_id, reported_row.id "
+    "ORDER BY numbered_runs.finished_at DESC, findings.created_at DESC, "
+    "findings.id DESC) AS decision_number"
     + _FINDING_JOINS
-    + "JOIN latest_run_of_rule ON latest_run_of_rule.rule_id = findings.rule_id "
-    "AND latest_run_of_rule.run_id = findings.run_id "
-    "JOIN numbered_runs ON numbered_runs.id = findings.run_id "
-    "WHERE decisions.outcome = %s" + _ORDER_FINDINGS
+    + "JOIN numbered_runs ON numbered_runs.id = findings.run_id "
+    "WHERE numbered_runs.status = %s) "
+    "SELECT id, rule_id, rule_text, issue, evidence, question, decision_key, "
+    "outcome, row_number, register_row_id, run_number FROM decided_findings "
+    "WHERE decision_number = 1 AND outcome = %s" + _ORDER_DECIDED_FINDINGS
 )
 
 
@@ -149,22 +148,20 @@ async def approved_findings_of_project(
     connection: AsyncConnection,
     project_id: UUID,
 ) -> list[dict[str, Any]]:
-    """What each rule found, the last time each rule actually ran.
+    """The latest explicit finding decision for each rule and register row.
 
-    Every run re-examines the whole register, so a rule that raised a finding
-    in run 5 and raised nothing in run 6 has answered again — and the register
-    shows the newer answer, which is no finding at all. A rejected finding in
-    that newer run clears the row for that rule too: the person was asked and
-    said no. Where the newer run never applied the rule — because a kind of
-    document it names had not been read — the older answer is still the
-    latest one there is, and it stands.
+    Once a person approves a finding, a later model call that says nothing
+    about that rule and row cannot silently clear it. A later finding decision
+    for the same pair does replace it: approval shows the newer finding and
+    rejection clears it. Decisions on another row are independent even when
+    they concern the same rule.
 
     Only runs that ended `done` count: an approved finding on a run still at
     review has not passed the add/discard gate, and one on a discarded run
     never will. Nothing is deleted; History keeps every run's findings.
     """
     result = await connection.execute(
-        _LATEST_APPLICABLE_FINDINGS, (project_id, DONE, APPROVED)
+        _LATEST_DECIDED_FINDINGS, (project_id, DONE, APPROVED)
     )
     return [
         _finding_as_read(finding) | {"raised_by_run": finding["run_number"]}

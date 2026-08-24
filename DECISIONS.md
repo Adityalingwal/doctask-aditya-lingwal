@@ -754,15 +754,18 @@ match.
   fingerprint every run and trigger rules-only re-examines that changed
   nothing. Every reader of "which rules ran" — `examine.rules`, the Markdown
   export, and the register read below — comes from this column.
-- **The register shows each rule's finding from the latest run that applied it
-  (2026-08-23).** No schema change and no "resolved" flag: `findings` keeps
-  every run's findings, and only the register read changes. For each rule, the
-  project's latest `done` run whose `rules_applied` names it decides, and that
-  run's approved findings are what the row shows — which may be none, including
-  when that run raised one and the person rejected it. Where a later run never
-  applied the rule, the older answer is still the latest there is and stands.
-  Before this, a row carried two and three copies of one rule's finding from
-  three runs. Older findings stay in History.
+- **An approved finding stays until the same rule and row receive a newer
+  explicit decision (2026-08-25).** This replaces the 2026-08-23 latest-run-
+  per-rule projection. A later model call that applies a rule but raises
+  nothing is silence, not a human decision, and cannot erase an approved
+  finding. A newer approved finding for the same rule and row replaces the one
+  the register shows; a newer rejected one clears it. The same rule on another
+  row is independent. No schema change and no destructive resolution flag:
+  every finding and decision remains in History, while the register reads the
+  latest explicit decision for each `(rule_id, register_row_id)` pair. Why:
+  the documented Helpline flow approved R1 on row 7, but a later model call
+  did not repeat it and the register silently hid a gap the Delivery Owner had
+  approved. Human decisions outrank absence from a later model answer.
 - **`examined_row_count` on `runs`** records how many rows Examine judged, so
   the `No findings` result can state it after the run ends, whether or not
   the run committed. A proposal still waiting on a possible-match answer is
@@ -770,9 +773,9 @@ match.
   it would join with the proposal's `Written down` overlaid, and counts real
   rows only. **Known limitation:** if the person then rejects the match, the
   new row gets no finding in that run; the next run raises it.
-- **Known limitation:** a rule is judged by a model, so a rule that runs again
-  in a later run may not re-raise a finding an earlier run raised. The register
-  then shows the newer answer and History keeps the older one.
+- **Known limitation:** a rule is judged by a model, so a later run may not
+  repeat a finding. The approved finding remains on the register until the
+  same rule and row produce another finding that a person decides.
 - **Status:** Implemented and verified with the scripted model. Findings reach
   the human gate through the existing review queue, a rejected finding stays in
   the run record and never reaches the register, and Examine re-entry after a
@@ -1256,7 +1259,8 @@ a symlink after creation is not re-checked.
   the source document, not through a cell of its own.
 - A batch holding two documents of one type orders them by file name.
 - One Extract call can repeat in the answer-to-checkpoint kill window.
-- Rejected findings stay suppressed even if later evidence strengthens them.
+- A rejected finding clears the register for that rule and row. A later model
+  call may raise a new finding there, which requires a new human decision.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are not read rather than chunked, and scanned PDFs are not
   read rather than OCR'd; chunking and OCR are not planned for V1.

@@ -4,6 +4,20 @@ Current status only. Completed narrative that has fallen out of this file
 stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-25, branch `codex/task1-eight-findings`
+
+The first repair checkpoint changes only the register's finding projection.
+An approved finding now remains until a later finding for the same rule and row
+receives an explicit decision; a later model answer that simply omits it no
+longer clears it. A newer approval replaces it, a newer rejection clears it,
+and another row of the same rule is independent. Every historical finding and
+decision remains in History.
+
+The revised never-do test was observed failing against the old projection, then
+passed with the implementation. The focused register/Examine regression set is
+**13 passed, 1 known third-party warning** against real PostgreSQL. Full-suite
+and live-corpus verification remain pending until the repair branch closes.
+
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 
 The screen half of the demo-run repairs: after this branch the review screen
@@ -163,8 +177,9 @@ cells, findings and history say what the documents actually support.
   `config/rules.yaml`, validated at startup and at every freeze), and
   `runs.rules_applied` (migration `20260823_0023`) records exactly what
   Examine sent to the model.
-- **The register shows each rule's finding from the latest run that applied
-  it**, so a row never carries two copies of one rule's finding again.
+- **Superseded by the 2026-08-25 snapshot:** this branch originally made the
+  latest run that applied a rule replace its earlier register findings. The
+  current contract keeps the latest explicit decision per rule and row.
 - **Examine treats an unanswered possible match as the match**: it judges the
   row the proposal would join, with that proposal's `Written down` overlaid,
   and counts real rows only.
@@ -1360,8 +1375,8 @@ working claim only after its own implementation and proof land.
   a rejected match leaves the new row without a finding for that run. Written
   up for a reader in README's "What it does not do"; the next run raises it.
 - **A model-judged rule that runs again may not re-raise an earlier finding.**
-  The register shows the newer answer and History keeps the older one; README's
-  "What it does not do" states it for a reader.
+  Silence leaves the approved finding on that row; a later explicit decision
+  for the same rule and row replaces it. History keeps every answer.
 - **A rule still asks its question again on every run**, once the documents it
   names have been read — README's "What it does not do" is that one's home.
   `applies_when` removed the worse half of it: the demo's six findings raised
