@@ -217,6 +217,14 @@ export is always gated.
   `POST /runs` remains. Files arriving during Review wait for the next run.
   Both numbers are `config/watcher.yaml`, read through `WATCHER_CONFIG_PATH`.
   **Implemented and verified** by `tests/runs/test_watched_folder.py`.
+- **One settled arrival starts at most one run (2026-08-25).** Before the
+  watcher starts for a changed signature, it checks whether every current file
+  was settled after that file's last modification. A manual run or the queued
+  run may therefore serve the arrival while the watcher is waiting, in which
+  case the watcher remembers the signature and writes no duplicate `no
+  changes` run. A file absent from that run remains unsettled and starts after
+  the project lock clears; an unsupported arrival still earns one run and one
+  `not read` reason.
 - **Baseline, not backlog:** whatever the watcher first sees in a folder is not
   an arrival, so a project created over a folder of documents starts nothing by
   itself and never surprises a fresh `docker compose up` with a paid run. The

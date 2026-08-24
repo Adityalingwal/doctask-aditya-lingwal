@@ -12,9 +12,16 @@ import yaml
 from psycopg import AsyncConnection
 
 from app.refusal import UnusableRequest
+from app.ingest.collect_batch import top_level_files
+from app.ingest.read_once import READ_BY_THE_PROJECT, read_by_the_project_parameters
 from app.run_logging import log_run_event
 from app.runs.run_lifecycle import RunEngine, start_or_queue_run
-from app.runs.statuses import ACTIVE_STATUSES, WAITING
+from app.runs.statuses import (
+    ACTIVE_STATUSES,
+    DONE,
+    ENDED_WITHOUT_CHANGES,
+    WAITING,
+)
 
 
 POLL_SECONDS_KEY = "poll_seconds"
@@ -124,6 +131,24 @@ async def start_runs_for_settled_folders(
                 # A run already holds this project. Its signature is left
                 # alone, so the files that arrived reach the run after it.
                 continue
+            if await _folder_signature_was_served(
+                connection, project["id"], folder
+            ):
+                # A manual run, or the one already waiting behind another run,
+                # may have collected this arrival while the watcher was
+                # waiting for the folder to settle. Remember that exact
+                # signature without writing a second `no changes` run.
+                watched[project["id"]].started_for = signature
+                log_run_event(
+                    logging.INFO,
+                    "watcher_arrival_already_served",
+                    f"The settled folder change for '{project['name']}' was "
+                    "already handled by another run, so the watcher did not "
+                    "start a duplicate.",
+                    None,
+                    project_id=str(project["id"]),
+                )
+                continue
 
         watched[project["id"]].started_for = signature
         try:
@@ -214,6 +239,55 @@ async def _project_has_a_run_in_flight(
         (project_id, [*ACTIVE_STATUSES, WAITING]),
     )
     return await result.fetchone() is not None
+
+
+async def _folder_signature_was_served(
+    connection: AsyncConnection,
+    project_id: UUID,
+    folder: Path,
+) -> bool:
+    """Whether every current file was settled after its last filesystem change.
+
+    A file is served when a settled document read names it, or when a terminal
+    run reports it in Skipped (for example an unsupported format or a renamed
+    copy already read by content). Comparing the run's finish time with the
+    file's modification time matters: an old run naming `notes.md` must not
+    suppress the watcher after that same path is edited later.
+
+    An empty folder deliberately returns false. The watcher must still reach
+    the shared empty-folder refusal once for a settled deletion, rather than
+    silently treating no files as work another run consumed.
+    """
+    files = await asyncio.to_thread(top_level_files, folder)
+    if not files:
+        return False
+
+    result = await connection.execute(
+        "WITH served AS ("
+        "SELECT documents.source_path AS file, runs.finished_at AS served_at "
+        "FROM documents JOIN runs ON runs.id = documents.run_id "
+        f"WHERE {READ_BY_THE_PROJECT} "
+        "UNION ALL "
+        "SELECT skipped.entry ->> 'file' AS file, runs.finished_at AS served_at "
+        "FROM runs CROSS JOIN LATERAL "
+        "jsonb_array_elements(runs.skipped) AS skipped(entry) "
+        "WHERE runs.project_id = %s AND runs.status = ANY(%s)"
+        ") SELECT file, max(served_at) AS served_at FROM served "
+        "WHERE file IS NOT NULL GROUP BY file",
+        (
+            *read_by_the_project_parameters(project_id),
+            project_id,
+            [DONE, ENDED_WITHOUT_CHANGES],
+        ),
+    )
+    served_at = {
+        row["file"]: row["served_at"] for row in await result.fetchall()
+    }
+    return all(
+        served_at.get(path.name) is not None
+        and served_at[path.name].timestamp() >= path.stat().st_mtime
+        for path in files
+    )
 
 
 def _resolve_folder(project_root: Path, project: dict[str, Any]) -> Path:

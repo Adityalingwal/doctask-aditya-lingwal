@@ -27,6 +27,15 @@ attached`. The focused extraction/schema/full-flow set is **33 passed** against
 real PostgreSQL. Wider regressions and the live warehouse corpus remain
 pending until the repair branch closes.
 
+The third checkpoint removes mixed-trigger duplicates. If a manual or queued
+run settles every file in the watcher's changed signature, the watcher marks
+that signature served instead of adding a second `no changes` run. It still
+starts the next run for a file that missed the active batch, and an unsupported
+arrival still gets one run with one `not read` reason. Both new duplicate tests
+were observed failing first; the complete watcher file is now **5 passed**, and
+the wider watcher/queue/run-ending set had **12 existing tests pass** before a
+new fixture-only assertion was corrected and re-run green.
+
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 
 The screen half of the demo-run repairs: after this branch the review screen
