@@ -23,9 +23,11 @@ extraction path. They never enter the positive requirements list and never
 create a row. A related exclusion is always human-gated; approval moves
 `Written down` and `Status` to `Excluded` with the exact quote, rejection
 leaves the row unchanged, and an unmatched exclusion is reported as `not
-attached`. The focused extraction/schema/full-flow set is **33 passed** against
-real PostgreSQL. Wider regressions and the live warehouse corpus remain
-pending until the repair branch closes.
+attached`. Four end-to-end scope tests now cover the same-batch approval,
+rejection, unmatched case, and a later exclusion against a committed row; the
+focused extraction/schema/full-flow set is **34 passed** against real
+PostgreSQL. Wider regressions and the live warehouse corpus remain pending
+until the repair branch closes.
 
 The third checkpoint removes mixed-trigger duplicates. If a manual or queued
 run settles every file in the watcher's changed signature, the watcher marks

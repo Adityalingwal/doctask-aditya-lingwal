@@ -61,7 +61,8 @@ def _extraction_answers(exclusion_summary: str = EXCLUSION) -> dict:
 def _one_batch(
     tmp_path: Path,
     script: dict,
-) -> Iterator[tuple[Any, str, str]]:
+    include_scope: bool = True,
+) -> Iterator[tuple[Any, str, str, Path]]:
     with temporary_project_folder("scope-exclusions") as (
         folder,
         source_folder_path,
@@ -69,9 +70,10 @@ def _one_batch(
         write_document_stating(
             folder, MEETING_FILE, "10 March 2026", [ASK_QUOTE]
         )
-        write_document_stating(
-            folder, SCOPE_FILE, "12 March 2026", [EXCLUSION_QUOTE]
-        )
+        if include_scope:
+            write_document_stating(
+                folder, SCOPE_FILE, "12 March 2026", [EXCLUSION_QUOTE]
+            )
         script_path = tmp_path / "script.json"
         write_script(script_path, script)
         with temporary_database() as database_url:
@@ -90,7 +92,7 @@ def _one_batch(
                     run_id = client.post(
                         "/runs", json={"project_id": project_id}
                     ).json()["run_id"]
-                    yield client, project_id, run_id
+                    yield client, project_id, run_id, folder
             finally:
                 application.stop()
 
@@ -124,7 +126,7 @@ def test_a_scope_exclusion_is_never_a_second_positive_requirement(
         observation_marker(): observation_answer_of([1]),
         examine_marker(): no_findings_answer(),
     }
-    with _one_batch(tmp_path, script) as (client, project_id, run_id):
+    with _one_batch(tmp_path, script) as (client, project_id, run_id, _):
         at_review = _settle(client, run_id)
         register = client.get(f"/projects/{project_id}/register").json()
 
@@ -147,7 +149,7 @@ def test_rejecting_the_scope_link_leaves_the_requirement_unchanged(
         observation_marker(): observation_answer_of([1]),
         examine_marker(): no_findings_answer(),
     }
-    with _one_batch(tmp_path, script) as (client, project_id, run_id):
+    with _one_batch(tmp_path, script) as (client, project_id, run_id, _):
         _settle(client, run_id, reject_exclusion=True)
         register = client.get(f"/projects/{project_id}/register").json()
 
@@ -164,7 +166,7 @@ def test_an_unmatched_scope_exclusion_is_reported_not_attached(
         observation_marker(): observation_answer_of([None]),
         examine_marker(): no_findings_answer(),
     }
-    with _one_batch(tmp_path, script) as (client, project_id, run_id):
+    with _one_batch(tmp_path, script) as (client, project_id, run_id, _):
         at_review = _settle(client, run_id)
         register = client.get(f"/projects/{project_id}/register").json()
 
@@ -175,3 +177,37 @@ def test_an_unmatched_scope_exclusion_is_reported_not_attached(
     assert at_review["skipped"][0]["summary"] == (
         "offline stock counting is outside scope"
     )
+
+
+def test_a_later_exclusion_against_a_committed_row_is_still_gated(
+    tmp_path: Path,
+) -> None:
+    """The scope boundary may not silently overwrite a committed row."""
+    script = _extraction_answers() | {
+        match_marker_against_an_empty_register(): match_answer(1),
+        observation_marker(): observation_answer_of([1]),
+        examine_marker(): no_findings_answer(),
+    }
+    with _one_batch(tmp_path, script, include_scope=False) as (
+        client,
+        project_id,
+        first_run,
+        folder,
+    ):
+        _settle(client, first_run)
+        write_document_stating(
+            folder, SCOPE_FILE, "12 March 2026", [EXCLUSION_QUOTE]
+        )
+        second_run = client.post(
+            "/runs", json={"project_id": project_id}
+        ).json()["run_id"]
+        at_review = _settle(client, second_run)
+        register = client.get(f"/projects/{project_id}/register").json()
+
+    assert [decision["kind"] for decision in at_review["decisions"]] == [
+        "observation match"
+    ]
+    assert EXCLUSION_QUOTE in at_review["decisions"][0]["question"]
+    assert len(register["rows"]) == 1
+    assert register["rows"][0]["cells"]["in_writing"] == "Excluded"
+    assert register["rows"][0]["cells"]["status"] == "Excluded"
