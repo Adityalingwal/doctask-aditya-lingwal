@@ -357,7 +357,7 @@ Migration `20260817_0017` dropped the other three cells; history: 2026-08-17.
 Statuses are fixed in code and in a database check constraint:
 
 `Done` · `Partial` · `Not delivered` · `Handed over` · `Disputed` ·
-`Requested`
+`Requested` · `Excluded`
 
 Each means one thing, written down so a model, an implementer and a reader
 cannot each assume a different one:
@@ -381,6 +381,10 @@ cannot each assume a different one:
   has not spoken yet.
 - **`Disputed`** — two documents make opposing claims about this requirement.
   The system never resolves it; it goes to a person.
+- **`Excluded`** — the client's requirements document explicitly puts this
+  ask outside approved scope, and the Delivery Owner approved linking that
+  boundary to this row. `Written down` also reads `Excluded`, with the exact
+  scope quote behind both cells. It is not a delivery or testing failure.
 
 - What moves a row: a testing observation's label (`Passed` → `Done`,
   `Defect` → `Partial`; `Change request` and `Unclear` move no status, because
@@ -394,7 +398,7 @@ cannot each assume a different one:
 - Unknown cells say what is unknown; they are never blank or guessed.
 - **A cell answers in as few words as a reader can scan down a column, and the
   file behind the answer lives in the row's evidence (2026-08-23).**
-  `Written down` reads `Not known yet` · `Yes` · `Not mentioned`, and `What
+  `Written down` reads `Not known yet` · `Yes` · `Excluded` · `Not mentioned`, and `What
   testing found` reads `Not known yet` · what testing said · `Not mentioned`.
   This replaces the bullet that had the cell read `Not found in <file>.` and
   the two long "Not known yet — no … has been read" sentences: a column of
@@ -565,8 +569,10 @@ match.
 
 - **Decision:** One model call per document, sequentially. This makes filename
   attribution deterministic, checkpointing clean, and failures isolated.
-- **Output:** type, date, requirements, testing observations, delivery
-  evidence, blockers, and embedded instructions, each tied to exact words. This
+- **Output:** type, requirements, explicit scope exclusions, testing
+  observations, delivery evidence, and embedded instructions, each tied to
+  exact words. A negative scope sentence from the client's requirements is a
+  typed exclusion, never a positive requirement. This
   list may widen only with a real later-slice need.
 - **Contract:** the model call sends `response_format` of type `json_schema`
   with `strict: true`, and the schema is **generated from the Pydantic answer
@@ -664,6 +670,13 @@ match.
 - Each requirement reaches the Match prompt with its `document_type`, taken
   from the stored extraction and never guessed from a file name, so the
   question can name the kind of document each statement came from.
+- **Explicit scope exclusions never create rows (2026-08-25).** Match treats
+  one as a statement about already-requested work: no related row leaves it
+  `not attached`; a proposed link always goes to the Delivery Owner, even for
+  a row proposed in the same batch. Approval moves `Written down` and `Status`
+  to `Excluded` with the exact quote; rejection leaves the row unchanged and
+  retains the proposal on the run. This implements conflict surfacing without
+  making negative wording into work the provider is expected to deliver.
 - Approved merge moves citations to the candidate — following a merge already
   approved, since two proposals of one batch can settle in either order — and
   marks the proposal with `merged_into_register_row_id`; it is retained and

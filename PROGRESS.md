@@ -18,6 +18,15 @@ passed with the implementation. The focused register/Examine regression set is
 **13 passed, 1 known third-party warning** against real PostgreSQL. Full-suite
 and live-corpus verification remain pending until the repair branch closes.
 
+The second checkpoint gives explicit client scope exclusions their own typed
+extraction path. They never enter the positive requirements list and never
+create a row. A related exclusion is always human-gated; approval moves
+`Written down` and `Status` to `Excluded` with the exact quote, rejection
+leaves the row unchanged, and an unmatched exclusion is reported as `not
+attached`. The focused extraction/schema/full-flow set is **33 passed** against
+real PostgreSQL. Wider regressions and the live warehouse corpus remain
+pending until the repair branch closes.
+
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 
 The screen half of the demo-run repairs: after this branch the review screen

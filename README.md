@@ -85,11 +85,18 @@ about it, and every move keeps the quote behind it.
 | `Partial` | It exists, but testing found it broken or unfinished. | A testing report that found a defect |
 | `Not delivered` | Testing looked for it and it was not there, and no handover note ever claimed it was built. | A testing report that found it missing |
 | `Disputed` | A handover note says it is built. Testing says it is missing. Both quotes stay on the row. | A handover note and a testing report that contradict each other |
+| `Excluded` | The client's written scope explicitly excludes this ask. It is not a delivery failure. | A scope exclusion linked to the row and approved by the Delivery Owner |
 
 Two things testing can say move nothing. A **change request** — a new ask that
 turns up during testing — is not a verdict on the work already done. And a note
 with **no verdict in it** is not a verdict either. Both are recorded on the run
 and left off the status.
+
+An explicit negative scope sentence is never turned into a positive
+requirement. If it clearly relates to an ask already in the register, the run
+asks the Delivery Owner whether to link the conflict; approval leaves the exact
+quote behind `Written down: Excluded` and `Status: Excluded`. If it reaches no
+row, it stays on the run as `not attached`.
 
 ### The rules
 

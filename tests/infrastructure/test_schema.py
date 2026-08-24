@@ -137,6 +137,7 @@ REGISTER_ROW_STATUSES = (
     "Handed over",
     "Disputed",
     "Requested",
+    "Excluded",
 )
 
 

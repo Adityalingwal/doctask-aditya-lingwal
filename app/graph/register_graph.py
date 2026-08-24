@@ -776,7 +776,11 @@ def _observations_in(extraction: dict[str, Any]) -> int:
     """How much this document says about work the client already asked for."""
     return sum(
         len(extraction[list_name])
-        for list_name in ("testing_observations", "delivery_evidence")
+        for list_name in (
+            "scope_exclusions",
+            "testing_observations",
+            "delivery_evidence",
+        )
     )
 
 
