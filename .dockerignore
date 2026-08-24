@@ -6,4 +6,5 @@
 *.pyc
 documentation/
 handoff/
-ui/
+ui/node_modules/
+ui/dist/
