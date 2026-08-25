@@ -4,6 +4,31 @@ Current status only. Completed narrative that has fallen out of this file
 stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-25, branch `codex/task1-eight-findings`
+
+The watcher repair removes mixed-trigger duplicates. If a manual or queued
+run settles every file in the watcher's changed signature, the watcher marks
+that signature served instead of adding a second `no changes` run. It still
+starts the next run for a file that missed the active batch, and an unsupported
+arrival still gets one run with one `not read` reason. Both new duplicate tests
+were observed failing first; the complete watcher file is now **5 passed**, and
+the wider watcher/queue/run-ending set had **12 existing tests pass** before a
+new fixture-only assertion was corrected and re-run green.
+
+The documentation/UI drift pass points README at the current `Run` tab, documents the
+shipped 2-second poll and 5-second quiet window in `config/README.md`, and
+bundles an SVG favicon under `/ui/`.
+
+The in-app Browser drove the four Helpline files sequentially and a second
+Helpline project in batches, including the three-column screen, both rails,
+review buttons, History, a 900px viewport and a clean console. MCP discovery
+returned exactly eight tools; queue/dedupe behaviour and MCP/HTTP parity were
+checked. A no-bind image first reproduced the hidden 503 UI packaging gap; the
+final multi-stage image migrated fresh PostgreSQL and served health, `/ui/`,
+and `/ui/favicon.svg` with HTTP 200. The corrected release proof is **298
+Python passed** against real PostgreSQL and **116 front-end passed across 50
+files**; the production UI build also passes.
+
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 
 The screen half of the demo-run repairs: after this branch the review screen
@@ -1303,8 +1328,8 @@ merging and about `Written down` still stands.
 ## In progress / next slices
 
 Nothing is in progress. Every planned slice is built and merged (the review
-screen redesign landed as PR #15). What remains is the open fresh-clone and
-image-only verification, and the first live-model run.
+screen redesign landed as PR #15). Live-model and no-bind image proof are
+complete; only the literal fresh-clone walkthrough remains open.
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -1338,11 +1363,6 @@ working claim only after its own implementation and proof land.
    `build_export` is now `build_register_document`, the run-level export
    route is gone, and the register read still serves committed rows only, so
    the gate still shows no merge.
-2. **Development Compose mount is too broad for final proof.** `.:/workspace`
-   is intentionally retained for iteration, exposes local `.env`, and lets
-   local files override the image. Remove/narrow it and wipe stale dev DB
-   before final image-only/fresh-clone verification.
-
 ## Active assumptions and unverified claims
 
 | Assumption / claim | Current basis | What closes it |
@@ -1351,8 +1371,8 @@ working claim only after its own implementation and proof land.
 | Source documents are usually 5–10 pages | Small-team domain expectation | Measure actual corpora; revisit pgvector/chunking only if needed |
 | Real SDK exception classification matches tests | Typed `status_code`; only scripted/401 path observed | Live provider failure evidence |
 | SDK retry is close enough to locked policy | Two attempts/120s configured; SDK owns wait | Live timing and explicit retry evidence |
-| Default OpenRouter model is suitable | Configured but never called | Bounded live-model run |
-| The Helpline AI end-state table (`sample-documents/helpline-ai/README.md`) — 7 row statuses, 3 rule findings, 1 rule expected silent | Written from the brief's design against the corpus text; never run | The bounded live-model run over the staged Helpline AI corpus |
+| Default OpenRouter model is suitable | Bounded Helpline live calls completed; broader suitability remains unverified | Exercise representative additional corpora before generalising |
+| The Helpline AI end-state table (`sample-documents/helpline-ai/README.md`) — 7 row statuses, 3 rule findings, 1 rule expected silent | Three live drives reached all seven expected statuses; finding output varied by model as recorded below | Repeat only when the corpus or model configuration changes |
 
 ## Known limitations
 
@@ -1513,6 +1533,8 @@ working claim only after its own implementation and proof land.
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.
   Image-only serving is part of the open fresh-clone verification.
+  **Superseded on 2026-08-25:** the pinned Node stage now builds `ui/dist` and
+  copies it into the Python image; the no-bind image proof serves the screen.
 - The screen authenticates nobody, exactly as the endpoints behind it do not.
 - A folder that exists but the application cannot read is accepted by
   `create_project`, which only checks that it is a directory; the failure
@@ -1543,7 +1565,8 @@ working claim only after its own implementation and proof land.
 - Neither door authenticates a caller; the MCP endpoint additionally answers
   `421` to a `Host` header other than `localhost` or `127.0.0.1`, so a client
   on another machine cannot reach it as it stands.
-- Fresh-clone and image-only verification remain open.
+- The literal fresh-clone walkthrough remains open; separate no-bind image
+  verification is complete.
 
 ## Next actions
 
@@ -1646,8 +1669,8 @@ configures twice. Before the change an INFO run event printed nothing
 | Register-moves hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Same session: a project that had never run read "Nothing has been added to this register yet."; a run driven to Review showed the question "Add this run's changes to the register?" verbatim; after approving and finishing, its project's Register entry read "1 row" and opening it showed the full table with citations and rules; opening the run's own Decisions tab (showing the answered export decision) and then clicking Register left no trace of the run's decision or its Approve/Reject buttons on screen |
 | `docker compose -p fx8 run --rm app pytest` | 2026-08-16, `match-within-batch-duplicates` branch, after the review repairs | 195 passed, real PostgreSQL, no live key. Was 188 before the three repairs; the seven new tests cover the merge recompute, the merge chain and the date ordering. Re-run in the foreground, independently of the implementing agent, because Codex cannot reach a Docker socket |
 | `npm --prefix ui test` | 2026-08-16, same branch, after the review repairs | 44 passed, 29 files, no live key — unchanged; no front-end file was touched |
-| Live model | Never | Unverified |
-| Fresh clone/image-only | Not run yet | Open release gate |
+| Live model | 2026-08-25, `codex/task1-eight-findings` branch | Four synthetic Helpline documents exercised as single-file and batched updates through OpenRouter; broader domain and provider behaviour remain unverified |
+| Image-only | 2026-08-25, same branch | A no-bind image migrated fresh PostgreSQL and served health, `/ui/`, and favicon with HTTP 200; a literal fresh-clone walkthrough remains open |
 
 ## Documentation history policy
 

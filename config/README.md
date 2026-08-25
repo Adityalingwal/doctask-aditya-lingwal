@@ -15,7 +15,7 @@ watcher reacts, is an edit here, never a code change.
 
 ## Editing `watcher.yaml`
 
-The shipped values are `poll_seconds: 4` and `quiet_seconds: 10`. Both must be
+The shipped values are `poll_seconds: 2` and `quiet_seconds: 5`. Both must be
 numbers above zero; anything else stops the application at startup, naming the
 key and what is wrong with it.
 
@@ -25,6 +25,9 @@ key and what is wrong with it.
   changing for `quiet_seconds`.
 - Nothing starts while that project already has a run running, at review, or
   queued. Files that arrive during a review wait for the run after it.
+- If a manual or queued run handles the settled arrival first, the watcher
+  marks that folder signature served instead of writing a duplicate `no
+  changes` run. A later file that missed that run still starts the next one.
 - The watcher forgets what it has seen when the application restarts, so files
   that arrived while it was down are read by the next run started by hand.
 

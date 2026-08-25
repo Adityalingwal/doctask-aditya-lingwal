@@ -180,7 +180,7 @@ has stopped changing for 5s the first run starts by itself. You will see its
 progress move through Ingest, Extract, Match and Examine, and then stop at
 Review.
 
-It stops there because it needs you. Open the **Decisions** tab and answer the
+It stops there because it needs you. Open the **Run** tab and answer the
 questions this run raised. Then press **Add this run's changes to the register**.
 
 That is when the register is written. This meeting note names seven things the
@@ -247,8 +247,8 @@ CRM work.
 | Testing feedback | Moves existing rows. Creates none. |
 
 A handover note or testing report that arrives before the requirement it talks
-about has no row to move. Instead of guessing, the system lists it on the **Not
-used** tab and explains why.
+about has no row to move. Instead of guessing, the system lists it on the
+**Skipped** tab and explains why.
 
 ### Two file formats
 
@@ -407,8 +407,9 @@ The rest of the limits:
 - **Nothing checks who is calling** — not the screen, not the API, not the
   tools. The MCP endpoint refuses any request whose `Host` is not `localhost`
   or `127.0.0.1`, so another machine cannot reach it as it stands.
-- **The screen is built by Node, which the application image does not have.**
-  `ui/dist` has to be built on your machine before `docker compose up`.
+- **The production image builds the screen in a pinned Node stage.** The final
+  Python image contains `ui/dist` but no Node runtime. The broad Compose source
+  bind remains a development convenience, not proof of packaged contents.
 - **A project's folder must sit directly inside** the folder named in
   `config/projects.yaml` (`sample-projects/` by default). Not the root itself,
   not nested deeper, never an absolute path. Anything else is refused, with the

@@ -30,11 +30,12 @@ from tests.register.stored_register import runs_of_project
 ALREADY_THERE = "meeting-notes-10-mar.md"
 ARRIVING = "meeting-notes-20-mar.md"
 ARRIVING_LATER = "testing-feedback-25-mar.md"
+UNSUPPORTED_ARRIVAL = "delivery-plan.csv"
 FIRST_REQUIREMENT = "an email to the operations team on intake form submit"
 SECOND_REQUIREMENT = "the same notification sent over WhatsApp"
 THIRD_REQUIREMENT = "a search over old intake records"
-# Short enough to keep the test quick, and still two polls inside one quiet
-# period, which is the shape the shipped ten-and-thirty-second pair has.
+# Short enough to keep the test quick, and still several polls inside one quiet
+# period, which is the shape the shipped two-and-five-second pair has.
 POLL_SECONDS = 0.2
 QUIET_SECONDS = 0.6
 LONGER_THAN_A_QUIET_PERIOD = 3.0
@@ -183,3 +184,101 @@ def test_the_watcher_does_not_start_a_second_run_while_one_is_active(
 
     assert [status for _, status in while_active] == ["needs review"]
     assert len(after_release) == 2
+
+
+def test_a_manual_run_serves_the_arrival_before_the_watcher_starts_one(
+    tmp_path: Path,
+) -> None:
+    """Never-do: one arrival must not leave a second `no changes` run."""
+    with _watched_project(tmp_path) as (
+        application,
+        database_url,
+        project_id,
+        source_folder,
+    ):
+        _let_the_watcher_see_the_folder()
+        _copy_in(source_folder, ARRIVING, SECOND_REQUIREMENT)
+        with application.client() as client:
+            manual_run = client.post(
+                "/runs", json={"project_id": project_id}
+            ).json()["run_id"]
+            wait_for_run_status(client, manual_run, "needs review")
+            approve_every_decision_and_finish_review(client, manual_run)
+            wait_for_run_status(client, manual_run, "done")
+            time.sleep(LONGER_THAN_A_QUIET_PERIOD)
+        after_the_watcher_settles = _runs(database_url, project_id)
+
+    assert after_the_watcher_settles == [(manual_run, "done")]
+
+
+def test_a_queued_run_serves_an_arrival_without_a_watcher_duplicate(
+    tmp_path: Path,
+) -> None:
+    """A file collected by the waiting run must not earn a third run."""
+    with _watched_project(tmp_path) as (
+        application,
+        database_url,
+        project_id,
+        source_folder,
+    ):
+        _let_the_watcher_see_the_folder()
+        _copy_in(source_folder, ARRIVING, SECOND_REQUIREMENT)
+        first_run = wait_until(
+            lambda: _runs(database_url, project_id),
+            "the watcher starts the first run",
+        )[0][0]
+        with application.client() as client:
+            wait_for_run_status(client, first_run, "needs review")
+            _copy_in(source_folder, ARRIVING_LATER, THIRD_REQUIREMENT)
+            queued_run = client.post(
+                "/runs", json={"project_id": project_id}
+            ).json()
+            assert queued_run["status"] == "queued"
+
+            approve_every_decision_and_finish_review(client, first_run)
+            wait_for_run_status(client, first_run, "done")
+            wait_for_run_status(client, queued_run["run_id"], "needs review")
+            approve_every_decision_and_finish_review(client, queued_run["run_id"])
+            wait_for_run_status(client, queued_run["run_id"], "done")
+            time.sleep(LONGER_THAN_A_QUIET_PERIOD)
+        after_the_watcher_settles = _runs(database_url, project_id)
+
+    assert after_the_watcher_settles == [
+        (first_run, "done"),
+        (queued_run["run_id"], "done"),
+    ]
+
+
+def test_an_unsupported_arrival_still_gets_one_watcher_run_and_reason(
+    tmp_path: Path,
+) -> None:
+    """Duplicate suppression must not suppress the first honest refusal."""
+    with _watched_project(tmp_path) as (
+        application,
+        database_url,
+        project_id,
+        source_folder,
+    ):
+        # This case is about the unsupported arrival alone. Remove the fixture
+        # document before the watcher's first sight so it cannot become an
+        # unrelated model-driven batch in the same run.
+        (source_folder / ALREADY_THERE).unlink()
+        _let_the_watcher_see_the_folder()
+        (source_folder / UNSUPPORTED_ARRIVAL).write_text(
+            "feature,owner\nbarcode scanning,warehouse\n", encoding="utf-8"
+        )
+        started = wait_until(
+            lambda: _runs(database_url, project_id),
+            "the watcher starts one run for the unsupported arrival",
+        )
+        with application.client() as client:
+            ended = wait_for_run_status(client, started[0][0], "no changes")
+            time.sleep(LONGER_THAN_A_QUIET_PERIOD)
+        after_the_watcher_settles = _runs(database_url, project_id)
+
+    unsupported = [
+        entry for entry in ended["skipped"] if entry["file"] == UNSUPPORTED_ARRIVAL
+    ]
+    assert len(unsupported) == 1
+    assert unsupported[0]["kind"] == "not read"
+    assert after_the_watcher_settles == [(started[0][0], "no changes")]
