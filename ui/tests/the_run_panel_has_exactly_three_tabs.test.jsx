@@ -79,16 +79,16 @@ test("no run heading is numbered", async () => {
   }
 });
 
-test("the Run tab reads stages, then what it waits for, then its decisions", async () => {
+test("the Run tab reads stages, then its decisions, then what it waits for", async () => {
   screenShowing({ decisions: [decisionReply()] });
 
   const runTab = await screen.findByRole("region", { name: /^run$/i });
   const text = runTab.textContent;
   expect(text.indexOf("ingest")).toBeLessThan(
-    text.indexOf("This run is waiting for you."),
-  );
-  expect(text.indexOf("This run is waiting for you.")).toBeLessThan(
     text.indexOf("Is this the same ask as row 2?"),
+  );
+  expect(text.indexOf("Is this the same ask as row 2?")).toBeLessThan(
+    text.indexOf("This run is waiting for you."),
   );
 });
 

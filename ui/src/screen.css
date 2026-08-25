@@ -135,6 +135,21 @@
     background-size: 10px 7px;
   }
 
+  /* Each line of the Add-will-write block wears its arrow as an ornament
+     rather than as text, so the block reads out exactly the sentence the
+     server sent and nothing the screen added to it. */
+  .will-write {
+    padding-left: 15px;
+    position: relative;
+  }
+
+  .will-write::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--color-signal-edge);
+  }
+
   /* The name of a section, set to carry the weight of a heading. */
   .section-name {
     font-family: var(--font-mono);

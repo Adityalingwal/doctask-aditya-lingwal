@@ -1,3 +1,4 @@
+import AddWillWrite from "./AddWillWrite.jsx";
 import Question from "./Question.jsx";
 import Stages from "./Stages.jsx";
 import { Examine } from "./Register.jsx";
@@ -9,8 +10,13 @@ const ADD_LABEL = "Add this run's changes to the register";
 const DISCARD_LABEL = "Discard this run's changes";
 
 /**
- * One run, top to bottom: what each stage did, why it stopped early, what it
- * is waiting for, the decisions it raised, and the rules it judged against.
+ * One run, top to bottom: what each stage did, why it stopped early, the
+ * decisions it raised, what adding it would write, the two ways to end the
+ * review, and the rules it judged against.
+ *
+ * One fixed order, and the preview sits where a person arrives once the last
+ * decision is answered — immediately above the press it describes. A run with
+ * no decision at all simply reads the preview straight after the stages.
  */
 export default function RunTab({
   run,
@@ -24,14 +30,6 @@ export default function RunTab({
   return (
     <div className="flex flex-col gap-8">
       <Stages run={run} />
-
-      {reviewing && (
-        <WaitingForYou
-          waiting={waiting}
-          answering={answering}
-          onFinish={onFinish}
-        />
-      )}
 
       {decisions.length === 0 ? (
         <p className="m-0 text-ink-soft">This run has raised no decision.</p>
@@ -47,6 +45,21 @@ export default function RunTab({
             />
           ))}
         </ul>
+      )}
+
+      {run.add_will_write !== null && run.add_will_write !== undefined && (
+        <AddWillWrite
+          entries={run.add_will_write}
+          openDecisions={run.open_decisions}
+        />
+      )}
+
+      {reviewing && (
+        <WaitingForYou
+          waiting={waiting}
+          answering={answering}
+          onFinish={onFinish}
+        />
       )}
 
       {run.examine !== null && (

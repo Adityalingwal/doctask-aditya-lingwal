@@ -18,6 +18,11 @@ export function runReply(overrides = {}) {
     ended_early_reason: null,
     failure_reason: null,
     decisions: [],
+    // What the adding press would write, and how many questions still stand
+    // between the person and pressing it. A run that has ended answers null:
+    // the block previews a press, it does not record one.
+    add_will_write: [],
+    open_decisions: 0,
     examine: null,
     finished_stages: ["ingest", "extract", "match", "examine"],
     exported: false,
