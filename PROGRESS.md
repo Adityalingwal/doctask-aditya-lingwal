@@ -41,6 +41,14 @@ panel.
 
 **Assumptions made on this branch** — each one a place the brief left room:
 
+- **A chained merge can land a previewed write on a different row.** An
+  approved-merge line renders the decision's own stored row number, while
+  Commit follows merge chains to the surviving row — so in a run where one
+  proposal merges into another that itself merges into a register row, the
+  line's row number can differ from where the write finally lands. The
+  decision cards have carried this same frozen number since they shipped;
+  the review found it (2026-08-26) and the accepted resolution is this
+  recorded limitation, not a resolver in the preview.
 - The Add-will-write lines name **source files only**, never
   `<file>, under "<Heading>"`. Every one of the brief's eight templates and
   every mockup line shows a bare file name, and one line can rest on two cells

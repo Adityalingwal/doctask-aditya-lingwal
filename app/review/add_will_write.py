@@ -18,7 +18,6 @@ from app.register.cells import (
 from app.register.move_rows import DELIVERY_EVIDENCE, TESTING_OBSERVATION
 from app.review.review_queue import (
     APPROVED,
-    OBSERVATION_MATCH_DECISION,
     POSSIBLE_MATCH_DECISION,
     REJECTED,
     decisions_of_run,
