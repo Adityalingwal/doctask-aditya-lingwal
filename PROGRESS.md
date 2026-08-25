@@ -4,6 +4,70 @@ Current status only. Completed narrative that has fallen out of this file
 stays in its own Git history — `git log -p PROGRESS.md` reaches all of it.
 Decision rationale belongs in `DECISIONS.md`, not here.
 
+## Snapshot — 2026-08-25, branch `demo-polish`
+
+Eight locked review-screen items. The screen now says what the adding press
+will do before it is pressed, and the register page is one table and one row
+panel.
+
+- **The run payload carries `add_will_write` and `open_decisions`**
+  (`app/review/add_will_write.py`, assembled by `read_run_status`, so both
+  doors serve the identical field). Every line is a deterministic template
+  over stored data: the rows Commit creates and the documents that stated
+  them, what each answered question writes, the row a rejected match gets,
+  each approved finding, and each silence. Nothing an unanswered decision
+  would settle appears; `Nothing — the register stays as it is.` is said out
+  loud. `null` on any run not waiting at review.
+- **The Run tab's order is stages → ended early → decisions → the
+  Add-will-write block → the two endings → rules.** The block is always
+  present at review, never collapsible, and renders only server-sent entries;
+  the one sentence the screen composes is the open-decisions count.
+- **The folder dropdown is a button and a listbox** (`AddProject.jsx`), so the
+  open list wears the screen's square border, hard shadow and mono type
+  instead of the operating system's rounded menu. Escape, an outside click and
+  picking all close it; arrows move, Enter picks; the disabled state keeps its
+  wording.
+- **The row panel is 768px wide**, its `Evidence` heading is anchored, each
+  source line leads with the file, and every pill row is labelled `Proof for`
+  — absence entries included.
+- **The register page lost its History tab.** The route, the `get_history`
+  tool, `readHistory` and `History.jsx` all stay; the row panel is where a
+  history is read, grouped run → document → change, with no `Row N ·` prefix.
+- **A merged row's creation entry names the document that stated it**
+  (`commit_register.py`): with two citations on one cell the earlier document
+  in the workflow wins, instead of whichever the database returned last.
+- **The rules section says no more than the run judged**: `No rule ran.` alone
+  when nothing ran, and `No findings.` when rules ran and found nothing.
+
+**Assumptions made on this branch** — each one a place the brief left room:
+
+- The Add-will-write lines name **source files only**, never
+  `<file>, under "<Heading>"`. Every one of the brief's eight templates and
+  every mockup line shows a bare file name, and one line can rest on two cells
+  that share one document; the full source line stays available in the
+  decision's own parts.
+- `add_will_write` is the **list**, and `open_decisions` is a **separate
+  top-level field**. An ended run answers `add_will_write: null`;
+  `open_decisions` is always a number, and is naturally `0` once review ends.
+- Mockup scenario 2b groups five approved matches into one
+  `Rows 1, 2, 4, 5, 6 ·` line. The brief's exact template is per-row, and the
+  same mockup's scenario 2 renders the identical case per row, so **one line
+  per row** is what ships.
+- **Singular and many-document wordings the brief did not give:**
+  `1 new row, from <file>.`, and for a batch of more than two documents
+  `… from a, b and c — an ask stated in more than one becomes one row.`
+- **An ungated observation move** — one onto a row this same run proposed —
+  **does get a line.** It is written with certainty at Commit, so leaving it
+  out would make the block understate the press.
+- **An approved merge whose `if_approved` is empty gets no line.** It moves
+  evidence and writes no cell, and the block lists cell writes.
+- The block's title is written `Add will write` and uppercased by `.eyebrow`,
+  the way every other label on this screen is.
+- `RegisterPanel` keeps the row count as a badge beside the `Register`
+  heading, where the removed tab used to carry it.
+- `ui/demo/serve_demo_runs.js` was left alone, so its runs render the block
+  with no entries. It is a development-only Vite plugin, outside this brief.
+
 ## Snapshot — 2026-08-25, branch `codex/task1-eight-findings`
 
 The watcher repair removes mixed-trigger duplicates. If a manual or queued
@@ -21,7 +85,7 @@ bundles an SVG favicon under `/ui/`.
 
 The in-app Browser drove the four Helpline files sequentially and a second
 Helpline project in batches, including the three-column screen, both rails,
-review buttons, History, a 900px viewport and a clean console. MCP discovery
+review buttons, the row panel's history, a 900px viewport and a clean console. MCP discovery
 returned exactly eight tools; queue/dedupe behaviour and MCP/HTTP parity were
 checked. A no-bind image first reproduced the hidden 503 UI packaging gap; the
 final multi-stage image migrated fresh PostgreSQL and served health, `/ui/`,
@@ -49,13 +113,13 @@ shows what the backend already built, and composes no sentence of its own.
 - **The Skipped tab is three groups by kind**, one line per entry, and an
   observation that reached no row is titled by what it says. A place is named
   only where the server sent one.
-- **The register page is two tabs, and a row opens a panel.** `Register · n`
-  and `History · n runs`; the first column is `Row`; a row with findings wears
+- **A row opens a panel.** The first column is `Row`; a row with findings wears
   a `1 finding` mark beside its status and a clean row wears none. The panel
   carries the four cells, the evidence in payload order with the cells each
   quote supports, the findings keyed on `finding_id` with the run that raised
-  them, and that row's own history, collapsed. History is grouped under the run
-  that changed the register, and the run heading names no file.
+  them, and that row's own history, collapsed and grouped under the run that
+  changed the register. (The second tab this branch added went again on
+  2026-08-25 — see the snapshot above.)
 - **Both side columns collapse to a rail** that still opens the register and
   every run; a run's mark is its plain number. Every clickable thing carries a
   pointer, a hover state and a pressed state.
@@ -209,7 +273,7 @@ against a live model since; the expected end state is in
 - The register JSON's `findings` entries gained `raised_by_run` and
   `finding_id`.
 - A `done` run from before this branch has `rules_applied` null, so its
-  findings no longer show on the register (History keeps them). A fresh
+  findings no longer show on the register (the row's history keeps them). A fresh
   database never has such a run.
 - The register JSON's `examine` block and per-row `citations` list left the
   JSON on the screen branch, once nothing read them.
@@ -380,8 +444,9 @@ branch's own snapshot (`audit-history-read`) is in this file's Git history.
 - Built: `app/register/read_history.py` (the one core function),
   `GET /projects/{project_id}/history` in `app/api/routes.py`, the
   `get_history` tool in `app/mcp_server/tools.py`, `readHistory` in
-  `ui/src/run_requests.js`, `ui/src/History.jsx`, and the section and its
-  own read/refusal state in `ui/src/ReviewScreen.jsx`. `CELL_HEADINGS` is now
+  `ui/src/run_requests.js`, `ui/src/History.jsx` — which since 2026-08-25
+  renders inside the row panel only — and the read's own refusal state in
+  `ui/src/ReviewScreen.jsx`. `CELL_HEADINGS` is now
   exported from `ui/src/Register.jsx` and imported rather than copied.
 - Ordering is fixed in the query — newest `created_at`, then `row_number`,
   then `cell_name` nulls last — because one run's entries all carry that
@@ -1380,8 +1445,8 @@ working claim only after its own implementation and proof land.
   a rejected match leaves the new row without a finding for that run. Written
   up for a reader in README's "What it does not do"; the next run raises it.
 - **A model-judged rule that runs again may not re-raise an earlier finding.**
-  The register shows the newer answer and History keeps the older one; README's
-  "What it does not do" states it for a reader.
+  The register shows the newer answer and the row's own history keeps the
+  older one; README's "What it does not do" states it for a reader.
 - **A rule still asks its question again on every run**, once the documents it
   names have been read — README's "What it does not do" is that one's home.
   `applies_when` removed the worse half of it: the demo's six findings raised

@@ -19,8 +19,11 @@ LIMITATIONS_WITH_ONE_HOME = (
     "Partial",
     # S10 — a testing observation that reached no row runs against no rule.
     "Skipped tab",
-    # S27 — a model-judged rule may not raise the same finding twice.
-    "may not raise the same finding again",
+    # S27 — a model-judged rule may not raise the same finding twice, so the
+    # latest run that applied it decides what the register shows. Merged on
+    # 2026-08-25 with the finding-lifetime limitation into one wording, which
+    # is why the marker is the sentence stating that wording's cost.
+    "clears its finding until the next run re-raises it",
 )
 WATCHER_TIMING = ("2s", "5s")
 

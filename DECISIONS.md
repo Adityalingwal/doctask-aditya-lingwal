@@ -512,7 +512,7 @@ cannot each assume a different one:
 - **The audit trail is readable, and it is not part of the register (locked
   and built 2026-08-18).** `read_history` (`app/register/read_history.py`) is
   one core function behind `GET /projects/{id}/history`, the `get_history`
-  MCP tool and the screen's HISTORY section — read-only over `audit`, no
+  MCP tool and the row panel's own history — read-only over `audit`, no
   migration and no change to what Commit records. It is deliberately **not**
   a key in the register document: the register says what is true now, the
   history says how it got there, and the export carries only the former.
@@ -531,6 +531,17 @@ cannot each assume a different one:
   never an error. Run numbers are computed exactly as
   `app/projects/list_projects.py` computes them, so the two surfaces cannot
   number one run differently. History: 2026-08-18.
+- **The whole project's history is no longer a screen of its own (locked
+  2026-08-25, replacing the register panel's second tab of 2026-08-18).** The
+  register page is one table plus the panel a row opens; the tab that listed
+  every run's changes for every row is gone from the screen only. `/history`,
+  `get_history`, `read_history`, `readHistory` and `ui/src/History.jsx` all
+  stay — the eight-tool lock is untouchable, and the row panel renders through
+  the same component. Why: the tab answered "what changed in this register",
+  which is a question a reader almost always asks about one row, and they were
+  already reading that row's panel when they asked it. **Inside the panel the
+  entries are grouped run, then document, then change (2026-08-25)**, and no
+  line repeats the row number the panel's own title already gives.
   **Not built, deliberately:** revert or restore, register version snapshots,
   filters, search, pagination, and any history export format.
 
@@ -770,7 +781,7 @@ match.
   when that run raised one and the person rejected it. Where a later run never
   applied the rule, the older answer is still the latest there is and stands.
   Before this, a row carried two and three copies of one rule's finding from
-  three runs. Older findings stay in History.
+  three runs. Older findings stay in the row's own history.
 - **`examined_row_count` on `runs`** records how many rows Examine judged, so
   the `No findings` result can state it after the run ends, whether or not
   the run committed. A proposal still waiting on a possible-match answer is
@@ -780,7 +791,7 @@ match.
   new row gets no finding in that run; the next run raises it.
 - **Known limitation:** a rule is judged by a model, so a rule that runs again
   in a later run may not re-raise a finding an earlier run raised. The register
-  then shows the newer answer and History keeps the older one.
+  then shows the newer answer and the row's own history keeps the older one.
 - **Status:** Implemented and verified with the scripted model. Findings reach
   the human gate through the existing review queue, a rejected finding stays in
   the run record and never reaches the register, and Examine re-entry after a
@@ -905,6 +916,32 @@ first table.
 - **`decisions.parts` (JSONB, nullable, 2026-08-23)** — the whole decision
   text taken apart, frozen beside `question` at raise time. Nullable because
   the export gate is a button, not a card, and has no parts at all.
+- **The run payload carries `add_will_write` and `open_decisions`
+  (2026-08-25).** `add_will_write` is every line the adding press would write,
+  built in `app/review/add_will_write.py` and assembled by the one
+  `read_run_status` both doors already call, so the screen and an MCP client
+  read the identical field. Each entry is `{"text": <the whole sentence>}`
+  plus the parts it was built from; the templates are deterministic and their
+  values come from stored data alone — proposed rows, each decision's stored
+  `if_approved`, the moves and absences on `runs.pending_moves`, and the
+  approved findings. No model is called, and nothing is worked out at read
+  time that Commit does not already do. **It never carries the outcome of an
+  unanswered decision**, and it is `null` on a run that is not waiting at
+  review: the block previews a press, it does not record one.
+  `open_decisions` is the count the screen renders its one own sentence from,
+  so the payload carries a number and never that sentence. Why a preview at
+  all: a pair batch that raises no question showed a person nothing whatsoever
+  before Add. **Limitation:** an approved merge whose `if_approved` is empty
+  moves evidence and writes no cell, so it produces no line.
+- **A stored observation move's citations carry their `kind` (2026-08-25).**
+  `testing observation` or `delivery evidence`, written in
+  `app/register/move_rows.py`. `Disputed` is the one status that exists
+  because two documents oppose each other, and the preview's line names both
+  sides — which the source file alone cannot do. Where this batch carries no
+  delivery evidence, because the handover was read in an earlier run, the
+  claim that the work was built comes from the citation still standing behind
+  the row's `status`; where neither side can be named honestly the line falls
+  back to the plain list of sources rather than inventing one.
 - **`get_register` rows carry `evidence` (2026-08-23)** — citations merged by
   quote, each entry naming its source line, its words and the cells it
   supports; an absence carries its sentence and no quote. **The per-row
@@ -1031,8 +1068,14 @@ a symlink after creation is not re-checked.
   the stages, what the run is waiting for and the questions it raised were
   three tabs describing one run, and a reader had to visit all three to learn
   whether anything was wanted of them. They are now one Run tab, read top to
-  bottom — stages, why it ended early, the waiting block, the decisions, the
-  rules. A tab wears a count only when it counts something above zero.
+  bottom. **That order is stages, why it ended early, the decisions, the
+  Add-will-write block, the waiting block with the two ending buttons, and the
+  rules (locked 2026-08-25, replacing the 2026-08-23 order which put the
+  waiting block above the decisions).** Why: the preview and the press it
+  describes belong together, and a person arrives at both once the last
+  decision is answered. One fixed order covers a run with no decision too — the
+  block simply sits straight under the stages. A tab wears a count only when it
+  counts something above zero.
 - **A skipped entry's label comes from its `kind` and from nothing else**
   (locked 2026-08-17): the screen maps `read before`, `not read` and
   `not attached` to `Read before`, `Not read` and `Not attached to any row`,

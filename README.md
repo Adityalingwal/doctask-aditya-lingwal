@@ -282,16 +282,27 @@ On the right, one run, across three tabs:
 
 | Tab | What it shows |
 |---|---|
-| Run | Each step of the run, why it stopped early or failed, what it is waiting for, every question it raised, and the rules it judged against |
+| Run | Each step of the run, why it stopped early or failed, every question it raised, what pressing Add would write, the two ways to end the review, and the rules it judged against |
 | Skipped | Every file and quote this run did not use, and the reason: read before, not read, or not attached to any row |
 | Reported instructions | Any line in a document that tried to give the system an instruction. It is shown to you and never followed. |
 
+A run waiting for you carries an **Add will write** block above the two ending
+buttons. It lists, line by line, exactly what pressing Add would put into the
+register: the rows it creates, the cells each answered question moves, the
+findings it attaches, and the rows a document was read and stayed silent
+about. Every line is written by the server from what is already stored — no
+model is asked, and nothing an unanswered question would settle appears. While
+questions are still open the block says how many, and Add stays disabled until
+they are all answered. Discard previews nothing, because it writes nothing.
+
 The Register entry above the runs opens the project's own register instead, in
-the same panel, across two tabs: **Register**, the table of rows with a mark
-beside any row a rule found something on, and **History**, what changed in the
-register, grouped under the run that changed it. Clicking a row opens a panel
-beside the table with that row's four cells in full, the evidence each rests on,
-its findings, and its own history. Close it with ×, Escape, or a click outside.
+the same panel: one table of rows, with a mark beside any row a rule found
+something on. Clicking a row opens a panel beside the table with that row's
+four cells in full, the evidence each rests on, its findings, and its own
+history — grouped under the run that changed it, and under each document that
+touched it in that run. Close it with ×, Escape, or a click outside. The whole
+project's trail is not a screen of its own; read it with `get_history` or
+`GET /projects/{id}/history`.
 
 The screen refreshes every three seconds and only shows what the server has
 confirmed. When you answer a question, the answer is sent and then the run is
@@ -373,10 +384,16 @@ The rest of the limits:
   the question is open, the rules are checked against the existing row rather
   than against the new one. If you then reject the match, the new row gets no
   finding in that run. The next run checks it like any other row.
-- **A rule that ran before may not raise the same finding again.** A rule is
-  judged by a model, so a later run that checks the same row may or may not
-  repeat what an earlier run found. The register shows the newer answer, and
-  the History tab keeps the older one.
+- **A finding shows on the register only while the latest run that applied its
+  rule still raises it.** Every applicable run re-examines the whole register,
+  so a later clean run clears the finding. That is deliberate: the register
+  states what the latest examination supports, and a row's own history keeps
+  every earlier finding under the run that raised it. The cost is honest — a
+  rule is judged by a model, and a model that misses a still-broken rule
+  clears its finding until the next run re-raises it. The alternative, keeping
+  findings until someone explicitly marks them resolved, needs a resolution
+  decision, a finding state, and a second bookkeeping system; this version
+  chooses the single rule.
 - **A rule that keeps failing asks its question again on every run.** A rule is
   checked against the row as it stands right now, so no row is ever done being
   checked. The cost is the same question coming back run after run.
