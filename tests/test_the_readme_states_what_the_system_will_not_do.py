@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from app.examine.examine_register import _INSTRUCTIONS as EXAMINE_INSTRUCTIONS
@@ -39,6 +40,13 @@ def test_the_readme_states_the_watcher_timing_the_shipped_config_uses() -> None:
         assert interval in readme
     assert "(4s)" not in readme
     assert "(10s)" not in readme
+
+
+def test_the_readme_uses_the_current_skipped_tab_name() -> None:
+    readme = README.read_text(encoding="utf-8")
+
+    assert "**Skipped** tab" in readme
+    assert re.search(r"\*\*Not\s+used\*\*\s+tab", readme) is None
 
 
 def test_the_readme_uses_the_status_word_the_register_writes() -> None:

@@ -254,8 +254,8 @@ CRM work.
 | Testing feedback | Moves existing rows. Creates none. |
 
 A handover note or testing report that arrives before the requirement it talks
-about has no row to move. Instead of guessing, the system lists it on the **Not
-used** tab and explains why.
+about has no row to move. Instead of guessing, the system lists it on the
+**Skipped** tab and explains why.
 
 ### Two file formats
 

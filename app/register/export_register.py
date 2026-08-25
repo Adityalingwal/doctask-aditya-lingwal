@@ -83,9 +83,10 @@ async def _read_register_document(
             }
         )
 
-    # A row carries what each rule found the last time that rule ran — which
-    # may be nothing at all; the `rules` section below names which rules the
-    # newest committed run judged this register against.
+    # A row carries the latest explicitly decided finding for each rule and
+    # row. Silence in a later model answer cannot erase a human decision; the
+    # `rules` section below still names which rules the newest committed run
+    # judged this register against.
     findings_by_row: dict[UUID, list[dict[str, Any]]] = {}
     for finding in await approved_findings_of_project(connection, project["id"]):
         findings_by_row.setdefault(finding["register_row_id"], []).append(

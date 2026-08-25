@@ -244,7 +244,9 @@ against a live model since; the expected end state is in
   `finding_id`.
 - A `done` run from before this branch has `rules_applied` null, so its
   findings no longer show on the register (History keeps them). A fresh
-  database never has such a run.
+  database never has such a run. **Superseded on 2026-08-25:** the register's
+  finding projection no longer reads `rules_applied`; it uses the latest
+  explicit decision for each rule and row.
 - The register JSON's `examine` block and per-row `citations` list left the
   JSON on the screen branch, once nothing read them.
 

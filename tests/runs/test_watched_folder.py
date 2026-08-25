@@ -34,8 +34,8 @@ UNSUPPORTED_ARRIVAL = "delivery-plan.csv"
 FIRST_REQUIREMENT = "an email to the operations team on intake form submit"
 SECOND_REQUIREMENT = "the same notification sent over WhatsApp"
 THIRD_REQUIREMENT = "a search over old intake records"
-# Short enough to keep the test quick, and still two polls inside one quiet
-# period, which is the shape the shipped ten-and-thirty-second pair has.
+# Short enough to keep the test quick, and still several polls inside one quiet
+# period, which is the shape the shipped two-and-five-second pair has.
 POLL_SECONDS = 0.2
 QUIET_SECONDS = 0.6
 LONGER_THAN_A_QUIET_PERIOD = 3.0
