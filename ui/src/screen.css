@@ -128,11 +128,28 @@
   }
 
   /* The folder dropdown keeps this screen's square border and mono type, so
-     it draws its own arrow once the browser's rounded control is taken away
-     (item 1). Ink, not the accent — it points, it does not signal. */
-  .select-caret {
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M0 0h10L5 7z' fill='%230f0f0e'/%3E%3C/svg%3E");
-    background-size: 10px 7px;
+     it draws its own arrow rather than the browser's (item 1). Ink, not the
+     accent — it points, it does not signal. It turns over while the list is
+     open, which is the one thing on the closed control that says so. */
+  .folder-caret::after {
+    content: "";
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    width: 10px;
+    height: 7px;
+    transform: translateY(-50%);
+    background: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M0 0h10L5 7z' fill='%230f0f0e'/%3E%3C/svg%3E")
+      no-repeat center / 10px 7px;
+    transition: transform 0.12s ease;
+  }
+
+  .folder-caret {
+    position: relative;
+  }
+
+  .folder-caret-up::after {
+    transform: translateY(-50%) rotate(180deg);
   }
 
   /* Each line of the Add-will-write block wears its arrow as an ornament

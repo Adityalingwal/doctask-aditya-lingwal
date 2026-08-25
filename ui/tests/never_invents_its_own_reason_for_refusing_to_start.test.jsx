@@ -11,6 +11,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import AddProject from "../src/AddProject.jsx";
 import { serverAnswering } from "./server_replies.js";
+import { chooseFolder } from "./choose_folder.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -65,7 +66,7 @@ test("a chosen folder the server refuses is sent exactly as chosen, and the serv
     />,
   );
 
-  fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
+  chooseFolder(FOLDER);
 
   await act(async () => {
     screen.getByRole("button", { name: /create and start run/i }).click();

@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
+import { chooseFolder } from "./choose_folder.js";
 import {
   projectId,
   projectReply,
@@ -61,34 +62,41 @@ function answering(projectsAfterwards) {
 async function openTheBox() {
   render(<ReviewScreen projectId="" runId="" />);
   fireEvent.click(await screen.findByRole("button", { name: /add project/i }));
-  return await screen.findByRole("combobox");
+  return await screen.findByRole("button", { name: "Folder" });
 }
 
 test("the folder dropdown wears the screen's own treatment, not the browser's", async () => {
   vi.stubGlobal("fetch", answering());
   const folders = await openTheBox();
 
-  // The browser's rounded, shaded control is taken away, and the square
-  // border, mono type, focus edge and disabled treatment every other field
-  // here wears are put back.
-  expect(folders.className).toContain("appearance-none");
+  // The browser's rounded, shaded control is taken away, and so is its
+  // rounded, shaded open menu: the square border, mono type, own caret, focus
+  // edge and disabled treatment every other field here wears are put back,
+  // and the open list wears the screen's hard shadow too.
   expect(folders.className).toContain("border-line-strong");
   expect(folders.className).toContain("bg-card");
   expect(folders.className).toContain("font-mono");
   expect(folders.className).toContain("cursor-pointer");
-  expect(folders.className).toContain("select-caret");
-  expect(folders.className).toContain("focus:border-signal-edge");
+  expect(folders.className).toContain("folder-caret");
+  expect(folders.className).toContain("focus-visible:outline-signal-edge");
   expect(folders.className).toContain("disabled:bg-paper");
+
+  fireEvent.click(folders);
+  const list = screen.getByRole("listbox");
+  expect(list.className).toContain("edge-shadow");
+  expect(list.className).toContain("border-line-strong");
+  expect(list.className).toContain("bg-card");
+  expect(list.className).toContain("font-mono");
 });
 
 test("the button offers to start a run only for a folder that holds a file", async () => {
   vi.stubGlobal("fetch", answering());
-  const folders = await openTheBox();
+  await openTheBox();
 
   // Before a folder is chosen the ordinary ending is the one offered.
   expect(screen.getByRole("button", { name: /^create and start run$/i })).toBeTruthy();
 
-  fireEvent.change(folders, { target: { value: EMPTY_FOLDER } });
+  chooseFolder(EMPTY_FOLDER);
   expect(screen.getByRole("button", { name: /^create project$/i })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /start run/i })).toBeNull();
 });
@@ -96,9 +104,9 @@ test("the button offers to start a run only for a folder that holds a file", asy
 test("creating on an empty folder opens no run and names only the project", async () => {
   const answered = answering([projectReply(), created]);
   vi.stubGlobal("fetch", answered);
-  const folders = await openTheBox();
+  await openTheBox();
 
-  fireEvent.change(folders, { target: { value: EMPTY_FOLDER } });
+  chooseFolder(EMPTY_FOLDER);
   fireEvent.click(screen.getByRole("button", { name: /^create project$/i }));
 
   await waitFor(() => {

@@ -10,6 +10,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import ReviewScreen from "../src/ReviewScreen.jsx";
 import { runReply, serverAnswering } from "./server_replies.js";
+import { chooseFolder } from "./choose_folder.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -90,7 +91,7 @@ test("never_shows_a_project_the_server_has_not_confirmed", async () => {
   });
 
   fireEvent.click(screen.getByRole("button", { name: /add project/i }));
-  fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
+  chooseFolder(FOLDER);
 
   await act(async () => {
     screen.getByRole("button", { name: /create and start run/i }).click();

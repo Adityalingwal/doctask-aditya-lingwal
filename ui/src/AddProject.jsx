@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Refusal from "./Refusal.jsx";
 import { createProject, startRun } from "./run_requests.js";
 
 const NO_FOLDER_CHECK = "Choose the folder to watch.";
 const NO_FOLDER_LEFT = "No folder left to add.";
+const NOTHING_CHOSEN_YET = "Choose a folder";
+const FOLDER_LABEL = "Folder";
 
 // An empty folder makes a project and starts no run, refused identically
 // through the endpoint, the MCP tool and the watcher (locked change (a)). The
@@ -141,37 +143,21 @@ export default function AddProject({
         )}
 
         <form onSubmit={start}>
-          <label className="block">
-            <span className="eyebrow mb-1 block">Folder</span>
-            {/* The browser's own dropdown paints a rounded, shaded control
-                that belongs to no other part of this screen. `appearance-none`
-                takes that away and leaves the same square border, mono type
-                and focus edge every other field here wears (item 1). */}
-            <select
-              value={sourceFolderPath}
-              onChange={(changed) => setSourceFolderPath(changed.target.value)}
-              disabled={openFolders.length === 0}
-              className="w-full cursor-pointer appearance-none border border-line-strong bg-card bg-[right_0.75rem_center] bg-no-repeat px-3 py-2 pr-9 font-mono text-sm select-caret hover:border-signal-edge focus:border-signal-edge focus:outline-2 focus:outline-offset-2 focus:outline-signal-edge disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-soft"
-            >
-              {openFolders.length === 0 ? (
-                <option value="">{NO_FOLDER_LEFT}</option>
-              ) : (
-                <>
-                  <option value="">Choose a folder</option>
-                  {openFolders.map((folder) => (
-                    <option key={folder} value={folder}>
-                      {folder}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
+          <div className="block">
+            <span id="folder-field-label" className="eyebrow mb-1 block">
+              {FOLDER_LABEL}
+            </span>
+            <FolderDropdown
+              folders={openFolders}
+              chosen={sourceFolderPath}
+              onChoose={setSourceFolderPath}
+            />
             <span className="mt-1 block text-xs text-ink-soft">
               {projectsRoot === null
                 ? "The folders shown here come from the application."
                 : `New folders go inside ${projectsRoot}/ — a person puts one there; this screen never creates one by itself.`}
             </span>
-          </label>
+          </div>
 
           <button
             type="submit"
@@ -182,6 +168,123 @@ export default function AddProject({
           </button>
         </form>
       </div>
+    </div>
+  );
+}
+
+// The browser's own open menu is a rounded panel in the operating system's
+// style that CSS cannot reach, and it was the one thing on this screen drawn
+// by somebody else. Button and listbox instead, so the open list wears the
+// same square border, hard shadow and mono type as every other control
+// (item 1). The closed control keeps exactly the look it already had.
+function FolderDropdown({ folders, chosen, onChoose }) {
+  const [open, setOpen] = useState(false);
+  const [keyboardRow, setKeyboardRow] = useState(0);
+  const dropdown = useRef(null);
+  const control = useRef(null);
+  const empty = folders.length === 0;
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    const closeOnOutsideClick = (clicked) => {
+      if (!dropdown.current?.contains(clicked.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("click", closeOnOutsideClick);
+    return () => document.removeEventListener("click", closeOnOutsideClick);
+  }, [open]);
+
+  const close = () => {
+    setOpen(false);
+    control.current?.focus();
+  };
+
+  const pick = (folder) => {
+    onChoose(folder);
+    close();
+  };
+
+  const move = (by) => {
+    setKeyboardRow((row) => {
+      const next = row + by;
+      if (next < 0) {
+        return folders.length - 1;
+      }
+      return next >= folders.length ? 0 : next;
+    });
+  };
+
+  const readKey = (pressed) => {
+    if (pressed.key === "Escape" && open) {
+      pressed.preventDefault();
+      close();
+      return;
+    }
+    if (pressed.key === "ArrowDown" || pressed.key === "ArrowUp") {
+      pressed.preventDefault();
+      if (!open) {
+        setOpen(true);
+        return;
+      }
+      move(pressed.key === "ArrowDown" ? 1 : -1);
+      return;
+    }
+    if (pressed.key === "Enter" && open) {
+      pressed.preventDefault();
+      pick(folders[keyboardRow]);
+    }
+  };
+
+  return (
+    <div ref={dropdown} className="relative" onKeyDown={readKey}>
+      <button
+        ref={control}
+        type="button"
+        aria-labelledby="folder-field-label"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={empty}
+        onClick={() => {
+          setKeyboardRow(Math.max(folders.indexOf(chosen), 0));
+          setOpen((was) => !was);
+        }}
+        className={`folder-caret w-full cursor-pointer border border-line-strong bg-card px-3 py-2 pr-9 text-left font-mono text-sm hover:border-signal-edge focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal-edge disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-soft ${
+          open ? "folder-caret-up border-signal-edge" : ""
+        }`}
+      >
+        {empty ? NO_FOLDER_LEFT : chosen || NOTHING_CHOSEN_YET}
+      </button>
+
+      {open && (
+        <ul
+          role="listbox"
+          aria-labelledby="folder-field-label"
+          className="edge-shadow absolute top-full right-0 left-0 z-10 mt-1 max-h-56 overflow-y-auto border border-line-strong bg-card font-mono text-sm"
+        >
+          {folders.map((folder, row) => (
+            <li
+              key={folder}
+              role="option"
+              aria-selected={folder === chosen}
+              onClick={() => pick(folder)}
+              onMouseEnter={() => setKeyboardRow(row)}
+              className={`flex cursor-pointer items-center justify-between border-b border-line px-3 py-2 last:border-b-0 ${
+                row === keyboardRow ? "bg-signal" : ""
+              }`}
+            >
+              {folder}
+              {folder === chosen && (
+                <span aria-hidden="true" className="font-semibold text-signal-edge">
+                  ✓
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
