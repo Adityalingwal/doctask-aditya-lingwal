@@ -288,10 +288,15 @@ def _citations_of(observations: list[dict[str, Any]]) -> list[dict[str, str]]:
 
 
 def _citation(observed: dict[str, Any]) -> dict[str, str]:
+    # The kind travels with the citation because `Disputed` is two documents
+    # opposing each other, and the review preview has to name which of them
+    # claims the work was built and which reports it absent — a distinction
+    # the source file alone cannot carry.
     return {
         "source_file": observed["source_file"],
         "place": observed["place"],
         "source_words": observed["source_words"],
+        "kind": observed["kind"],
     }
 
 
