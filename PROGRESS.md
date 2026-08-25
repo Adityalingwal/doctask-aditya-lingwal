@@ -1574,6 +1574,8 @@ working claim only after its own implementation and proof land.
   `.dockerignore` excludes `ui/`, so `ui/dist` must be built on the host before
   `docker compose up`; the bind mount is what carries it into the container.
   Image-only serving is part of the open fresh-clone verification.
+  **Superseded on 2026-08-25:** the pinned Node stage now builds `ui/dist` and
+  copies it into the Python image; the no-bind image proof serves the screen.
 - The screen authenticates nobody, exactly as the endpoints behind it do not.
 - A folder that exists but the application cannot read is accepted by
   `create_project`, which only checks that it is a directory; the failure

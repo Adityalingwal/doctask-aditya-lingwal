@@ -13,9 +13,9 @@ BUILD_COMMAND = "npm --prefix ui ci && npm --prefix ui run build"
 def serve_review_screen(application: FastAPI, built_screen: Path, path: str) -> None:
     """Serve the built review screen, or answer with the command that builds it.
 
-    The screen is built by Node, which this image does not carry, so a checkout
-    that has not run the build must be told so rather than answer 404 and leave
-    a reviewer guessing whether the route exists at all.
+    The production image already carries the screen built by its Node stage.
+    A direct host checkout may still have no local build, so tell that developer
+    what to run rather than answer 404 and leave the route ambiguous.
     """
     if (built_screen / "index.html").is_file():
         application.mount(
