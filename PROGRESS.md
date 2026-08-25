@@ -25,8 +25,9 @@ review buttons, History, a 900px viewport and a clean console. MCP discovery
 returned exactly eight tools; queue/dedupe behaviour and MCP/HTTP parity were
 checked. A no-bind image first reproduced the hidden 503 UI packaging gap; the
 final multi-stage image migrated fresh PostgreSQL and served health, `/ui/`,
-and `/ui/favicon.svg` with HTTP 200. Final suite counts will be refreshed after
-the false-positive repair code has been removed and the release checks rerun.
+and `/ui/favicon.svg` with HTTP 200. The corrected release proof is **298
+Python passed** against real PostgreSQL and **116 front-end passed across 50
+files**; the production UI build also passes.
 
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 
