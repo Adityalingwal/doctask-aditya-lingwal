@@ -43,7 +43,7 @@ export default function RowDrawer({ row, columns, history, onClose }) {
     >
       <aside
         aria-label={`Row ${row.row_number}`}
-        className="pane flex h-full w-full max-w-xl flex-col border-l-2 border-line-strong bg-card"
+        className="pane flex h-full w-full max-w-3xl flex-col border-l-2 border-line-strong bg-card"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-line px-6 py-4">
           <h3 className="section-name m-0">Row {row.row_number}</h3>

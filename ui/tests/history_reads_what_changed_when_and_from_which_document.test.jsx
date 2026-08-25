@@ -52,10 +52,12 @@ async function openHistory(history) {
   render(<ReviewScreen projectId="" runId="" />);
   fireEvent.click(await screen.findByText(project.name));
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
-  // The history is the register panel's second tab (item 15), so it is opened
-  // the way a person opens it.
-  fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
-  return await screen.findByRole("tabpanel", { name: /history/i });
+  // Since item 6a the history is read inside the row's own panel, so it is
+  // opened the way a person opens it: press the row, then its history.
+  fireEvent.click(await screen.findByText("Applicants upload supporting documents."));
+  const drawer = await screen.findByRole("complementary", { name: /row 1/i });
+  fireEvent.click(within(drawer).getByRole("button", { name: /history/i }));
+  return drawer;
 }
 
 test("the history says what changed, when, and which document changed it", async () => {
@@ -63,13 +65,12 @@ test("the history says what changed, when, and which document changed it", async
   const section = await openHistory(history);
   const [statusMove, writtenMove, attached, born] = history.entries;
 
-  // Entries sit inside the run heading they belong under (item 17), so the
-  // lines a reader reads are the innermost ones.
-  const lines = [...section.querySelectorAll("li li")].map(
+  // Run, then document, then the change itself: the lines a reader reads are
+  // the innermost ones.
+  const lines = [...section.querySelectorAll("li li li")].map(
     (item) => item.textContent,
   );
 
-  expect(lines[0]).toContain(`Row ${statusMove.row_number}`);
   expect(lines[0]).toContain(statusMove.old_value);
   expect(lines[0]).toContain(statusMove.new_value);
   // The reader's own heading for the cell, never the stored column key.
@@ -83,10 +84,13 @@ test("the history says what changed, when, and which document changed it", async
   expect(lines[3]).toContain("Row created");
   expect(lines[3]).toContain(born.what_was_asked);
 
-  // Which document, on the entry's own line; when and which run, on the
-  // heading the entry sits under (S13).
-  expect(lines[0]).toContain(statusMove.source_file);
-  expect(lines[3]).toContain(born.source_file);
+  // Which document, on the sub-heading its changes sit under; when and which
+  // run, on the run heading above that (S13, item 7). The panel already says
+  // which row this is, so no line repeats it.
+  const files = [...section.querySelectorAll("h5")].map((one) => one.textContent);
+  expect(files).toContain(statusMove.source_file);
+  expect(files).toContain(born.source_file);
+  expect(section.textContent).not.toContain(`Row ${statusMove.row_number} ·`);
   expect(section.textContent).toContain("Run 2");
   expect(section.textContent).toContain("Run 1");
   // The moment, in the one date shape the whole screen uses.

@@ -39,8 +39,20 @@ async function openHistory(history) {
   render(<ReviewScreen projectId="" runId="" />);
   fireEvent.click(await screen.findByText(project.name));
   fireEvent.click(await screen.findByRole("link", { name: /register/i }));
-  fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
-  return await screen.findByRole("tabpanel", { name: /history/i });
+  // Since item 6a the history is read inside the row's own panel, so it is
+  // opened the way a person opens it: press the row, then its history.
+  fireEvent.click(await screen.findByText("Applicants upload supporting documents."));
+  const drawer = await screen.findByRole("complementary", { name: /row 1/i });
+  fireEvent.click(within(drawer).getByRole("button", { name: /history/i }));
+  return drawer;
+}
+
+// The panel's own Evidence heading is an h4 too, so the run headings are the
+// ones that name a run.
+function runHeadings(panel) {
+  return [...panel.querySelectorAll("h4")]
+    .map((heading) => heading.textContent)
+    .filter((heading) => heading.startsWith("Run "));
 }
 
 test("entries sit under a heading naming their run and the moment, and no file", async () => {
@@ -48,9 +60,7 @@ test("entries sit under a heading naming their run and the moment, and no file",
   const panel = await openHistory(history);
   const [newest, , , born] = history.entries;
 
-  const headings = [...panel.querySelectorAll("h4")].map(
-    (heading) => heading.textContent,
-  );
+  const headings = runHeadings(panel);
   expect(headings).toEqual([
     `Run 2 · ${dayMonthTime(newest.changed_at)}`,
     `Run 1 · ${dayMonthTime(born.changed_at)}`,
@@ -60,15 +70,19 @@ test("entries sit under a heading naming their run and the moment, and no file",
   }
 });
 
-test("each entry beneath still names the document it came from", async () => {
+test("a document is named once above the entries it changed, not on each of them", async () => {
   const history = historyReply();
   const panel = await openHistory(history);
-  const groups = [...panel.querySelectorAll(":scope > ul > li")];
 
-  const firstRun = within(groups[0]).getAllByRole("listitem");
-  expect(firstRun).toHaveLength(3);
-  expect(firstRun[0].textContent).toContain(history.entries[0].source_file);
-  expect(firstRun[1].textContent).toContain(history.entries[1].source_file);
+  const files = [...panel.querySelectorAll("h5")].map((one) => one.textContent);
+  expect(files).toContain(history.entries[0].source_file);
+  expect(files).toContain(history.entries[1].source_file);
+
+  const lines = entryLines(panel);
+  expect(lines).toHaveLength(history.entries.length);
+  for (const line of lines) {
+    expect(line).not.toContain(".md");
+  }
 });
 
 test("a finding's line is the rule's own words and carries no rule id", async () => {
@@ -76,9 +90,13 @@ test("a finding's line is the rule's own words and carries no rule id", async ()
   const panel = await openHistory(history);
   const attached = history.entries[2];
 
-  const line = [...panel.querySelectorAll("li li")].find((item) =>
-    item.textContent.includes("Finding:"),
-  );
-  expect(line.textContent).toBe(`Row ${attached.row_number} · ${attached.detail}`);
-  expect(line.textContent).not.toMatch(/\bR\d\b/);
+  const line = entryLines(panel).find((item) => item.includes("Finding:"));
+  expect(line).toBe(attached.detail);
+  expect(line).not.toMatch(/\bR\d\b/);
 });
+
+// Run, then document, then the change itself: the innermost list is the one a
+// reader reads.
+function entryLines(panel) {
+  return [...panel.querySelectorAll("li li li")].map((item) => item.textContent);
+}
