@@ -74,7 +74,6 @@ def locate_extraction(
         "document_type": answer.document_type.value,
         "source_file": source_file,
         "requirements": [],
-        "scope_exclusions": [],
         "testing_observations": [],
         "delivery_evidence": [],
         "embedded_instructions": [],
@@ -84,11 +83,6 @@ def locate_extraction(
         found = located(requirement.summary, requirement.quote)
         if found is not None:
             extraction["requirements"].append(found)
-
-    for exclusion in answer.scope_exclusions:
-        found = located(exclusion.summary, exclusion.quote)
-        if found is not None:
-            extraction["scope_exclusions"].append(found)
 
     for observation in answer.testing_observations:
         found = located(observation.summary, observation.quote)

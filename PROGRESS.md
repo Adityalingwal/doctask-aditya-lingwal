@@ -6,32 +6,7 @@ Decision rationale belongs in `DECISIONS.md`, not here.
 
 ## Snapshot — 2026-08-25, branch `codex/task1-eight-findings`
 
-The first repair checkpoint changes only the register's finding projection.
-An approved finding now remains until a later finding for the same rule and row
-receives an explicit decision; a later model answer that simply omits it no
-longer clears it. A newer approval replaces it, a newer rejection clears it,
-and another row of the same rule is independent. Every historical finding and
-decision remains in History.
-
-The revised never-do test was observed failing against the old projection, then
-passed with the implementation. The focused register/Examine regression set is
-**13 passed, 1 known third-party warning** against real PostgreSQL. The clean
-live Helpline sequence kept the approved handover finding through the later
-testing run, while History retained the decision that raised it.
-
-The second checkpoint gives explicit client scope exclusions their own typed
-extraction path. They never enter the positive requirements list and never
-create a row. A related exclusion is always human-gated; approval moves
-`Written down` and `Status` to `Excluded` with the exact quote, rejection
-leaves the row unchanged, and an unmatched exclusion is reported as `not
-attached`. Four end-to-end scope tests now cover the same-batch approval,
-rejection, unmatched case, and a later exclusion against a committed row; the
-focused extraction/schema/full-flow set is **34 passed** against real
-PostgreSQL. A clean live Warehouse corpus then produced one human-gated scope
-exclusion instead of a second positive row; a later MCP-only exclusion update
-did the same against a committed row.
-
-The third checkpoint removes mixed-trigger duplicates. If a manual or queued
+The watcher repair removes mixed-trigger duplicates. If a manual or queued
 run settles every file in the watcher's changed signature, the watcher marks
 that signature served instead of adding a second `no changes` run. It still
 starts the next run for a file that missed the active batch, and an unsupported
@@ -40,27 +15,18 @@ were observed failing first; the complete watcher file is now **5 passed**, and
 the wider watcher/queue/run-ending set had **12 existing tests pass** before a
 new fixture-only assertion was corrected and re-run green.
 
-The small drift pass now points README at the current `Run` tab, documents the
+The documentation/UI drift pass points README at the current `Run` tab, documents the
 shipped 2-second poll and 5-second quiet window in `config/README.md`, and
-bundles an SVG favicon under `/ui/`. The remaining startup warning is diagnosed
-to the pinned official MCP SDK's unresolved `Settings.lifespan` forward
-reference under `pydantic-settings==2.15.0`; its upstream issue is still open,
-so it is recorded as a third-party limitation rather than suppressed or
-patched through a private SDK import. The production UI build succeeds and the
-full front-end suite is **116 passed across 50 files**.
+bundles an SVG favicon under `/ui/`.
 
-Release verification is now **302 Python passed, 1 known third-party warning**
-against real PostgreSQL and **116 front-end passed across 50 files**; the UI
-production build succeeds. The in-app Browser drove the four Helpline files
-sequentially, a second project in batches, the three-column screen, both rails,
-the review buttons, History, a 900px viewport with no horizontal body overflow,
-and a clean console. Real MCP discovery returned exactly eight tools. Back-to-
-back starts exposed one queued run in the UI, repeated starts deduplicated, the
-queued run started after review finished, and MCP/HTTP register, history and run
-payloads matched for all three live projects. A no-bind image first reproduced
-the hidden 503 UI packaging gap; the final multi-stage image now migrates a
-fresh PostgreSQL database and serves health, `/ui/`, and `/ui/favicon.svg` with
-HTTP 200.
+The in-app Browser drove the four Helpline files sequentially and a second
+Helpline project in batches, including the three-column screen, both rails,
+review buttons, History, a 900px viewport and a clean console. MCP discovery
+returned exactly eight tools; queue/dedupe behaviour and MCP/HTTP parity were
+checked. A no-bind image first reproduced the hidden 503 UI packaging gap; the
+final multi-stage image migrated fresh PostgreSQL and served health, `/ui/`,
+and `/ui/favicon.svg` with HTTP 200. Final suite counts will be refreshed after
+the false-positive repair code has been removed and the release checks rerun.
 
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 
@@ -221,9 +187,8 @@ cells, findings and history say what the documents actually support.
   `config/rules.yaml`, validated at startup and at every freeze), and
   `runs.rules_applied` (migration `20260823_0023`) records exactly what
   Examine sent to the model.
-- **Superseded by the 2026-08-25 snapshot:** this branch originally made the
-  latest run that applied a rule replace its earlier register findings. The
-  current contract keeps the latest explicit decision per rule and row.
+- **The register shows each rule's finding from the latest run that applied
+  it**, so a row never carries two copies of one rule's finding again.
 - **Examine treats an unanswered possible match as the match**: it judges the
   row the proposal would join, with that proposal's `Written down` overlaid,
   and counts real rows only.
@@ -244,9 +209,7 @@ against a live model since; the expected end state is in
   `finding_id`.
 - A `done` run from before this branch has `rules_applied` null, so its
   findings no longer show on the register (History keeps them). A fresh
-  database never has such a run. **Superseded on 2026-08-25:** the register's
-  finding projection no longer reads `rules_applied`; it uses the latest
-  explicit decision for each rule and row.
+  database never has such a run.
 - The register JSON's `examine` block and per-row `citations` list left the
   JSON on the screen branch, once nothing read them.
 
@@ -1421,8 +1384,8 @@ working claim only after its own implementation and proof land.
   a rejected match leaves the new row without a finding for that run. Written
   up for a reader in README's "What it does not do"; the next run raises it.
 - **A model-judged rule that runs again may not re-raise an earlier finding.**
-  Silence leaves the approved finding on that row; a later explicit decision
-  for the same rule and row replaces it. History keeps every answer.
+  The register shows the newer answer and History keeps the older one; README's
+  "What it does not do" states it for a reader.
 - **A rule still asks its question again on every run**, once the documents it
   names have been read — README's "What it does not do" is that one's home.
   `applies_when` removed the worse half of it: the demo's six findings raised

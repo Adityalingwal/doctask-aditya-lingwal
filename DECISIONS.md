@@ -88,9 +88,8 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
 - **Must preserve:** Facts, not judgements. Surface documentation gaps,
   conflicts, blockers, and uncertainty; never silently decide which claim wins.
 - **Evidence/status:** Scripted tests cover all supported formats. Clean live
-  model runs prove incremental single-file and batched `.md` updates across
-  Helpline and a distinct Warehouse corpus; broader domain validation remains
-  later proof.
+  model runs prove incremental single-file and batched `.md` updates on the
+  Helpline corpus; broader domain validation remains later proof.
 - **History:** Detailed comparisons with narrative brief/report and earlier
   narrower domain/run definitions are in decision history.
 
@@ -367,7 +366,7 @@ Migration `20260817_0017` dropped the other three cells; history: 2026-08-17.
 Statuses are fixed in code and in a database check constraint:
 
 `Done` · `Partial` · `Not delivered` · `Handed over` · `Disputed` ·
-`Requested` · `Excluded`
+`Requested`
 
 Each means one thing, written down so a model, an implementer and a reader
 cannot each assume a different one:
@@ -391,11 +390,6 @@ cannot each assume a different one:
   has not spoken yet.
 - **`Disputed`** — two documents make opposing claims about this requirement.
   The system never resolves it; it goes to a person.
-- **`Excluded`** — the client's requirements document explicitly puts this
-  ask outside approved scope, and the Delivery Owner approved linking that
-  boundary to this row. `Written down` also reads `Excluded`, with the exact
-  scope quote behind both cells. It is not a delivery or testing failure.
-
 - What moves a row: a testing observation's label (`Passed` → `Done`,
   `Defect` → `Partial`; `Change request` and `Unclear` move no status, because
   a new ask arriving during testing is not a verdict on the work), and delivery
@@ -408,7 +402,7 @@ cannot each assume a different one:
 - Unknown cells say what is unknown; they are never blank or guessed.
 - **A cell answers in as few words as a reader can scan down a column, and the
   file behind the answer lives in the row's evidence (2026-08-23).**
-  `Written down` reads `Not known yet` · `Yes` · `Excluded` · `Not mentioned`, and `What
+  `Written down` reads `Not known yet` · `Yes` · `Not mentioned`, and `What
   testing found` reads `Not known yet` · what testing said · `Not mentioned`.
   This replaces the bullet that had the cell read `Not found in <file>.` and
   the two long "Not known yet — no … has been read" sentences: a column of
@@ -579,10 +573,8 @@ match.
 
 - **Decision:** One model call per document, sequentially. This makes filename
   attribution deterministic, checkpointing clean, and failures isolated.
-- **Output:** type, requirements, explicit scope exclusions, testing
-  observations, delivery evidence, and embedded instructions, each tied to
-  exact words. A negative scope sentence from the client's requirements is a
-  typed exclusion, never a positive requirement. This
+- **Output:** type, date, requirements, testing observations, delivery
+  evidence, blockers, and embedded instructions, each tied to exact words. This
   list may widen only with a real later-slice need.
 - **Contract:** the model call sends `response_format` of type `json_schema`
   with `strict: true`, and the schema is **generated from the Pydantic answer
@@ -680,13 +672,6 @@ match.
 - Each requirement reaches the Match prompt with its `document_type`, taken
   from the stored extraction and never guessed from a file name, so the
   question can name the kind of document each statement came from.
-- **Explicit scope exclusions never create rows (2026-08-25).** Match treats
-  one as a statement about already-requested work: no related row leaves it
-  `not attached`; a proposed link always goes to the Delivery Owner, even for
-  a row proposed in the same batch. Approval moves `Written down` and `Status`
-  to `Excluded` with the exact quote; rejection leaves the row unchanged and
-  retains the proposal on the run. This implements conflict surfacing without
-  making negative wording into work the provider is expected to deliver.
 - Approved merge moves citations to the candidate — following a merge already
   approved, since two proposals of one batch can settle in either order — and
   marks the proposal with `merged_into_register_row_id`; it is retained and
@@ -777,18 +762,15 @@ match.
   fingerprint every run and trigger rules-only re-examines that changed
   nothing. Every reader of "which rules ran" — `examine.rules`, the Markdown
   export, and the register read below — comes from this column.
-- **An approved finding stays until the same rule and row receive a newer
-  explicit decision (2026-08-25).** This replaces the 2026-08-23 latest-run-
-  per-rule projection. A later model call that applies a rule but raises
-  nothing is silence, not a human decision, and cannot erase an approved
-  finding. A newer approved finding for the same rule and row replaces the one
-  the register shows; a newer rejected one clears it. The same rule on another
-  row is independent. No schema change and no destructive resolution flag:
-  every finding and decision remains in History, while the register reads the
-  latest explicit decision for each `(rule_id, register_row_id)` pair. Why:
-  the documented Helpline flow approved R1 on row 7, but a later model call
-  did not repeat it and the register silently hid a gap the Delivery Owner had
-  approved. Human decisions outrank absence from a later model answer.
+- **The register shows each rule's finding from the latest run that applied it
+  (2026-08-23).** No schema change and no "resolved" flag: `findings` keeps
+  every run's findings, and only the register read changes. For each rule, the
+  project's latest `done` run whose `rules_applied` names it decides, and that
+  run's approved findings are what the row shows — which may be none, including
+  when that run raised one and the person rejected it. Where a later run never
+  applied the rule, the older answer is still the latest there is and stands.
+  Before this, a row carried two and three copies of one rule's finding from
+  three runs. Older findings stay in History.
 - **`examined_row_count` on `runs`** records how many rows Examine judged, so
   the `No findings` result can state it after the run ends, whether or not
   the run committed. A proposal still waiting on a possible-match answer is
@@ -796,9 +778,9 @@ match.
   it would join with the proposal's `Written down` overlaid, and counts real
   rows only. **Known limitation:** if the person then rejects the match, the
   new row gets no finding in that run; the next run raises it.
-- **Known limitation:** a rule is judged by a model, so a later run may not
-  repeat a finding. The approved finding remains on the register until the
-  same rule and row produce another finding that a person decides.
+- **Known limitation:** a rule is judged by a model, so a rule that runs again
+  in a later run may not re-raise a finding an earlier run raised. The register
+  then shows the newer answer and History keeps the older one.
 - **Status:** Implemented and verified with the scripted model. Findings reach
   the human gate through the existing review queue, a rejected finding stays in
   the run record and never reaches the register, and Examine re-entry after a
@@ -821,7 +803,7 @@ match.
 - One client is constructed centrally and injected into stages. Tests use the
   deterministic scripted client and require no provider or key.
 - **Status:** Client/config path implemented and exercised through clean live
-  OpenRouter runs on the Helpline and Warehouse corpora. Those runs prove the
+  OpenRouter runs on the Helpline corpus. Those runs prove the
   configured success path and real latency only; wider provider exception
   shapes, representative quality, and cost remain unverified.
 
@@ -1023,17 +1005,6 @@ a symlink after creation is not re-checked.
 - The dependency is the official `mcp` SDK pinned at `1.29.0`. Its 2.x line was
   days old and changes the HTTP stack it depends on; `fastmcp` would put a
   second server framework beside FastAPI.
-- **Known third-party warning (2026-08-25):** constructing `FastMCP` under the
-  resolved `pydantic-settings==2.15.0` emits
-  `IncompleteFieldDefinitionWarning` for the SDK's `Settings.lifespan` forward
-  reference. A warnings-as-errors import traces entirely through
-  `mcp.server.fastmcp.server.Settings`; the same `mcp==1.29.0` reproduction is
-  open upstream as
-  [python-sdk issue 3294](https://github.com/modelcontextprotocol/python-sdk/issues/3294).
-  Current MCP discovery and flow tests pass. We do not suppress it, import the
-  SDK's private Settings class to rebuild it, or move to its alpha/new-major
-  line merely to hide a non-functional warning; revisit when the pinned stable
-  SDK ships the upstream fix.
 - **The screen is three columns (L1–L10, locked 2026-08-15, superseding the
   single run list):** projects (16rem), one selected project's runs (12rem,
   collapsible to a strip that
@@ -1303,8 +1274,7 @@ a symlink after creation is not re-checked.
   the source document, not through a cell of its own.
 - A batch holding two documents of one type orders them by file name.
 - One Extract call can repeat in the answer-to-checkpoint kill window.
-- A rejected finding clears the register for that rule and row. A later model
-  call may raise a new finding there, which requires a new human decision.
+- Rejected findings stay suppressed even if later evidence strengthens them.
 - Files arriving during Review wait; the project lock may be held a long time.
 - Oversized PDFs are not read rather than chunked, and scanned PDFs are not
   read rather than OCR'd; chunking and OCR are not planned for V1.
@@ -1317,9 +1287,8 @@ a symlink after creation is not re-checked.
   of its own.
 - Neither door authenticates a caller, and the MCP endpoint answers `421` to a
   `Host` header other than `localhost` or `127.0.0.1`.
-- A later applicable run may raise a newer finding or stay silent. Silence does
-  not erase an approved finding; a newer explicit decision for the same rule
-  and row replaces or clears the register view.
+- A finding raised against a register row is never re-examined by a later run;
+  a rules change re-examines the register the next run touches it.
 
 ## Superseded index
 

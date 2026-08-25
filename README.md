@@ -85,18 +85,11 @@ about it, and every move keeps the quote behind it.
 | `Partial` | It exists, but testing found it broken or unfinished. | A testing report that found a defect |
 | `Not delivered` | Testing looked for it and it was not there, and no handover note ever claimed it was built. | A testing report that found it missing |
 | `Disputed` | A handover note says it is built. Testing says it is missing. Both quotes stay on the row. | A handover note and a testing report that contradict each other |
-| `Excluded` | The client's written scope explicitly excludes this ask. It is not a delivery failure. | A scope exclusion linked to the row and approved by the Delivery Owner |
 
 Two things testing can say move nothing. A **change request** — a new ask that
 turns up during testing — is not a verdict on the work already done. And a note
 with **no verdict in it** is not a verdict either. Both are recorded on the run
 and left off the status.
-
-An explicit negative scope sentence is never turned into a positive
-requirement. If it clearly relates to an ask already in the register, the run
-asks the Delivery Owner whether to link the conflict; approval leaves the exact
-quote behind `Written down: Excluded` and `Status: Excluded`. If it reaches no
-row, it stays on the run as `not attached`.
 
 ### The rules
 
@@ -382,18 +375,16 @@ The rest of the limits:
   finding in that run. The next run checks it like any other row.
 - **A rule that ran before may not raise the same finding again.** A rule is
   judged by a model, so a later run that checks the same row may or may not
-  repeat what an earlier run found. Silence never erases a finding a person
-  approved. It stays on that row until a later finding for the same rule and
-  row is explicitly approved or rejected; the History tab keeps every answer.
+  repeat what an earlier run found. The register shows the newer answer, and
+  the History tab keeps the older one.
 - **A rule that keeps failing asks its question again on every run.** A rule is
   checked against the row as it stands right now, so no row is ever done being
   checked. The cost is the same question coming back run after run.
 - **The evidence in a finding is not checked against the row.** It is only
   checked for not being empty. If the model paraphrases instead of quoting,
   nothing catches it.
-- **A rejected finding stays off the register** until the model raises a new
-  finding for that rule and row and a person approves it. The earlier rejection
-  remains in History.
+- **A rejected finding does not come back** if later evidence would make it
+  stronger. An approved one is not looked at again.
 - **A handover only ever moves a row to `Handed over`.** A handover that says
   the work is partly there still reads `Handed over`, because `Partial` is
   testing's word for what testing found. Testing moves the row when it runs.
@@ -419,11 +410,6 @@ The rest of the limits:
 - **The production image builds the screen in a pinned Node stage.** The final
   Python image contains `ui/dist` but no Node runtime. The broad Compose source
   bind remains a development convenience, not proof of packaged contents.
-- **The pinned MCP SDK emits one startup warning under the resolved
-  `pydantic-settings==2.15.0`.** Its internal `Settings.lifespan` annotation is
-  left unresolved; MCP discovery and flow still pass. The upstream issue is
-  open, and this repository neither suppresses the warning nor reaches into a
-  private SDK class to hide it.
 - **A project's folder must sit directly inside** the folder named in
   `config/projects.yaml` (`sample-projects/` by default). Not the root itself,
   not nested deeper, never an absolute path. Anything else is refused, with the

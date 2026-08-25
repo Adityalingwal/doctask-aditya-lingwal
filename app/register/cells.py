@@ -32,7 +32,6 @@ STATUS_DONE = "Done"
 STATUS_PARTIAL = "Partial"
 STATUS_NOT_DELIVERED = "Not delivered"
 STATUS_DISPUTED = "Disputed"
-STATUS_EXCLUDED = "Excluded"
 MAXIMUM_QUOTE_CHARACTERS = 300
 TRUNCATED_QUOTE_SUFFIX = "\u2026"
 
@@ -42,7 +41,6 @@ TRUNCATED_QUOTE_SUFFIX = "\u2026"
 # cannot tell which, so a cell with no answer yet still carries words.
 IN_WRITING_NOT_KNOWN_YET = "Not known yet"
 IN_WRITING_YES = "Yes"
-IN_WRITING_EXCLUDED = "Excluded"
 TESTING_NOT_KNOWN_YET = "Not known yet"
 # Said once a document of the kind that speaks to this cell has been read and
 # does not mention this ask. "No" would claim more than a document saying

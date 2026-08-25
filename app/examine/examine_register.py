@@ -121,11 +121,6 @@ mentioned", which says a document was read and is silent. This rule
 is also about work that was built, and nothing here says this was
 built.
 
-A row whose Status is "Excluded" records a client scope boundary that a
-person approved. It is not missing delivery or testing merely because excluded
-work was not built or tested. Apply a rule only if that rule explicitly says an
-excluded item violates it.
-
 ## When nothing is wrong
 
 An empty findings list is the correct and most common answer against a

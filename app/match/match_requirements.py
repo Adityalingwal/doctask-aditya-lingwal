@@ -103,9 +103,7 @@ _OBSERVATION_INSTRUCTIONS = f"""You decide, for each observation found in this \
 batch of documents, which register row it is about.
 
 An observation is something a document says about work the client already \
-asked for: what testing found, what was handed over, or an explicit client \
-scope exclusion. A scope exclusion matches only the requirement it explicitly \
-rules out; shared words or a related feature are not enough. It never states a new \
+asked for: what testing found, or what was handed over. It never states a new \
 ask, so it never becomes a row of its own — it either belongs to a row that \
 already exists, or it belongs to none of them.
 

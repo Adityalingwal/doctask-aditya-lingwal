@@ -33,13 +33,7 @@ DOCUMENT_WORKFLOW_ORDER = (
 REQUIREMENTS = "requirements"
 TESTING_OBSERVATIONS = "testing_observations"
 DELIVERY_EVIDENCE = "delivery_evidence"
-SCOPE_EXCLUSIONS = "scope_exclusions"
-QUOTED_LISTS = (
-    REQUIREMENTS,
-    SCOPE_EXCLUSIONS,
-    TESTING_OBSERVATIONS,
-    DELIVERY_EVIDENCE,
-)
+QUOTED_LISTS = (REQUIREMENTS, TESTING_OBSERVATIONS, DELIVERY_EVIDENCE)
 
 # Which of those three lists each document type may fill at all. The prompt
 # states this table and the generated schema carries it in the field
@@ -47,9 +41,7 @@ QUOTED_LISTS = (
 # rather than something Python quietly zeroes.
 LISTS_A_TYPE_MAY_FILL: dict[DocumentType, frozenset[str]] = {
     DocumentType.MEETING_NOTES: frozenset({REQUIREMENTS}),
-    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT: frozenset(
-        {REQUIREMENTS, SCOPE_EXCLUSIONS}
-    ),
+    DocumentType.CLIENT_REQUIREMENTS_DOCUMENT: frozenset({REQUIREMENTS}),
     DocumentType.TESTING_FEEDBACK: frozenset({TESTING_OBSERVATIONS}),
     DocumentType.HANDOVER_SUMMARY: frozenset({DELIVERY_EVIDENCE}),
     DocumentType.UNRELATED: frozenset(),
@@ -133,13 +125,6 @@ class ExtractionAnswer(BaseModel):
     requirements: list[QuotedFact] = Field(
         default_factory=list,
         description="One entry for each thing the client asked for.",
-    )
-    scope_exclusions: list[QuotedFact] = Field(
-        default_factory=list,
-        description=(
-            "One entry for each thing the client explicitly says is outside "
-            "the approved scope, not included, or excluded."
-        ),
     )
     testing_observations: list[QuotedTestingObservation] = Field(
         default_factory=list,

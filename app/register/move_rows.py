@@ -15,12 +15,9 @@ from app.register.audit_entries import write_cell_change
 from app.register.cells import (
     CELL_NAMES,
     COLUMN_HEADINGS,
-    IN_WRITING,
-    IN_WRITING_EXCLUDED,
     STATUS,
     STATUS_DISPUTED,
     STATUS_DONE,
-    STATUS_EXCLUDED,
     STATUS_HANDED_OVER,
     STATUS_NOT_DELIVERED,
     STATUS_PARTIAL,
@@ -44,7 +41,6 @@ from app.runs.skipped_kinds import NOT_ATTACHED_KIND
 
 TESTING_OBSERVATION = "testing observation"
 DELIVERY_EVIDENCE = "delivery evidence"
-SCOPE_EXCLUSION = "scope exclusion"
 
 
 class ProposedMoves(NamedTuple):
@@ -67,7 +63,6 @@ async def observations_of_batch(
     for document in await result.fetchall():
         extraction = document["extraction"]
         for kind, list_name in (
-            (SCOPE_EXCLUSION, "scope_exclusions"),
             (TESTING_OBSERVATION, "testing_observations"),
             (DELIVERY_EVIDENCE, "delivery_evidence"),
         ):
@@ -133,11 +128,7 @@ async def propose_moves(
         # batch's evidence to a committed row changes what that row says —
         # D02 scenario 3. A confident link to a row this same batch proposed
         # is covered by the export gate, like the proposal itself.
-        if (
-            observation["kind"] == SCOPE_EXCLUSION
-            or outcome.outcome == POSSIBLE_MATCH
-            or row["is_committed"]
-        ):
+        if outcome.outcome == POSSIBLE_MATCH or row["is_committed"]:
             ask_about.add(row["row_number"])
         observations_by_row.setdefault(row["row_number"], []).append(observation)
 
@@ -218,13 +209,6 @@ async def _store_the_moves(
                         "value": value,
                         "citations": citations,
                         "decision_id": str(decision_id) if decision_id else None,
-                        "replace_status_citations": (
-                            cell_name == STATUS
-                            and (
-                                value == STATUS_EXCLUDED
-                                or row[STATUS] == STATUS_EXCLUDED
-                            )
-                        ),
                     }
                 )
         await connection.execute(
@@ -247,13 +231,8 @@ def _cells_the_observations_move(
     """
     testing = [one for one in observations if one["kind"] == TESTING_OBSERVATION]
     delivered = [one for one in observations if one["kind"] == DELIVERY_EVIDENCE]
-    exclusions = [one for one in observations if one["kind"] == SCOPE_EXCLUSION]
 
     moved: list[tuple[str, str, list[dict[str, str]]]] = []
-    if exclusions and row[IN_WRITING] != IN_WRITING_EXCLUDED:
-        moved.append(
-            (IN_WRITING, IN_WRITING_EXCLUDED, _citations_of(exclusions))
-        )
     if testing and _joined(testing) != row[WHAT_TESTING_FOUND]:
         moved.append(
             (WHAT_TESTING_FOUND, _joined(testing), _citations_of(testing))
@@ -263,15 +242,9 @@ def _cells_the_observations_move(
     # Documents usually arrive one at a time, and without this the same two
     # documents oppose each other in one batch and quietly agree across two.
     claimed = bool(delivered) or row[STATUS] == STATUS_HANDED_OVER
-    status = STATUS_EXCLUDED if exclusions else status_after(testing, claimed)
+    status = status_after(testing, claimed)
     if status is not None and status != row[STATUS]:
-        moved.append(
-            (
-                STATUS,
-                status,
-                _citations_of(exclusions if exclusions else testing + delivered),
-            )
-        )
+        moved.append((STATUS, status, _citations_of(testing + delivered)))
     return moved
 
 
@@ -482,12 +455,7 @@ async def _settle_the_citations(
     arrives only the verdict is superseded, so only its citation goes and the
     handover's stays standing behind the cell it still supports.
     """
-    if move["cell"] == STATUS and move.get("replace_status_citations"):
-        await connection.execute(
-            "DELETE FROM citations WHERE register_row_id = %s AND cell_name = %s",
-            (register_row_id, STATUS),
-        )
-    elif move["cell"] == STATUS:
+    if move["cell"] == STATUS:
         for stale in superseded_testing:
             await _drop_one_citation(connection, register_row_id, STATUS, stale)
     else:

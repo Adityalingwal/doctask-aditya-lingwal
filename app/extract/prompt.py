@@ -36,12 +36,6 @@ deletes real information instead of merely adding a false one.
 
 ## One ask is one requirement
 
-An explicit boundary is not an ask. If a client requirements document says a
-capability is "not included", "outside scope", "out of scope", or "excluded",
-report it in scope_exclusions and never in requirements. This remains true when
-the excluded capability sounds like useful product work. A scope exclusion is
-the client's written boundary, not a positive request to build that work.
-
 Take the client's own cut. If the document writes three asks as three
 separate points, report three requirements. If it writes one compound ask
 as a single sentence, report one requirement — even if a developer would
@@ -62,13 +56,13 @@ Testing feedback reports only what testing found. A handover summary reports
 only what was delivered — never a new ask and never a testing verdict. An
 unrelated document reports nothing in the three lists below.
 
-| document_type | requirements | scope_exclusions | testing_observations | delivery_evidence |
-|---|---|---|---|---|
-| meeting notes | yes | no | no | no |
-| client requirements document | yes | yes | no | no |
-| testing feedback | no | no | yes | no |
-| handover summary | no | no | no | yes |
-| unrelated | no | no | no | no |
+| document_type | requirements | testing_observations | delivery_evidence |
+|---|---|---|---|
+| meeting notes | yes | no | no |
+| client requirements document | yes | no | no |
+| testing feedback | no | yes | no |
+| handover summary | no | no | yes |
+| unrelated | no | no | no |
 
 A filled list where this table says "no" is a wrong answer, not a style
 choice — leave that list empty even if the document's wording tempts you
