@@ -3,6 +3,13 @@ import { useEffect, useState } from "react";
 import History from "./History.jsx";
 import { CELL_HEADINGS } from "./Register.jsx";
 
+// What the pills beside a piece of evidence are: the cells resting on it.
+const PROOF_FOR = "Proof for";
+// Where a source line stops naming the file and starts naming the place in
+// it. The convention is `app/ingest/source_line.py`'s, and the file name it
+// writes first never carries a comma of its own.
+const PLACE_STARTS_AT = ",";
+
 /**
  * One register row, read beside the table rather than instead of it: the panel
  * slides in over a dimmed backdrop and the table underneath does not move, so
@@ -60,7 +67,9 @@ export default function RowDrawer({ row, columns, history, onClose }) {
             ))}
           </dl>
 
-          <h4 className="eyebrow mt-8 mb-3">Evidence</h4>
+          <h4 className="eyebrow mt-8 mb-3 border-b-2 border-line-strong pb-1.5 text-ink">
+            Evidence
+          </h4>
           <ul className="m-0 flex list-none flex-col gap-4 p-0">
             {row.evidence.map((entry, place) => (
               <li key={place}>
@@ -121,9 +130,7 @@ function countedRuns(entries) {
 function Evidence({ entry }) {
   return (
     <>
-      {entry.source_line !== null && (
-        <p className="eyebrow m-0">{entry.source_line}</p>
-      )}
+      {entry.source_line !== null && <SourceLine line={entry.source_line} />}
       {entry.quote === null ? (
         <p className="m-0 border-l-2 border-line pl-4 text-ink-soft italic">
           {entry.absence}
@@ -133,16 +140,33 @@ function Evidence({ entry }) {
           &ldquo;{entry.quote}&rdquo;
         </p>
       )}
-      <p className="m-0 mt-2 flex flex-wrap gap-2">
+      <p className="m-0 mt-2 flex flex-wrap items-center gap-2">
+        <span className="eyebrow">{PROOF_FOR}</span>
         {entry.cells.map((cell) => (
           <span
             key={cell}
-            className="border border-line px-2 py-0.5 font-mono text-[11px] text-ink-soft"
+            className="border border-signal-edge px-2 py-0.5 font-mono text-[11px] font-medium text-signal-edge"
           >
             {cell}
           </span>
         ))}
       </p>
     </>
+  );
+}
+
+// The file leads and the place follows it, because a reader scanning a column
+// of evidence is looking for the document first. The line itself is the
+// server's one source-line sentence; only its two halves are set apart.
+function SourceLine({ line }) {
+  const place = line.indexOf(PLACE_STARTS_AT);
+  if (place === -1) {
+    return <p className="eyebrow m-0 text-ink">{line}</p>;
+  }
+  return (
+    <p className="eyebrow m-0 font-normal">
+      <span className="font-semibold text-ink">{line.slice(0, place)}</span>
+      {line.slice(place)}
+    </p>
   );
 }
