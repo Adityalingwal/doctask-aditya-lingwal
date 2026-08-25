@@ -1363,11 +1363,6 @@ working claim only after its own implementation and proof land.
    `build_export` is now `build_register_document`, the run-level export
    route is gone, and the register read still serves committed rows only, so
    the gate still shows no merge.
-2. **Development Compose mount is too broad for final proof.** `.:/workspace`
-   is intentionally retained for iteration, exposes local `.env`, and lets
-   local files override the image. Remove/narrow it and wipe stale dev DB
-   before final image-only/fresh-clone verification.
-
 ## Active assumptions and unverified claims
 
 | Assumption / claim | Current basis | What closes it |
