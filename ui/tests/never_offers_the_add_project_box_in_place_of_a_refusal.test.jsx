@@ -57,6 +57,10 @@ test("the button and its dropdown appear once the read succeeds, offering only c
 
   fireEvent.click(screen.getByRole("button", { name: /add project/i }));
 
-  const folderField = screen.getByLabelText(/folder/i);
-  expect(folderField.querySelectorAll("option")).toHaveLength(1);
+  // No folder was confirmed, so the dropdown offers none and says so rather
+  // than inventing one.
+  const folderField = screen.getByRole("button", { name: "Folder" });
+  expect(folderField.textContent).toContain("No folder left to add.");
+  fireEvent.click(folderField);
+  expect(screen.queryByRole("option")).toBeNull();
 });

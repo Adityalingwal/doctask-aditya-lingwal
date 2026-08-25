@@ -6,6 +6,7 @@ from uuid import UUID
 from psycopg import AsyncConnection
 
 from app.examine.read_findings import examine_under_review
+from app.review.add_will_write import what_add_will_write
 from app.review.review_queue import decisions_of_run
 from app.runs.finished_stages import ordered_finished_stages
 from app.runs.run_records import require_run
@@ -29,6 +30,14 @@ async def read_run_status(
         "ended_early_reason": run["ended_early_reason"],
         "failure_reason": run["failure_reason"],
         "decisions": [_decision_as_read(decision) for decision in decisions],
+        # What the adding press would write, and how many questions still
+        # stand between the person and pressing it. The screen renders the
+        # count as a sentence; the payload carries the number, so both doors
+        # are told the same thing and neither is told a sentence twice.
+        "add_will_write": await what_add_will_write(connection, run),
+        "open_decisions": sum(
+            1 for decision in decisions if decision["outcome"] is None
+        ),
         "examine": await examine_under_review(connection, run),
         "finished_stages": ordered_finished_stages(run["finished_stages"]),
         # The key name is machinery both doors already answer with; since the

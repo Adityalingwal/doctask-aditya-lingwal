@@ -1,57 +1,29 @@
-// A project whose audit trail is empty is not a failure and not a refusal.
-// The server answers 200 with no entries, and the section says so in one
-// line — never an error box, never a blank space a reader has to interpret.
+// A row whose audit trail is empty is not a failure and not a refusal. The
+// server answers 200 with no entries, and the row's own panel — the one place
+// a history is read since item 6a — says so in one line, never an error box
+// and never a blank space a reader has to interpret.
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 
-import ReviewScreen from "../src/ReviewScreen.jsx";
-import {
-  projectId,
-  projectReply,
-  projectsReply,
-  registerReply,
-  serverAnswering,
-} from "./server_replies.js";
+import RowDrawer from "../src/RowDrawer.jsx";
+import { registerReply } from "./server_replies.js";
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+test("an_empty_history_reads_no_history_yet", () => {
+  const exported = registerReply();
 
-test("an_empty_history_reads_no_history_yet", async () => {
-  const exported = registerReply({ rows: [], exported_at: null, rules: null });
-  const project = projectReply();
-
-  vi.stubGlobal(
-    "fetch",
-    serverAnswering([
-      {
-        method: "GET",
-        path: "/projects",
-        reply: { body: projectsReply({ projects: [project] }) },
-      },
-      {
-        method: "GET",
-        path: `/projects/${projectId}/register`,
-        reply: { body: exported },
-      },
-      {
-        method: "GET",
-        path: `/projects/${projectId}/history`,
-        reply: { body: { entries: [] } },
-      },
-    ]),
+  render(
+    <RowDrawer
+      row={exported.rows[0]}
+      columns={exported.columns}
+      history={[]}
+      onClose={() => {}}
+    />,
   );
 
-  render(<ReviewScreen projectId="" runId="" />);
-  fireEvent.click(await screen.findByText(project.name));
-  fireEvent.click(await screen.findByRole("link", { name: /register/i }));
-  // The history is the register panel's second tab (item 15), so it is opened
-  // the way a person opens it.
-  fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
-  const section = await screen.findByRole("tabpanel", { name: /history/i });
+  const drawer = screen.getByRole("complementary", { name: "Row 1" });
+  fireEvent.click(within(drawer).getByRole("button", { name: /history/i }));
 
-  expect(within(section).getByText("No history yet.")).toBeTruthy();
-  expect(within(section).queryByRole("alert")).toBeNull();
-  expect(section.querySelectorAll(".border-danger")).toHaveLength(0);
-  expect(within(section).queryAllByRole("listitem")).toHaveLength(0);
+  expect(within(drawer).getByText("No history yet.")).toBeTruthy();
+  expect(within(drawer).queryByRole("alert")).toBeNull();
+  expect(drawer.querySelectorAll(".border-danger")).toHaveLength(0);
 });

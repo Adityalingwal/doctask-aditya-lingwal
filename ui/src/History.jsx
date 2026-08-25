@@ -3,8 +3,8 @@ import { dayMonthTime } from "./format_date.js";
 
 // The three shapes GET /projects/{id}/history sends. A row's birth arrives
 // already folded into one entry by the core function, so this file only
-// chooses words: it gathers what it was sent under the run each entry already
-// names, and never orders or interprets it.
+// chooses words: it gathers what it was sent under the run and the document
+// each entry already names, and never orders or interprets it.
 const ROW_CREATED = "row created";
 const FINDING_ATTACHED = "finding attached";
 
@@ -15,9 +15,13 @@ const NOTE_LINE = "Not part of the exported register.";
 const EMPTY_HISTORY_LINE = "No history yet.";
 
 /**
- * What changed in this register, grouped under the run that changed it. The
- * heading names the run and the moment and no file (S13) — one run can read
- * two documents, and each entry beneath keeps naming its own.
+ * How one row came to say what it says, read inside that row's own panel.
+ *
+ * The heading names the run and the moment and no file (S13) — one run can
+ * read two documents — and under it each document that touched this row in
+ * that run is named once, with its changes beneath. An entry that came from
+ * no document at all sits under the run heading naming none. Nothing repeats
+ * the row number: the panel this sits in already is that row.
  */
 export default function History({ entries }) {
   const runs = groupedByRun(entries);
@@ -39,12 +43,23 @@ export default function History({ entries }) {
                 Run {run.runNumber} · {dayMonthTime(run.changedAt)}
               </h4>
               <ul className="m-0 flex list-none flex-col gap-3 p-0">
-                {run.entries.map((entry, entryPlace) => (
-                  <li key={entryPlace} className="border-l-2 border-line pl-4">
-                    <p className="m-0">{whatChanged(entry)}</p>
-                    {entry.source_file !== undefined && entry.source_file !== null && (
-                      <p className="eyebrow m-0 mt-1">{entry.source_file}</p>
+                {run.files.map((file, filePlace) => (
+                  <li key={filePlace}>
+                    {file.sourceFile !== null && (
+                      <h5 className="eyebrow m-0 mb-1.5 text-ink">
+                        {file.sourceFile}
+                      </h5>
                     )}
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                      {file.entries.map((entry, entryPlace) => (
+                        <li
+                          key={entryPlace}
+                          className="border-l-2 border-line pl-4"
+                        >
+                          {whatChanged(entry)}
+                        </li>
+                      ))}
+                    </ul>
                   </li>
                 ))}
               </ul>
@@ -56,29 +71,36 @@ export default function History({ entries }) {
   );
 }
 
-/** How many runs this history covers — the count the History tab wears. */
-export function runsInHistory(entries) {
-  return groupedByRun(entries).length;
-}
-
 // The order the core function answered in is kept exactly; entries are only
-// gathered under the run they already name, so a run that appeared twice in
-// that order would stay two headings rather than being merged into one.
+// gathered under the run and then the document they already name, so a run or
+// a file that appeared twice in that order stays two headings rather than
+// being merged into one.
 function groupedByRun(entries) {
   const runs = [];
   for (const entry of entries) {
     const open = runs[runs.length - 1];
     if (open !== undefined && open.runNumber === entry.run_number) {
-      open.entries.push(entry);
+      gatheredUnderItsFile(open.files, entry);
       continue;
     }
     runs.push({
       runNumber: entry.run_number,
       changedAt: entry.changed_at,
-      entries: [entry],
+      files: gatheredUnderItsFile([], entry),
     });
   }
   return runs;
+}
+
+function gatheredUnderItsFile(files, entry) {
+  const sourceFile = entry.source_file ?? null;
+  const open = files[files.length - 1];
+  if (open !== undefined && open.sourceFile === sourceFile) {
+    open.entries.push(entry);
+    return files;
+  }
+  files.push({ sourceFile, entries: [entry] });
+  return files;
 }
 
 // A cell is named by the heading a reader was shown in the register itself,
@@ -87,13 +109,12 @@ function groupedByRun(entries) {
 // backend's whole `detail`, which already reads `Finding: <rule text>` and
 // carries no rule id (item 48).
 function whatChanged(entry) {
-  const row = `Row ${entry.row_number} · `;
   if (entry.kind === ROW_CREATED) {
-    return `${row}Row created — "${entry.what_was_asked}"`;
+    return `Row created — "${entry.what_was_asked}"`;
   }
   if (entry.kind === FINDING_ATTACHED) {
-    return `${row}${entry.detail}`;
+    return entry.detail;
   }
   const heading = CELL_HEADINGS[entry.cell] ?? entry.cell;
-  return `${row}${heading}: ${entry.old_value} → ${entry.new_value}`;
+  return `${heading}: ${entry.old_value} → ${entry.new_value}`;
 }

@@ -1,6 +1,7 @@
 // Never-do test for section 1.5: when every folder already has a project, the
-// dropdown stays where it is and shows exactly one line — no options.
-import { render, screen } from "@testing-library/react";
+// dropdown stays where it is and shows exactly one line — and opens on to
+// nothing, because there is nothing left to choose.
+import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test } from "vitest";
 
 import AddProject from "../src/AddProject.jsx";
@@ -30,5 +31,6 @@ test("shows_one_line_when_no_folder_is_left_to_add", () => {
   );
 
   expect(screen.getByText("No folder left to add.")).toBeTruthy();
-  expect(screen.getAllByRole("option")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Folder" }));
+  expect(screen.queryByRole("option")).toBeNull();
 });

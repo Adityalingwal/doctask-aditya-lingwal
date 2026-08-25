@@ -6,6 +6,7 @@ from uuid import UUID
 from psycopg import AsyncConnection
 
 from app.examine.read_findings import findings_of_run
+from app.extract.answer import DOCUMENT_WORKFLOW_ORDER, workflow_position
 from app.register.audit_entries import write_attachment, write_cell_change
 from app.register.cells import (
     CELL_NAMES,
@@ -40,6 +41,7 @@ async def commit_register(
     `register_rows`.
     """
     document_id_by_file = await _documents_of_run(connection, run_id)
+    workflow_place_by_file = await _workflow_place_by_file(connection, run_id)
     merged_row_numbers = await _merge_approved_matches(
         connection, run_id, document_id_by_file
     )
@@ -85,6 +87,7 @@ async def commit_register(
             citations,
             run_id,
             document_id_by_file,
+            workflow_place_by_file,
         )
         committed_row_numbers.append(row["row_number"])
 
@@ -292,6 +295,28 @@ async def _documents_of_run(
     return {row["source_path"]: row["id"] for row in await result.fetchall()}
 
 
+async def _workflow_place_by_file(
+    connection: AsyncConnection,
+    run_id: UUID,
+) -> dict[str, int]:
+    """Where each of this run's documents sits in the requirements workflow.
+
+    `citations` has no column that orders two statements of one ask, so the
+    order comes from the same place the row's own wording came from: a meeting
+    note is read before a requirements document, and two documents of one kind
+    fall back to file name.
+    """
+    result = await connection.execute(
+        "SELECT source_path, extraction ->> 'document_type' AS document_type "
+        "FROM documents WHERE run_id = %s",
+        (run_id,),
+    )
+    return {
+        row["source_path"]: workflow_position(row["document_type"])
+        for row in await result.fetchall()
+    }
+
+
 async def _citations_of_row(
     connection: AsyncConnection,
     register_row_id: UUID,
@@ -310,10 +335,11 @@ async def _write_audit_entries(
     citations: list[dict[str, Any]],
     run_id: UUID,
     document_id_by_file: dict[str, UUID],
+    workflow_place_by_file: dict[str, int],
 ) -> None:
-    source_file_by_cell = {
-        citation["cell_name"]: citation["source_file"] for citation in citations
-    }
+    source_file_by_cell = _the_document_behind_each_cell(
+        citations, workflow_place_by_file
+    )
     for cell_name, new_value in cells.items():
         source_file = source_file_by_cell.get(cell_name)
         await write_cell_change(
@@ -325,3 +351,27 @@ async def _write_audit_entries(
             run_id,
             document_id_by_file.get(source_file) if source_file else None,
         )
+
+
+def _the_document_behind_each_cell(
+    citations: list[dict[str, Any]],
+    workflow_place_by_file: dict[str, int],
+) -> dict[str, str]:
+    """The one document a new row's history names for each of its cells.
+
+    One ask stated in two documents leaves two citations on `what was asked`,
+    and the row carries the earlier document's words — so the entry recording
+    its birth names that document too, not whichever citation the database
+    returned last.
+    """
+    earliest: dict[str, str] = {}
+    unplaced = len(DOCUMENT_WORKFLOW_ORDER)
+    for citation in sorted(
+        citations,
+        key=lambda one: (
+            workflow_place_by_file.get(one["source_file"], unplaced),
+            one["source_file"],
+        ),
+    ):
+        earliest.setdefault(citation["cell_name"], citation["source_file"])
+    return earliest

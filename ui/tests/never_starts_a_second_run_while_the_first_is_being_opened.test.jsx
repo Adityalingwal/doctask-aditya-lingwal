@@ -11,6 +11,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import AddProject from "../src/AddProject.jsx";
 import { serverAnswering } from "./server_replies.js";
+import { chooseFolder } from "./choose_folder.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -53,7 +54,7 @@ test("never_starts_a_second_run_while_the_first_is_being_opened", async () => {
     />,
   );
 
-  fireEvent.change(screen.getByLabelText(/folder/i), { target: { value: FOLDER } });
+  chooseFolder(FOLDER);
 
   const startButton = screen.getByRole("button", { name: /create and start run/i });
 

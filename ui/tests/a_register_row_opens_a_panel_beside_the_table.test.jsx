@@ -57,19 +57,6 @@ async function openTheRow(exported, history) {
   return { panel, drawer: await screen.findByRole("complementary", { name: /row 1/i }) };
 }
 
-test("the register page has only a Register tab and a History tab", async () => {
-  const panel = await openRegister(registerReply(), historyReply());
-
-  expect(within(panel).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-    "Register1",
-    "History2 runs",
-  ]);
-  // The rules a run judged against belong to that run, and the Run tab keeps
-  // them — this page no longer lists them (item 15).
-  expect(panel.textContent).not.toContain("Rules and findings");
-  expect(panel.textContent).not.toContain("ran against");
-});
-
 test("the first column is headed Row and the number stays in the cell", async () => {
   const panel = await openRegister(registerReply());
 

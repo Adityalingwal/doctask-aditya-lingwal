@@ -107,7 +107,17 @@ function FindingMark({ findings }) {
   );
 }
 
+// Said when a run judged nothing at all, and said alone: a run whose rules
+// every one named a kind of document this project has not read yet found no
+// finding because it looked for none, and "no findings" there would report a
+// clean register nobody examined (item 8).
+const NO_RULE_RAN = "No rule ran.";
+const NO_FINDINGS = "No findings.";
+
 export function Examine({ examine }) {
+  if (examine.rules.length === 0) {
+    return <p className="m-0 text-ink-soft">{NO_RULE_RAN}</p>;
+  }
   return (
     <>
       <p className="eyebrow m-0 mb-3">
@@ -123,9 +133,7 @@ export function Examine({ examine }) {
         ))}
       </ul>
       {examine.findings.length === 0 ? (
-        <p className="mt-4 text-ink-soft">
-          No findings — no row broke any of these rules.
-        </p>
+        <p className="mt-4 text-ink-soft">{NO_FINDINGS}</p>
       ) : (
         <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
           {examine.findings.map((finding) => (
