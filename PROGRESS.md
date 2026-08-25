@@ -1328,8 +1328,8 @@ merging and about `Written down` still stands.
 ## In progress / next slices
 
 Nothing is in progress. Every planned slice is built and merged (the review
-screen redesign landed as PR #15). What remains is the open fresh-clone and
-image-only verification, and the first live-model run.
+screen redesign landed as PR #15). Live-model and no-bind image proof are
+complete; only the literal fresh-clone walkthrough remains open.
 
 Later-slice absence is not a defect in Slice 1. Each capability becomes a
 working claim only after its own implementation and proof land.
@@ -1376,8 +1376,8 @@ working claim only after its own implementation and proof land.
 | Source documents are usually 5–10 pages | Small-team domain expectation | Measure actual corpora; revisit pgvector/chunking only if needed |
 | Real SDK exception classification matches tests | Typed `status_code`; only scripted/401 path observed | Live provider failure evidence |
 | SDK retry is close enough to locked policy | Two attempts/120s configured; SDK owns wait | Live timing and explicit retry evidence |
-| Default OpenRouter model is suitable | Configured but never called | Bounded live-model run |
-| The Helpline AI end-state table (`sample-documents/helpline-ai/README.md`) — 7 row statuses, 3 rule findings, 1 rule expected silent | Written from the brief's design against the corpus text; never run | The bounded live-model run over the staged Helpline AI corpus |
+| Default OpenRouter model is suitable | Bounded Helpline live calls completed; broader suitability remains unverified | Exercise representative additional corpora before generalising |
+| The Helpline AI end-state table (`sample-documents/helpline-ai/README.md`) — 7 row statuses, 3 rule findings, 1 rule expected silent | Three live drives reached all seven expected statuses; finding output varied by model as recorded below | Repeat only when the corpus or model configuration changes |
 
 ## Known limitations
 
@@ -1570,7 +1570,8 @@ working claim only after its own implementation and proof land.
 - Neither door authenticates a caller; the MCP endpoint additionally answers
   `421` to a `Host` header other than `localhost` or `127.0.0.1`, so a client
   on another machine cannot reach it as it stands.
-- Fresh-clone and image-only verification remain open.
+- The literal fresh-clone walkthrough remains open; separate no-bind image
+  verification is complete.
 
 ## Next actions
 
