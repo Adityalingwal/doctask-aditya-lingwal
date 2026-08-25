@@ -1673,8 +1673,8 @@ configures twice. Before the change an INFO run event printed nothing
 | Register-moves hand-driven | 2026-08-16, `folder-is-a-project-and-register-moves` branch | Same session: a project that had never run read "Nothing has been added to this register yet."; a run driven to Review showed the question "Add this run's changes to the register?" verbatim; after approving and finishing, its project's Register entry read "1 row" and opening it showed the full table with citations and rules; opening the run's own Decisions tab (showing the answered export decision) and then clicking Register left no trace of the run's decision or its Approve/Reject buttons on screen |
 | `docker compose -p fx8 run --rm app pytest` | 2026-08-16, `match-within-batch-duplicates` branch, after the review repairs | 195 passed, real PostgreSQL, no live key. Was 188 before the three repairs; the seven new tests cover the merge recompute, the merge chain and the date ordering. Re-run in the foreground, independently of the implementing agent, because Codex cannot reach a Docker socket |
 | `npm --prefix ui test` | 2026-08-16, same branch, after the review repairs | 44 passed, 29 files, no live key — unchanged; no front-end file was touched |
-| Live model | Never | Unverified |
-| Fresh clone/image-only | Not run yet | Open release gate |
+| Live model | 2026-08-25, `codex/task1-eight-findings` branch | Four synthetic Helpline documents exercised as single-file and batched updates through OpenRouter; broader domain and provider behaviour remain unverified |
+| Image-only | 2026-08-25, same branch | A no-bind image migrated fresh PostgreSQL and served health, `/ui/`, and favicon with HTTP 200; a literal fresh-clone walkthrough remains open |
 
 ## Documentation history policy
 

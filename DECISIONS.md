@@ -1260,11 +1260,11 @@ a symlink after creation is not re-checked.
 
 ## Known limitations and unverified assumptions
 
-- Live success-path model calls have run on two synthetic corpora; broad
+- Live success-path model calls have run on the synthetic Helpline corpus;
+  broad
   provider quality, exception shapes, representative latency, and cost remain
   unverified.
-- Register-size assumptions remain unmeasured beyond the two small live
-  synthetic corpora.
+- Register-size assumptions remain unmeasured beyond that small live corpus.
 - The page limit binds `.pdf` only; no other declared format reports pages.
 - A handover summary that lists requirements, in a run that never ends
   `done`, is read again by the next run.
