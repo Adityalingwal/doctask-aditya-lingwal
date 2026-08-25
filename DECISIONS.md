@@ -87,8 +87,10 @@ Use these words in code, tests, logs, UI, and documentation. Do not substitute
   submitted document batch for that project; unrelated projects never mix.
 - **Must preserve:** Facts, not judgements. Surface documentation gaps,
   conflicts, blockers, and uncertainty; never silently decide which claim wins.
-- **Evidence/status:** Slice 1 proves one `.md` batch through export. Wider
-  domain, formats, second corpus, and incremental updates remain later proof.
+- **Evidence/status:** Scripted tests cover all supported formats. Clean live
+  model runs prove incremental single-file and batched `.md` updates across
+  Helpline and a distinct Warehouse corpus; broader domain validation remains
+  later proof.
 - **History:** Detailed comparisons with narrative brief/report and earlier
   narrower domain/run definitions are in decision history.
 
@@ -818,9 +820,10 @@ match.
   settings live in `config/model.yaml`; key comes only from environment.
 - One client is constructed centrally and injected into stages. Tests use the
   deterministic scripted client and require no provider or key.
-- **Status:** Client/config path implemented; no live model has been called.
-  Default model quality, real SDK exception shapes, cost, and latency remain
-  unverified.
+- **Status:** Client/config path implemented and exercised through clean live
+  OpenRouter runs on the Helpline and Warehouse corpora. Those runs prove the
+  configured success path and real latency only; wider provider exception
+  shapes, representative quality, and cost remain unverified.
 
 ### Failure contract
 
@@ -898,6 +901,11 @@ false-success `done` run.
     while the first holds the lock in either active status.
   - A waiting run's batch is formed when it starts: a file that arrived while
     it waited belongs to it, and to the run ahead of it never.
+- **Live confirmation, 2026-08-25:** MCP starts while a project run was at
+  Review produced a visible `queued` run; another start deduplicated to that
+  same run id, finishing Review released it, and it processed the file that
+  arrived while waiting. A later explicit queued run over an already-settled
+  signature ended honestly as `no changes`.
   - The run behind is not lost when the one ahead ends, whether that ending is
     `done` or `failed`.
 - **Known limitation:** A run at Review holds the project lock as long as the
@@ -1206,7 +1214,8 @@ a symlink after creation is not re-checked.
   `sample-projects`); background reading stays under `documentation/`.
 - Build thin end-to-end slices, risky runtime properties first, UI last.
 - Slice 1 is complete: `.md` Ingest → Extract → Match → Review → Commit,
-  PostgreSQL, its six endpoints, human gate, export, and real-process resume.
+  PostgreSQL, its eight HTTP operations, human gate, export, and real-process
+  resume.
 - The formats and types slice is built: four readers, the page limit, the
   document-type enum and its buckets, and per-format citation places. The two
   synthetic corpora that exercised it were removed 2026-08-18 for the
@@ -1214,7 +1223,7 @@ a symlink after creation is not re-checked.
 - The rules and findings slice is built: Examine, the `findings` table, rules
   frozen per run, and the attachment audit event. Every rule lives in
   `config/rules.yaml`.
-- The MCP slice is built: its six tools mounted in the same process over the
+- The MCP slice is built: its eight tools mounted in the same process over the
   same core functions the endpoints call.
 - The incremental update slice is built: the watched folder, the read-once
   rule keyed by name or content, the rules-only route, and the byte-identical
@@ -1230,8 +1239,8 @@ a symlink after creation is not re-checked.
   for. The seventh surface on both doors was `GET /runs`/`list_runs`, then
   `GET /projects`/`list_projects` replaced it in place (2026-08-15) once the
   screen became projects, and inside each project its runs. Every planned
-  slice is now built; what remains is the open fresh-clone and image-only
-  verification and the first live-model run.
+  slice is now built. The first clean live-model runs and no-bind image proof
+  are complete; only the literal fresh-clone walkthrough remains open.
 
 ### Brief-behaviour acceptance summary
 
@@ -1242,8 +1251,8 @@ a symlink after creation is not re-checked.
 | 3 | Human gate | Mixed decisions, incomplete-review refusal, export gate | Verified in slice 1 scope |
 | 4 | Machine drive | Full API flow, then same flow through MCP | Both halves verified |
 | 5 | Never bluff | Unfindable quote rejected; unknown status honest | Citation half verified |
-| 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Open |
-| 7 | Automated proof | Key-free full suite with real paths | 130 Python and 13 front-end tests verified; later minima remain |
+| 6 | Stranger runs | Fresh clone, exact README commands, expected outcome | Image-only setup verified; literal fresh clone remains open |
+| 7 | Automated proof | Key-free full suite with real paths | 302 Python and 116 front-end tests verified |
 | 8 | No document authority | Hostile document cannot approve/commit/export | Verified by test fixtures that build their own buried-instruction document (D08) |
 | 9 | Concurrent isolation | Two projects parallel; same project queues | Verified for both halves |
 | 10 | Cost/time visibility | Per-stage duration + estimated cost from configured rates | Verified with the scripted client; no provider cost measured |
@@ -1253,7 +1262,8 @@ a symlink after creation is not re-checked.
 - Required core tests use the scripted model and real PostgreSQL. Kill proof
   uses a separate process and real `SIGKILL`, not an in-process exception.
 - Verified development test command: `docker compose run --rm app pytest`.
-  Fresh-clone proof is still open; do not present it as completed.
+  A built image with no source bind has migrated a fresh PostgreSQL database
+  and served health, UI and favicon; literal fresh-clone proof is still open.
 - Planned run is `docker compose up`; migrations run on startup. A live run
   needs an OpenRouter key, tests do not.
 - **Network bind:** Loopback-only host exposure is implemented: the
@@ -1262,8 +1272,9 @@ a symlink after creation is not re-checked.
   and publishes `127.0.0.1:8000:8000`, matching `db`. Proven by
   `tests/infrastructure/test_loopback_bind.py`.
 - **Known development limitation:** Broad `.:/workspace` bind mount is retained
-  for iteration. Remove/narrow it and clear stale dev DB before final
-  image-only verification.
+  for iteration. It is not release proof; the separate no-bind run is. The
+  application image now builds the production UI in a pinned Node stage and
+  copies only `ui/dist` into the Python runtime image.
 
 ## Open decisions
 
@@ -1278,10 +1289,11 @@ a symlink after creation is not re-checked.
 
 ## Known limitations and unverified assumptions
 
-- No live model call has run; provider quality, exception shapes, latency, and
-  cost are unverified.
-- Register-size and short-document assumptions remain unmeasured on a full
-  corpus; no live-model run has exercised one yet.
+- Live success-path model calls have run on two synthetic corpora; broad
+  provider quality, exception shapes, representative latency, and cost remain
+  unverified.
+- Register-size assumptions remain unmeasured beyond the two small live
+  synthetic corpora.
 - The page limit binds `.pdf` only; no other declared format reports pages.
 - A handover summary that lists requirements, in a run that never ends
   `done`, is read again by the next run.
@@ -1298,15 +1310,16 @@ a symlink after creation is not re-checked.
   read rather than OCR'd; chunking and OCR are not planned for V1.
 - Timing and cost are dropped (D16). Nothing reports a duration, a token count
   or a cost; which stages a run finished is read from `runs.finished_stages`.
-- The review screen is built by Node, which the application image does not
-  carry, so `ui/dist` must be built before the screen can be served.
+- The review screen is built in the image's pinned Node stage; the final Python
+  image carries `ui/dist` and no Node runtime.
 - The watcher holds what it last saw in memory, so a restart re-baselines every
   folder and a file that arrived while the application was down starts no run
   of its own.
 - Neither door authenticates a caller, and the MCP endpoint answers `421` to a
   `Host` header other than `localhost` or `127.0.0.1`.
-- A finding raised against a register row is never re-examined by a later run;
-  a rules change re-examines the register the next run touches it.
+- A later applicable run may raise a newer finding or stay silent. Silence does
+  not erase an approved finding; a newer explicit decision for the same rule
+  and row replaces or clears the register view.
 
 ## Superseded index
 

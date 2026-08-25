@@ -15,8 +15,9 @@ decision remains in History.
 
 The revised never-do test was observed failing against the old projection, then
 passed with the implementation. The focused register/Examine regression set is
-**13 passed, 1 known third-party warning** against real PostgreSQL. Full-suite
-and live-corpus verification remain pending until the repair branch closes.
+**13 passed, 1 known third-party warning** against real PostgreSQL. The clean
+live Helpline sequence kept the approved handover finding through the later
+testing run, while History retained the decision that raised it.
 
 The second checkpoint gives explicit client scope exclusions their own typed
 extraction path. They never enter the positive requirements list and never
@@ -26,8 +27,9 @@ leaves the row unchanged, and an unmatched exclusion is reported as `not
 attached`. Four end-to-end scope tests now cover the same-batch approval,
 rejection, unmatched case, and a later exclusion against a committed row; the
 focused extraction/schema/full-flow set is **34 passed** against real
-PostgreSQL. Wider regressions and the live warehouse corpus remain pending
-until the repair branch closes.
+PostgreSQL. A clean live Warehouse corpus then produced one human-gated scope
+exclusion instead of a second positive row; a later MCP-only exclusion update
+did the same against a committed row.
 
 The third checkpoint removes mixed-trigger duplicates. If a manual or queued
 run settles every file in the watcher's changed signature, the watcher marks
@@ -46,6 +48,19 @@ reference under `pydantic-settings==2.15.0`; its upstream issue is still open,
 so it is recorded as a third-party limitation rather than suppressed or
 patched through a private SDK import. The production UI build succeeds and the
 full front-end suite is **116 passed across 50 files**.
+
+Release verification is now **302 Python passed, 1 known third-party warning**
+against real PostgreSQL and **116 front-end passed across 50 files**; the UI
+production build succeeds. The in-app Browser drove the four Helpline files
+sequentially, a second project in batches, the three-column screen, both rails,
+the review buttons, History, a 900px viewport with no horizontal body overflow,
+and a clean console. Real MCP discovery returned exactly eight tools. Back-to-
+back starts exposed one queued run in the UI, repeated starts deduplicated, the
+queued run started after review finished, and MCP/HTTP register, history and run
+payloads matched for all three live projects. A no-bind image first reproduced
+the hidden 503 UI packaging gap; the final multi-stage image now migrates a
+fresh PostgreSQL database and serves health, `/ui/`, and `/ui/favicon.svg` with
+HTTP 200.
 
 ## Snapshot — 2026-08-24, branch `brief-2-screen`
 

@@ -416,8 +416,9 @@ The rest of the limits:
 - **Nothing checks who is calling** — not the screen, not the API, not the
   tools. The MCP endpoint refuses any request whose `Host` is not `localhost`
   or `127.0.0.1`, so another machine cannot reach it as it stands.
-- **The screen is built by Node, which the application image does not have.**
-  `ui/dist` has to be built on your machine before `docker compose up`.
+- **The production image builds the screen in a pinned Node stage.** The final
+  Python image contains `ui/dist` but no Node runtime. The broad Compose source
+  bind remains a development convenience, not proof of packaged contents.
 - **The pinned MCP SDK emits one startup warning under the resolved
   `pydantic-settings==2.15.0`.** Its internal `Settings.lifespan` annotation is
   left unresolved; MCP discovery and flow still pass. The upstream issue is
