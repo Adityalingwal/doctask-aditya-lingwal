@@ -16,37 +16,41 @@ watcher reacts, is an edit here, never a code change.
 ## Editing `watcher.yaml`
 
 The shipped values are `poll_seconds: 2` and `quiet_seconds: 5`. Both must be
-numbers above zero; anything else stops the application at startup, naming the
-key and what is wrong with it.
+numbers above zero; anything else stops the application at startup and names
+the key. In short: the folder is checked every 2 seconds, and a new file
+starts a run once the folder has been quiet for 5 seconds.
 
-- Whatever the watcher first sees in a project's folder is not an arrival. It
-  starts nothing by itself, and `POST /runs` reads it exactly as before.
-- A file that arrives afterwards starts a run once the folder has stopped
-  changing for `quiet_seconds`.
-- Nothing starts while that project already has a run running, at review, or
-  queued. Files that arrive during a review wait for the run after it.
-- If a manual or queued run handles the settled arrival first, the watcher
-  marks that folder signature served instead of writing a duplicate `no
-  changes` run. A later file that missed that run still starts the next one.
-- The watcher forgets what it has seen when the application restarts, so files
-  that arrived while it was down are read by the next run started by hand.
+- Files already in the folder when the application starts do not start a run
+  — only a file that arrives afterwards does.
+- One run at a time per project: files arriving during a run or a review wait
+  for the next run.
+- After a restart the watcher starts fresh, so files that arrived while it
+  was down are read by the next run started by hand.
 
 ## Editing `rules.yaml`
 
-Each rule needs an `id` and a `text`, and may carry `params` the text refers to,
-such as `max_days`. Ids must be unique. Every rule the register is judged
+Each rule needs a unique `id` and a `text`. Every rule the register is judged
 against lives in this file; no rule is judged anywhere else.
 
-A run parses this file when it starts and keeps that copy for its whole life,
-alongside a fingerprint of the parsed rules — comments and layout do not change
-the fingerprint, a value such as `max_days` does. So:
+A rule may also carry `applies_when` — a list of document kinds. A rule with
+`applies_when` waits: it is not checked until the project has read at least
+one document of every kind it lists. All four shipped rules use it:
 
-- An edit applies to the **next run**. It never changes what a run already
-  under way is examining, and it never re-opens a run that already finished.
-- A run resumed after a crash still uses the rules it froze, even if the file
-  changed or broke in the meantime.
-- A file that cannot be read as a rules list fails the run at its first stage,
-  naming what is wrong and what to fix. It is never treated as "no rules".
+    - id: R4
+      text: "Every written requirement must have a testing outcome."
+      applies_when:
+        - testing feedback
 
-There is no per-rule change detection: the register is small, so a rules change
-means the whole register is examined again in one call by the next run.
+R4 lists `testing feedback`, so it stays silent until a testing report
+arrives. The four allowed values are `meeting notes`, `client requirements
+document`, `handover summary`, `testing feedback`. A rule with no
+`applies_when` is checked on every run.
+
+A run reads this file once, when it starts, and keeps that copy for its whole
+life. So:
+
+- An edit applies to the next run, never to a run already under way or
+  already finished.
+- A run resumed after a crash still uses the rules it started with.
+
+When the rules change, the next run examines the whole register again.
